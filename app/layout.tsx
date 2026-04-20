@@ -1,9 +1,6 @@
 import type { Metadata } from "next";
-import { Signika, Geist } from "next/font/google";
+import { Signika } from "next/font/google";
 import "./globals.css";
-import { cn } from "@/lib/utils";
-
-const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 
 const signika = Signika({
   subsets: ["latin"],
@@ -24,7 +21,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="pt-BR" className={cn("font-sans", geist.variable)}>
+    <html lang="pt-BR">
       <body className={`${signika.variable} font-sans antialiased`}>
         {children}
       </body>
