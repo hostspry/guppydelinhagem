@@ -62,7 +62,7 @@ export default function Navbar() {
             href="https://wa.me/27997594173"
             target="_blank"
             rel="noopener noreferrer"
-            className="hidden sm:flex items-center gap-2 text-sm font-light hover:text-accent transition-colors"
+            className="hidden sm:flex items-center gap-2 text-sm font-light text-white hover:text-accent transition-colors"
           >
             <MapPin size={16} />
             <span>Rastreamento de Pedidos</span>
