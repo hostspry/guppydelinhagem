@@ -50,15 +50,8 @@ COPY --from=builder --chown=nextjs:nodejs /app/prisma.config.ts ./prisma.config.
 # 4. Prisma Client gerado (custom output configurado no schema)
 COPY --from=builder --chown=nextjs:nodejs /app/lib/generated/prisma ./lib/generated/prisma
 
-# 5. Prisma CLI + engines + dependências transitivas
-# (Prisma 7 + pnpm: COPY dereferencia symlinks, traz conteúdo real do .pnpm store)
-# Lista baseada na discussão oficial prisma/prisma#28759
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/prisma ./node_modules/prisma
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@prisma ./node_modules/@prisma
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/dotenv ./node_modules/dotenv
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/effect ./node_modules/effect
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/fast-check ./node_modules/fast-check
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/pure-rand ./node_modules/pure-rand
+# 5. node_modules completo (necessário para resolver a árvore .pnpm do Prisma 7)
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules ./node_modules
 
 # 6. Entrypoint
 COPY --from=builder --chown=nextjs:nodejs /app/scripts/entrypoint.sh ./entrypoint.sh
