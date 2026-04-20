@@ -36,23 +36,31 @@ ENV NEXT_TELEMETRY_DISABLED=1
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
-# --- Output standalone do Next.js ---
+# 1. Output standalone do Next.js (inclui node_modules mínimo para o Next)
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+
+# 2. Assets estáticos e public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 
-# --- Prisma: schema + config ---
+# 3. Prisma: schema + config
 COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
 COPY --from=builder --chown=nextjs:nodejs /app/prisma.config.ts ./prisma.config.ts
 
-# --- Prisma Client gerado (custom output configurado no schema) ---
+# 4. Prisma Client gerado (custom output configurado no schema)
 COPY --from=builder --chown=nextjs:nodejs /app/lib/generated/prisma ./lib/generated/prisma
 
-# --- Prisma CLI + engines (necessários para rodar migrate deploy em runtime) ---
+# 5. Prisma CLI + engines + dependências transitivas
+# (Prisma 7 + pnpm: COPY dereferencia symlinks, traz conteúdo real do .pnpm store)
+# Lista baseada na discussão oficial prisma/prisma#28759
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/prisma ./node_modules/prisma
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@prisma ./node_modules/@prisma
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/dotenv ./node_modules/dotenv
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/effect ./node_modules/effect
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/fast-check ./node_modules/fast-check
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/pure-rand ./node_modules/pure-rand
 
-# --- Script de entrypoint que aplica migrations e inicia o servidor ---
+# 6. Entrypoint
 COPY --from=builder --chown=nextjs:nodejs /app/scripts/entrypoint.sh ./entrypoint.sh
 RUN chmod +x ./entrypoint.sh
 
