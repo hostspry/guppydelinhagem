@@ -45,7 +45,16 @@
       "Bash(pnpm install *)",
       "Bash(git add *)",
       "Bash(git commit -m ' *)",
-      "Bash(pnpm dlx *)"
+      "Bash(pnpm dlx *)",
+      "Bash(pnpm add *)",
+      "Bash(pnpm prisma *)",
+      "Bash(mkdir -p app/\\\\\\(public\\\\\\)/loja/\\\\[slug\\\\])",
+      "Bash(mkdir -p app/minha-conta/pedidos/\\\\[id\\\\])",
+      "Bash(mkdir -p app/admin/produtos/\\\\[id\\\\])",
+      "Bash(mkdir -p app/admin/pedidos/\\\\[id\\\\])",
+      "Bash(pnpm dev *)",
+      "Bash(curl -s http://localhost:3000/api/health)",
+      "Bash(curl -s http://localhost:3000)"
     ]
   }
 }
