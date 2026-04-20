@@ -29,7 +29,23 @@
       "Bash(grep \"woocommerce-Price-amount\\\\|amount.*R\\\\$\\\\|span.*price\" tmp_home.html)",
       "Bash(grep \"R\\\\$\\\\|375\\\\|380\\\\|250\\\\|312\")",
       "Bash(curl -s -L \"https://guppydelinhagem.com.br/conheca-os-guppy/\" --insecure -A \"Mozilla/5.0\" -o conheca.html)",
-      "Bash(curl -s -L \"https://guppydelinhagem.com.br/loja/\" --insecure -A \"Mozilla/5.0\" -o loja.html)"
+      "Bash(curl -s -L \"https://guppydelinhagem.com.br/loja/\" --insecure -A \"Mozilla/5.0\" -o loja.html)",
+      "Bash(command -v pnpm)",
+      "Bash(/c/Users/Manassés/AppData/Local/pnpm/pnpm --version)",
+      "Bash(corepack enable *)",
+      "Bash(pnpm --version)",
+      "Bash(npm install *)",
+      "Bash(/c/Users/Manassés/AppData/Roaming/npm/pnpm --version)",
+      "Bash(export PATH=\"/c/Users/Manassés/AppData/Roaming/npm:$PATH\")",
+      "Bash(mkdir -p /c/Users/Manassés/guppy-tmp)",
+      "Bash(pnpm create *)",
+      "Bash(cp -r app /c/Users/Manassés/guppydelinhagem/)",
+      "Bash(cp package.json pnpm-lock.yaml pnpm-workspace.yaml postcss.config.mjs tsconfig.json next.config.ts eslint.config.mjs next-env.d.ts /c/Users/Manassés/guppydelinhagem/)",
+      "Bash(cp .gitignore /c/Users/Manassés/guppydelinhagem/)",
+      "Bash(pnpm install *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(pnpm dlx *)"
     ]
   }
 }
