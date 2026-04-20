@@ -52,9 +52,11 @@ COPY --from=builder --chown=nextjs:nodejs /app/lib/generated/prisma ./lib/genera
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/prisma ./node_modules/prisma
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@prisma ./node_modules/@prisma
 
+# --- Script de entrypoint que aplica migrations e inicia o servidor ---
+COPY --from=builder --chown=nextjs:nodejs /app/scripts/entrypoint.sh ./entrypoint.sh
+RUN chmod +x ./entrypoint.sh
+
 USER nextjs
 EXPOSE 3000
 
-# Aplica migrations pendentes e inicia o servidor.
-# Se não houver migrations ou o banco já estiver atualizado, segue direto pro server.
-CMD npx --no-install prisma migrate deploy && node server.js
+CMD ["./entrypoint.sh"]

@@ -1,0 +1,2 @@
+# Força LF em scripts shell (Alpine/Linux nao aceita CRLF)
+*.sh text eol=lf
