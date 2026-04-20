@@ -1,6 +1,6 @@
 export default function HomePage() {
   return (
-    <main className="container-site py-16 space-y-12">
+    <div className="container-site py-16 space-y-12">
       {/* Tipografia */}
       <section className="space-y-4">
         <h1>Guppy de Linhagem</h1>
@@ -75,6 +75,6 @@ export default function HomePage() {
         <p className="font-semibold text-lg">600 — SemiBold: Guppy de Linhagem</p>
         <p className="font-bold text-lg">700 — Bold: Guppy de Linhagem</p>
       </section>
-    </main>
+    </div>
   );
 }
