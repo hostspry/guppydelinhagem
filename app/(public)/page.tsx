@@ -74,24 +74,40 @@ export default function HomePage() {
               </Link>
             </div>
 
-            {/* Coluna direita — imagem orgânica */}
+            {/* Coluna direita — forma orgânica verde + peixe */}
             <div className="relative order-1 md:order-2 flex justify-center md:justify-end">
-              {/* Pontilhado decorativo rosa */}
-              <div
-                className="absolute -top-4 -right-4 w-28 h-28 opacity-70 z-10 pointer-events-none"
-                style={{
-                  backgroundImage: "radial-gradient(#FF035C 2px, transparent 2px)",
-                  backgroundSize: "16px 16px",
-                }}
-              />
-              <div className="relative w-full max-w-sm md:max-w-md aspect-square">
+              {/* Container com forma verde de fundo */}
+              <div className="relative w-full max-w-sm md:max-w-md h-[400px] md:h-[480px]">
+                {/* Imagem de fundo verde/habitat */}
                 <Image
-                  src="/assets/home/hero-fish.png"
-                  alt="Guppy de linhagem premium"
+                  src="/assets/home/hero-background.png"
+                  alt=""
                   fill
                   priority
-                  className="object-cover rounded-[50%_30%_60%_40%_/_40%_60%_30%_50%]"
+                  className="object-contain object-center"
                   sizes="(max-width: 768px) 80vw, 40vw"
+                  aria-hidden="true"
+                />
+                {/* Peixe principal centralizado sobre a forma */}
+                <div className="absolute inset-0 flex items-center justify-center p-8">
+                  <div className="relative w-full h-full">
+                    <Image
+                      src="/assets/home/hero-fish.png"
+                      alt="Guppy de linhagem premium"
+                      fill
+                      priority
+                      className="object-contain rounded-[50%_30%_60%_40%_/_40%_60%_30%_50%]"
+                      sizes="(max-width: 768px) 70vw, 35vw"
+                    />
+                  </div>
+                </div>
+                {/* Pontilhado decorativo rosa — canto inferior direito */}
+                <div
+                  className="absolute bottom-2 right-2 w-24 h-24 opacity-70 z-10 pointer-events-none"
+                  style={{
+                    backgroundImage: "radial-gradient(#FF035C 2px, transparent 2px)",
+                    backgroundSize: "16px 16px",
+                  }}
                 />
               </div>
             </div>
@@ -145,15 +161,21 @@ export default function HomePage() {
         <div className="container-site">
           <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
             {/* Card escuro — História de Vitórias (60%) */}
-            <div
-              className="md:col-span-3 relative rounded-[20px] overflow-hidden flex flex-col justify-end p-10 min-h-[400px]"
-              style={{
-                background: "linear-gradient(135deg, #07366A 0%, #0a4a8f 100%)",
-              }}
-            >
-              {/* Pontilhado decorativo */}
+            <div className="md:col-span-3 relative rounded-[20px] overflow-hidden flex flex-col justify-end p-10 min-h-[400px]">
+              {/* Imagem de fundo */}
+              <Image
+                src="/assets/home/vitorias-bg.jpg"
+                alt=""
+                fill
+                className="object-cover object-center"
+                sizes="(max-width: 768px) 100vw, 60vw"
+                aria-hidden="true"
+              />
+              {/* Overlay navy */}
+              <div className="absolute inset-0 bg-primary/70" />
+              {/* Pontilhado decorativo âmbar */}
               <div
-                className="absolute top-6 right-6 w-24 h-24 opacity-20 pointer-events-none"
+                className="absolute top-6 right-6 w-24 h-24 opacity-20 pointer-events-none z-10"
                 style={{
                   backgroundImage: "radial-gradient(#FAB82A 2px, transparent 2px)",
                   backgroundSize: "14px 14px",
@@ -189,6 +211,23 @@ export default function HomePage() {
                   backgroundSize: "14px 14px",
                 }}
               />
+              {/* Peixes decorativos SVG — silhuetas pretas */}
+              <svg
+                className="absolute top-8 right-8 opacity-30 pointer-events-none rotate-12"
+                width="64" height="40" viewBox="0 0 64 40" fill="none"
+                aria-hidden="true"
+              >
+                <path d="M2 20 C8 8, 20 4, 32 8 C44 12, 54 10, 62 4 C58 14, 58 26, 62 36 C54 30, 44 28, 32 32 C20 36, 8 32, 2 20Z" fill="#000" />
+                <path d="M62 4 L56 12 L62 20 Z" fill="#000" />
+              </svg>
+              <svg
+                className="absolute top-24 right-4 opacity-25 pointer-events-none -rotate-6"
+                width="44" height="28" viewBox="0 0 64 40" fill="none"
+                aria-hidden="true"
+              >
+                <path d="M2 20 C8 8, 20 4, 32 8 C44 12, 54 10, 62 4 C58 14, 58 26, 62 36 C54 30, 44 28, 32 32 C20 36, 8 32, 2 20Z" fill="#000" />
+                <path d="M62 4 L56 12 L62 20 Z" fill="#000" />
+              </svg>
               <div className="relative z-10 space-y-4">
                 <p className="text-white/80 text-sm font-light">Sobre os Guppy</p>
                 <h3 className="text-white text-2xl font-semibold leading-snug">

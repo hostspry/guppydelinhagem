@@ -1,14 +1,53 @@
-node_modules
-.next
+# Git
 .git
+.gitattributes
+.gitignore
+
+# Dependências locais (vêm do stage "deps")
+node_modules
+.pnpm-store
+
+# Next.js build cache
+.next
+out
+
+# Env (CapRover injeta via variáveis)
 .env
 .env.local
 .env.*.local
+
+# OS / Editor
 .DS_Store
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-*.log
-coverage
+Thumbs.db
 .vscode
 .idea
+*.swp
+*.swo
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+*.log
+
+# Documentação de desenvolvimento (não necessária no container)
+conheca.html
+loja.html
+PAGES_STRUCTURE.md
+HOME_STRUCTURE.md
+SOBRE_STRUCTURE.md
+CONTATOS_STRUCTURE.md
+DESIGN_TOKENS.md
+VISUAL_NOTES.md
+POLIMENTO.md
+README.md
+
+# Testes
+coverage
+*.test.ts
+*.test.tsx
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
