@@ -42,97 +42,63 @@ export default function HomePage() {
       <WaveDivider fill="#ECE7E8" flip />
 
       {/* ── Seção 1: Hero ── */}
-      <section className="bg-[#ECE7E8] relative overflow-hidden min-h-[520px] md:min-h-[580px]">
-        {/* Forma verde — ocupa metade direita, sangra até a borda */}
-        <div className="hidden md:block absolute right-0 top-0 h-full w-[52%] pointer-events-none">
-          <Image
-            src="/assets/home/hero-background.png"
-            alt=""
-            fill
-            priority
-            className="object-cover object-left"
-            sizes="52vw"
-            aria-hidden="true"
-          />
-          {/* Peixe principal centralizado sobre a forma */}
-          <div className="absolute inset-0 flex items-center justify-center p-10">
-            <div className="relative w-72 h-72 lg:w-80 lg:h-80">
-              <Image
-                src="/assets/home/hero-fish.png"
-                alt="Guppy de linhagem premium"
-                fill
-                priority
-                className="object-contain rounded-[50%_30%_60%_40%_/_40%_60%_30%_50%]"
-                sizes="320px"
-              />
-            </div>
-          </div>
-        </div>
+      <section className="bg-[#ECE7E8] relative overflow-hidden">
+        <div className="container-site py-16 md:py-24">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-10 items-center">
 
-        {/* Mobile: imagem compacta no topo */}
-        <div className="md:hidden relative h-56 w-full">
-          <Image
-            src="/assets/home/hero-background.png"
-            alt=""
-            fill
-            priority
-            className="object-cover object-center"
-            aria-hidden="true"
-          />
-          <div className="absolute inset-0 flex items-center justify-center p-6">
-            <div className="relative w-44 h-44">
-              <Image
-                src="/assets/home/hero-fish.png"
-                alt="Guppy de linhagem premium"
-                fill
-                className="object-contain"
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Conteúdo texto — coluna esquerda */}
-        <div className="container-site relative z-10 py-12 md:py-20">
-          <div className="md:max-w-[48%] space-y-6">
-            <div className="space-y-1">
-              <h3 className="text-xl font-medium text-text">
-                Seu Guppy{" "}
-                <span className="text-accent font-semibold">Novo Aqui!</span>
-              </h3>
-              {/* H1 com pontilhado rosa atrás de "Linhagem" */}
-              <div className="relative inline-block w-full">
-                <div
-                  className="absolute rounded-full pointer-events-none opacity-60"
-                  style={{
-                    backgroundImage: "radial-gradient(#FF035C 2px, transparent 2px)",
-                    backgroundSize: "10px 10px",
-                    width: "140px",
-                    height: "48px",
-                    bottom: "4px",
-                    left: "120px",
-                    zIndex: 0,
-                  }}
-                />
-                <h1 className="relative z-10 text-primary font-bold leading-tight">
+            {/* Coluna esquerda — texto */}
+            <div className="space-y-6 order-2 md:order-1">
+              <div className="space-y-2">
+                <h3 className="text-xl font-medium text-text">
+                  Seu Guppy{" "}
+                  <span className="text-accent font-semibold">Novo Aqui!</span>
+                </h3>
+                <h1 className="relative text-primary font-bold leading-tight inline-block">
                   Guppys de{" "}
-                  <span className="text-secondary">Linhagem</span>
+                  <span className="relative text-secondary">
+                    <span
+                      className="absolute -inset-y-1 -inset-x-3 opacity-40 pointer-events-none"
+                      style={{
+                        backgroundImage: "radial-gradient(#FF035C 1.5px, transparent 1.5px)",
+                        backgroundSize: "10px 10px",
+                        borderRadius: "50%",
+                        zIndex: 0,
+                      }}
+                      aria-hidden="true"
+                    />
+                    <span className="relative z-10">Linhagem</span>
+                  </span>
                 </h1>
               </div>
+              <p className="text-text font-light text-base leading-relaxed max-w-md">
+                Peixes selecionados, saudáveis e com genética apurada para aquaristas exigentes.{" "}
+                <strong className="font-medium">Transforme seu aquário com beleza, qualidade e vitalidade.</strong>{" "}
+                💧 Envio seguro para todo o Brasil!
+              </p>
+              <Link
+                href="/loja"
+                className="inline-block bg-primary text-white font-semibold px-8 py-3.5 rounded-pill hover:bg-accent hover:text-[#302f2f] transition-all text-base"
+              >
+                Ver Loja
+              </Link>
             </div>
-            <p className="text-text font-light text-base leading-relaxed max-w-md">
-              Peixes selecionados, saudáveis e com genética apurada para aquaristas exigentes.{" "}
-              <strong className="font-medium">Transforme seu aquário com beleza, qualidade e vitalidade.</strong>{" "}
-              💧 Envio seguro para todo o Brasil!
-            </p>
-            <Link
-              href="/loja"
-              className="inline-block bg-primary text-white font-semibold px-8 py-3.5 rounded-pill hover:bg-accent hover:text-[#302f2f] transition-all text-base"
-            >
-              Ver Loja
-            </Link>
+
+            {/* Coluna direita — foto do peixe com blob */}
+            <div className="order-1 md:order-2 flex justify-center md:justify-end">
+              <div className="relative w-[320px] h-[320px] md:w-[420px] md:h-[420px]">
+                <Image
+                  src="/assets/home/hero-fish.png"
+                  alt="Guppy de linhagem premium"
+                  fill
+                  priority
+                  className="object-cover rounded-[50%_30%_60%_40%_/_40%_60%_30%_50%]"
+                  sizes="(max-width: 768px) 320px, 420px"
+                />
+              </div>
+            </div>
+
           </div>
         </div>
-
         <WaveDivider fill="#ffffff" />
       </section>
 
