@@ -15,3 +15,13 @@
 
 ## Home — Seção 5 (História de Vitórias)
 - [ ] Imagem de fundo do card escuro — verificar se ficou com gradiente navy ou imagem real
+
+## Página /sobre-nos
+- [ ] Imagem da seção "História": usando prod-dragon-blue.png como placeholder — enviar foto real da farm/família
+
+## Página /contatos
+- [ ] E-mail contato@guppydelinhagem.com.br — confirmar endereço real
+- [ ] Integrar envio de e-mail com Resend (backend) — deixado sem backend na Etapa 5
+
+## Página /conheca-os-guppy
+- [ ] Revisar textos das respostas do FAQ com informações mais específicas da farm se necessário

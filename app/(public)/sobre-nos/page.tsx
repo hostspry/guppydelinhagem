@@ -1,37 +1,39 @@
 import Image from "next/image";
 import Link from "next/link";
+import PageBanner from "@/components/site/PageBanner";
 import TestimonialsSection from "@/components/home/TestimonialsSection";
 import CtaWhatsapp from "@/components/site/CtaWhatsapp";
 
 export default function SobreNosPage() {
   return (
     <>
-      {/* ── Banner topo ── */}
-      <div className="relative h-[250px] bg-secondary overflow-hidden flex flex-col items-center justify-center text-center px-4">
-        <div className="absolute inset-0 bg-black/40" />
-        <div className="relative z-10 space-y-2">
-          <h2 className="text-white font-bold">Sobre Nós</h2>
-          <p className="text-white/90 font-light text-lg">
+      <PageBanner
+        title="Sobre Nós"
+        subtitle={
+          <>
             Onde a Linhagem de Guppys Se Torna{" "}
             <span className="text-accent font-semibold">Arte e Tradição</span>
-          </p>
-        </div>
-      </div>
+          </>
+        }
+      />
 
       {/* ── História da Empresa ── */}
       <section className="bg-white py-20">
         <div className="container-site">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-start">
-            <div className="relative aspect-[4/3] rounded-2xl overflow-hidden">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-12 items-start">
+            {/* Imagem (40%) */}
+            <div className="md:col-span-2 relative aspect-[4/3] rounded-2xl overflow-hidden">
               <Image
-                src="/assets/home/hero-fish.png"
-                alt="Marchezi Guppy Farm — história"
+                src="/assets/home/prod-dragon-blue.png"
+                alt="Marchezi Guppy Farm"
                 fill
                 className="object-cover"
-                sizes="(max-width: 768px) 100vw, 50vw"
+                sizes="(max-width: 768px) 100vw, 40vw"
               />
             </div>
-            <div className="space-y-5">
+
+            {/* Texto (60%) */}
+            <div className="md:col-span-3 space-y-5">
               <h2 className="text-primary text-3xl font-semibold">
                 Nossa <span className="text-secondary">História</span>
               </h2>
@@ -59,10 +61,10 @@ export default function SobreNosPage() {
         </div>
       </section>
 
-      {/* ── Conquistas e Títulos ── */}
+      {/* ── Conquistando Espaço ── */}
       <section className="bg-[#ECE7E8]/50 py-16">
         <div className="container-site max-w-3xl space-y-6">
-          <p className="text-accent font-semibold text-sm uppercase tracking-wide">
+          <p className="text-accent font-semibold text-sm uppercase tracking-widest">
             Conquistando Espaço
           </p>
           <h2 className="text-primary text-3xl font-semibold">
@@ -82,16 +84,16 @@ export default function SobreNosPage() {
               Esse ano também marcou nossa entrada no cenário mundial, com duas conquistas históricas no
               III WORLD GUPPY CONTEST VIRTUAL – 2023:
             </p>
-            <ul className="space-y-2 pl-4">
-              <li className="flex items-start gap-2">
-                <span className="text-xl leading-relaxed">🥇</span>
+            <ul className="space-y-3 pl-2">
+              <li className="flex items-start gap-3">
+                <span className="text-xl shrink-0">🥇</span>
                 <span>
                   <strong className="font-medium">Guppy Full Black</strong> — campeão mundial na
                   categoria Delta Tail – ¾ Black - Moscow Black.
                 </span>
               </li>
-              <li className="flex items-start gap-2">
-                <span className="text-xl leading-relaxed">🥇</span>
+              <li className="flex items-start gap-3">
+                <span className="text-xl shrink-0">🥇</span>
                 <span>
                   <strong className="font-medium">Blue Dragon Halfmoon</strong> — campeão mundial na
                   categoria Half Moon.
@@ -102,14 +104,12 @@ export default function SobreNosPage() {
               Em 2024, a linhagem Full Black conquistou o bicampeonato no World Guppy Contest Virtual.
             </p>
           </div>
-          <div className="pt-2">
-            <Link
-              href="/loja"
-              className="inline-block bg-primary text-white font-semibold px-8 py-3.5 rounded-pill hover:bg-accent hover:text-[#302f2f] transition-all text-base"
-            >
-              Ver Loja
-            </Link>
-          </div>
+          <Link
+            href="/loja"
+            className="inline-block bg-primary text-white font-semibold px-8 py-3.5 rounded-pill hover:bg-accent hover:text-[#302f2f] transition-all text-base"
+          >
+            Ver Loja
+          </Link>
         </div>
       </section>
 
