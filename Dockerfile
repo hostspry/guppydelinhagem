@@ -1,4 +1,3 @@
-# syntax=docker/dockerfile:1.6
 # ===== Estágio 1: Dependências =====
 FROM node:20-alpine AS deps
 RUN apk add --no-cache libc6-compat openssl
@@ -7,11 +6,7 @@ WORKDIR /app
 # Copia apenas manifestos — mudanças em código NÃO invalidam esta camada
 COPY package.json pnpm-lock.yaml* ./
 
-# Monta pnpm store como cache persistente entre builds
-RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
-    corepack enable pnpm && \
-    pnpm config set store-dir /root/.local/share/pnpm/store && \
-    pnpm install --frozen-lockfile
+RUN corepack enable pnpm && pnpm install --frozen-lockfile
 
 # ===== Estágio 2: Build =====
 FROM node:20-alpine AS builder
