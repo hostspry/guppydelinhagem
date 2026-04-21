@@ -1,6 +1,6 @@
-export default function WaveDivider({ fill = "#07366A" }: { fill?: string }) {
+export default function WaveDivider({ fill = "#07366A", flip = false }: { fill?: string; flip?: boolean }) {
   return (
-    <div className="w-full overflow-hidden leading-[0]">
+    <div className="w-full overflow-hidden leading-[0]" style={flip ? { transform: "scaleY(-1)" } : undefined}>
       <svg
         viewBox="0 0 1440 60"
         xmlns="http://www.w3.org/2000/svg"
