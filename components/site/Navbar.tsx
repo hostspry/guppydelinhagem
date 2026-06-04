@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Truck, MapPin, User, ShoppingCart } from "lucide-react";
 import NavSearchInput from "./NavSearchInput";
 import NavBar3 from "./NavBar3";
+import { WHATSAPP_URL } from "@/lib/constants";
 
 function IconInstagram({ size = 16 }: { size?: number }) {
   return (
@@ -59,7 +60,7 @@ export default function Navbar() {
 
           {/* Direita: rastreamento */}
           <a
-            href="https://wa.me/27997594173"
+            href={WHATSAPP_URL}
             target="_blank"
             rel="noopener noreferrer"
             className="hidden sm:flex items-center gap-2 text-sm font-light text-white hover:text-accent transition-colors"

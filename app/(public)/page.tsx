@@ -1,13 +1,16 @@
 import Image from "next/image";
 import Link from "next/link";
 import CtaWhatsapp from "@/components/site/CtaWhatsapp";
-import HeroHome from "@/components/site/HeroHome";
-import HeroFeatures from "@/components/site/HeroFeatures";
+import { HeroSection } from "@/components/site/HeroSection";
 import SectionHeader from "@/components/home/SectionHeader";
 import CategoryCard from "@/components/home/CategoryCard";
 import ProductGrid from "@/components/home/ProductGrid";
 import TestimonialsSection from "@/components/home/TestimonialsSection";
 import { CATEGORIES, PRODUCTS_MOCK } from "@/lib/mock-data";
+
+// HeroSection consulta o banco — DATABASE_URL não está disponível no build do
+// CapRover. Marca dynamic pra DB query rodar em request-time, não build-time.
+export const dynamic = "force-dynamic";
 
 export default function HomePage() {
   const destaques = PRODUCTS_MOCK.filter((p) => p.destaque);
@@ -15,11 +18,8 @@ export default function HomePage() {
 
   return (
     <>
-      {/* ── Seção 1: Hero + diferenciais ── */}
-      <section className="relative overflow-hidden bg-[linear-gradient(135deg,#fafafa_0%,#f4f1f0_55%,#e8e1e1_100%)]">
-        <HeroHome />
-        <HeroFeatures />
-      </section>
+      {/* ── Seção 1: Hero ── */}
+      <HeroSection />
 
       {/* ── Seção 2: Principais Categorias ── */}
       <section className="bg-white py-20">

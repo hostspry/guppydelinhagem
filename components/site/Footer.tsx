@@ -1,6 +1,8 @@
 import Image from "next/image";
 import Link from "next/link";
-import { ChevronRight, Phone } from "lucide-react";
+import { ChevronRight } from "lucide-react";
+import { WhatsAppIcon } from "@/components/icons/WhatsAppIcon";
+import { WHATSAPP_URL, WHATSAPP_DISPLAY } from "@/lib/constants";
 import WaveDivider from "./WaveDivider";
 
 function IconInstagram({ size = 20 }: { size?: number }) {
@@ -52,7 +54,7 @@ const LINKS_UTEIS = [
   { href: "/loja", label: "Loja" },
   { href: "/minha-conta", label: "Minha Conta" },
   { href: "/carrinho", label: "Carrinho" },
-  { href: "https://wa.me/27997594173", label: "Rastreamento de Pedido", external: true },
+  { href: WHATSAPP_URL, label: "Rastreamento de Pedido", external: true },
 ];
 
 const SOCIAL = [
@@ -86,13 +88,13 @@ export default function Footer() {
                 Peixes selecionados, saudáveis e com genética apurada para aquaristas exigentes. Envio seguro para todo o Brasil.
               </p>
               <a
-                href="https://wa.me/27997594173"
+                href={WHATSAPP_URL}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 bg-accent text-[#302f2f] font-semibold text-sm px-5 py-2.5 rounded-pill hover:brightness-95 transition-all"
               >
-                <Phone size={15} />
-                27 99759-4173
+                <WhatsAppIcon className="w-4 h-4 text-[#25D366]" />
+                {WHATSAPP_DISPLAY}
               </a>
             </div>
 

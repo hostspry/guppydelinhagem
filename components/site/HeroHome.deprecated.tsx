@@ -1,3 +1,5 @@
+// ⚠️ DEPRECATED — substituído por HeroSection. Será removido
+// quando o novo hero estabilizar em produção.
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, MessageCircle, Star, Trophy } from "lucide-react";

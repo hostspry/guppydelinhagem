@@ -44,13 +44,13 @@ enum VideoPlatform {
 // ─────────────────────────────────────────────
 
 model User {
-  id        String    @id @default(cuid())
-  email     String    @unique
+  id        String   @id @default(cuid())
+  email     String   @unique
   senhaHash String?
   nome      String
   telefone  String?
-  role      UserRole  @default(CUSTOMER)
-  criadoEm DateTime  @default(now())
+  role      UserRole @default(CUSTOMER)
+  criadoEm  DateTime @default(now())
 
   enderecos Address[]
   pedidos   Order[]
@@ -102,10 +102,10 @@ model Product {
   altura         Decimal?    @db.Decimal(8, 2)
   ativo          Boolean     @default(true)
   categoryId     String
-  criadoEm      DateTime    @default(now())
-  atualizadoEm  DateTime    @updatedAt
+  criadoEm       DateTime    @default(now())
+  atualizadoEm   DateTime    @updatedAt
 
-  category   Category       @relation(fields: [categoryId], references: [id])
+  category   Category        @relation(fields: [categoryId], references: [id])
   imagens    ProductImage[]
   videos     ProductVideo[]
   waitlist   WaitlistEntry[]
@@ -140,7 +140,7 @@ model WaitlistEntry {
   userId     String?
   email      String
   notificado Boolean  @default(false)
-  criadoEm  DateTime @default(now())
+  criadoEm   DateTime @default(now())
 
   product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
   user    User?   @relation(fields: [userId], references: [id])
@@ -153,22 +153,22 @@ model WaitlistEntry {
 // ─────────────────────────────────────────────
 
 model Order {
-  id               String      @id @default(cuid())
-  numero           String      @unique
-  userId           String
-  subtotal         Decimal     @db.Decimal(10, 2)
-  desconto         Decimal     @default(0) @db.Decimal(10, 2)
-  frete            Decimal     @db.Decimal(10, 2)
-  total            Decimal     @db.Decimal(10, 2)
-  metodoPagamento  String
-  parcelas         Int         @default(1)
-  status           OrderStatus @default(PENDING)
-  mpPaymentId      String?
-  mpPreferenceId   String?
-  enderecoEntrega  Json
-  codigoRastreio   String?
-  meCalcId         String?
-  meShipmentId     String?
+  id              String      @id @default(cuid())
+  numero          String      @unique
+  userId          String
+  subtotal        Decimal     @db.Decimal(10, 2)
+  desconto        Decimal     @default(0) @db.Decimal(10, 2)
+  frete           Decimal     @db.Decimal(10, 2)
+  total           Decimal     @db.Decimal(10, 2)
+  metodoPagamento String
+  parcelas        Int         @default(1)
+  status          OrderStatus @default(PENDING)
+  mpPaymentId     String?
+  mpPreferenceId  String?
+  enderecoEntrega Json
+  codigoRastreio  String?
+  meCalcId        String?
+  meShipmentId    String?
   criadoEm        DateTime    @default(now())
   atualizadoEm    DateTime    @updatedAt
 
@@ -187,4 +187,62 @@ model OrderItem {
 
   order   Order   @relation(fields: [orderId], references: [id])
   product Product @relation(fields: [productId], references: [id])
+}
+
+// ─────────────────────────────────────────────
+// Hero / Home — slides editáveis e configurações globais
+// ─────────────────────────────────────────────
+
+model HeroSlide {
+  id     String  @id @default(cuid())
+  active Boolean @default(true)
+  order  Int     @default(0)
+
+  // Eyebrow (texto pequeno em cima do título)
+  eyebrowText String?
+  eyebrowIcon String? // nome do ícone Lucide (ex: "Trophy", "Award", "Star")
+
+  // Título principal (duas linhas, segunda em destaque rosa)
+  titleLine1 String
+  titleLine2 String?
+
+  // Subtítulo descritivo
+  subtitle String? @db.Text
+
+  // Imagem do peixe (PNG/WebP transparente)
+  fishImageUrl String
+  fishImageAlt String
+
+  // Background opcional (se null, usa o default global)
+  backgroundUrl String?
+
+  // Selo de prêmio (canto/base)
+  badgeText String?
+  badgeYear String?
+  badgeIcon String? // nome do ícone Lucide (ex: "Trophy")
+
+  // CTAs (botões)
+  primaryCtaText   String  @default("Comprar agora")
+  primaryCtaUrl    String  @default("/loja")
+  secondaryCtaText String?
+  secondaryCtaUrl  String?
+
+  // Vínculo opcional com produto (preparado pro futuro)
+  productId String?
+
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  @@index([active, order])
+}
+
+model HeroSettings {
+  id                   String  @id @default("default")
+  autoplayEnabled      Boolean @default(true)
+  autoplayDurationMs   Int     @default(5000)
+  showArrows           Boolean @default(true)
+  showDots             Boolean @default(true)
+  defaultBackgroundUrl String  @default("/images/hero/bg-aquario-plantado.webp")
+
+  atualizadoEm DateTime @updatedAt
 }

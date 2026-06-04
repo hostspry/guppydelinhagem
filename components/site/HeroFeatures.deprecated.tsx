@@ -1,3 +1,5 @@
+// ⚠️ DEPRECATED — substituído por HeroSection. Será removido
+// quando o novo hero estabilizar em produção.
 import { Truck, Award, ShieldCheck, HeartHandshake } from "lucide-react";
 
 const FEATURES = [

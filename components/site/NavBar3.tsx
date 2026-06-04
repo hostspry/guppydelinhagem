@@ -3,7 +3,9 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { Menu, X, Star, Phone } from "lucide-react";
+import { Menu, X, Star } from "lucide-react";
+import { WhatsAppIcon } from "@/components/icons/WhatsAppIcon";
+import { WHATSAPP_URL, WHATSAPP_DISPLAY } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 
 const NAV_LINKS = [
@@ -60,13 +62,13 @@ export default function NavBar3() {
               Linhagem Premium
             </Link>
             <a
-              href="https://wa.me/27997594173"
+              href={WHATSAPP_URL}
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-1.5 text-primary font-medium hover:text-accent transition-colors"
             >
-              <Phone size={14} />
-              27 99759-4173
+              <WhatsAppIcon className="w-3.5 h-3.5 text-[#25D366]" />
+              {WHATSAPP_DISPLAY}
             </a>
           </div>
         </div>
@@ -127,13 +129,13 @@ export default function NavBar3() {
               Linhagem Premium
             </Link>
             <a
-              href="https://wa.me/27997594173"
+              href={WHATSAPP_URL}
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-2 text-primary font-medium hover:text-accent transition-colors"
             >
-              <Phone size={16} />
-              27 99759-4173
+              <WhatsAppIcon className="w-4 h-4 text-[#25D366]" />
+              {WHATSAPP_DISPLAY}
             </a>
           </div>
         </nav>
