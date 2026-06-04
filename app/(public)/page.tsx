@@ -1,36 +1,13 @@
 import Image from "next/image";
 import Link from "next/link";
-import { Truck, Trophy, Package, HeartHandshake } from "lucide-react";
-import WaveDivider from "@/components/site/WaveDivider";
 import CtaWhatsapp from "@/components/site/CtaWhatsapp";
+import HeroHome from "@/components/site/HeroHome";
+import HeroFeatures from "@/components/site/HeroFeatures";
 import SectionHeader from "@/components/home/SectionHeader";
 import CategoryCard from "@/components/home/CategoryCard";
 import ProductGrid from "@/components/home/ProductGrid";
 import TestimonialsSection from "@/components/home/TestimonialsSection";
 import { CATEGORIES, PRODUCTS_MOCK } from "@/lib/mock-data";
-
-const DIFERENCIAIS = [
-  {
-    icon: <Truck size={40} className="text-accent" />,
-    titulo: "Envio Nacional",
-    descricao: "Envio para todo o Brasil",
-  },
-  {
-    icon: <Trophy size={40} className="text-accent" />,
-    titulo: "Linhagem Pura",
-    descricao: "Peixes Premiados",
-  },
-  {
-    icon: <Package size={40} className="text-accent" />,
-    titulo: "Envio Seguro",
-    descricao: "Pensado na Saúde do Animal",
-  },
-  {
-    icon: <HeartHandshake size={40} className="text-accent" />,
-    titulo: "Suporte e Direcionamento",
-    descricao: "Suporte via Whats com Profissional",
-  },
-];
 
 export default function HomePage() {
   const destaques = PRODUCTS_MOCK.filter((p) => p.destaque);
@@ -38,68 +15,10 @@ export default function HomePage() {
 
   return (
     <>
-      {/* Wave superior — navbar branca → hero bg-alt */}
-      <WaveDivider fill="#ECE7E8" flip />
-
-      {/* ── Seção 1: Hero ── */}
-      <section className="bg-[#ECE7E8] relative overflow-hidden">
-        <div className="container-site py-16 md:py-24">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-10 items-center">
-
-            {/* Coluna esquerda — texto */}
-            <div className="space-y-6 order-2 md:order-1">
-              <div className="space-y-2">
-                <h3 className="text-xl font-medium text-text">
-                  Seu Guppy{" "}
-                  <span className="text-accent font-semibold">Novo Aqui!</span>
-                </h3>
-                <h1 className="relative text-primary font-bold leading-tight inline-block">
-                  Guppys de{" "}
-                  <span className="relative text-secondary">
-                    <span
-                      className="absolute -inset-y-1 -inset-x-3 opacity-40 pointer-events-none"
-                      style={{
-                        backgroundImage: "radial-gradient(#FF035C 1.5px, transparent 1.5px)",
-                        backgroundSize: "10px 10px",
-                        borderRadius: "50%",
-                        zIndex: 0,
-                      }}
-                      aria-hidden="true"
-                    />
-                    <span className="relative z-10">Linhagem</span>
-                  </span>
-                </h1>
-              </div>
-              <p className="text-text font-light text-base leading-relaxed max-w-md">
-                Peixes selecionados, saudáveis e com genética apurada para aquaristas exigentes.{" "}
-                <strong className="font-medium">Transforme seu aquário com beleza, qualidade e vitalidade.</strong>{" "}
-                💧 Envio seguro para todo o Brasil!
-              </p>
-              <Link
-                href="/loja"
-                className="inline-block bg-primary text-white font-semibold px-8 py-3.5 rounded-pill hover:bg-accent hover:text-[#302f2f] transition-all text-base"
-              >
-                Ver Loja
-              </Link>
-            </div>
-
-            {/* Coluna direita — foto do peixe com blob */}
-            <div className="order-1 md:order-2 flex justify-center md:justify-end">
-              <div className="relative w-[320px] h-[320px] md:w-[420px] md:h-[420px]">
-                <Image
-                  src="/assets/home/hero-fish.png"
-                  alt="Guppy de linhagem premium"
-                  fill
-                  priority
-                  className="object-cover rounded-[50%_30%_60%_40%_/_40%_60%_30%_50%]"
-                  sizes="(max-width: 768px) 320px, 420px"
-                />
-              </div>
-            </div>
-
-          </div>
-        </div>
-        <WaveDivider fill="#ffffff" />
+      {/* ── Seção 1: Hero + diferenciais ── */}
+      <section className="relative overflow-hidden bg-[linear-gradient(135deg,#fafafa_0%,#f4f1f0_55%,#e8e1e1_100%)]">
+        <HeroHome />
+        <HeroFeatures />
       </section>
 
       {/* ── Seção 2: Principais Categorias ── */}
@@ -241,24 +160,7 @@ export default function HomePage() {
       {/* ── Seção 7: Avaliações de Clientes ── */}
       <TestimonialsSection />
 
-      {/* ── Seção 8: Diferenciais ── */}
-      <section className="bg-white py-16">
-        <div className="container-site">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-            {DIFERENCIAIS.map((item) => (
-              <div key={item.titulo} className="flex flex-col items-center text-center space-y-3 p-4">
-                <div className="w-16 h-16 bg-accent/10 rounded-full flex items-center justify-center">
-                  {item.icon}
-                </div>
-                <p className="text-primary font-semibold text-base">{item.titulo}</p>
-                <p className="text-muted-foreground font-light text-sm">{item.descricao}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── Seção 9: CTA WhatsApp ── */}
+      {/* ── CTA WhatsApp ── */}
       <CtaWhatsapp />
     </>
   );

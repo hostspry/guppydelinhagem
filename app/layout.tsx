@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
-import { Signika } from "next/font/google";
+import { Nunito } from "next/font/google";
 import "./globals.css";
 
-const signika = Signika({
+const nunito = Nunito({
   subsets: ["latin"],
-  weight: ["300", "400", "500", "600", "700"],
-  variable: "--font-signika",
+  weight: ["300", "400", "500", "600", "700", "800", "900"],
+  variable: "--font-nunito",
   display: "swap",
 });
 
@@ -22,7 +22,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="pt-BR">
-      <body className={`${signika.variable} font-sans antialiased`}>
+      <body className={`${nunito.variable} font-sans antialiased`}>
         {children}
       </body>
     </html>
