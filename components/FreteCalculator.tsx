@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { AlertTriangle, Loader2 } from "lucide-react";
+import { AlertTriangle, Loader2, MapPin } from "lucide-react";
 import { WhatsAppIcon } from "@/components/icons/WhatsAppIcon";
 import { WHATSAPP_PHONE } from "@/lib/constants";
 
@@ -13,7 +13,15 @@ type JadlogOpt = {
   requerAvaliacao: boolean;
 };
 
+type Endereco = {
+  rua: string | null;
+  bairro: string | null;
+  cidade: string | null;
+  uf: string | null;
+};
+
 type FreteResponse = {
+  endereco: Endereco | null;
   jadlog: JadlogOpt[];
   gollog: { min: number; max: number };
 };
@@ -23,9 +31,26 @@ const brl = new Intl.NumberFormat("pt-BR", {
   currency: "BRL",
 });
 
+// Versão compacta sem centavos pra cards apertados no mobile
+const brlCompact = new Intl.NumberFormat("pt-BR", {
+  style: "currency",
+  currency: "BRL",
+  maximumFractionDigits: 0,
+});
+
 function formatCep(raw: string): string {
   const digits = raw.replace(/\D/g, "").slice(0, 8);
   return digits.length > 5 ? `${digits.slice(0, 5)}-${digits.slice(5)}` : digits;
+}
+
+function formatEndereco(end: Endereco): string {
+  // Ordem: "rua, bairro — cidade/uf". Omite partes null.
+  const ruaBairro = [end.rua, end.bairro].filter(Boolean).join(", ");
+  const cidadeUf = [end.cidade, end.uf].filter(Boolean).join("/");
+  if (!ruaBairro && !cidadeUf) return "";
+  if (!ruaBairro) return cidadeUf;
+  if (!cidadeUf) return ruaBairro;
+  return `${ruaBairro} — ${cidadeUf}`;
 }
 
 export default function FreteCalculator() {
@@ -100,16 +125,16 @@ export default function FreteCalculator() {
             value={cep}
             onChange={(e) => setCep(formatCep(e.target.value))}
             maxLength={9}
-            className="flex-1 h-12 px-4 rounded-xl border border-border bg-white text-base font-medium text-primary placeholder:text-muted-foreground focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
+            className="flex-1 min-h-14 px-5 py-3 box-border rounded-xl border border-border bg-white text-lg font-medium leading-none text-primary placeholder:text-muted-foreground focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
           />
           <button
             type="submit"
             disabled={!cepValido || loading}
-            className="inline-flex items-center justify-center gap-2 min-h-12 px-7 rounded-pill bg-secondary text-white font-semibold shadow-[0_8px_24px_-8px_rgba(255,3,92,0.5)] hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none transition-all"
+            className="inline-flex items-center justify-center gap-2 min-h-14 px-7 rounded-pill bg-secondary text-white font-semibold text-base shadow-[0_8px_24px_-8px_rgba(255,3,92,0.5)] hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none transition-all"
           >
             {loading ? (
               <>
-                <Loader2 size={16} className="animate-spin" aria-hidden="true" />
+                <Loader2 size={18} className="animate-spin" aria-hidden="true" />
                 Calculando…
               </>
             ) : (
@@ -130,6 +155,24 @@ export default function FreteCalculator() {
 
       {result && (
         <div className="space-y-3">
+          {result.endereco &&
+            (() => {
+              const enderecoLinha = formatEndereco(result.endereco);
+              return enderecoLinha ? (
+                <p className="flex items-start gap-2 text-sm text-[#555] leading-snug">
+                  <MapPin
+                    size={16}
+                    className="text-primary shrink-0 mt-0.5"
+                    aria-hidden="true"
+                  />
+                  <span>
+                    <span className="font-medium">Entrega para:</span>{" "}
+                    {enderecoLinha}
+                  </span>
+                </p>
+              ) : null;
+            })()}
+
           {semJadlog && (
             <p className="text-sm text-[#555]">
               Para sua região, o envio é feito via Gollog.
@@ -183,7 +226,7 @@ export default function FreteCalculator() {
           ))}
 
           <div
-            className={`rounded-xl p-4 space-y-3 ${
+            className={`rounded-xl overflow-hidden p-4 space-y-3 ${
               gollogDestaque
                 ? "border-2 border-accent bg-accent/5"
                 : "border border-black/10"
@@ -194,8 +237,8 @@ export default function FreteCalculator() {
                 Recomendado para sua região
               </span>
             )}
-            <div className="flex items-center justify-between gap-4">
-              <div>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4">
+              <div className="min-w-0 flex-1">
                 <p className="font-semibold text-primary">
                   Gollog (envio aéreo)
                 </p>
@@ -204,9 +247,16 @@ export default function FreteCalculator() {
                   aeroporto mais próximo
                 </p>
               </div>
-              <div className="text-lg font-bold text-primary shrink-0 text-right">
-                {brl.format(result.gollog.min)} a{" "}
-                {brl.format(result.gollog.max)}
+              <div className="text-lg font-bold text-primary sm:text-right sm:shrink-0">
+                {/* Mobile: compacto sem centavos; sm:+ valor completo */}
+                <span className="sm:hidden">
+                  {brlCompact.format(result.gollog.min)} –{" "}
+                  {brlCompact.format(result.gollog.max)}
+                </span>
+                <span className="hidden sm:inline">
+                  {brl.format(result.gollog.min)} a{" "}
+                  {brl.format(result.gollog.max)}
+                </span>
               </div>
             </div>
             {gollogDestaque && (

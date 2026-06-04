@@ -4,6 +4,23 @@ import { FRETE_CONFIG } from "@/lib/shipping";
 export const dynamic = "force-dynamic";
 
 const ME_ENDPOINT = "https://melhorenvio.com.br/api/v2/me/shipment/calculate";
+const VIACEP_ENDPOINT = (cep: string) =>
+  `https://viacep.com.br/ws/${cep}/json/`;
+
+type ViaCepResponse = {
+  logradouro?: string;
+  bairro?: string;
+  localidade?: string;
+  uf?: string;
+  erro?: boolean | "true";
+};
+
+type Endereco = {
+  rua: string | null;
+  bairro: string | null;
+  cidade: string | null;
+  uf: string | null;
+};
 
 type MeCompany = { name: string };
 type MeQuoteOk = {
@@ -41,8 +58,10 @@ export async function POST(req: Request) {
     );
   }
 
-  try {
-    const res = await fetch(ME_ENDPOINT, {
+  // ME e ViaCEP em paralelo. ViaCEP é cosmético + valida existência do CEP;
+  // se cair, segue sem endereço — não pode quebrar a cotação.
+  const [meSettled, viacepSettled] = await Promise.allSettled([
+    fetch(ME_ENDPOINT, {
       method: "POST",
       headers: {
         Accept: "application/json",
@@ -63,16 +82,47 @@ export async function POST(req: Request) {
         services: "4", // Jadlog .Com
       }),
       cache: "no-store",
-    });
+    }),
+    fetch(VIACEP_ENDPOINT(cepDestino), { cache: "no-store" }),
+  ]);
 
-    if (!res.ok) {
-      return NextResponse.json(
-        { error: "Não foi possível calcular o frete agora." },
-        { status: 502 },
-      );
+  // ── ViaCEP: valida CEP + monta endereço ──
+  let endereco: Endereco | null = null;
+  if (viacepSettled.status === "fulfilled" && viacepSettled.value.ok) {
+    try {
+      const data = (await viacepSettled.value.json()) as ViaCepResponse;
+      // ViaCEP responde 200 com { erro: true } pra CEP inexistente
+      if (data.erro === true || data.erro === "true") {
+        return NextResponse.json(
+          {
+            error:
+              "CEP não encontrado. Confira o número ou use o CEP da sua rua.",
+          },
+          { status: 400 },
+        );
+      }
+      endereco = {
+        rua: data.logradouro?.trim() || null,
+        bairro: data.bairro?.trim() || null,
+        cidade: data.localidade?.trim() || null,
+        uf: data.uf?.trim() || null,
+      };
+    } catch {
+      // payload inválido — segue sem endereço
     }
+  }
+  // ViaCEP rejected / não-ok: endereco fica null silenciosamente
 
-    const rawResp = (await res.json()) as unknown;
+  // ── Melhor Envio: cotação Jadlog ──
+  if (meSettled.status === "rejected" || !meSettled.value.ok) {
+    return NextResponse.json(
+      { error: "Não foi possível calcular o frete agora." },
+      { status: 502 },
+    );
+  }
+
+  try {
+    const rawResp = (await meSettled.value.json()) as unknown;
     const raw: MeQuote[] = Array.isArray(rawResp)
       ? (rawResp as MeQuote[])
       : ([rawResp] as MeQuote[]);
@@ -95,11 +145,13 @@ export async function POST(req: Request) {
           name: FRETE_CONFIG.jadlogLabel,
           price: final,
           deliveryTime: q.delivery_time,
-          requerAvaliacao: q.delivery_time > FRETE_CONFIG.prazoMaximoSeguro,
+          requerAvaliacao:
+            q.delivery_time >= FRETE_CONFIG.prazoMaximoSeguro,
         };
       });
 
     return NextResponse.json({
+      endereco,
       jadlog,
       gollog: FRETE_CONFIG.gollog,
     });

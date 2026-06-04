@@ -11,5 +11,5 @@ export const FRETE_CONFIG = {
   caixaIsopor: 20, // R$ adicionados após o markup
   gollog: { min: 80, max: 110 }, // faixa exibida ao cliente, valor fixo
   jadlogLabel: "JADLOG entrega no seu CEP", // label exibido ao client
-  prazoMaximoSeguro: 14, // dias úteis — acima disso, frete terrestre exige avaliação
+  prazoMaximoSeguro: 13, // dias úteis — a partir disso (>=) frete terrestre exige avaliação
 };

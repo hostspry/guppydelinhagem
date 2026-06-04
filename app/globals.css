@@ -35,9 +35,6 @@
   --color-destructive: #ff035c;
   --color-destructive-foreground: #ffffff;
 
-  /* Tipografia */
-  --font-sans: var(--font-nunito), sans-serif;
-
   /* Border radius */
   --radius-pill: 25px;
   --radius-lg: 0.75rem;
@@ -217,6 +214,10 @@
 }
 
 @theme inline {
+  /* Tipografia — @theme inline pra que Tailwind use var(--font-nunito) em
+     runtime (a variável só existe quando o <body> aplica o class do next/font).
+     No @theme regular, a substituição é em build-time e a variável fica vazia. */
+  --font-sans: var(--font-nunito), sans-serif;
   --font-heading: var(--font-sans);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
