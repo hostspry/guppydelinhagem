@@ -24,14 +24,17 @@ RUN pnpm prisma generate && pnpm build
 FROM node:20-alpine AS runner
 WORKDIR /app
 RUN apk add --no-cache openssl && \
-    npm install -g prisma@7.7.0 && \
+    npm install -g prisma@7.7.0 dotenv@17.4.2 && \
     addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs
 
+# NODE_PATH = onde npm install -g deposita em alpine. Permite que
+# prisma.config.ts resolva `prisma/config` e `dotenv/config` globais.
 ENV NODE_ENV=production \
     PORT=3000 \
     HOSTNAME=0.0.0.0 \
-    NEXT_TELEMETRY_DISABLED=1
+    NEXT_TELEMETRY_DISABLED=1 \
+    NODE_PATH=/usr/local/lib/node_modules
 
 # Next standalone (server.js + node_modules tracados pelo Next)
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
