@@ -43,8 +43,9 @@ COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
 COPY --from=builder --chown=nextjs:nodejs /app/prisma.config.ts ./prisma.config.ts
 COPY --from=builder --chown=nextjs:nodejs /app/lib/generated/prisma ./lib/generated/prisma
 
-# Entrypoint
-COPY --from=builder --chown=nextjs:nodejs --chmod=755 /app/scripts/entrypoint.sh ./entrypoint.sh
+# Entrypoint (chmod separado pra compatibilidade sem BuildKit)
+COPY --from=builder --chown=nextjs:nodejs /app/scripts/entrypoint.sh ./entrypoint.sh
+RUN chmod +x ./entrypoint.sh
 
 USER nextjs
 EXPOSE 3000
