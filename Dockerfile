@@ -1,55 +1,50 @@
 # ===== Estágio 1: Dependências =====
 FROM node:20-alpine AS deps
-RUN apk add --no-cache libc6-compat openssl
 WORKDIR /app
+RUN apk add --no-cache libc6-compat openssl && \
+    npm install -g pnpm@9.15.0
 
-# Copia apenas manifestos — mudanças em código NÃO invalidam esta camada
-COPY package.json pnpm-lock.yaml* ./
-
-RUN corepack enable pnpm && pnpm install --frozen-lockfile
+COPY package.json pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile
 
 # ===== Estágio 2: Build =====
 FROM node:20-alpine AS builder
-RUN apk add --no-cache libc6-compat openssl
 WORKDIR /app
+RUN apk add --no-cache libc6-compat openssl && \
+    npm install -g pnpm@9.15.0
+
+ENV NEXT_TELEMETRY_DISABLED=1
 
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-ENV NEXT_TELEMETRY_DISABLED=1
-
-RUN corepack enable pnpm && pnpm prisma generate
-RUN pnpm build
+RUN pnpm prisma generate && pnpm build
 
 # ===== Estágio 3: Runner (imagem final mínima) =====
 FROM node:20-alpine AS runner
-RUN apk add --no-cache openssl
 WORKDIR /app
-
-ENV NODE_ENV=production
-ENV PORT=3000
-ENV HOSTNAME=0.0.0.0
-ENV NEXT_TELEMETRY_DISABLED=1
-
-RUN addgroup --system --gid 1001 nodejs && \
+RUN apk add --no-cache openssl && \
+    npm install -g prisma@7.7.0 && \
+    addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs
 
-# 1. Next standalone
+ENV NODE_ENV=production \
+    PORT=3000 \
+    HOSTNAME=0.0.0.0 \
+    NEXT_TELEMETRY_DISABLED=1
+
+# Next standalone (server.js + node_modules tracados pelo Next)
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 
-# 2. Prisma: schema + config + client gerado
+# Prisma: schema, config e client gerado (output customizado)
 COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
 COPY --from=builder --chown=nextjs:nodejs /app/prisma.config.ts ./prisma.config.ts
 COPY --from=builder --chown=nextjs:nodejs /app/lib/generated/prisma ./lib/generated/prisma
 
-# 3. node_modules completo (Prisma 7 + pnpm exigem árvore .pnpm)
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules ./node_modules
-
-# 4. Entrypoint
-COPY --from=builder --chown=nextjs:nodejs /app/scripts/entrypoint.sh ./entrypoint.sh
-RUN chmod +x ./entrypoint.sh
+# Entrypoint
+COPY --from=builder --chown=nextjs:nodejs --chmod=755 /app/scripts/entrypoint.sh ./entrypoint.sh
 
 USER nextjs
 EXPOSE 3000
