@@ -18,7 +18,7 @@ ENV NEXT_TELEMETRY_DISABLED=1
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-RUN pnpm exec prisma generate && pnpm exec next build
+RUN pnpm prisma generate && pnpm build
 
 # ===== Estágio 3: Runner (imagem final mínima) =====
 FROM node:20-alpine AS runner
