@@ -154,6 +154,7 @@ export async function POST(req: Request) {
       endereco,
       jadlog,
       gollog: FRETE_CONFIG.gollog,
+      maxPeixesPorCaixa: FRETE_CONFIG.maxPeixesPorCaixa,
     });
   } catch {
     return NextResponse.json(

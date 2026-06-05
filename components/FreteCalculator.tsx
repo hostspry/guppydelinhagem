@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { AlertTriangle, Clock, Loader2, MapPin } from "lucide-react";
+import { AlertTriangle, Clock, Fish, Loader2, MapPin } from "lucide-react";
 import { WhatsAppIcon } from "@/components/icons/WhatsAppIcon";
 import { WHATSAPP_PHONE } from "@/lib/constants";
 
@@ -24,6 +24,7 @@ type FreteResponse = {
   endereco: Endereco | null;
   jadlog: JadlogOpt[];
   gollog: { min: number; max: number };
+  maxPeixesPorCaixa: number;
 };
 
 const brl = new Intl.NumberFormat("pt-BR", {
@@ -191,6 +192,19 @@ export default function FreteCalculator() {
                 </p>
               ) : null;
             })()}
+
+          {/* Faixa de destaque: frete único por caixa */}
+          <div className="flex items-start gap-3 rounded-xl bg-primary text-white p-3">
+            <Fish size={18} className="shrink-0 mt-0.5" aria-hidden="true" />
+            <div className="min-w-0 flex-1">
+              <p className="font-semibold leading-tight">
+                Frete único para até {result.maxPeixesPorCaixa} peixes
+              </p>
+              <p className="text-sm opacity-90 mt-0.5">
+                Leve mais guppies pagando o mesmo envio.
+              </p>
+            </div>
+          </div>
 
           {semJadlog && (
             <p className="text-sm text-[#555]">

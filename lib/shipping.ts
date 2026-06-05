@@ -12,4 +12,5 @@ export const FRETE_CONFIG = {
   gollog: { min: 80, max: 110 }, // faixa exibida ao cliente, valor fixo
   jadlogLabel: "JADLOG entrega no seu CEP", // label exibido ao client
   prazoMaximoSeguro: 13, // dias úteis — a partir disso (>=) frete terrestre exige avaliação
+  maxPeixesPorCaixa: 10, // limite por caixa — o frete é único até esse número
 };
