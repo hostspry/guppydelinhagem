@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { AlertTriangle, Loader2, MapPin } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { AlertTriangle, Clock, Loader2, MapPin } from "lucide-react";
 import { WhatsAppIcon } from "@/components/icons/WhatsAppIcon";
 import { WHATSAPP_PHONE } from "@/lib/constants";
 
@@ -59,8 +59,21 @@ export default function FreteCalculator() {
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<FreteResponse | null>(null);
 
+  const resultRef = useRef<HTMLDivElement>(null);
+
   const cepDigits = cep.replace(/\D/g, "");
   const cepValido = /^\d{8}$/.test(cepDigits);
+
+  // Rola até resultado OU erro depois que aparece. Mobile precisa disso —
+  // o resultado nasce abaixo da dobra e passa despercebido sem o scroll.
+  useEffect(() => {
+    if (result || error) {
+      resultRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    }
+  }, [result, error]);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -144,17 +157,23 @@ export default function FreteCalculator() {
         </div>
       </form>
 
-      {error && (
-        <div
-          role="alert"
-          className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
-        >
-          {error}
-        </div>
-      )}
+      {/* Container único pra erro+result: ref pro scroll, aria-live pra SR */}
+      <div
+        ref={resultRef}
+        aria-live="polite"
+        className="scroll-mt-4 space-y-3 empty:hidden"
+      >
+        {error && (
+          <div
+            role="alert"
+            className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+          >
+            {error}
+          </div>
+        )}
 
-      {result && (
-        <div className="space-y-3">
+        {result && (
+        <>
           {result.endereco &&
             (() => {
               const enderecoLinha = formatEndereco(result.endereco);
@@ -185,9 +204,12 @@ export default function FreteCalculator() {
               className="rounded-xl border border-black/10 p-4 space-y-3"
             >
               <div className="flex items-center justify-between gap-4">
-                <div className="flex-1 min-w-0">
-                  <span className="font-semibold text-primary">{opt.name}</span>
-                  <p className="text-xs text-[#666] mt-0.5">
+                <div className="flex-1 min-w-0 space-y-1">
+                  <span className="block font-semibold text-primary">
+                    {opt.name}
+                  </span>
+                  <p className="flex items-center gap-1.5 text-base font-semibold text-primary">
+                    <Clock size={16} aria-hidden="true" />
                     {opt.deliveryTime} dias úteis
                   </p>
                 </div>
@@ -238,11 +260,15 @@ export default function FreteCalculator() {
               </span>
             )}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4">
-              <div className="min-w-0 flex-1">
+              <div className="min-w-0 flex-1 space-y-1">
                 <p className="font-semibold text-primary">
                   Gollog (envio aéreo)
                 </p>
-                <p className="text-xs text-[#666] mt-0.5">
+                <p className="flex items-center gap-1.5 text-base font-semibold text-primary">
+                  <Clock size={16} aria-hidden="true" />
+                  1-2 dias úteis
+                </p>
+                <p className="text-xs text-[#666]">
                   Valor confirmado no fechamento do pedido — retirada no
                   aeroporto mais próximo
                 </p>
@@ -275,8 +301,9 @@ export default function FreteCalculator() {
               Confirmar valor no WhatsApp
             </a>
           </div>
-        </div>
-      )}
+        </>
+        )}
+      </div>
     </div>
   );
 }
