@@ -1,4 +1,5 @@
 import { PrismaPg } from "@prisma/adapter-pg";
+import bcrypt from "bcryptjs";
 import { PrismaClient } from "../lib/generated/prisma/client";
 import { WHATSAPP_URL } from "../lib/constants";
 
@@ -36,7 +37,38 @@ const blueDragonData = {
   productId: null,
 };
 
+async function seedAdmin() {
+  const email = process.env.SEED_ADMIN_EMAIL;
+  const password = process.env.SEED_ADMIN_PASSWORD;
+  if (!email || !password) {
+    throw new Error(
+      "SEED_ADMIN_EMAIL e SEED_ADMIN_PASSWORD precisam estar no .env pra seedar o admin inicial.",
+    );
+  }
+  const senhaHash = await bcrypt.hash(password, 10);
+  const user = await prisma.user.upsert({
+    where: { email },
+    create: {
+      email,
+      nome: "Manassés",
+      senhaHash,
+      role: "SUPER_ADMIN",
+      senhaPrecisaTroca: true,
+    },
+    update: {
+      // upsert idempotente — mantém role/nome existentes; só reseta senha
+      // se a senha do .env mudar (útil pra ambientes de dev).
+      senhaHash,
+      senhaPrecisaTroca: true,
+    },
+    select: { id: true, email: true, role: true },
+  });
+  console.log(`[seed] Admin upserted: ${user.email} (${user.role})`);
+}
+
 async function main() {
+  await seedAdmin();
+
   const slide = await prisma.heroSlide.upsert({
     where: { id: BLUE_DRAGON_ID },
     create: { id: BLUE_DRAGON_ID, ...blueDragonData },

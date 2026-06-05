@@ -15,8 +15,10 @@ datasource db {
 // ─────────────────────────────────────────────
 
 enum UserRole {
-  CUSTOMER
-  ADMIN
+  CUSTOMER    // usuário normal do site
+  EDITOR      // pode editar produtos/categorias/hero, NÃO pedidos/settings
+  ADMIN       // tudo do EDITOR + pedidos + clientes
+  SUPER_ADMIN // tudo + settings + gerenciar outros admins
 }
 
 enum OrderStatus {
@@ -44,13 +46,15 @@ enum VideoPlatform {
 // ─────────────────────────────────────────────
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  senhaHash String?
-  nome      String
-  telefone  String?
-  role      UserRole @default(CUSTOMER)
-  criadoEm  DateTime @default(now())
+  id                String    @id @default(cuid())
+  email             String    @unique
+  senhaHash         String?
+  nome              String
+  telefone          String?
+  role              UserRole  @default(CUSTOMER)
+  senhaPrecisaTroca Boolean   @default(false)
+  ultimoLogin       DateTime?
+  criadoEm          DateTime  @default(now())
 
   enderecos Address[]
   pedidos   Order[]
