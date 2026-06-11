@@ -38,10 +38,10 @@ export const productSchema = z.object({
   categoryId: z.string().min(1, "Selecione uma categoria"),
   ativo: checkboxBool.default(true),
   destaque: checkboxBool.default(false),
-  metaTitle: z.string().max(70, "Máx 70 caracteres").optional().or(z.literal("")),
+  metaTitle: z.string().max(60, "Máx 60 caracteres").optional().or(z.literal("")),
   metaDescription: z
     .string()
-    .max(170, "Máx 170 caracteres")
+    .max(160, "Máx 160 caracteres")
     .optional()
     .or(z.literal("")),
   keywords: z

@@ -61,8 +61,8 @@ CAMPOS (gere todos de uma vez):
 - nome: nome de produto claro e comercial (ex: "Guppy Koi Tuxedo — Trio Linhagem Importada"). Conciso, sem exageros.
 - descricao: 2 a 4 parágrafos curtos, separados por uma linha em branco.
 - descricaoCurta: 1 a 2 frases (máx 160 caracteres).
-- metaTitle: máximo 60 caracteres.
-- metaDescription: máximo 155 caracteres.
+- metaTitle: no máximo 58 caracteres.
+- metaDescription: no máximo 150 caracteres.
 - keywords: de 5 a 8 termos que pessoas buscariam, minúsculas, sem "#".`;
 
 const SEARCH_BLOCK = `

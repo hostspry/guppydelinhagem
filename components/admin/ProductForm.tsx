@@ -14,6 +14,8 @@ import {
   type VideoDraft,
 } from "@/lib/validations/product";
 import { slugify } from "@/lib/utils/slug";
+import { truncateAtWord } from "@/lib/utils/text";
+import { MARCHEZI_SIGNATURE } from "@/lib/constants";
 import { createProduct, updateProduct } from "@/actions/products";
 import { generateContent } from "@/actions/ai";
 import { ProductVideosField } from "./ProductVideosField";
@@ -167,16 +169,30 @@ export function ProductForm({ categorias, initialData }: ProductFormProps) {
         return;
       }
       const d = res.data;
-      setValue("nome", d.nome, { shouldValidate: true });
+      // Rede de segurança: a IA não conta caracteres com precisão e pode estourar
+      // os limites do Zod, travando o save. Truncamos na última palavra inteira
+      // antes do limite ANTES de preencher os campos. (números do schema)
+      const nome = truncateAtWord(d.nome, 120);
+      // Descrição final = parte da linhagem (IA) + assinatura fixa da Marchezi.
+      // A assinatura nunca é gerada/reescrita pela IA; é colada ao final.
+      const descricao = `${d.descricao.trim()}\n\n${MARCHEZI_SIGNATURE}`;
+
+      setValue("nome", nome, { shouldValidate: true });
       // Slug deriva do nome pelo mecanismo existente — só recalcula se o operador
       // ainda não editou o slug à mão (mesma regra do handleNomeChange).
       if (!slugManuallyEdited) {
-        setValue("slug", slugify(d.nome), { shouldValidate: true });
+        setValue("slug", slugify(nome), { shouldValidate: true });
       }
-      setValue("descricao", d.descricao, { shouldValidate: true });
-      setValue("descricaoCurta", d.descricaoCurta, { shouldValidate: true });
-      setValue("metaTitle", d.metaTitle, { shouldValidate: true });
-      setValue("metaDescription", d.metaDescription, { shouldValidate: true });
+      setValue("descricao", descricao, { shouldValidate: true });
+      setValue("descricaoCurta", truncateAtWord(d.descricaoCurta, 160), {
+        shouldValidate: true,
+      });
+      setValue("metaTitle", truncateAtWord(d.metaTitle, 60), {
+        shouldValidate: true,
+      });
+      setValue("metaDescription", truncateAtWord(d.metaDescription, 160), {
+        shouldValidate: true,
+      });
       setKeywords(d.keywords);
       setAiGenerated(true);
       toast.success("Conteúdo gerado. Revise antes de salvar.");
@@ -509,7 +525,7 @@ export function ProductForm({ categorias, initialData }: ProductFormProps) {
           label="Meta título"
           name="metaTitle"
           error={errors.metaTitle?.message}
-          hint="Título da página nos resultados de busca (~60 caracteres). Opcional."
+          hint="Título da página nos resultados de busca (até 60 caracteres). Opcional."
         >
           <input
             id="metaTitle"
@@ -523,7 +539,7 @@ export function ProductForm({ categorias, initialData }: ProductFormProps) {
           label="Meta descrição"
           name="metaDescription"
           error={errors.metaDescription?.message}
-          hint="Trecho exibido no Google (~155 caracteres). Opcional."
+          hint="Trecho exibido no Google (até 160 caracteres). Opcional."
         >
           <textarea
             id="metaDescription"
