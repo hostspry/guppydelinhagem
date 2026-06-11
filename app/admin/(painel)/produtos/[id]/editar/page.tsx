@@ -43,6 +43,7 @@ export default async function EditarProdutoPage({ params }: Props) {
           destaque: produto.destaque,
           metaTitle: produto.metaTitle,
           metaDescription: produto.metaDescription,
+          keywords: produto.keywords,
           videos: produto.videos.map((v) => ({
             id: v.id,
             platform: v.platform,

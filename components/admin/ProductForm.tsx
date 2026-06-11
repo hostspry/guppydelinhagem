@@ -5,6 +5,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
+import { Sparkles } from "lucide-react";
 import Link from "next/link";
 import { FormField } from "./FormField";
 import {
@@ -14,7 +15,9 @@ import {
 } from "@/lib/validations/product";
 import { slugify } from "@/lib/utils/slug";
 import { createProduct, updateProduct } from "@/actions/products";
+import { generateContent } from "@/actions/ai";
 import { ProductVideosField } from "./ProductVideosField";
+import { KeywordsField } from "./KeywordsField";
 
 const inputClass =
   "w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:border-[#FF035C] focus:ring-1 focus:ring-[#FF035C]";
@@ -37,6 +40,7 @@ type ProductFormProps = {
     destaque: boolean;
     metaTitle: string | null;
     metaDescription: string | null;
+    keywords: string[];
     videos: VideoDraft[];
   };
 };
@@ -45,11 +49,22 @@ export function ProductForm({ categorias, initialData }: ProductFormProps) {
   const [isPending, startTransition] = useTransition();
   const [slugManuallyEdited, setSlugManuallyEdited] = useState(!!initialData);
   const [videos, setVideos] = useState<VideoDraft[]>(initialData?.videos ?? []);
+  // keywords fora do react-hook-form (array gerenciado como os vídeos):
+  // serializado p/ FormData no submit; a IA preenche via setKeywords.
+  const [keywords, setKeywords] = useState<string[]>(
+    initialData?.keywords ?? [],
+  );
+  // Estado da geração com IA. Loading próprio (useState, não useTransition —
+  // lição da 6c: server action em transition trava o botão).
+  const [briefing, setBriefing] = useState("");
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiGenerated, setAiGenerated] = useState(false);
 
   const {
     register,
     handleSubmit,
     setValue,
+    watch,
     formState: { errors },
   } = useForm<z.input<typeof productSchema>, unknown, ProductInput>({
     resolver: zodResolver(productSchema),
@@ -101,6 +116,42 @@ export function ProductForm({ categorias, initialData }: ProductFormProps) {
     setValue("slug", e.target.value, { shouldValidate: true });
   }
 
+  const primaryVideo = videos.find((v) => v.principal) ?? videos[0];
+  const canGenerate = !!primaryVideo?.titulo?.trim() || !!briefing.trim();
+
+  async function handleGenerate() {
+    if (aiGenerated) {
+      const ok = window.confirm(
+        "Isto vai substituir descrição, descrição curta, SEO e palavras-chave. Edições manuais nesses campos serão perdidas. Continuar?",
+      );
+      if (!ok) return;
+    }
+    setAiLoading(true);
+    try {
+      const categoriaId = watch("categoryId");
+      const categoria = categorias.find((c) => c.id === categoriaId)?.nome;
+      const res = await generateContent({
+        videoTitle: primaryVideo?.titulo ?? "",
+        briefing,
+        categoria,
+      });
+      if (!res.ok) {
+        toast.error(res.error);
+        return;
+      }
+      const d = res.data;
+      setValue("descricao", d.descricao, { shouldValidate: true });
+      setValue("descricaoCurta", d.descricaoCurta, { shouldValidate: true });
+      setValue("metaTitle", d.metaTitle, { shouldValidate: true });
+      setValue("metaDescription", d.metaDescription, { shouldValidate: true });
+      setKeywords(d.keywords);
+      setAiGenerated(true);
+      toast.success("Conteúdo gerado. Revise antes de salvar.");
+    } finally {
+      setAiLoading(false);
+    }
+  }
+
   const onSubmit = handleSubmit((data) => {
     const formData = new FormData();
     formData.append("nome", data.nome);
@@ -119,6 +170,7 @@ export function ProductForm({ categorias, initialData }: ProductFormProps) {
     if (data.metaTitle) formData.append("metaTitle", data.metaTitle);
     if (data.metaDescription)
       formData.append("metaDescription", data.metaDescription);
+    formData.append("keywords", JSON.stringify(keywords));
     formData.append("videos", JSON.stringify(videos));
 
     startTransition(async () => {
@@ -135,6 +187,65 @@ export function ProductForm({ categorias, initialData }: ProductFormProps) {
 
   return (
     <form onSubmit={onSubmit} className="max-w-2xl space-y-5">
+      {/* Gerar conteúdo com IA — rascunha descrição/SEO/keywords; o operador revisa */}
+      <fieldset className="bg-white border border-gray-200 rounded-lg p-5">
+        <legend className="px-2 text-xs font-semibold text-[#07366A] uppercase tracking-wide">
+          Gerar conteúdo com IA
+        </legend>
+
+        <div className="text-xs text-gray-600 mb-3">
+          {primaryVideo ? (
+            <p>
+              A IA vai ler o vídeo primário:{" "}
+              <span className="font-medium text-[#07366A]">
+                {primaryVideo.titulo || "(sem título — use o briefing abaixo)"}
+              </span>
+            </p>
+          ) : (
+            <p className="text-amber-600">
+              Nenhum vídeo adicionado. Você pode gerar só pelo briefing, mas o
+              resultado fica mais genérico.
+            </p>
+          )}
+        </div>
+
+        <label
+          htmlFor="ai-briefing"
+          className="block text-sm font-medium text-gray-700 mb-1"
+        >
+          Briefing <span className="text-gray-400">(opcional)</span>
+        </label>
+        <textarea
+          id="ai-briefing"
+          value={briefing}
+          onChange={(e) => setBriefing(e.target.value)}
+          rows={2}
+          className={inputClass}
+          placeholder="macho, cauda véu, linhagem importada, pais campeões, últimas unidades"
+        />
+
+        <div className="flex items-center gap-3 mt-3">
+          <button
+            type="button"
+            onClick={handleGenerate}
+            disabled={aiLoading || !canGenerate}
+            className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#FF035C] text-white text-sm font-medium rounded-md hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+          >
+            <Sparkles className="w-4 h-4" aria-hidden="true" />
+            {aiLoading
+              ? "Gerando…"
+              : aiGenerated
+                ? "Gerar novamente"
+                : "Gerar com IA"}
+          </button>
+          {aiGenerated && (
+            <p className="text-[11px] text-amber-600">
+              Gerado pela IA — revise antes de salvar. Pode haver imprecisões.
+            </p>
+          )}
+        </div>
+      </fieldset>
+
       {/* Básico */}
       <fieldset className="bg-white border border-gray-200 rounded-lg p-5">
         <legend className="px-2 text-xs font-semibold text-[#07366A] uppercase tracking-wide">
@@ -363,6 +474,16 @@ export function ProductForm({ categorias, initialData }: ProductFormProps) {
             placeholder="Casal de Guppy Koi Red Ear de linhagem importada, pronto para reprodução…"
           />
         </FormField>
+
+        <div className="mt-1">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Palavras-chave
+          </label>
+          <p className="text-xs text-gray-400 mb-2">
+            Termos que as pessoas buscariam. Enter ou “Adicionar” para incluir.
+          </p>
+          <KeywordsField value={keywords} onChange={setKeywords} />
+        </div>
       </fieldset>
 
       <div className="flex gap-2">
