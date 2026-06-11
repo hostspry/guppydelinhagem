@@ -15,9 +15,9 @@ datasource db {
 // ─────────────────────────────────────────────
 
 enum UserRole {
-  CUSTOMER    // usuário normal do site
-  EDITOR      // pode editar produtos/categorias/hero, NÃO pedidos/settings
-  ADMIN       // tudo do EDITOR + pedidos + clientes
+  CUSTOMER // usuário normal do site
+  EDITOR // pode editar produtos/categorias/hero, NÃO pedidos/settings
+  ADMIN // tudo do EDITOR + pedidos + clientes
   SUPER_ADMIN // tudo + settings + gerenciar outros admins
 }
 
@@ -90,25 +90,27 @@ model Category {
 }
 
 model Product {
-  id             String      @id @default(cuid())
-  slug           String      @unique
-  nome           String
-  descricao      String
-  descricaoCurta String?
-  preco          Decimal     @db.Decimal(10, 2)
-  descontoPix    Decimal?    @db.Decimal(5, 2)
-  parcelasMax    Int         @default(3)
-  tipo           ProductType @default(FISICO)
-  estoque        Int         @default(0)
-  peso           Decimal?    @db.Decimal(8, 3)
-  comprimento    Decimal?    @db.Decimal(8, 2)
-  largura        Decimal?    @db.Decimal(8, 2)
-  altura         Decimal?    @db.Decimal(8, 2)
-  ativo          Boolean     @default(true)
-  destaque       Boolean     @default(false)
-  categoryId     String
-  criadoEm       DateTime    @default(now())
-  atualizadoEm   DateTime    @updatedAt
+  id              String      @id @default(cuid())
+  slug            String      @unique
+  nome            String
+  descricao       String
+  descricaoCurta  String?
+  metaTitle       String?
+  metaDescription String?
+  preco           Decimal     @db.Decimal(10, 2)
+  descontoPix     Decimal?    @db.Decimal(5, 2)
+  parcelasMax     Int         @default(3)
+  tipo            ProductType @default(FISICO)
+  estoque         Int         @default(0)
+  peso            Decimal?    @db.Decimal(8, 3)
+  comprimento     Decimal?    @db.Decimal(8, 2)
+  largura         Decimal?    @db.Decimal(8, 2)
+  altura          Decimal?    @db.Decimal(8, 2)
+  ativo           Boolean     @default(true)
+  destaque        Boolean     @default(false)
+  categoryId      String
+  criadoEm        DateTime    @default(now())
+  atualizadoEm    DateTime    @updatedAt
 
   category   Category        @relation(fields: [categoryId], references: [id])
   imagens    ProductImage[]
