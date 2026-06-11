@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { toast } from "sonner";
 import Link from "next/link";
 import { FormField } from "./FormField";
@@ -36,7 +37,7 @@ export function CategoryForm({
     handleSubmit,
     setValue,
     formState: { errors },
-  } = useForm<CategoryInput>({
+  } = useForm<z.input<typeof categorySchema>, unknown, CategoryInput>({
     resolver: zodResolver(categorySchema),
     defaultValues: initialData ?? {
       nome: "",
