@@ -38,6 +38,28 @@ export const productSchema = z.object({
   categoryId: z.string().min(1, "Selecione uma categoria"),
   ativo: checkboxBool.default(true),
   destaque: checkboxBool.default(false),
+  metaTitle: z.string().max(70, "Máx 70 caracteres").optional().or(z.literal("")),
+  metaDescription: z
+    .string()
+    .max(170, "Máx 170 caracteres")
+    .optional()
+    .or(z.literal("")),
 });
 
 export type ProductInput = z.infer<typeof productSchema>;
+
+// ── Vídeos (relação filha gerenciada como array no form) ───────────────────
+// Validado na action a partir do JSON serializado pelo ProductForm.
+export const videoDraftSchema = z.object({
+  id: z.string().optional(), // presente em vídeos já existentes (edição)
+  platform: z.enum(["YOUTUBE", "INSTAGRAM", "TIKTOK"]),
+  videoId: z.string().nullable().optional(),
+  originalUrl: z.string().url("URL inválida"),
+  titulo: z.string().max(200).optional().or(z.literal("")),
+  thumbnailUrl: z.string().url("Thumbnail inválida").optional().or(z.literal("")),
+  principal: z.boolean().optional(),
+});
+
+export const videosSchema = z.array(videoDraftSchema);
+
+export type VideoDraft = z.infer<typeof videoDraftSchema>;

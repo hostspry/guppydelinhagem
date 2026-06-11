@@ -7,9 +7,14 @@ import { z } from "zod";
 import { toast } from "sonner";
 import Link from "next/link";
 import { FormField } from "./FormField";
-import { productSchema, type ProductInput } from "@/lib/validations/product";
+import {
+  productSchema,
+  type ProductInput,
+  type VideoDraft,
+} from "@/lib/validations/product";
 import { slugify } from "@/lib/utils/slug";
 import { createProduct, updateProduct } from "@/actions/products";
+import { ProductVideosField } from "./ProductVideosField";
 
 const inputClass =
   "w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:border-[#FF035C] focus:ring-1 focus:ring-[#FF035C]";
@@ -30,12 +35,16 @@ type ProductFormProps = {
     categoryId: string;
     ativo: boolean;
     destaque: boolean;
+    metaTitle: string | null;
+    metaDescription: string | null;
+    videos: VideoDraft[];
   };
 };
 
 export function ProductForm({ categorias, initialData }: ProductFormProps) {
   const [isPending, startTransition] = useTransition();
   const [slugManuallyEdited, setSlugManuallyEdited] = useState(!!initialData);
+  const [videos, setVideos] = useState<VideoDraft[]>(initialData?.videos ?? []);
 
   const {
     register,
@@ -58,6 +67,8 @@ export function ProductForm({ categorias, initialData }: ProductFormProps) {
           categoryId: initialData.categoryId,
           ativo: initialData.ativo,
           destaque: initialData.destaque,
+          metaTitle: initialData.metaTitle ?? "",
+          metaDescription: initialData.metaDescription ?? "",
         }
       : {
           nome: "",
@@ -72,6 +83,8 @@ export function ProductForm({ categorias, initialData }: ProductFormProps) {
           categoryId: "",
           ativo: true,
           destaque: false,
+          metaTitle: "",
+          metaDescription: "",
         },
   });
 
@@ -103,6 +116,10 @@ export function ProductForm({ categorias, initialData }: ProductFormProps) {
     formData.append("categoryId", data.categoryId);
     formData.append("ativo", String(data.ativo));
     formData.append("destaque", String(data.destaque));
+    if (data.metaTitle) formData.append("metaTitle", data.metaTitle);
+    if (data.metaDescription)
+      formData.append("metaDescription", data.metaDescription);
+    formData.append("videos", JSON.stringify(videos));
 
     startTransition(async () => {
       const result = initialData
@@ -203,6 +220,9 @@ export function ProductForm({ categorias, initialData }: ProductFormProps) {
           />
         </FormField>
       </fieldset>
+
+      {/* Vídeos */}
+      <ProductVideosField value={videos} onChange={setVideos} />
 
       {/* Preço & estoque */}
       <fieldset className="bg-white border border-gray-200 rounded-lg p-5">
@@ -307,6 +327,42 @@ export function ProductForm({ categorias, initialData }: ProductFormProps) {
             vitrine da home.
           </span>
         </label>
+      </fieldset>
+
+      {/* SEO */}
+      <fieldset className="bg-white border border-gray-200 rounded-lg p-5">
+        <legend className="px-2 text-xs font-semibold text-[#07366A] uppercase tracking-wide">
+          SEO
+        </legend>
+
+        <FormField
+          label="Meta título"
+          name="metaTitle"
+          error={errors.metaTitle?.message}
+          hint="Título da página nos resultados de busca (~60 caracteres). Opcional."
+        >
+          <input
+            id="metaTitle"
+            {...register("metaTitle")}
+            className={inputClass}
+            placeholder="Guppy Koi Red Ear — casal premium | Guppy de Linhagem"
+          />
+        </FormField>
+
+        <FormField
+          label="Meta descrição"
+          name="metaDescription"
+          error={errors.metaDescription?.message}
+          hint="Trecho exibido no Google (~155 caracteres). Opcional."
+        >
+          <textarea
+            id="metaDescription"
+            {...register("metaDescription")}
+            rows={2}
+            className={inputClass}
+            placeholder="Casal de Guppy Koi Red Ear de linhagem importada, pronto para reprodução…"
+          />
+        </FormField>
       </fieldset>
 
       <div className="flex gap-2">

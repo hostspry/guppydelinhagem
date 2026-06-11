@@ -42,6 +42,7 @@ export default async function ProdutosPage() {
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr className="text-left text-xs font-medium text-gray-500 uppercase tracking-wide">
+                <th className="px-4 py-3 w-12"></th>
                 <th className="px-4 py-3">Nome</th>
                 <th className="px-4 py-3">Categoria</th>
                 <th className="px-4 py-3 text-right">Preço</th>
@@ -54,6 +55,18 @@ export default async function ProdutosPage() {
             <tbody className="divide-y divide-gray-100">
               {produtos.map((p) => (
                 <tr key={p.id} className="hover:bg-gray-50">
+                  <td className="px-4 py-3">
+                    <div className="w-9 aspect-[9/16] rounded bg-gray-100 overflow-hidden">
+                      {p.videos[0]?.thumbnailUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={p.videos[0].thumbnailUrl}
+                          alt=""
+                          className="w-full h-full object-cover"
+                        />
+                      ) : null}
+                    </div>
+                  </td>
                   <td className="px-4 py-3 font-medium text-[#07366A]">{p.nome}</td>
                   <td className="px-4 py-3 text-gray-600">{p.category.nome}</td>
                   <td className="px-4 py-3 text-right text-gray-700 tabular-nums">

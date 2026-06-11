@@ -5,6 +5,12 @@ export async function listProducts() {
     orderBy: { criadoEm: "desc" },
     include: {
       category: { select: { nome: true } },
+      // Vídeo principal (capa) para a thumbnail da listagem.
+      videos: {
+        where: { principal: true },
+        take: 1,
+        select: { thumbnailUrl: true, platform: true },
+      },
       _count: {
         select: { imagens: true, videos: true, orderItems: true, waitlist: true },
       },
@@ -17,7 +23,13 @@ export async function listProducts() {
  * retornar — Decimal (Prisma) não serializa direto para Client Component.
  */
 export async function getProductById(id: string) {
-  const p = await prisma.product.findUnique({ where: { id } });
+  const p = await prisma.product.findUnique({
+    where: { id },
+    include: {
+      // Principal primeiro, depois pela ordem dos adicionais.
+      videos: { orderBy: [{ principal: "desc" }, { ordem: "asc" }] },
+    },
+  });
   if (!p) return null;
 
   return {
