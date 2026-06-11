@@ -272,13 +272,13 @@ function VideoRow({
       }`}
     >
       {/* Thumbnail 9:16 */}
-      <div className="relative w-14 shrink-0 aspect-[9/16] bg-gray-100 rounded overflow-hidden">
+      <div className="relative w-[110px] shrink-0 aspect-[9/16] bg-gray-100 rounded overflow-hidden">
         {video.thumbnailUrl ? (
           <Image
             src={video.thumbnailUrl}
             alt={video.titulo || "Thumbnail do vídeo"}
             fill
-            sizes="56px"
+            sizes="110px"
             className="object-cover"
             unoptimized={!isConfiguredImageHost(video.thumbnailUrl)}
           />
@@ -327,7 +327,7 @@ function VideoRow({
                     key={f}
                     onClick={() => onPatch({ thumbnailUrl: f })}
                     aria-label="Usar este frame como capa"
-                    className={`relative w-24 aspect-video rounded overflow-hidden border-2 transition-colors ${
+                    className={`relative w-40 aspect-video rounded overflow-hidden border-2 transition-colors ${
                       selected
                         ? "border-[#0EA5E9] ring-1 ring-[#0EA5E9]"
                         : "border-transparent hover:border-gray-300"
@@ -337,7 +337,7 @@ function VideoRow({
                       src={f}
                       alt=""
                       fill
-                      sizes="96px"
+                      sizes="160px"
                       className="object-cover"
                     />
                   </button>
