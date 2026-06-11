@@ -1,3 +1,7 @@
+// TODO (Fase 2): os 3 produtos abaixo com categoria: "linhagem" devem virar
+// "linhagens-exclusivas" pra bater com o slug em CATEGORIES — hoje o filtro
+// por essa categoria nunca acha nada.
+
 export type CategoryMock = {
   slug: string;
   nome: string;
