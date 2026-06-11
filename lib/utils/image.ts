@@ -5,6 +5,7 @@ const CONFIGURED_IMAGE_HOSTS = new Set([
   "img.youtube.com",
   "i.ytimg.com",
   "www.guppydelinhagem.com.br",
+  "media.guppydelinhagem.com.br",
   "utfs.io",
 ]);
 

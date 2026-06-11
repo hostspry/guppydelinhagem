@@ -7,6 +7,7 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "img.youtube.com" },
       { protocol: "https", hostname: "i.ytimg.com" },
       { protocol: "https", hostname: "www.guppydelinhagem.com.br" },
+      { protocol: "https", hostname: "media.guppydelinhagem.com.br" },
       { protocol: "https", hostname: "utfs.io" },
     ],
   },
