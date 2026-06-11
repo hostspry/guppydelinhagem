@@ -149,6 +149,7 @@ export async function createProduct(formData: FormData): Promise<ActionResult> {
   // detalhe + edição), não só a rota da listagem — assim a tela de edição não
   // serve RSC em cache stale ao voltar para o produto.
   revalidatePath("/admin/produtos", "layout");
+  revalidatePath("/"); // home pública reflete o novo produto
   redirect("/admin/produtos");
 }
 
@@ -199,6 +200,7 @@ export async function updateProduct(
   }
 
   revalidatePath("/admin/produtos", "layout");
+  revalidatePath("/"); // home pública reflete a edição
   redirect("/admin/produtos");
 }
 
@@ -247,6 +249,7 @@ export async function deleteProduct(id: string): Promise<ActionResult> {
   );
 
   revalidatePath("/admin/produtos", "layout");
+  revalidatePath("/"); // home pública deixa de mostrar o produto excluído
   return { success: true, message: "Produto excluído." };
 }
 

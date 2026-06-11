@@ -1,12 +1,12 @@
 import Link from "next/link";
 import ProductCard from "@/components/product/ProductCard";
 import SectionHeader from "@/components/home/SectionHeader";
-import type { ProductMock } from "@/lib/mock-data";
+import type { PublicProductCard } from "@/lib/queries/products";
 
 type Props = {
   title: string;
   highlight: string;
-  products: ProductMock[];
+  products: PublicProductCard[];
   verTudoHref: string;
 };
 

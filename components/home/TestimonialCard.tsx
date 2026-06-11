@@ -1,5 +1,5 @@
 import Image from "next/image";
-import type { Testimonial } from "@/lib/mock-data";
+import type { Testimonial } from "@/lib/home-content";
 
 function StarIcon() {
   return (

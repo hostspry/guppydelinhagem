@@ -1,8 +1,8 @@
 import Image from "next/image";
 import Link from "next/link";
-import type { CategoryMock } from "@/lib/mock-data";
+import type { HomeCategory } from "@/lib/home-content";
 
-export default function CategoryCard({ category }: { category: CategoryMock }) {
+export default function CategoryCard({ category }: { category: HomeCategory }) {
   return (
     <Link
       href={category.href}

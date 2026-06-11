@@ -1,3 +1,7 @@
+// DEPRECATED (Fase 4a): a home agora lê produtos do banco (lib/queries/products.ts)
+// e o conteúdo estático (categorias/depoimentos) está em lib/home-content.ts.
+// Mantido só por referência histórica — NÃO importar em código novo.
+
 // TODO (Fase 2): os 3 produtos abaixo com categoria: "linhagem" devem virar
 // "linhagens-exclusivas" pra bater com o slug em CATEGORIES — hoje o filtro
 // por essa categoria nunca acha nada.

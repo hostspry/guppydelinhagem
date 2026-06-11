@@ -6,15 +6,26 @@ import SectionHeader from "@/components/home/SectionHeader";
 import CategoryCard from "@/components/home/CategoryCard";
 import ProductGrid from "@/components/home/ProductGrid";
 import TestimonialsSection from "@/components/home/TestimonialsSection";
-import { CATEGORIES, PRODUCTS_MOCK } from "@/lib/mock-data";
+import { CATEGORIES } from "@/lib/home-content";
+import {
+  getDestaques,
+  getUltimosAdicionados,
+  getCasais,
+} from "@/lib/queries/products";
 
-// HeroSection consulta o banco — DATABASE_URL não está disponível no build do
-// CapRover. Marca dynamic pra DB query rodar em request-time, não build-time.
+// HeroSection e as seções de produto consultam o banco. force-dynamic faz a
+// query rodar em request-time (DATABASE_URL não existe no build do CapRover) e,
+// de quebra, a home sempre reflete o que foi cadastrado/editado no admin —
+// sem cache stale (revalidação imediata). As actions de produto também chamam
+// revalidatePath("/") como reforço explícito.
 export const dynamic = "force-dynamic";
 
-export default function HomePage() {
-  const destaques = PRODUCTS_MOCK.filter((p) => p.destaque);
-  const casais = PRODUCTS_MOCK.filter((p) => p.categoria === "casais");
+export default async function HomePage() {
+  const [destaques, ultimos, casais] = await Promise.all([
+    getDestaques(),
+    getUltimosAdicionados(),
+    getCasais(),
+  ]);
 
   return (
     <>
@@ -38,28 +49,32 @@ export default function HomePage() {
       </section>
 
       {/* ── Seção 3: Mais Procurados ── */}
-      <section className="bg-[#ECE7E8]/40 py-16">
-        <div className="container-site">
-          <ProductGrid
-            title="Mais"
-            highlight="Procurados"
-            products={destaques}
-            verTudoHref="/loja?categoria=peixes-de-linhagem"
-          />
-        </div>
-      </section>
+      {destaques.length > 0 && (
+        <section className="bg-[#ECE7E8]/40 py-16">
+          <div className="container-site">
+            <ProductGrid
+              title="Mais"
+              highlight="Procurados"
+              products={destaques}
+              verTudoHref="/loja?categoria=peixes-de-linhagem"
+            />
+          </div>
+        </section>
+      )}
 
       {/* ── Seção 4: Últimos Adicionados ── */}
-      <section className="bg-white py-16">
-        <div className="container-site">
-          <ProductGrid
-            title="Últimos"
-            highlight="Adicionados"
-            products={PRODUCTS_MOCK}
-            verTudoHref="/loja"
-          />
-        </div>
-      </section>
+      {ultimos.length > 0 && (
+        <section className="bg-white py-16">
+          <div className="container-site">
+            <ProductGrid
+              title="Últimos"
+              highlight="Adicionados"
+              products={ultimos}
+              verTudoHref="/loja"
+            />
+          </div>
+        </section>
+      )}
 
       {/* ── Seção 5: História de Vitórias + Aprenda Sobre ── */}
       <section className="bg-white py-20">
@@ -146,16 +161,18 @@ export default function HomePage() {
       </section>
 
       {/* ── Seção 6: Casais de Guppy ── */}
-      <section className="bg-[#ECE7E8]/40 py-16">
-        <div className="container-site">
-          <ProductGrid
-            title="Casais de"
-            highlight="Guppy"
-            products={casais.length > 0 ? casais : PRODUCTS_MOCK.slice(0, 2)}
-            verTudoHref="/loja?categoria=casais"
-          />
-        </div>
-      </section>
+      {casais.length > 0 && (
+        <section className="bg-[#ECE7E8]/40 py-16">
+          <div className="container-site">
+            <ProductGrid
+              title="Casais de"
+              highlight="Guppy"
+              products={casais}
+              verTudoHref="/loja?categoria=casais"
+            />
+          </div>
+        </section>
+      )}
 
       {/* ── Seção 7: Avaliações de Clientes ── */}
       <TestimonialsSection />

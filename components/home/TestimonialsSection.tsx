@@ -1,7 +1,7 @@
 import WaveDivider from "@/components/site/WaveDivider";
 import SectionHeader from "@/components/home/SectionHeader";
 import TestimonialCard from "@/components/home/TestimonialCard";
-import { TESTIMONIALS } from "@/lib/mock-data";
+import { TESTIMONIALS } from "@/lib/home-content";
 
 export default function TestimonialsSection() {
   return (

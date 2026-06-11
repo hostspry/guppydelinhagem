@@ -281,6 +281,30 @@ Reusar componentes existentes — não reinventar.
 
 ---
 
+
+### Futuro: múltiplos tipos de produto (NÃO construir até existir demanda real)
+
+A loja hoje vende **apenas peixe** (guppy de linhagem). Toda a Fase 7 (IA de
+geração) e a assinatura institucional da Marchezi foram desenhadas para peixe:
+pesquisa de linhagem (origem, genética, manejo) + assinatura de criação.
+
+**Quando a loja passar a vender ração, plantas, equipamentos ou medicamentos**,
+esses produtos exigem tratamento diferente:
+- A pesquisa de "linhagem" não se aplica (ração não tem genética).
+- O prompt de "guppy pedigree" não serve.
+- A assinatura "criados com seleção genética" é absurda numa ração.
+
+**Decisão registrada:** NÃO construir o multi-tipo agora (YAGNI — não temos esses
+produtos ainda; construir no escuro = refazer depois). Quando a demanda for real:
+- Distinguir o comportamento da IA por **categoria/tipo de produto** (a estrutura
+  de Categoria já existe e é o gancho natural).
+- Assinatura institucional vira **condicional**: peixe tem a da fazenda; outros
+  tipos têm outra (ou nenhuma).
+- Provável trava intermediária: restringir o botão "Gerar com IA" de linhagem +
+  assinatura às categorias de peixe, para não gerar bobagem em produtos não-peixe.
+
+Isso é certo que virá — só não agora.
+
 ## 11. Próximos passos
 
 - **Fase 7 — IA (a essência):** campo de briefing em texto livre + a IA lê o contexto
