@@ -1,11 +1,13 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import Image from "next/image";
 import { Plus, Eye, Trash2, Star, X } from "lucide-react";
 import { toast } from "sonner";
 import type { VideoDraft } from "@/lib/validations/product";
 import { fetchVideoMetadata } from "@/actions/products";
 import { youtubeEmbedUrl } from "@/lib/utils/video";
+import { isConfiguredImageHost } from "@/lib/utils/image";
 
 type Props = {
   value: VideoDraft[];
@@ -228,11 +230,13 @@ function VideoRow({
       {/* Thumbnail 9:16 */}
       <div className="relative w-14 shrink-0 aspect-[9/16] bg-gray-100 rounded overflow-hidden">
         {video.thumbnailUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
+          <Image
             src={video.thumbnailUrl}
             alt={video.titulo || "Thumbnail do vídeo"}
-            className="w-full h-full object-cover"
+            fill
+            sizes="56px"
+            className="object-cover"
+            unoptimized={!isConfiguredImageHost(video.thumbnailUrl)}
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-[10px] text-gray-400 text-center px-1">

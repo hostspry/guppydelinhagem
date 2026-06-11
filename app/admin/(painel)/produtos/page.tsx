@@ -1,7 +1,9 @@
 import Link from "next/link";
+import Image from "next/image";
 import { Plus, Pencil } from "lucide-react";
 import { listProducts } from "@/lib/queries/products";
 import { formatBRL } from "@/lib/utils/format";
+import { isConfiguredImageHost } from "@/lib/utils/image";
 import { PageHeader } from "@/components/admin/PageHeader";
 import { DeleteProductButton } from "@/components/admin/DeleteProductButton";
 
@@ -56,13 +58,15 @@ export default async function ProdutosPage() {
               {produtos.map((p) => (
                 <tr key={p.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3">
-                    <div className="w-9 aspect-[9/16] rounded bg-gray-100 overflow-hidden">
+                    <div className="relative w-9 aspect-[9/16] rounded bg-gray-100 overflow-hidden">
                       {p.videos[0]?.thumbnailUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
+                        <Image
                           src={p.videos[0].thumbnailUrl}
                           alt=""
-                          className="w-full h-full object-cover"
+                          fill
+                          sizes="36px"
+                          className="object-cover"
+                          unoptimized={!isConfiguredImageHost(p.videos[0].thumbnailUrl)}
                         />
                       ) : null}
                     </div>
