@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import Image from "next/image";
-import { Plus, Eye, Trash2, Star, X } from "lucide-react";
+import { Plus, Eye, Trash2, Star, X, ImageUp } from "lucide-react";
 import { toast } from "sonner";
 import type { VideoDraft } from "@/lib/validations/product";
 import { fetchVideoMetadata } from "@/actions/products";
+import { uploadProductImage } from "@/actions/upload";
 import { youtubeEmbedUrl } from "@/lib/utils/video";
 import { isConfiguredImageHost } from "@/lib/utils/image";
 
@@ -220,6 +221,21 @@ function VideoRow({
   onPatch: (partial: Partial<VideoDraft>) => void;
 }) {
   const manual = video.platform !== "YOUTUBE";
+  const [uploading, startUpload] = useTransition();
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // permite re-selecionar o mesmo arquivo
+    if (!file) return;
+    const fd = new FormData();
+    fd.append("file", file);
+    startUpload(async () => {
+      const res = await uploadProductImage(fd);
+      if (res.ok) onPatch({ thumbnailUrl: res.url });
+      else toast.error(res.error);
+    });
+  }
 
   return (
     <div
@@ -263,9 +279,29 @@ function VideoRow({
               className="w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:border-[#FF035C]"
             />
             <input
+              ref={fileRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              onChange={handleUpload}
+              className="hidden"
+            />
+            <button
+              type="button"
+              onClick={() => fileRef.current?.click()}
+              disabled={uploading}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 border border-gray-300 rounded text-xs font-medium text-gray-700 hover:border-gray-400 disabled:opacity-50 transition-all"
+            >
+              <ImageUp className="w-3.5 h-3.5" aria-hidden="true" />
+              {uploading
+                ? "Enviando…"
+                : video.thumbnailUrl
+                  ? "Trocar imagem"
+                  : "Enviar imagem (capa)"}
+            </button>
+            <input
               value={video.thumbnailUrl ?? ""}
               onChange={(e) => onPatch({ thumbnailUrl: e.target.value })}
-              placeholder="URL da thumbnail (manual)"
+              placeholder="ou cole uma URL de imagem"
               className="w-full px-2 py-1 border border-gray-300 rounded text-xs font-mono focus:outline-none focus:border-[#FF035C]"
             />
           </div>
