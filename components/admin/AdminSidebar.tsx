@@ -17,6 +17,9 @@ type NavItem = {
   href: string;
   label: string;
   icon: typeof LayoutDashboard;
+  // Rota ainda não construída: link visível (navegação futura), mas sem
+  // prefetch — evita o 404 logado no console pelo prefetch do Next.
+  prefetch?: boolean;
 };
 
 type NavSection = {
@@ -34,20 +37,30 @@ const NAV_SECTIONS: NavSection[] = [
     items: [
       { href: "/admin/produtos", label: "Produtos", icon: Package },
       { href: "/admin/categorias", label: "Categorias", icon: FolderTree },
-      { href: "/admin/hero-slides", label: "Hero da home", icon: ImageIcon },
+      {
+        href: "/admin/hero-slides",
+        label: "Hero da home",
+        icon: ImageIcon,
+        prefetch: false,
+      },
     ],
   },
   {
     title: "Vendas",
     items: [
       { href: "/admin/pedidos", label: "Pedidos", icon: ShoppingCart },
-      { href: "/admin/clientes", label: "Clientes", icon: Users },
+      { href: "/admin/clientes", label: "Clientes", icon: Users, prefetch: false },
     ],
   },
   {
     title: "Sistema",
     items: [
-      { href: "/admin/configuracoes", label: "Configurações", icon: Settings },
+      {
+        href: "/admin/configuracoes",
+        label: "Configurações",
+        icon: Settings,
+        prefetch: false,
+      },
     ],
   },
 ];
@@ -87,6 +100,7 @@ export function AdminSidebar({ onNavigate }: { onNavigate?: () => void }) {
                 <Link
                   key={item.href}
                   href={item.href}
+                  prefetch={item.prefetch}
                   onClick={onNavigate}
                   className={`flex items-center gap-2.5 px-3 py-2 rounded-md text-xs transition-colors ${
                     active
