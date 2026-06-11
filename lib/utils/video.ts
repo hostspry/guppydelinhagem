@@ -42,6 +42,26 @@ export function youtubeThumbnailUrl(videoId: string): string {
   return `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
 }
 
+/**
+ * Thumbnail HD (1280×720, 16:9 limpo — sem o letterbox que a hqdefault 4:3 traz).
+ * Nem todo vídeo tem maxres (o YouTube responde 404), então no client ela é usada
+ * com fallback para a hqdefault. Persistimos sempre a hqdefault (sempre existe) e
+ * só fazemos o upgrade para maxres na exibição — ver youtubeHqToMaxRes.
+ */
+export function youtubeMaxResThumbnailUrl(videoId: string): string {
+  return `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
+}
+
+/**
+ * Versão maxres (HD) de uma URL de thumbnail *canônica* (hqdefault) do YouTube.
+ * Vale só para a hqdefault — os frames de seek (1/2/3.jpg) não têm versão HD.
+ * Retorna null quando a URL não é uma hqdefault do YouTube (ex.: imagem própria).
+ */
+export function youtubeHqToMaxRes(url: string): string | null {
+  const m = url.match(/\/vi\/([A-Za-z0-9_-]+)\/hqdefault\.jpg/);
+  return m ? youtubeMaxResThumbnailUrl(m[1]) : null;
+}
+
 /** URL de embed (usada no facade — iframe carregado só sob demanda). */
 export function youtubeEmbedUrl(videoId: string): string {
   return `https://www.youtube.com/embed/${videoId}`;

@@ -1,7 +1,6 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
-import Image from "next/image";
 import { Plus, Eye, Trash2, Star, X, ImageUp } from "lucide-react";
 import { toast } from "sonner";
 import type { VideoDraft } from "@/lib/validations/product";
@@ -13,7 +12,7 @@ import {
   instagramEmbedUrl,
   tiktokEmbedUrl,
 } from "@/lib/utils/video";
-import { isConfiguredImageHost } from "@/lib/utils/image";
+import { VideoThumb } from "./VideoThumb";
 
 /** URL de embed por plataforma; null quando não há id resolvido (cai no fallback). */
 function embedSrcFor(v: VideoDraft): string | null {
@@ -274,13 +273,10 @@ function VideoRow({
       {/* Thumbnail 9:16 */}
       <div className="relative w-[110px] shrink-0 aspect-[9/16] bg-gray-100 rounded overflow-hidden">
         {video.thumbnailUrl ? (
-          <Image
+          <VideoThumb
             src={video.thumbnailUrl}
             alt={video.titulo || "Thumbnail do vídeo"}
-            fill
             sizes="110px"
-            className="object-cover"
-            unoptimized={!isConfiguredImageHost(video.thumbnailUrl)}
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-[10px] text-gray-400 text-center px-1">
@@ -333,13 +329,7 @@ function VideoRow({
                         : "border-transparent hover:border-gray-300"
                     }`}
                   >
-                    <Image
-                      src={f}
-                      alt=""
-                      fill
-                      sizes="160px"
-                      className="object-cover"
-                    />
+                    <VideoThumb src={f} alt="" sizes="160px" />
                   </button>
                 );
               })}
@@ -361,7 +351,7 @@ function VideoRow({
             type="button"
             onClick={() => fileRef.current?.click()}
             disabled={uploading}
-            className="inline-flex items-center gap-1.5 px-2.5 py-1 border border-gray-300 rounded text-xs font-medium text-gray-700 hover:border-gray-400 disabled:opacity-50 transition-all"
+            className="inline-flex items-center gap-1.5 px-2.5 py-1 border border-[#FF035C]/50 rounded text-xs font-medium text-[#FF035C] hover:border-[#FF035C] hover:bg-[#FF035C]/5 disabled:opacity-50 transition-all"
           >
             <ImageUp className="w-3.5 h-3.5" aria-hidden="true" />
             {uploading
@@ -370,6 +360,9 @@ function VideoRow({
                 ? "Trocar imagem"
                 : "Enviar imagem (capa)"}
           </button>
+          <p className="text-[10px] text-gray-400 mt-1">
+            Para a melhor capa, envie sua própria imagem.
+          </p>
         </div>
 
         {/* IG/TikTok: alternativa de colar uma URL de imagem manualmente */}
