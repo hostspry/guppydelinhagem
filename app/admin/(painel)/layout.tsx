@@ -1,5 +1,8 @@
-import { auth, signOut } from "@/lib/auth";
+import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
+import { Toaster } from "sonner";
+import { AdminSidebar } from "@/components/admin/AdminSidebar";
+import { AdminHeader } from "@/components/admin/AdminHeader";
 
 export default async function PainelLayout({
   children,
@@ -20,32 +23,22 @@ export default async function PainelLayout({
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center">
-        <h1 className="text-lg font-semibold text-[#07366A]">
-          Guppy de Linhagem — Admin
-        </h1>
-        <div className="flex items-center gap-4 text-sm">
-          <span className="text-gray-600">
-            {session.user.name}{" "}
-            <span className="text-gray-400">({session.user.role})</span>
-          </span>
-          <form
-            action={async () => {
-              "use server";
-              await signOut({ redirectTo: "/admin/login" });
-            }}
-          >
-            <button
-              type="submit"
-              className="text-[#FF035C] hover:underline font-medium"
-            >
-              Sair
-            </button>
-          </form>
-        </div>
-      </header>
-      <main className="p-6">{children}</main>
+    <div className="min-h-screen flex bg-gray-50">
+      {/* Sidebar desktop (sticky, full height) */}
+      <div className="hidden md:flex md:sticky md:top-0 md:h-screen">
+        <AdminSidebar />
+      </div>
+
+      {/* Conteúdo principal */}
+      <div className="flex-1 flex flex-col min-w-0">
+        <AdminHeader
+          userName={session.user.name ?? "Admin"}
+          userRole={session.user.role}
+          breadcrumb="Início"
+        />
+        <main className="flex-1 p-4 md:p-6 overflow-x-hidden">{children}</main>
+      </div>
+      <Toaster position="top-right" richColors closeButton />
     </div>
   );
 }
