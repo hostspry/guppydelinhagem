@@ -97,6 +97,7 @@ model Product {
   descricaoCurta  String?
   metaTitle       String?
   metaDescription String?
+  keywords        String[]    @default([])
   preco           Decimal     @db.Decimal(10, 2)
   descontoPix     Decimal?    @db.Decimal(5, 2)
   parcelasMax     Int         @default(3)

@@ -44,6 +44,10 @@ export const productSchema = z.object({
     .max(170, "Máx 170 caracteres")
     .optional()
     .or(z.literal("")),
+  keywords: z
+    .array(z.string().trim().min(1).max(60))
+    .max(20, "Máximo de 20 palavras-chave")
+    .default([]),
 });
 
 export type ProductInput = z.infer<typeof productSchema>;

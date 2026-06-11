@@ -20,6 +20,17 @@ import {
   isPrismaError,
 } from "@/lib/utils/action-result";
 
+/** Keywords chegam como JSON (array serializado pelo form). Falha → []. */
+function parseKeywordsField(raw: FormDataEntryValue | null): string[] {
+  if (typeof raw !== "string" || raw.trim() === "") return [];
+  try {
+    const json = JSON.parse(raw);
+    return Array.isArray(json) ? json : [];
+  } catch {
+    return [];
+  }
+}
+
 function parseForm(formData: FormData) {
   return productSchema.safeParse({
     nome: formData.get("nome"),
@@ -36,6 +47,7 @@ function parseForm(formData: FormData) {
     destaque: formData.get("destaque"),
     metaTitle: formData.get("metaTitle") || undefined,
     metaDescription: formData.get("metaDescription") || undefined,
+    keywords: parseKeywordsField(formData.get("keywords")),
   });
 }
 
@@ -56,6 +68,7 @@ function toData(input: ReturnType<typeof productSchema.parse>) {
     destaque: input.destaque,
     metaTitle: input.metaTitle ? input.metaTitle : null,
     metaDescription: input.metaDescription ? input.metaDescription : null,
+    keywords: input.keywords,
   };
 }
 
