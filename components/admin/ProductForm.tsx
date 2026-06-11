@@ -5,7 +5,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
-import { Sparkles } from "lucide-react";
+import { Sparkles, Search } from "lucide-react";
 import Link from "next/link";
 import { FormField } from "./FormField";
 import {
@@ -21,6 +21,18 @@ import { KeywordsField } from "./KeywordsField";
 
 const inputClass =
   "w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:border-[#FF035C] focus:ring-1 focus:ring-[#FF035C]";
+
+// Templates de briefing clicáveis. `pesquisar` liga o grounding na geração.
+// Por enquanto só um; o array deixa fácil adicionar outros depois.
+const BRIEFING_TEMPLATES: { label: string; texto: string; pesquisar: boolean }[] =
+  [
+    {
+      label: "Pesquisar linhagem",
+      pesquisar: true,
+      texto:
+        "Pesquise a origem, características genéticas, padrão de cor, manejo (parâmetros de água, temperatura, alimentação, cuidados) e como criar esta linhagem. Priorize fontes especializadas em inglês e da Ásia (Tailândia, Japão, China, Taiwan), incluindo criadores e lojas de referência. Traga a informação técnica e confiável em português, sem inventar — se não encontrar dado sobre algum ponto, omita em vez de supor.",
+    },
+  ];
 
 type ProductFormProps = {
   categorias: { id: string; nome: string }[];
@@ -59,6 +71,8 @@ export function ProductForm({ categorias, initialData }: ProductFormProps) {
   const [briefing, setBriefing] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
   const [aiGenerated, setAiGenerated] = useState(false);
+  // Pesquisa web (grounding) sob demanda: liga ao aplicar o template de pesquisa.
+  const [pesquisarAtivo, setPesquisarAtivo] = useState(false);
 
   const {
     register,
@@ -119,10 +133,22 @@ export function ProductForm({ categorias, initialData }: ProductFormProps) {
   const primaryVideo = videos.find((v) => v.principal) ?? videos[0];
   const canGenerate = !!primaryVideo?.titulo?.trim() || !!briefing.trim();
 
+  function applyTemplate(t: (typeof BRIEFING_TEMPLATES)[number]) {
+    setBriefing(t.texto); // substitui o conteúdo; operador edita depois
+    if (t.pesquisar) setPesquisarAtivo(true);
+  }
+
+  function handleBriefingChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
+    const v = e.target.value;
+    setBriefing(v);
+    // Se o operador apagou tudo, a pesquisa deixa de fazer sentido — reseta.
+    if (v.trim() === "") setPesquisarAtivo(false);
+  }
+
   async function handleGenerate() {
     if (aiGenerated) {
       const ok = window.confirm(
-        "Isto vai substituir descrição, descrição curta, SEO e palavras-chave. Edições manuais nesses campos serão perdidas. Continuar?",
+        "Isto vai substituir nome, descrição, descrição curta, SEO e palavras-chave. Edições manuais nesses campos serão perdidas. Continuar?",
       );
       if (!ok) return;
     }
@@ -134,12 +160,19 @@ export function ProductForm({ categorias, initialData }: ProductFormProps) {
         videoTitle: primaryVideo?.titulo ?? "",
         briefing,
         categoria,
+        pesquisar: pesquisarAtivo,
       });
       if (!res.ok) {
         toast.error(res.error);
         return;
       }
       const d = res.data;
+      setValue("nome", d.nome, { shouldValidate: true });
+      // Slug deriva do nome pelo mecanismo existente — só recalcula se o operador
+      // ainda não editou o slug à mão (mesma regra do handleNomeChange).
+      if (!slugManuallyEdited) {
+        setValue("slug", slugify(d.nome), { shouldValidate: true });
+      }
       setValue("descricao", d.descricao, { shouldValidate: true });
       setValue("descricaoCurta", d.descricaoCurta, { shouldValidate: true });
       setValue("metaTitle", d.metaTitle, { shouldValidate: true });
@@ -215,14 +248,38 @@ export function ProductForm({ categorias, initialData }: ProductFormProps) {
         >
           Briefing <span className="text-gray-400">(opcional)</span>
         </label>
+
+        {/* Templates clicáveis de briefing */}
+        <div className="flex flex-wrap gap-2 mb-2">
+          {BRIEFING_TEMPLATES.map((t) => (
+            <button
+              key={t.label}
+              type="button"
+              onClick={() => applyTemplate(t)}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 border border-[#07366A]/30 rounded-full text-xs font-medium text-[#07366A] hover:bg-[#07366A]/5 transition-all"
+            >
+              <Search className="w-3.5 h-3.5" aria-hidden="true" />
+              {t.label}
+            </button>
+          ))}
+        </div>
+
         <textarea
           id="ai-briefing"
           value={briefing}
-          onChange={(e) => setBriefing(e.target.value)}
-          rows={2}
+          onChange={handleBriefingChange}
+          rows={3}
           className={inputClass}
           placeholder="macho, cauda véu, linhagem importada, pais campeões, últimas unidades"
         />
+
+        {pesquisarAtivo && (
+          <p className="flex items-center gap-1.5 text-[11px] text-[#07366A] mt-1.5 font-medium">
+            <Search className="w-3.5 h-3.5" aria-hidden="true" />
+            Pesquisa web ativada — esta geração consulta fontes online (mais
+            lenta e com custo maior).
+          </p>
+        )}
 
         <div className="flex items-center gap-3 mt-3">
           <button
@@ -233,7 +290,9 @@ export function ProductForm({ categorias, initialData }: ProductFormProps) {
           >
             <Sparkles className="w-4 h-4" aria-hidden="true" />
             {aiLoading
-              ? "Gerando…"
+              ? pesquisarAtivo
+                ? "Pesquisando…"
+                : "Gerando…"
               : aiGenerated
                 ? "Gerar novamente"
                 : "Gerar com IA"}
