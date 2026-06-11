@@ -105,6 +105,7 @@ model Product {
   largura        Decimal?    @db.Decimal(8, 2)
   altura         Decimal?    @db.Decimal(8, 2)
   ativo          Boolean     @default(true)
+  destaque       Boolean     @default(false)
   categoryId     String
   criadoEm       DateTime    @default(now())
   atualizadoEm   DateTime    @updatedAt
