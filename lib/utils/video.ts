@@ -43,3 +43,13 @@ export function youtubeThumbnailUrl(videoId: string): string {
 export function youtubeEmbedUrl(videoId: string): string {
   return `https://www.youtube.com/embed/${videoId}`;
 }
+
+/**
+ * 4 frames públicos do vídeo para escolher a capa: hqdefault (padrão) + os
+ * frames de início/meio/fim (1/2/3.jpg). Permite trocar quando a thumb
+ * automática pega uma cena ruim.
+ */
+export function youtubeFrameUrls(videoId: string): string[] {
+  const base = `https://img.youtube.com/vi/${videoId}`;
+  return [`${base}/hqdefault.jpg`, `${base}/1.jpg`, `${base}/2.jpg`, `${base}/3.jpg`];
+}

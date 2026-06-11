@@ -2,12 +2,12 @@
 
 import { useRef, useState, useTransition } from "react";
 import Image from "next/image";
-import { Plus, Eye, Trash2, Star, X, ImageUp } from "lucide-react";
+import { Plus, Eye, Trash2, Star, X, ImageUp, Images } from "lucide-react";
 import { toast } from "sonner";
 import type { VideoDraft } from "@/lib/validations/product";
 import { fetchVideoMetadata } from "@/actions/products";
 import { uploadProductImage } from "@/actions/upload";
-import { youtubeEmbedUrl } from "@/lib/utils/video";
+import { youtubeEmbedUrl, youtubeFrameUrls } from "@/lib/utils/video";
 import { isConfiguredImageHost } from "@/lib/utils/image";
 
 type Props = {
@@ -222,6 +222,7 @@ function VideoRow({
 }) {
   const manual = video.platform !== "YOUTUBE";
   const [uploading, startUpload] = useTransition();
+  const [showFrames, setShowFrames] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -306,9 +307,51 @@ function VideoRow({
             />
           </div>
         ) : (
-          <p className="text-sm text-[#07366A] font-medium truncate">
-            {video.titulo || "(sem título)"}
-          </p>
+          <div>
+            <p className="text-sm text-[#07366A] font-medium truncate">
+              {video.titulo || "(sem título)"}
+            </p>
+            {video.videoId && (
+              <div className="mt-1">
+                <button
+                  type="button"
+                  onClick={() => setShowFrames((s) => !s)}
+                  className="inline-flex items-center gap-1 text-[11px] text-gray-500 hover:text-[#07366A]"
+                >
+                  <Images className="w-3.5 h-3.5" aria-hidden="true" />
+                  Trocar capa (frames)
+                </button>
+                {showFrames && (
+                  <div className="flex gap-1.5 mt-1.5">
+                    {youtubeFrameUrls(video.videoId).map((f) => {
+                      const selected = video.thumbnailUrl === f;
+                      return (
+                        <button
+                          type="button"
+                          key={f}
+                          onClick={() => onPatch({ thumbnailUrl: f })}
+                          aria-label="Usar este frame como capa"
+                          className={`relative w-12 aspect-video rounded overflow-hidden border-2 ${
+                            selected
+                              ? "border-[#0EA5E9]"
+                              : "border-transparent hover:border-gray-300"
+                          }`}
+                        >
+                          <Image
+                            src={f}
+                            alt=""
+                            fill
+                            sizes="48px"
+                            className="object-cover"
+                          />
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         )}
 
         <p className="text-[11px] text-gray-400 truncate mt-0.5">
