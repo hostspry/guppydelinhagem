@@ -13,6 +13,7 @@ import {
   youtubeThumbnailUrl,
   type DetectedPlatform,
 } from "@/lib/utils/video";
+import { deleteImage } from "@/lib/s3";
 import {
   type ActionResult,
   assertAuthorized,
@@ -190,7 +191,10 @@ export async function deleteProduct(id: string): Promise<ActionResult> {
 
   const prod = await prisma.product.findUnique({
     where: { id },
-    include: { _count: { select: { orderItems: true } } },
+    include: {
+      _count: { select: { orderItems: true } },
+      videos: { select: { thumbnailUrl: true } },
+    },
   });
 
   if (!prod) return { success: false, error: "Produto não encontrado." };
@@ -216,6 +220,15 @@ export async function deleteProduct(id: string): Promise<ActionResult> {
     console.error(e);
     return { success: false, error: "Erro ao excluir." };
   }
+
+  // Best-effort: remove do Garage as thumbnails que nós enviamos.
+  // deleteImage ignora URLs que não são do nosso domínio público (YouTube etc.).
+  await Promise.all(
+    prod.videos
+      .map((v) => v.thumbnailUrl)
+      .filter((u): u is string => !!u)
+      .map((u) => deleteImage(u).catch(() => {})),
+  );
 
   revalidatePath("/admin/produtos");
   return { success: true, message: "Produto excluído." };
@@ -271,9 +284,32 @@ export async function fetchVideoMetadata(
     return { ok: true, data: { platform, videoId, titulo, thumbnailUrl } };
   }
 
-  // Instagram / TikTok: sem fetch automático.
+  // TikTok com URL curta (vt.tiktok.com): resolve o redirect p/ a URL canônica
+  // e extrai o id numérico. Se falhar, cai no fallback (videoId null → nova aba).
+  if (platform === "TIKTOK" && !videoId) {
+    try {
+      const res = await fetch(url, { redirect: "follow" });
+      const m = res.url.match(/\/video\/(\d+)/);
+      return {
+        ok: true,
+        data: {
+          platform,
+          videoId: m ? m[1] : null,
+          titulo: "",
+          thumbnailUrl: "",
+        },
+      };
+    } catch {
+      return {
+        ok: true,
+        data: { platform, videoId: null, titulo: "", thumbnailUrl: "" },
+      };
+    }
+  }
+
+  // Instagram (shortcode) ou TikTok já canônico: usa o videoId do parse.
   return {
     ok: true,
-    data: { platform, videoId: null, titulo: "", thumbnailUrl: "" },
+    data: { platform, videoId, titulo: "", thumbnailUrl: "" },
   };
 }

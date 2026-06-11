@@ -1,7 +1,7 @@
 "use server";
 
 import { assertAuthorized } from "@/lib/utils/action-result";
-import { uploadImage } from "@/lib/s3";
+import { uploadImage, deleteImage } from "@/lib/s3";
 
 const ALLOWED: Record<string, string> = {
   "image/jpeg": "jpg",
@@ -37,6 +37,14 @@ export async function uploadProductImage(
   try {
     const buffer = Buffer.from(await file.arrayBuffer());
     const url = await uploadImage(buffer, file.type, ext);
+
+    // Substituição: remove a thumbnail anterior do Garage (best-effort).
+    // deleteImage ignora URLs externas (ex: frame do YouTube colado).
+    const oldUrl = formData.get("oldUrl");
+    if (typeof oldUrl === "string" && oldUrl) {
+      await deleteImage(oldUrl).catch(() => {});
+    }
+
     return { ok: true, url };
   } catch (e) {
     console.error(e);

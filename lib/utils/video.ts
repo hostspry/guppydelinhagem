@@ -23,13 +23,16 @@ export function parseVideoUrl(url: string): ParsedVideo | null {
   );
   if (yt) return { platform: "YOUTUBE", videoId: yt[1] };
 
-  if (/instagram\.com\/(reel|reels|p|tv)\//.test(u)) {
-    return { platform: "INSTAGRAM", videoId: null };
-  }
+  // Instagram: extrai o shortcode (reel/p/tv) p/ usar no embed.
+  const ig = u.match(/instagram\.com\/(?:reel|reels|p|tv)\/([A-Za-z0-9_-]+)/);
+  if (ig) return { platform: "INSTAGRAM", videoId: ig[1] };
 
-  if (/tiktok\.com\//.test(u)) {
-    return { platform: "TIKTOK", videoId: null };
-  }
+  // TikTok canônico já traz o id numérico. URLs curtas (vt.tiktok.com/XXXX) não
+  // contêm o id — retornam null aqui e são resolvidas via redirect em
+  // fetchVideoMetadata.
+  const ttCanonical = u.match(/tiktok\.com\/@[\w.-]+\/video\/(\d+)/);
+  if (ttCanonical) return { platform: "TIKTOK", videoId: ttCanonical[1] };
+  if (/tiktok\.com\//.test(u)) return { platform: "TIKTOK", videoId: null };
 
   return null;
 }
@@ -52,4 +55,14 @@ export function youtubeEmbedUrl(videoId: string): string {
 export function youtubeFrameUrls(videoId: string): string[] {
   const base = `https://img.youtube.com/vi/${videoId}`;
   return [`${base}/hqdefault.jpg`, `${base}/1.jpg`, `${base}/2.jpg`, `${base}/3.jpg`];
+}
+
+/** Embed do Instagram (shortcode do reel/post). */
+export function instagramEmbedUrl(shortcode: string): string {
+  return `https://www.instagram.com/reel/${shortcode}/embed`;
+}
+
+/** Embed do TikTok (id numérico do vídeo). */
+export function tiktokEmbedUrl(videoId: string): string {
+  return `https://www.tiktok.com/embed/v2/${videoId}`;
 }

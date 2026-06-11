@@ -7,8 +7,28 @@ import { toast } from "sonner";
 import type { VideoDraft } from "@/lib/validations/product";
 import { fetchVideoMetadata } from "@/actions/products";
 import { uploadProductImage } from "@/actions/upload";
-import { youtubeEmbedUrl, youtubeFrameUrls } from "@/lib/utils/video";
+import {
+  youtubeEmbedUrl,
+  youtubeFrameUrls,
+  instagramEmbedUrl,
+  tiktokEmbedUrl,
+} from "@/lib/utils/video";
 import { isConfiguredImageHost } from "@/lib/utils/image";
+
+/** URL de embed por plataforma; null quando não há id resolvido (cai no fallback). */
+function embedSrcFor(v: VideoDraft): string | null {
+  if (!v.videoId) return null;
+  switch (v.platform) {
+    case "YOUTUBE":
+      return youtubeEmbedUrl(v.videoId);
+    case "INSTAGRAM":
+      return instagramEmbedUrl(v.videoId);
+    case "TIKTOK":
+      return tiktokEmbedUrl(v.videoId);
+    default:
+      return null;
+  }
+}
 
 type Props = {
   value: VideoDraft[];
@@ -90,10 +110,10 @@ export function ProductVideosField({ value, onChange }: Props) {
   }
 
   function openFacade(v: VideoDraft) {
-    if (v.platform === "YOUTUBE" && v.videoId) {
+    if (embedSrcFor(v)) {
       setPlaying(v); // iframe só monta agora (facade)
     } else {
-      // IG/TikTok não têm embed limpo por URL — abre no destino.
+      // Sem embed disponível (id não resolvido / post bloqueado) — abre no destino.
       window.open(v.originalUrl, "_blank", "noopener,noreferrer");
     }
   }
@@ -174,7 +194,7 @@ export function ProductVideosField({ value, onChange }: Props) {
       )}
 
       {/* Facade: iframe carregado só ao clicar em "ver" */}
-      {playing && playing.videoId && (
+      {playing && embedSrcFor(playing) && (
         <div
           className="fixed inset-0 z-[100] bg-black/70 flex items-center justify-center p-4"
           onClick={() => setPlaying(null)}
@@ -192,7 +212,7 @@ export function ProductVideosField({ value, onChange }: Props) {
               <X className="w-4 h-4" aria-hidden="true" />
             </button>
             <iframe
-              src={youtubeEmbedUrl(playing.videoId)}
+              src={embedSrcFor(playing)!}
               title={playing.titulo || "Vídeo"}
               className="w-full h-full"
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
@@ -231,6 +251,7 @@ function VideoRow({
     if (!file) return;
     const fd = new FormData();
     fd.append("file", file);
+    if (video.thumbnailUrl) fd.append("oldUrl", video.thumbnailUrl);
     startUpload(async () => {
       const res = await uploadProductImage(fd);
       if (res.ok) onPatch({ thumbnailUrl: res.url });
