@@ -1,0 +1,333 @@
+"use client";
+
+import { useState, useTransition } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { toast } from "sonner";
+import Link from "next/link";
+import { FormField } from "./FormField";
+import { productSchema, type ProductInput } from "@/lib/validations/product";
+import { slugify } from "@/lib/utils/slug";
+import { createProduct, updateProduct } from "@/actions/products";
+
+const inputClass =
+  "w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:border-[#FF035C] focus:ring-1 focus:ring-[#FF035C]";
+
+type ProductFormProps = {
+  categorias: { id: string; nome: string }[];
+  initialData?: {
+    id: string;
+    nome: string;
+    slug: string;
+    descricao: string;
+    descricaoCurta: string | null;
+    preco: number;
+    descontoPix: number | null;
+    parcelasMax: number;
+    tipo: "FISICO" | "DIGITAL";
+    estoque: number;
+    categoryId: string;
+    ativo: boolean;
+    destaque: boolean;
+  };
+};
+
+export function ProductForm({ categorias, initialData }: ProductFormProps) {
+  const [isPending, startTransition] = useTransition();
+  const [slugManuallyEdited, setSlugManuallyEdited] = useState(!!initialData);
+
+  const {
+    register,
+    handleSubmit,
+    setValue,
+    formState: { errors },
+  } = useForm<z.input<typeof productSchema>, unknown, ProductInput>({
+    resolver: zodResolver(productSchema),
+    defaultValues: initialData
+      ? {
+          nome: initialData.nome,
+          slug: initialData.slug,
+          descricao: initialData.descricao,
+          descricaoCurta: initialData.descricaoCurta ?? "",
+          preco: initialData.preco,
+          descontoPix: initialData.descontoPix ?? undefined,
+          parcelasMax: initialData.parcelasMax,
+          tipo: initialData.tipo,
+          estoque: initialData.estoque,
+          categoryId: initialData.categoryId,
+          ativo: initialData.ativo,
+          destaque: initialData.destaque,
+        }
+      : {
+          nome: "",
+          slug: "",
+          descricao: "",
+          descricaoCurta: "",
+          preco: "",
+          descontoPix: "",
+          parcelasMax: 3,
+          tipo: "FISICO",
+          estoque: 0,
+          categoryId: "",
+          ativo: true,
+          destaque: false,
+        },
+  });
+
+  function handleNomeChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const novoNome = e.target.value;
+    setValue("nome", novoNome, { shouldValidate: true });
+    if (!slugManuallyEdited) {
+      setValue("slug", slugify(novoNome), { shouldValidate: true });
+    }
+  }
+
+  function handleSlugChange(e: React.ChangeEvent<HTMLInputElement>) {
+    setSlugManuallyEdited(true);
+    setValue("slug", e.target.value, { shouldValidate: true });
+  }
+
+  const onSubmit = handleSubmit((data) => {
+    const formData = new FormData();
+    formData.append("nome", data.nome);
+    formData.append("slug", data.slug);
+    formData.append("descricao", data.descricao);
+    if (data.descricaoCurta) formData.append("descricaoCurta", data.descricaoCurta);
+    formData.append("preco", String(data.preco));
+    if (data.descontoPix !== undefined)
+      formData.append("descontoPix", String(data.descontoPix));
+    formData.append("parcelasMax", String(data.parcelasMax));
+    formData.append("tipo", data.tipo);
+    formData.append("estoque", String(data.estoque));
+    formData.append("categoryId", data.categoryId);
+    formData.append("ativo", String(data.ativo));
+    formData.append("destaque", String(data.destaque));
+
+    startTransition(async () => {
+      const result = initialData
+        ? await updateProduct(initialData.id, formData)
+        : await createProduct(formData);
+
+      // Em sucesso, a action faz redirect — só chegamos aqui em erro.
+      if (result?.success === false) {
+        toast.error(result.error);
+      }
+    });
+  });
+
+  return (
+    <form onSubmit={onSubmit} className="max-w-2xl space-y-5">
+      {/* Básico */}
+      <fieldset className="bg-white border border-gray-200 rounded-lg p-5">
+        <legend className="px-2 text-xs font-semibold text-[#07366A] uppercase tracking-wide">
+          Básico
+        </legend>
+
+        <FormField label="Nome" name="nome" required error={errors.nome?.message}>
+          <input
+            id="nome"
+            {...register("nome")}
+            onChange={handleNomeChange}
+            className={inputClass}
+            placeholder="Ex: Guppy Koi Red Ear"
+            autoFocus
+          />
+        </FormField>
+
+        <FormField
+          label="Slug"
+          name="slug"
+          required
+          error={errors.slug?.message}
+          hint="URL amigável. Gerado automaticamente do nome — pode editar."
+        >
+          <input
+            id="slug"
+            {...register("slug")}
+            onChange={handleSlugChange}
+            className={`${inputClass} font-mono`}
+            placeholder="guppy-koi-red-ear"
+          />
+        </FormField>
+
+        <FormField
+          label="Categoria"
+          name="categoryId"
+          required
+          error={errors.categoryId?.message}
+        >
+          <select id="categoryId" {...register("categoryId")} className={inputClass}>
+            <option value="">Selecione…</option>
+            {categorias.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.nome}
+              </option>
+            ))}
+          </select>
+        </FormField>
+
+        <FormField label="Tipo" name="tipo" required error={errors.tipo?.message}>
+          <select id="tipo" {...register("tipo")} className={inputClass}>
+            <option value="FISICO">Físico</option>
+            <option value="DIGITAL">Digital</option>
+          </select>
+        </FormField>
+
+        <FormField
+          label="Descrição"
+          name="descricao"
+          required
+          error={errors.descricao?.message}
+        >
+          <textarea
+            id="descricao"
+            {...register("descricao")}
+            rows={4}
+            className={inputClass}
+            placeholder="Detalhes do peixe, linhagem, cuidados…"
+          />
+        </FormField>
+
+        <FormField
+          label="Descrição curta"
+          name="descricaoCurta"
+          error={errors.descricaoCurta?.message}
+          hint="Resumo de até 160 caracteres (listagens, cards). Opcional."
+        >
+          <input
+            id="descricaoCurta"
+            {...register("descricaoCurta")}
+            className={inputClass}
+            placeholder="Casal premium de linhagem importada"
+          />
+        </FormField>
+      </fieldset>
+
+      {/* Preço & estoque */}
+      <fieldset className="bg-white border border-gray-200 rounded-lg p-5">
+        <legend className="px-2 text-xs font-semibold text-[#07366A] uppercase tracking-wide">
+          Preço &amp; estoque
+        </legend>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4">
+          <FormField
+            label="Preço (R$)"
+            name="preco"
+            required
+            error={errors.preco?.message}
+          >
+            <input
+              id="preco"
+              type="number"
+              step="0.01"
+              min="0"
+              {...register("preco")}
+              className={inputClass}
+              placeholder="49.90"
+            />
+          </FormField>
+
+          <FormField
+            label="Desconto Pix (%)"
+            name="descontoPix"
+            error={errors.descontoPix?.message}
+            hint="Opcional. Deixe vazio para não aplicar."
+          >
+            <input
+              id="descontoPix"
+              type="number"
+              step="0.01"
+              min="0"
+              max="100"
+              {...register("descontoPix")}
+              className={inputClass}
+              placeholder="5"
+            />
+          </FormField>
+
+          <FormField
+            label="Parcelas máx."
+            name="parcelasMax"
+            error={errors.parcelasMax?.message}
+          >
+            <input
+              id="parcelasMax"
+              type="number"
+              min="1"
+              max="12"
+              {...register("parcelasMax")}
+              className={inputClass}
+            />
+          </FormField>
+
+          <FormField
+            label="Estoque"
+            name="estoque"
+            required
+            error={errors.estoque?.message}
+          >
+            <input
+              id="estoque"
+              type="number"
+              min="0"
+              {...register("estoque")}
+              className={inputClass}
+            />
+          </FormField>
+        </div>
+      </fieldset>
+
+      {/* Publicação */}
+      <fieldset className="bg-white border border-gray-200 rounded-lg p-5">
+        <legend className="px-2 text-xs font-semibold text-[#07366A] uppercase tracking-wide">
+          Publicação
+        </legend>
+
+        <label className="flex items-start gap-2.5 mb-3 cursor-pointer">
+          <input
+            type="checkbox"
+            {...register("ativo")}
+            className="mt-0.5 w-4 h-4 accent-[#FF035C]"
+          />
+          <span className="text-sm text-gray-700">
+            <span className="font-medium text-[#07366A]">Ativo</span> — visível na
+            loja. Desmarque para ocultar sem excluir.
+          </span>
+        </label>
+
+        <label className="flex items-start gap-2.5 cursor-pointer">
+          <input
+            type="checkbox"
+            {...register("destaque")}
+            className="mt-0.5 w-4 h-4 accent-[#FF035C]"
+          />
+          <span className="text-sm text-gray-700">
+            <span className="font-medium text-[#07366A]">Destaque</span> — aparece na
+            vitrine da home.
+          </span>
+        </label>
+      </fieldset>
+
+      <div className="flex gap-2">
+        <button
+          type="submit"
+          disabled={isPending}
+          className="px-5 py-2 bg-[#FF035C] text-white text-sm font-medium rounded-md hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+        >
+          {isPending
+            ? "Salvando..."
+            : initialData
+              ? "Salvar alterações"
+              : "Criar produto"}
+        </button>
+        <Link
+          href="/admin/produtos"
+          className="px-5 py-2 border border-gray-300 text-sm font-medium text-gray-700 rounded-md hover:border-gray-400 transition-all"
+        >
+          Cancelar
+        </Link>
+      </div>
+    </form>
+  );
+}

@@ -1,7 +1,21 @@
-export default function Page() {
+import { PageHeader } from "@/components/admin/PageHeader";
+import { ProductForm } from "@/components/admin/ProductForm";
+import { getProductFormData } from "@/lib/queries/products";
+
+export default async function NovoProdutoPage() {
+  const { categorias } = await getProductFormData();
+
   return (
-    <main style={{ padding: "2rem" }}>
-      <p style={{ color: "#6b7280" }}>Em construção — Admin Novo Produto</p>
-    </main>
+    <div>
+      <PageHeader
+        title="Novo produto"
+        breadcrumb={[
+          { label: "Admin", href: "/admin" },
+          { label: "Produtos", href: "/admin/produtos" },
+          { label: "Novo" },
+        ]}
+      />
+      <ProductForm categorias={categorias} />
+    </div>
   );
 }
