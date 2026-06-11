@@ -4,26 +4,11 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { categorySchema } from "@/lib/validations/category";
-import { auth } from "@/lib/auth";
-
-type ActionResult =
-  | { success: true; message?: string }
-  | {
-      success: false;
-      error: string;
-      fieldErrors?: Record<string, string[]>;
-    };
-
-async function assertAuthorized() {
-  const session = await auth();
-  if (!session?.user) throw new Error("Não autenticado");
-  if (session.user.role === "CUSTOMER") throw new Error("Sem permissão");
-  return session;
-}
-
-function isPrismaError(e: unknown): e is { code: string } {
-  return typeof e === "object" && e !== null && "code" in e;
-}
+import {
+  type ActionResult,
+  assertAuthorized,
+  isPrismaError,
+} from "@/lib/utils/action-result";
 
 export async function createCategory(
   formData: FormData,
