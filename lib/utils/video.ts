@@ -57,9 +57,13 @@ export function youtubeFrameUrls(videoId: string): string[] {
   return [`${base}/hqdefault.jpg`, `${base}/1.jpg`, `${base}/2.jpg`, `${base}/3.jpg`];
 }
 
-/** Embed do Instagram (shortcode do reel/post). */
+/**
+ * Embed do Instagram (shortcode do reel/post). O caminho /p/ é o canônico do
+ * Instagram para qualquer mídia e serve tanto post quanto reel — evita o 404
+ * que /reel/ dava quando o link original era um /p/.
+ */
 export function instagramEmbedUrl(shortcode: string): string {
-  return `https://www.instagram.com/reel/${shortcode}/embed`;
+  return `https://www.instagram.com/p/${shortcode}/embed`;
 }
 
 /** Embed do TikTok (id numérico do vídeo). */
