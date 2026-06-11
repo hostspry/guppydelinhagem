@@ -2,7 +2,7 @@
 
 import { useRef, useState, useTransition } from "react";
 import Image from "next/image";
-import { Plus, Eye, Trash2, Star, X, ImageUp, Images } from "lucide-react";
+import { Plus, Eye, Trash2, Star, X, ImageUp } from "lucide-react";
 import { toast } from "sonner";
 import type { VideoDraft } from "@/lib/validations/product";
 import { fetchVideoMetadata } from "@/actions/products";
@@ -246,7 +246,6 @@ function VideoRow({
   // o botão travado em "Enviando…" mesmo após o upload concluir. Com estado
   // próprio o botão libera assim que o await retorna.
   const [uploading, setUploading] = useState(false);
-  const [showFrames, setShowFrames] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -299,87 +298,88 @@ function VideoRow({
           )}
         </div>
 
+        {/* Título: editável (manual) ou exibido (YouTube vem do oEmbed) */}
         {manual ? (
-          <div className="space-y-1.5">
-            <input
-              value={video.titulo ?? ""}
-              onChange={(e) => onPatch({ titulo: e.target.value })}
-              placeholder="Título (manual)"
-              className="w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:border-[#FF035C]"
-            />
-            <input
-              ref={fileRef}
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              onChange={handleUpload}
-              className="hidden"
-            />
-            <button
-              type="button"
-              onClick={() => fileRef.current?.click()}
-              disabled={uploading}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1 border border-gray-300 rounded text-xs font-medium text-gray-700 hover:border-gray-400 disabled:opacity-50 transition-all"
-            >
-              <ImageUp className="w-3.5 h-3.5" aria-hidden="true" />
-              {uploading
-                ? "Enviando…"
-                : video.thumbnailUrl
-                  ? "Trocar imagem"
-                  : "Enviar imagem (capa)"}
-            </button>
-            <input
-              value={video.thumbnailUrl ?? ""}
-              onChange={(e) => onPatch({ thumbnailUrl: e.target.value })}
-              placeholder="ou cole uma URL de imagem"
-              className="w-full px-2 py-1 border border-gray-300 rounded text-xs font-mono focus:outline-none focus:border-[#FF035C]"
-            />
-          </div>
+          <input
+            value={video.titulo ?? ""}
+            onChange={(e) => onPatch({ titulo: e.target.value })}
+            placeholder="Título (manual)"
+            className="w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:border-[#FF035C]"
+          />
         ) : (
-          <div>
-            <p className="text-sm text-[#07366A] font-medium truncate">
-              {video.titulo || "(sem título)"}
+          <p className="text-sm text-[#07366A] font-medium truncate">
+            {video.titulo || "(sem título)"}
+          </p>
+        )}
+
+        {/* YouTube: frames da capa inline, grandes e clicáveis (sem toggle) */}
+        {!manual && video.videoId && (
+          <div className="mt-2">
+            <p className="text-[11px] text-gray-500 mb-1">
+              Capa — escolha um frame ou envie uma imagem:
             </p>
-            {video.videoId && (
-              <div className="mt-1">
-                <button
-                  type="button"
-                  onClick={() => setShowFrames((s) => !s)}
-                  className="inline-flex items-center gap-1 text-[11px] text-gray-500 hover:text-[#07366A]"
-                >
-                  <Images className="w-3.5 h-3.5" aria-hidden="true" />
-                  Trocar capa (frames)
-                </button>
-                {showFrames && (
-                  <div className="flex gap-1.5 mt-1.5">
-                    {youtubeFrameUrls(video.videoId).map((f) => {
-                      const selected = video.thumbnailUrl === f;
-                      return (
-                        <button
-                          type="button"
-                          key={f}
-                          onClick={() => onPatch({ thumbnailUrl: f })}
-                          aria-label="Usar este frame como capa"
-                          className={`relative w-12 aspect-video rounded overflow-hidden border-2 ${
-                            selected
-                              ? "border-[#0EA5E9]"
-                              : "border-transparent hover:border-gray-300"
-                          }`}
-                        >
-                          <Image
-                            src={f}
-                            alt=""
-                            fill
-                            sizes="48px"
-                            className="object-cover"
-                          />
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            )}
+            <div className="flex flex-wrap gap-2">
+              {youtubeFrameUrls(video.videoId).map((f) => {
+                const selected = video.thumbnailUrl === f;
+                return (
+                  <button
+                    type="button"
+                    key={f}
+                    onClick={() => onPatch({ thumbnailUrl: f })}
+                    aria-label="Usar este frame como capa"
+                    className={`relative w-24 aspect-video rounded overflow-hidden border-2 transition-colors ${
+                      selected
+                        ? "border-[#0EA5E9] ring-1 ring-[#0EA5E9]"
+                        : "border-transparent hover:border-gray-300"
+                    }`}
+                  >
+                    <Image
+                      src={f}
+                      alt=""
+                      fill
+                      sizes="96px"
+                      className="object-cover"
+                    />
+                  </button>
+                );
+              })}
+            </div>
           </div>
+        )}
+
+        {/* Upload de capa própria — disponível em todos os cards (incl. YouTube,
+            quando nenhum frame serve) */}
+        <div className="mt-2">
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            onChange={handleUpload}
+            className="hidden"
+          />
+          <button
+            type="button"
+            onClick={() => fileRef.current?.click()}
+            disabled={uploading}
+            className="inline-flex items-center gap-1.5 px-2.5 py-1 border border-gray-300 rounded text-xs font-medium text-gray-700 hover:border-gray-400 disabled:opacity-50 transition-all"
+          >
+            <ImageUp className="w-3.5 h-3.5" aria-hidden="true" />
+            {uploading
+              ? "Enviando…"
+              : video.thumbnailUrl
+                ? "Trocar imagem"
+                : "Enviar imagem (capa)"}
+          </button>
+        </div>
+
+        {/* IG/TikTok: alternativa de colar uma URL de imagem manualmente */}
+        {manual && (
+          <input
+            value={video.thumbnailUrl ?? ""}
+            onChange={(e) => onPatch({ thumbnailUrl: e.target.value })}
+            placeholder="ou cole uma URL de imagem"
+            className="w-full mt-1.5 px-2 py-1 border border-gray-300 rounded text-xs font-mono focus:outline-none focus:border-[#FF035C]"
+          />
         )}
 
         <p className="text-[11px] text-gray-400 truncate mt-0.5">
