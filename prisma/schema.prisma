@@ -133,12 +133,17 @@ model ProductVideo {
   id           String        @id @default(cuid())
   productId    String
   platform     VideoPlatform
-  videoId      String
-  originalUrl  String
-  thumbnailUrl String?
+  videoId      String? // ID extraído (YouTube); null p/ IG/TikTok
+  originalUrl  String // URL original colada
+  titulo       String? // do oEmbed (YouTube) ou manual (IG/TikTok)
+  thumbnailUrl String? // auto (YouTube) ou URL manual (IG/TikTok)
+  principal    Boolean       @default(false)
   ordem        Int           @default(0)
+  criadoEm     DateTime      @default(now())
 
   product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
 }
 
 model WaitlistEntry {
