@@ -241,22 +241,29 @@ function VideoRow({
   onPatch: (partial: Partial<VideoDraft>) => void;
 }) {
   const manual = video.platform !== "YOUTUBE";
-  const [uploading, startUpload] = useTransition();
+  // Loading próprio (useState), não useTransition: chamar a Server Action dentro
+  // de uma transition acopla o pending ao auto-refresh de rota do Next, deixando
+  // o botão travado em "Enviando…" mesmo após o upload concluir. Com estado
+  // próprio o botão libera assim que o await retorna.
+  const [uploading, setUploading] = useState(false);
   const [showFrames, setShowFrames] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     e.target.value = ""; // permite re-selecionar o mesmo arquivo
     if (!file) return;
     const fd = new FormData();
     fd.append("file", file);
     if (video.thumbnailUrl) fd.append("oldUrl", video.thumbnailUrl);
-    startUpload(async () => {
+    setUploading(true);
+    try {
       const res = await uploadProductImage(fd);
       if (res.ok) onPatch({ thumbnailUrl: res.url });
       else toast.error(res.error);
-    });
+    } finally {
+      setUploading(false);
+    }
   }
 
   return (

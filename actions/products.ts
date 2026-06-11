@@ -132,7 +132,10 @@ export async function createProduct(formData: FormData): Promise<ActionResult> {
     return { success: false, error: "Erro ao salvar. Tente novamente." };
   }
 
-  revalidatePath("/admin/produtos");
+  // 'layout' invalida a subárvore inteira de /admin/produtos (listagem +
+  // detalhe + edição), não só a rota da listagem — assim a tela de edição não
+  // serve RSC em cache stale ao voltar para o produto.
+  revalidatePath("/admin/produtos", "layout");
   redirect("/admin/produtos");
 }
 
@@ -182,7 +185,7 @@ export async function updateProduct(
     return { success: false, error: "Erro ao salvar." };
   }
 
-  revalidatePath("/admin/produtos");
+  revalidatePath("/admin/produtos", "layout");
   redirect("/admin/produtos");
 }
 
@@ -230,7 +233,7 @@ export async function deleteProduct(id: string): Promise<ActionResult> {
       .map((u) => deleteImage(u).catch(() => {})),
   );
 
-  revalidatePath("/admin/produtos");
+  revalidatePath("/admin/produtos", "layout");
   return { success: true, message: "Produto excluído." };
 }
 
