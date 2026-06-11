@@ -4,10 +4,16 @@ import { z } from "zod";
 // ─────────────────────────────────────────────────────────────
 // Integração com o Gemini (Google AI Studio) — geração de conteúdo de produto.
 //
-// Escolha: API REST (fetch) em vez do SDK. Motivo: zero dependência nova, sem
-// churn de versão de SDK, e o gate descartável espelha exatamente o mesmo
-// request. Modelo Flash (barato/rápido). JSON é forçado via responseMimeType +
-// responseSchema — não dependemos de o modelo "lembrar" de não usar ```.
+// API REST (fetch), modelo Flash. Dois modos:
+//  - SIMPLES (pesquisar=false): força JSON via responseMimeType + responseSchema.
+//  - PESQUISA (pesquisar=true): liga o grounding (google_search). A API NÃO
+//    permite responseMimeType:application/json junto com tools — retorna HTTP 400
+//    "Tool use with a response mime type: 'application/json' is unsupported"
+//    (validado no gate). Então, em modo pesquisa, o JSON é instruído por prompt e
+//    parseado defensivamente (o modelo costuma cercar em ```json).
+//
+// Em ambos os modos parseamos defensivamente + validamos a forma com Zod, então
+// a geração nunca quebra por causa de cercas/markdown.
 //
 // Provedor único, desacoplado: trocar de provedor = reescrever só
 // generateProductContent, sem tocar na action nem na UI.
@@ -15,16 +21,19 @@ import { z } from "zod";
 
 const MODEL = "gemini-2.5-flash";
 const ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`;
-const TIMEOUT_MS = 30_000;
+const TIMEOUT_SIMPLE_MS = 30_000;
+const TIMEOUT_SEARCH_MS = 60_000; // grounding faz buscas — demora mais
 
 export type ProductContentInput = {
   videoTitle: string; // título/legenda do vídeo primário
   videoHashtags?: string; // hashtags, se separáveis
   briefing: string; // texto livre do operador (pode ser vazio)
   categoria?: string; // nome da categoria, dá contexto
+  pesquisar?: boolean; // liga o grounding (Google Search) — sob demanda
 };
 
 export type GeneratedProductContent = {
+  nome: string;
   descricao: string;
   descricaoCurta: string;
   metaTitle: string;
@@ -39,22 +48,34 @@ function apiKey(): string {
   return k;
 }
 
-const SYSTEM_INSTRUCTION = `Você é redator de uma loja brasileira de aquarismo premium especializada em guppy de linhagem (pedigree). Escreve em português do Brasil, com tom sofisticado, confiável e acolhedor — sem exageros publicitários nem emojis.
+const SYSTEM_BASE = `Você é redator de uma loja brasileira de aquarismo premium especializada em guppy de linhagem (pedigree). Escreve em português do Brasil, com tom sofisticado, confiável e acolhedor — sem exageros publicitários nem emojis.
 
-Sua tarefa: a partir dos dados de um produto (título/legenda do vídeo, briefing do operador e categoria), gerar de uma vez os 5 campos de conteúdo.
+PRIORIDADE DAS FONTES:
+- O BRIEFING do operador descreve o peixe DESTE produto e tem PRIORIDADE. O título do vídeo é apenas contexto auxiliar; se conflitar com o briefing, ignore o título do vídeo. Nunca combine características contraditórias das duas fontes (ex.: não funda "tuxedo" do título com "japan blue" do briefing).
+- Quando não houver briefing, o título do vídeo é a fonte principal.
 
 REGRA CRÍTICA — NÃO INVENTAR:
-- Nunca afirme características específicas (cor, sexo, tipo de cauda, linhagem, tamanho, origem) que não estejam explicitamente no título ou no briefing.
-- Em peixes pedigree, errar um traço é grave: não diga "cauda véu" se for "leque", não diga "macho" nem "importado" sem base. Na dúvida, escreva de forma genérica e atraente, sem cravar o traço.
+- Nunca afirme características específicas (cor, sexo, tipo de cauda, linhagem, tamanho, origem) sem base no briefing/título — ou, quando a pesquisa estiver ativa, nas fontes encontradas. Na dúvida, mantenha genérico. Em peixes pedigree, errar um traço é grave: não diga "cauda véu" se for "leque", nem "macho"/"importado" sem base.
 
-REGRAS DE CADA CAMPO:
-- descricao: 2 a 4 parágrafos curtos, separados por uma linha em branco. Apresenta o peixe, valoriza cuidado/qualidade e fala ao aquarista, sem inventar traços.
-- descricaoCurta: 1 a 2 frases (máx 160 caracteres). Resumo para card/listagem.
-- metaTitle: máximo 60 caracteres. Inclui o nome/tipo do peixe + marca quando couber.
-- metaDescription: máximo 155 caracteres. Chamada para clique, natural, sem encher de palavra-chave.
-- keywords: de 5 a 8 termos que pessoas realmente buscariam (ex: "comprar guppy koi", "guppy de linhagem", "guppy importado"). Sem hashtags, sem "#", minúsculas.
+CAMPOS (gere todos de uma vez):
+- nome: nome de produto claro e comercial (ex: "Guppy Koi Tuxedo — Trio Linhagem Importada"). Conciso, sem exageros.
+- descricao: 2 a 4 parágrafos curtos, separados por uma linha em branco.
+- descricaoCurta: 1 a 2 frases (máx 160 caracteres).
+- metaTitle: máximo 60 caracteres.
+- metaDescription: máximo 155 caracteres.
+- keywords: de 5 a 8 termos que pessoas buscariam, minúsculas, sem "#".`;
 
-Responda SOMENTE com o JSON pedido, sem texto extra e sem blocos de código.`;
+const SEARCH_BLOCK = `
+
+PESQUISA WEB ATIVA: use a busca para trazer informação técnica e confiável sobre a linhagem — origem, características genéticas, padrão de cor, manejo (parâmetros de água, temperatura, alimentação, cuidados) e criação/reprodução. Priorize fontes especializadas em inglês e da Ásia (Tailândia, Japão, China, Taiwan), incluindo criadores e lojas de referência. Traga a informação em português; se não encontrar dado sobre algum ponto, omita em vez de supor. Como há informação técnica a acomodar, a descricao pode ter 3 a 5 parágrafos curtos.`;
+
+const JSON_BLOCK = `
+
+FORMATO DE SAÍDA — responda APENAS com um objeto JSON válido, sem nenhum texto antes ou depois, sem comentários e sem blocos de código (não use crases). As chaves devem ser exatamente: nome, descricao, descricaoCurta, metaTitle, metaDescription, keywords (keywords é um array de strings).`;
+
+function buildSystemInstruction(pesquisar: boolean): string {
+  return SYSTEM_BASE + (pesquisar ? SEARCH_BLOCK : "") + JSON_BLOCK;
+}
 
 function buildUserPrompt(input: ProductContentInput): string {
   const linhas = [
@@ -72,10 +93,11 @@ function buildUserPrompt(input: ProductContentInput): string {
   return linhas.join("\n");
 }
 
-// responseSchema do Gemini (subconjunto do OpenAPI). Garante a forma do JSON.
+// responseSchema do Gemini (só no modo SIMPLES — incompatível com tools/grounding).
 const RESPONSE_SCHEMA = {
   type: "OBJECT",
   properties: {
+    nome: { type: "STRING" },
     descricao: { type: "STRING" },
     descricaoCurta: { type: "STRING" },
     metaTitle: { type: "STRING" },
@@ -83,6 +105,7 @@ const RESPONSE_SCHEMA = {
     keywords: { type: "ARRAY", items: { type: "STRING" } },
   },
   required: [
+    "nome",
     "descricao",
     "descricaoCurta",
     "metaTitle",
@@ -90,6 +113,7 @@ const RESPONSE_SCHEMA = {
     "keywords",
   ],
   propertyOrdering: [
+    "nome",
     "descricao",
     "descricaoCurta",
     "metaTitle",
@@ -100,6 +124,7 @@ const RESPONSE_SCHEMA = {
 
 // Validação de forma no servidor — não confiamos cegamente no retorno do modelo.
 const outputSchema = z.object({
+  nome: z.string().min(1),
   descricao: z.string().min(1),
   descricaoCurta: z.string().min(1),
   metaTitle: z.string().min(1),
@@ -108,22 +133,60 @@ const outputSchema = z.object({
 });
 
 /**
- * Gera os 5 campos de conteúdo a partir do vídeo primário + briefing.
- * Lança em qualquer falha (chave, quota, timeout, parse) — a action traduz para
- * mensagem amigável. Nunca persiste nada.
+ * Parse defensivo: o modo pesquisa costuma cercar o JSON em ```json … ```, e às
+ * vezes o texto vem em múltiplas parts. Limpa cercas e recorta do primeiro "{"
+ * ao último "}". Funciona também para o JSON puro do modo simples.
+ */
+function parseJsonLoose(text: string): unknown {
+  let t = text.trim();
+  t = t
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```$/i, "")
+    .trim();
+  const i = t.indexOf("{");
+  const j = t.lastIndexOf("}");
+  if (i !== -1 && j !== -1 && j > i) t = t.slice(i, j + 1);
+  return JSON.parse(t);
+}
+
+type GeminiResponse = {
+  candidates?: {
+    content?: { parts?: { text?: string }[] };
+  }[];
+};
+
+/**
+ * Gera os 6 campos de conteúdo a partir do vídeo primário + briefing.
+ * `pesquisar` liga o grounding (Google Search). Lança em qualquer falha (chave,
+ * quota, timeout, parse) — a action traduz para mensagem amigável. Nunca persiste.
  */
 export async function generateProductContent(
   input: ProductContentInput,
 ): Promise<GeneratedProductContent> {
-  const body = JSON.stringify({
-    systemInstruction: { parts: [{ text: SYSTEM_INSTRUCTION }] },
+  const pesquisar = input.pesquisar === true;
+
+  const requestBody: Record<string, unknown> = {
+    systemInstruction: {
+      parts: [{ text: buildSystemInstruction(pesquisar) }],
+    },
     contents: [{ role: "user", parts: [{ text: buildUserPrompt(input) }] }],
-    generationConfig: {
+  };
+
+  if (pesquisar) {
+    // Grounding: tools google_search. SEM responseMimeType/responseSchema
+    // (a API rejeita a combinação) — o JSON é garantido pelo prompt + parse.
+    requestBody.tools = [{ google_search: {} }];
+    requestBody.generationConfig = { temperature: 0.7 };
+  } else {
+    requestBody.generationConfig = {
       responseMimeType: "application/json",
       responseSchema: RESPONSE_SCHEMA,
       temperature: 0.7,
-    },
-  });
+    };
+  }
+
+  const body = JSON.stringify(requestBody);
+  const timeout = pesquisar ? TIMEOUT_SEARCH_MS : TIMEOUT_SIMPLE_MS;
 
   // O Flash às vezes responde 503 (high demand) ou 429 — picos transitórios.
   // Pequeno retry com backoff antes de desistir; demais erros falham na hora.
@@ -133,7 +196,7 @@ export async function generateProductContent(
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body,
-      signal: AbortSignal.timeout(TIMEOUT_MS),
+      signal: AbortSignal.timeout(timeout),
     });
     if (res.ok || (res.status !== 503 && res.status !== 429)) break;
     if (attempt < 2) await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)));
@@ -144,16 +207,19 @@ export async function generateProductContent(
     throw new Error(`Gemini API ${res.status}: ${errBody.slice(0, 300)}`);
   }
 
-  const data = (await res.json()) as {
-    candidates?: { content?: { parts?: { text?: string }[] } }[];
-  };
-  const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (typeof text !== "string" || text.trim() === "") {
+  const data = (await res.json()) as GeminiResponse;
+  // O grounding pode devolver o texto em múltiplas parts — junta todas.
+  const text = (data.candidates?.[0]?.content?.parts ?? [])
+    .map((p) => p.text)
+    .filter((t): t is string => typeof t === "string")
+    .join("");
+  if (text.trim() === "") {
     throw new Error("Resposta da IA vazia ou sem conteúdo.");
   }
 
-  const parsed = outputSchema.parse(JSON.parse(text));
+  const parsed = outputSchema.parse(parseJsonLoose(text));
   return {
+    nome: parsed.nome.trim(),
     descricao: parsed.descricao.trim(),
     descricaoCurta: parsed.descricaoCurta.trim(),
     metaTitle: parsed.metaTitle.trim(),

@@ -20,6 +20,7 @@ export async function generateContent(input: {
   videoHashtags?: string;
   briefing: string;
   categoria?: string;
+  pesquisar?: boolean;
 }): Promise<GenerateContentResult> {
   try {
     await assertAuthorized();
@@ -28,6 +29,7 @@ export async function generateContent(input: {
       videoHashtags: input.videoHashtags,
       briefing: input.briefing ?? "",
       categoria: input.categoria,
+      pesquisar: input.pesquisar === true,
     });
     return { ok: true, data };
   } catch (e) {
