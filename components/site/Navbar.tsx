@@ -1,8 +1,9 @@
 import Image from "next/image";
 import Link from "next/link";
-import { Truck, MapPin, User, ShoppingCart } from "lucide-react";
+import { Truck, MapPin, User } from "lucide-react";
 import NavSearchInput from "./NavSearchInput";
 import NavBar3 from "./NavBar3";
+import CartIcon from "./CartIcon";
 import { WHATSAPP_URL } from "@/lib/constants";
 
 function IconInstagram({ size = 16 }: { size?: number }) {
@@ -101,16 +102,7 @@ export default function Navbar() {
               <span>Minha Conta</span>
             </Link>
 
-            <Link
-              href="/carrinho"
-              className="relative text-primary hover:text-accent transition-colors"
-              aria-label="Carrinho de compras"
-            >
-              <ShoppingCart size={24} />
-              <span className="absolute -top-2 -right-2 bg-secondary text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center leading-none">
-                0
-              </span>
-            </Link>
+            <CartIcon />
           </div>
         </div>
       </div>
