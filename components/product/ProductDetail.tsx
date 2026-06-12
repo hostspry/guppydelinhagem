@@ -547,21 +547,23 @@ export default function ProductDetail({
           // Selo é emblema circular — contain p/ não cortar; demais são fotos (cover).
           const contain = b.imagem.includes("selo");
           return (
-            <div key={b.titulo} className="flex gap-3 items-start">
-              {/* Imagem ~1/3 à esquerda, sem card/moldura */}
-              <div className="relative w-1/3 shrink-0 aspect-square rounded-lg overflow-hidden">
+            <div key={b.titulo} className="flex gap-4 items-start">
+              {/* Imagem ~40% à esquerda (generosa), sem card/moldura */}
+              <div className="relative w-2/5 shrink-0 aspect-square rounded-lg overflow-hidden">
                 <Image
                   src={b.imagem}
                   alt={b.titulo}
                   fill
-                  sizes="(max-width: 768px) 33vw, 12vw"
+                  sizes="(max-width: 768px) 40vw, 15vw"
                   className={contain ? "object-contain" : "object-cover"}
                 />
               </div>
 
-              {/* Texto ~2/3 à direita */}
+              {/* Texto à direita — título de seção (médio, não enorme) */}
               <div className="flex-1 min-w-0 space-y-1.5">
-                <h3 className="font-semibold text-primary">{b.titulo}</h3>
+                <h3 className="font-semibold text-primary text-base leading-snug">
+                  {b.titulo}
+                </h3>
                 <p className="text-sm text-muted-foreground leading-relaxed">
                   {b.texto}
                 </p>
