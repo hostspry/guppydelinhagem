@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import {
@@ -20,7 +20,6 @@ import {
   Headset,
   Package,
   ImageIcon,
-  Flame,
   type LucideIcon,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -106,6 +105,7 @@ export default function ProductDetail({
   const [playing, setPlaying] = useState(false);
   const [selectedId, setSelectedId] = useState(product.videos[0]?.id ?? null);
   const [descExpandida, setDescExpandida] = useState(false);
+  const [barFill, setBarFill] = useState(0); // anima o preenchimento ao montar
   const addItem = useCart((s) => s.addItem);
 
   const selected =
@@ -120,6 +120,17 @@ export default function ProductDetail({
     : product.preco;
   const valorParcela = product.preco / product.parcelasMax;
   const capa = product.videos.find((v) => v.principal)?.thumbnailUrl ?? null;
+
+  // Barra de disponibilidade estilo tanque: cheia em 50 unidades; o nível (cor +
+  // rótulo) vem do estoque real, mas o número exato nunca é exibido.
+  const fillPct = Math.min(product.estoque / 50, 1) * 100;
+  const nivel =
+    product.estoque >= 25
+      ? { bar: "bg-green-500", text: "text-green-700", label: "Em estoque" }
+      : product.estoque >= 10
+        ? { bar: "bg-amber-500", text: "text-amber-700", label: "Estoque limitado" }
+        : { bar: "bg-red-500", text: "text-red-600", label: "Últimas unidades!" };
+  useEffect(() => setBarFill(fillPct), [fillPct]);
 
   const lineage = stripMarcheziSignature(product.descricao);
   const lineageParags = lineage
@@ -355,16 +366,26 @@ export default function ProductDetail({
             </div>
           ) : (
             <div className="space-y-4 max-w-md">
-              <div className="rounded-lg bg-green-50 border border-green-200 px-3 py-2.5 flex items-center justify-between gap-2">
-                <span className="flex items-center gap-1.5 text-sm font-semibold text-green-800">
-                  <Check size={16} className="shrink-0" aria-hidden="true" />
-                  Em estoque
-                </span>
-                <span className="flex items-center gap-1 text-xs font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">
-                  <Flame size={12} className="shrink-0" aria-hidden="true" />
-                  Apenas {product.estoque} disponíve
-                  {product.estoque > 1 ? "is" : "l"}!
-                </span>
+              {/* Disponibilidade — barra tipo tanque, sem expor o número exato */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-sm font-medium text-primary">
+                    Disponibilidade
+                  </span>
+                  <span className={`text-xs font-semibold ${nivel.text}`}>
+                    {nivel.label}
+                  </span>
+                </div>
+                <div
+                  className="h-3 w-full rounded-full bg-muted overflow-hidden"
+                  role="meter"
+                  aria-label={`Disponibilidade: ${nivel.label}`}
+                >
+                  <div
+                    className={`h-full rounded-full ${nivel.bar} transition-[width] duration-700 ease-out`}
+                    style={{ width: `${barFill}%` }}
+                  />
+                </div>
               </div>
 
               <div className="flex items-center gap-3">
@@ -481,10 +502,13 @@ export default function ProductDetail({
                 </button>
               )}
 
-              {/* Nota Marchezi integrada (pequena, não mais painel gigante) */}
-              <div className="mt-4 flex items-start gap-2 rounded-lg bg-primary/5 border border-primary/15 p-3">
-                <Trophy size={16} className="text-accent shrink-0 mt-0.5" aria-hidden="true" />
-                <p className="text-sm text-text leading-snug">{MARCHEZI_NOTA}</p>
+              {/* Nota Marchezi — fecho integrado da descrição (divisória sutil,
+                  não um box solto no meio da página) */}
+              <div className="mt-4 pt-3 border-t border-border flex items-start gap-2">
+                <Trophy size={15} className="text-accent shrink-0 mt-0.5" aria-hidden="true" />
+                <p className="text-sm text-muted-foreground italic leading-snug">
+                  {MARCHEZI_NOTA}
+                </p>
               </div>
             </div>
           )}
