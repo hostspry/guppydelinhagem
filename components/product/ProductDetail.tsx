@@ -540,75 +540,69 @@ export default function ProductDetail({
         </section>
       )}
 
-      {/* ═══ Blocos institucionais (3 colunas, fundo branco) ═══ */}
-      <section className="grid grid-cols-1 md:grid-cols-3 gap-5">
+      {/* ═══ Blocos institucionais (imagem à esquerda + texto, sem moldura) ═══ */}
+      <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {INSTITUCIONAIS.map((b) => {
           const externo = b.link?.href.startsWith("http");
           // Selo é emblema circular — contain p/ não cortar; demais são fotos (cover).
           const contain = b.imagem.includes("selo");
-
-          const corpo = (
-            <>
-              <h3 className="font-semibold text-primary text-lg">{b.titulo}</h3>
-              <p className="text-sm text-muted-foreground leading-relaxed">
-                {b.texto}
-              </p>
-
-              {b.checks && (
-                <ul className="space-y-1.5 pt-1">
-                  {b.checks.map((c) => (
-                    <li
-                      key={c}
-                      className="flex items-center gap-2 text-sm text-primary"
-                    >
-                      <Check
-                        size={16}
-                        className="text-green-600 shrink-0"
-                        aria-hidden="true"
-                      />
-                      {c}
-                    </li>
-                  ))}
-                </ul>
-              )}
-
-              {b.link &&
-                (externo ? (
-                  <a
-                    href={b.link.href}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 min-h-11 text-sm font-semibold text-secondary hover:underline"
-                  >
-                    {b.link.label} →
-                  </a>
-                ) : (
-                  <Link
-                    href={b.link.href}
-                    className="inline-flex items-center gap-1 min-h-11 text-sm font-semibold text-secondary hover:underline"
-                  >
-                    {b.link.label} →
-                  </Link>
-                ))}
-            </>
-          );
-
-          // Imagem no topo (cover p/ fotos, contain p/ o selo), texto abaixo.
           return (
-            <div
-              key={b.titulo}
-              className="rounded-xl border border-border bg-white overflow-hidden flex flex-col"
-            >
-              <div className="relative w-full aspect-video bg-white">
+            <div key={b.titulo} className="flex gap-3 items-start">
+              {/* Imagem ~1/3 à esquerda, sem card/moldura */}
+              <div className="relative w-1/3 shrink-0 aspect-square rounded-lg overflow-hidden">
                 <Image
                   src={b.imagem}
                   alt={b.titulo}
                   fill
-                  sizes="(max-width: 768px) 100vw, 33vw"
-                  className={contain ? "object-contain p-4" : "object-cover"}
+                  sizes="(max-width: 768px) 33vw, 12vw"
+                  className={contain ? "object-contain" : "object-cover"}
                 />
               </div>
-              <div className="p-5 flex-1 space-y-2">{corpo}</div>
+
+              {/* Texto ~2/3 à direita */}
+              <div className="flex-1 min-w-0 space-y-1.5">
+                <h3 className="font-semibold text-primary">{b.titulo}</h3>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  {b.texto}
+                </p>
+
+                {b.checks && (
+                  <ul className="space-y-1.5 pt-1">
+                    {b.checks.map((c) => (
+                      <li
+                        key={c}
+                        className="flex items-center gap-2 text-sm text-primary"
+                      >
+                        <Check
+                          size={16}
+                          className="text-green-600 shrink-0"
+                          aria-hidden="true"
+                        />
+                        {c}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+
+                {b.link &&
+                  (externo ? (
+                    <a
+                      href={b.link.href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 min-h-11 text-sm font-semibold text-secondary hover:underline"
+                    >
+                      {b.link.label} →
+                    </a>
+                  ) : (
+                    <Link
+                      href={b.link.href}
+                      className="inline-flex items-center gap-1 min-h-11 text-sm font-semibold text-secondary hover:underline"
+                    >
+                      {b.link.label} →
+                    </Link>
+                  ))}
+              </div>
             </div>
           );
         })}
