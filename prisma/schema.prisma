@@ -98,6 +98,21 @@ model Product {
   metaTitle       String?
   metaDescription String?
   keywords        String[]    @default([])
+
+  // Atributos específicos do peixe (preenchidos manualmente no admin). São eixos
+  // distintos — um peixe pode ser koi + halfmoon + dumbo ao mesmo tempo.
+  sexoComposicao  String? // lista fixa: MACHO, FEMEA, CASAL, TRIO, LOTE
+  padraoCor       String? // eixo principal de busca (koi, full red, tuxedo…) — livre
+  cauda           String? // formato do rabo (halfmoon, delta, roundtail…) — livre
+  caracteristica  String? // extra física (dumbo…) — livre, opcional
+  origem          String? // nacional, americano, asiático… — livre
+
+  // Atributos gerais de manejo (preenchidos pela IA, revisáveis).
+  temperatura     String? // ex: "22–28°C"
+  ph              String? // ex: "6.8–7.8"
+  alimentacao     String? // ex: "Onívoro"
+  expectativaVida String? // ex: "2–3 anos"
+  porte           String? // ex: "~6 cm"
   preco           Decimal     @db.Decimal(10, 2)
   descontoPix     Decimal?    @db.Decimal(5, 2)
   parcelasMax     Int         @default(3)

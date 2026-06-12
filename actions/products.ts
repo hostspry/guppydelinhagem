@@ -48,7 +48,22 @@ function parseForm(formData: FormData) {
     metaTitle: formData.get("metaTitle") || undefined,
     metaDescription: formData.get("metaDescription") || undefined,
     keywords: parseKeywordsField(formData.get("keywords")),
+    sexoComposicao: formData.get("sexoComposicao") || undefined,
+    padraoCor: formData.get("padraoCor") || undefined,
+    cauda: formData.get("cauda") || undefined,
+    caracteristica: formData.get("caracteristica") || undefined,
+    origem: formData.get("origem") || undefined,
+    temperatura: formData.get("temperatura") || undefined,
+    ph: formData.get("ph") || undefined,
+    alimentacao: formData.get("alimentacao") || undefined,
+    expectativaVida: formData.get("expectativaVida") || undefined,
+    porte: formData.get("porte") || undefined,
   });
+}
+
+/** "" → null para colunas opcionais de texto. */
+function orNull(v: string | undefined | null): string | null {
+  return v ? v : null;
 }
 
 /** Monta o objeto persistível (campos escalares) a partir dos dados validados. */
@@ -69,6 +84,16 @@ function toData(input: ReturnType<typeof productSchema.parse>) {
     metaTitle: input.metaTitle ? input.metaTitle : null,
     metaDescription: input.metaDescription ? input.metaDescription : null,
     keywords: input.keywords,
+    sexoComposicao: orNull(input.sexoComposicao),
+    padraoCor: orNull(input.padraoCor),
+    cauda: orNull(input.cauda),
+    caracteristica: orNull(input.caracteristica),
+    origem: orNull(input.origem),
+    temperatura: orNull(input.temperatura),
+    ph: orNull(input.ph),
+    alimentacao: orNull(input.alimentacao),
+    expectativaVida: orNull(input.expectativaVida),
+    porte: orNull(input.porte),
   };
 }
 

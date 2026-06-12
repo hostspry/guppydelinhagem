@@ -48,9 +48,41 @@ export const productSchema = z.object({
     .array(z.string().trim().min(1).max(60))
     .max(20, "Máximo de 20 palavras-chave")
     .default([]),
+
+  // ── Atributos específicos (manuais) ──
+  // sexoComposicao é lista fixa; os demais são flexíveis (sugestões + livre).
+  sexoComposicao: z
+    .enum(["MACHO", "FEMEA", "CASAL", "TRIO", "LOTE"])
+    .optional()
+    .or(z.literal("")),
+  padraoCor: z.string().max(60, "Máx 60 caracteres").optional().or(z.literal("")),
+  cauda: z.string().max(60, "Máx 60 caracteres").optional().or(z.literal("")),
+  caracteristica: z.string().max(60, "Máx 60 caracteres").optional().or(z.literal("")),
+  origem: z.string().max(60, "Máx 60 caracteres").optional().or(z.literal("")),
+
+  // ── Atributos gerais (IA, revisáveis) ──
+  temperatura: z.string().max(40, "Máx 40 caracteres").optional().or(z.literal("")),
+  ph: z.string().max(40, "Máx 40 caracteres").optional().or(z.literal("")),
+  alimentacao: z.string().max(60, "Máx 60 caracteres").optional().or(z.literal("")),
+  expectativaVida: z.string().max(40, "Máx 40 caracteres").optional().or(z.literal("")),
+  porte: z.string().max(40, "Máx 40 caracteres").optional().or(z.literal("")),
 });
 
 export type ProductInput = z.infer<typeof productSchema>;
+
+// Opções/sugestões dos atributos — usadas no form admin.
+export const SEXO_COMPOSICAO_OPCOES = [
+  { value: "MACHO", label: "Macho" },
+  { value: "FEMEA", label: "Fêmea" },
+  { value: "CASAL", label: "Casal" },
+  { value: "TRIO", label: "Trio" },
+  { value: "LOTE", label: "Lote" },
+] as const;
+
+export const PADRAO_COR_SUGESTOES = ["koi", "super koi", "full red", "tuxedo"];
+export const CAUDA_SUGESTOES = ["halfmoon", "delta", "super delta", "roundtail"];
+export const CARACTERISTICA_SUGESTOES = ["dumbo"];
+export const ORIGEM_SUGESTOES = ["nacional", "americano", "asiático", "europeu"];
 
 // ── Vídeos (relação filha gerenciada como array no form) ───────────────────
 // Validado na action a partir do JSON serializado pelo ProductForm.
