@@ -65,7 +65,6 @@ export const productSchema = z.object({
   ph: z.string().max(40, "Máx 40 caracteres").optional().or(z.literal("")),
   alimentacao: z.string().max(60, "Máx 60 caracteres").optional().or(z.literal("")),
   expectativaVida: z.string().max(40, "Máx 40 caracteres").optional().or(z.literal("")),
-  porte: z.string().max(40, "Máx 40 caracteres").optional().or(z.literal("")),
 });
 
 export type ProductInput = z.infer<typeof productSchema>;

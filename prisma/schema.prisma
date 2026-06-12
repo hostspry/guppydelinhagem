@@ -112,7 +112,6 @@ model Product {
   ph              String? // ex: "6.8–7.8"
   alimentacao     String? // ex: "Onívoro"
   expectativaVida String? // ex: "2–3 anos"
-  porte           String? // ex: "~6 cm"
   preco           Decimal     @db.Decimal(10, 2)
   descontoPix     Decimal?    @db.Decimal(5, 2)
   parcelasMax     Int         @default(3)
@@ -166,7 +165,8 @@ model WaitlistEntry {
   id         String   @id @default(cuid())
   productId  String
   userId     String?
-  email      String
+  email      String? // legado/conta logada; a captura pública usa whatsapp
+  whatsapp   String? // lista de espera pública (digits BR)
   notificado Boolean  @default(false)
   criadoEm   DateTime @default(now())
 
@@ -174,6 +174,7 @@ model WaitlistEntry {
   user    User?   @relation(fields: [userId], references: [id])
 
   @@unique([productId, email])
+  @@unique([productId, whatsapp]) // dedup por whatsapp no mesmo produto
 }
 
 // ─────────────────────────────────────────────

@@ -57,7 +57,6 @@ function parseForm(formData: FormData) {
     ph: formData.get("ph") || undefined,
     alimentacao: formData.get("alimentacao") || undefined,
     expectativaVida: formData.get("expectativaVida") || undefined,
-    porte: formData.get("porte") || undefined,
   });
 }
 
@@ -93,7 +92,6 @@ function toData(input: ReturnType<typeof productSchema.parse>) {
     ph: orNull(input.ph),
     alimentacao: orNull(input.alimentacao),
     expectativaVida: orNull(input.expectativaVida),
-    porte: orNull(input.porte),
   };
 }
 

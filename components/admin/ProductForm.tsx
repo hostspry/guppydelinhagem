@@ -70,7 +70,6 @@ type ProductFormProps = {
     ph: string | null;
     alimentacao: string | null;
     expectativaVida: string | null;
-    porte: string | null;
     videos: VideoDraft[];
   };
 };
@@ -126,7 +125,6 @@ export function ProductForm({ categorias, initialData }: ProductFormProps) {
           ph: initialData.ph ?? "",
           alimentacao: initialData.alimentacao ?? "",
           expectativaVida: initialData.expectativaVida ?? "",
-          porte: initialData.porte ?? "",
         }
       : {
           nome: "",
@@ -152,7 +150,6 @@ export function ProductForm({ categorias, initialData }: ProductFormProps) {
           ph: "",
           alimentacao: "",
           expectativaVida: "",
-          porte: "",
         },
   });
 
@@ -238,7 +235,6 @@ export function ProductForm({ categorias, initialData }: ProductFormProps) {
       setValue("expectativaVida", truncateAtWord(d.expectativaVida, 40), {
         shouldValidate: true,
       });
-      setValue("porte", truncateAtWord(d.porte, 40), { shouldValidate: true });
       setKeywords(d.keywords);
       setAiGenerated(true);
       toast.success("Conteúdo gerado. Revise antes de salvar.");
@@ -276,7 +272,6 @@ export function ProductForm({ categorias, initialData }: ProductFormProps) {
     formData.append("ph", data.ph ?? "");
     formData.append("alimentacao", data.alimentacao ?? "");
     formData.append("expectativaVida", data.expectativaVida ?? "");
-    formData.append("porte", data.porte ?? "");
     formData.append("videos", JSON.stringify(videos));
 
     startTransition(async () => {
@@ -569,9 +564,6 @@ export function ProductForm({ categorias, initialData }: ProductFormProps) {
           </FormField>
           <FormField label="Expectativa de vida" name="expectativaVida" error={errors.expectativaVida?.message}>
             <input id="expectativaVida" {...register("expectativaVida")} className={inputClass} placeholder="2–3 anos" />
-          </FormField>
-          <FormField label="Porte" name="porte" error={errors.porte?.message}>
-            <input id="porte" {...register("porte")} className={inputClass} placeholder="~6 cm" />
           </FormField>
         </div>
       </fieldset>

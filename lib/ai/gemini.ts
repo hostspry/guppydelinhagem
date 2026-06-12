@@ -44,7 +44,6 @@ export type GeneratedProductContent = {
   ph: string;
   alimentacao: string;
   expectativaVida: string;
-  porte: string;
 };
 
 // Lazy: não exigir a env no build (igual lib/s3, lib/prisma).
@@ -72,15 +71,15 @@ CAMPOS (gere todos de uma vez):
 - metaTitle: no máximo 58 caracteres.
 - metaDescription: no máximo 150 caracteres.
 - keywords: de 5 a 8 termos que pessoas buscariam, minúsculas, sem "#".
-- temperatura, ph, alimentacao, expectativaVida, porte: dados de manejo da espécie/linhagem para a ficha técnica (ex.: temperatura "22–28°C", ph "6.8–7.8", alimentacao "Onívoro", expectativaVida "2–3 anos", porte "~6 cm"). Use dados confiáveis (da pesquisa quando ativa). Se não tiver base para algum, deixe a string vazia — NÃO invente.`;
+- temperatura, ph, alimentacao, expectativaVida: dados de manejo da espécie/linhagem para a ficha técnica (ex.: temperatura "22–28°C", ph "6.8–7.8", alimentacao "Onívoro", expectativaVida "2–3 anos"). Use dados confiáveis (da pesquisa quando ativa). Se não tiver base para algum, deixe a string vazia — NÃO invente.`;
 
 const SEARCH_BLOCK = `
 
-PESQUISA WEB ATIVA: use a busca para confirmar a linhagem (origem, padrão de cor genético) e o manejo (temperatura, pH, alimentação, porte, expectativa de vida). Priorize fontes especializadas em inglês e da Ásia (Tailândia, Japão, China, Taiwan), incluindo criadores e lojas de referência. Os dados de manejo vão nos CAMPOS estruturados (temperatura, ph, alimentacao, expectativaVida, porte), não no texto da descrição. Traga só o que encontrar; se faltar um dado, deixe o campo vazio — não invente.`;
+PESQUISA WEB ATIVA: use a busca para confirmar a linhagem (origem, padrão de cor genético) e o manejo (temperatura, pH, alimentação, expectativa de vida). Priorize fontes especializadas em inglês e da Ásia (Tailândia, Japão, China, Taiwan), incluindo criadores e lojas de referência. Os dados de manejo vão nos CAMPOS estruturados (temperatura, ph, alimentacao, expectativaVida), não no texto da descrição. Traga só o que encontrar; se faltar um dado, deixe o campo vazio — não invente.`;
 
 const JSON_BLOCK = `
 
-FORMATO DE SAÍDA — responda APENAS com um objeto JSON válido, sem nenhum texto antes ou depois, sem comentários e sem blocos de código (não use crases). As chaves devem ser exatamente: nome, descricao, descricaoCurta, metaTitle, metaDescription, keywords (array de strings), temperatura, ph, alimentacao, expectativaVida, porte (strings; vazias quando não houver dado).`;
+FORMATO DE SAÍDA — responda APENAS com um objeto JSON válido, sem nenhum texto antes ou depois, sem comentários e sem blocos de código (não use crases). As chaves devem ser exatamente: nome, descricao, descricaoCurta, metaTitle, metaDescription, keywords (array de strings), temperatura, ph, alimentacao, expectativaVida (strings; vazias quando não houver dado).`;
 
 function buildSystemInstruction(pesquisar: boolean): string {
   return SYSTEM_BASE + (pesquisar ? SEARCH_BLOCK : "") + JSON_BLOCK;
@@ -116,7 +115,6 @@ const RESPONSE_SCHEMA = {
     ph: { type: "STRING" },
     alimentacao: { type: "STRING" },
     expectativaVida: { type: "STRING" },
-    porte: { type: "STRING" },
   },
   // Só os essenciais são obrigatórios; os de manejo podem vir vazios/omitidos.
   required: [
@@ -138,7 +136,6 @@ const RESPONSE_SCHEMA = {
     "ph",
     "alimentacao",
     "expectativaVida",
-    "porte",
   ],
 } as const;
 
@@ -154,7 +151,6 @@ const outputSchema = z.object({
   ph: z.string().optional().default(""),
   alimentacao: z.string().optional().default(""),
   expectativaVida: z.string().optional().default(""),
-  porte: z.string().optional().default(""),
 });
 
 /**
@@ -254,6 +250,5 @@ export async function generateProductContent(
     ph: parsed.ph.trim(),
     alimentacao: parsed.alimentacao.trim(),
     expectativaVida: parsed.expectativaVida.trim(),
-    porte: parsed.porte.trim(),
   };
 }

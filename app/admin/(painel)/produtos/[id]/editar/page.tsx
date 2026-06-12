@@ -53,7 +53,6 @@ export default async function EditarProdutoPage({ params }: Props) {
           ph: produto.ph,
           alimentacao: produto.alimentacao,
           expectativaVida: produto.expectativaVida,
-          porte: produto.porte,
           videos: produto.videos.map((v) => ({
             id: v.id,
             platform: v.platform,
