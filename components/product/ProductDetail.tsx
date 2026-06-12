@@ -19,7 +19,6 @@ import {
   Wind,
   Headset,
   Package,
-  ImageIcon,
   type LucideIcon,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -541,36 +540,72 @@ export default function ProductDetail({
         </section>
       )}
 
-      {/* ═══ Blocos institucionais (placeholder Leva 2) ═══ */}
-      <section className="grid grid-cols-1 md:grid-cols-3 gap-5">
-        {INSTITUCIONAIS.map((b) => (
-          <div
-            key={b.titulo}
-            className="rounded-xl border border-border overflow-hidden flex flex-col"
-          >
-            {/* Imagem real quando houver; senão placeholder (ex: "Sobre a criação") */}
-            <div className="relative aspect-video bg-muted">
-              {b.imagem ? (
+      {/* ═══ Blocos institucionais (imagem ao lado + checks + links) ═══ */}
+      <section className="space-y-5">
+        {INSTITUCIONAIS.map((b) => {
+          const externo = b.link?.href.startsWith("http");
+          return (
+            <div
+              key={b.titulo}
+              className="rounded-xl border border-border overflow-hidden flex flex-col sm:flex-row"
+            >
+              {/* Imagem ao lado (empilha no mobile), preenchendo o espaço */}
+              <div className="relative w-full aspect-video sm:aspect-auto sm:w-2/5 sm:min-h-[200px] bg-muted shrink-0">
                 <Image
                   src={b.imagem}
                   alt={b.titulo}
                   fill
-                  sizes="(max-width: 768px) 100vw, 33vw"
-                  className="object-contain p-3"
+                  sizes="(max-width: 640px) 100vw, 40vw"
+                  className="object-cover"
                 />
-              ) : (
-                <div className="w-full h-full flex flex-col items-center justify-center text-muted-foreground gap-1">
-                  <ImageIcon size={28} aria-hidden="true" />
-                  <span className="text-[11px]">imagem em breve</span>
-                </div>
-              )}
+              </div>
+
+              <div className="p-5 flex-1 space-y-2">
+                <h3 className="font-semibold text-primary text-lg">{b.titulo}</h3>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  {b.texto}
+                </p>
+
+                {b.checks && (
+                  <ul className="space-y-1.5 pt-1">
+                    {b.checks.map((c) => (
+                      <li
+                        key={c}
+                        className="flex items-center gap-2 text-sm text-primary"
+                      >
+                        <Check
+                          size={16}
+                          className="text-green-600 shrink-0"
+                          aria-hidden="true"
+                        />
+                        {c}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+
+                {b.link &&
+                  (externo ? (
+                    <a
+                      href={b.link.href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 min-h-11 text-sm font-semibold text-secondary hover:underline"
+                    >
+                      {b.link.label} →
+                    </a>
+                  ) : (
+                    <Link
+                      href={b.link.href}
+                      className="inline-flex items-center gap-1 min-h-11 text-sm font-semibold text-secondary hover:underline"
+                    >
+                      {b.link.label} →
+                    </Link>
+                  ))}
+              </div>
             </div>
-            <div className="p-4 space-y-1.5">
-              <h3 className="font-semibold text-primary">{b.titulo}</h3>
-              <p className="text-sm text-muted-foreground leading-relaxed">{b.texto}</p>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </section>
 
       {/* ═══ Quem viu também viu (placeholder Leva 2: mesma categoria) ═══ */}

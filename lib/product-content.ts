@@ -1,6 +1,8 @@
 // Conteúdo estático da página de produto (Leva 1). Texto fixo, reaproveitável;
 // os ícones são escolhidos no componente via `icon` (chave → lucide).
 
+import { whatsappLink } from "@/lib/constants";
+
 export const PROVA_SOCIAL_VENDIDOS = "+10 mil guppys vendidos na estufa";
 export const PROVA_SOCIAL_CRIADOR =
   "Criador campeão no World Guppy Contest";
@@ -62,29 +64,44 @@ export const SEGURANCA: { icon: IconKey; label: string }[] = [
 export const MARCHEZI_NOTA =
   "Cada peixe é selecionado à mão na Marchezi Guppy Farm — criador premiado no World Guppy Contest, com seleção genética rigorosa e manejo diário.";
 
-// Blocos institucionais (Leva 2). imagem real quando disponível; senão placeholder.
+// Blocos institucionais — imagem ao lado do texto, com checks/link conforme o bloco.
 export const INSTITUCIONAIS: {
   titulo: string;
   texto: string;
-  imagem?: string;
+  imagem: string;
+  checks?: string[];
+  link?: { label: string; href: string };
 }[] = [
   {
     titulo: "Sobre a criação",
     texto:
       "Nossa estufa é dedicada exclusivamente à criação de guppies de linhagem, com seleção genética e acompanhamento diário de cada geração.",
-    // sem foto da estufa ainda — segue placeholder.
+    imagem: "/images/estufa-aquarios.webp",
+    link: { label: "Conheça nossa estrutura", href: "/sobre-nos" },
   },
   {
     titulo: "Como enviamos",
     texto:
-      "Cada peixe vai em embalagem com oxigênio e proteção térmica, preparado para chegar com segurança em todo o Brasil.",
+      "Cada peixe vai em embalagem preparada para chegar com segurança em todo o Brasil:",
     imagem: "/images/caixa.png",
+    checks: [
+      "Sacos duplos reforçados",
+      "Oxigênio puro",
+      "Caixa térmica",
+      "Envio rápido e seguro",
+    ],
   },
   {
     titulo: "Garantia de chegada viva",
     texto:
       "Se algo acontecer no transporte, a gente resolve. Sua compra é protegida pela nossa garantia de chegada viva.",
     imagem: "/images/selo.png",
+    link: {
+      label: "Saiba mais sobre nossa garantia",
+      href: whatsappLink(
+        "Olá! Quero saber mais sobre a garantia de chegada viva.",
+      ),
+    },
   },
 ];
 
