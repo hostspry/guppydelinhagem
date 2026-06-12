@@ -135,11 +135,17 @@ export default function CarrinhoPage() {
 
                   <button
                     type="button"
-                    onClick={() => removeItem(item.produtoId)}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      removeItem(item.produtoId);
+                    }}
                     aria-label={`Remover ${item.nome}`}
-                    className="text-muted-foreground hover:text-secondary transition-colors"
+                    // Alvo de toque de 44x44 (mínimo mobile) — o ícone de 16px
+                    // sozinho era pequeno demais e os toques erravam no celular.
+                    className="flex items-center justify-center w-11 h-11 -my-1 text-muted-foreground hover:text-secondary transition-colors"
                   >
-                    <Trash2 size={16} aria-hidden="true" />
+                    <Trash2 size={18} aria-hidden="true" />
                   </button>
                 </div>
               </div>
