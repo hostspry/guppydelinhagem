@@ -76,7 +76,7 @@ export const INSTITUCIONAIS: {
     titulo: "Sobre a criação",
     texto:
       "Nossa estufa é dedicada exclusivamente à criação de guppies de linhagem, com seleção genética e acompanhamento diário de cada geração.",
-    imagem: "/images/estufa-aquarios.webp",
+    imagem: "/images/estufa.jpg",
     link: { label: "Conheça nossa estrutura", href: "/sobre-nos" },
   },
   {

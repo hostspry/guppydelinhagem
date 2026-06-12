@@ -544,10 +544,8 @@ export default function ProductDetail({
       <section className="grid grid-cols-1 md:grid-cols-3 gap-5">
         {INSTITUCIONAIS.map((b) => {
           const externo = b.link?.href.startsWith("http");
-          // Selo é emblema circular — contain p/ não cortar; demais preenchem (cover).
+          // Selo é emblema circular — contain p/ não cortar; demais são fotos (cover).
           const contain = b.imagem.includes("selo");
-          // Estufa é vertical — imagem menor ao lado do texto (não no topo).
-          const lateral = b.imagem.includes("estufa");
 
           const corpo = (
             <>
@@ -595,28 +593,7 @@ export default function ProductDetail({
             </>
           );
 
-          // Imagem vertical (estufa): pequena, ao lado do texto.
-          if (lateral) {
-            return (
-              <div
-                key={b.titulo}
-                className="rounded-xl border border-border bg-white p-4 flex gap-4"
-              >
-                <div className="relative w-24 shrink-0 aspect-[3/4] rounded-lg overflow-hidden bg-white">
-                  <Image
-                    src={b.imagem}
-                    alt={b.titulo}
-                    fill
-                    sizes="96px"
-                    className="object-cover"
-                  />
-                </div>
-                <div className="flex-1 space-y-2">{corpo}</div>
-              </div>
-            );
-          }
-
-          // Demais: imagem no topo (cover/contain), texto abaixo.
+          // Imagem no topo (cover p/ fotos, contain p/ o selo), texto abaixo.
           return (
             <div
               key={b.titulo}
