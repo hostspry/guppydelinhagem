@@ -546,12 +546,82 @@ export default function ProductDetail({
           const externo = b.link?.href.startsWith("http");
           // Selo é emblema circular — contain p/ não cortar; demais preenchem (cover).
           const contain = b.imagem.includes("selo");
+          // Estufa é vertical — imagem menor ao lado do texto (não no topo).
+          const lateral = b.imagem.includes("estufa");
+
+          const corpo = (
+            <>
+              <h3 className="font-semibold text-primary text-lg">{b.titulo}</h3>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                {b.texto}
+              </p>
+
+              {b.checks && (
+                <ul className="space-y-1.5 pt-1">
+                  {b.checks.map((c) => (
+                    <li
+                      key={c}
+                      className="flex items-center gap-2 text-sm text-primary"
+                    >
+                      <Check
+                        size={16}
+                        className="text-green-600 shrink-0"
+                        aria-hidden="true"
+                      />
+                      {c}
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              {b.link &&
+                (externo ? (
+                  <a
+                    href={b.link.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 min-h-11 text-sm font-semibold text-secondary hover:underline"
+                  >
+                    {b.link.label} →
+                  </a>
+                ) : (
+                  <Link
+                    href={b.link.href}
+                    className="inline-flex items-center gap-1 min-h-11 text-sm font-semibold text-secondary hover:underline"
+                  >
+                    {b.link.label} →
+                  </Link>
+                ))}
+            </>
+          );
+
+          // Imagem vertical (estufa): pequena, ao lado do texto.
+          if (lateral) {
+            return (
+              <div
+                key={b.titulo}
+                className="rounded-xl border border-border bg-white p-4 flex gap-4"
+              >
+                <div className="relative w-24 shrink-0 aspect-[3/4] rounded-lg overflow-hidden bg-white">
+                  <Image
+                    src={b.imagem}
+                    alt={b.titulo}
+                    fill
+                    sizes="96px"
+                    className="object-cover"
+                  />
+                </div>
+                <div className="flex-1 space-y-2">{corpo}</div>
+              </div>
+            );
+          }
+
+          // Demais: imagem no topo (cover/contain), texto abaixo.
           return (
             <div
               key={b.titulo}
               className="rounded-xl border border-border bg-white overflow-hidden flex flex-col"
             >
-              {/* Imagem no topo, fundo branco (sem retângulo cinza) */}
               <div className="relative w-full aspect-video bg-white">
                 <Image
                   src={b.imagem}
@@ -561,50 +631,7 @@ export default function ProductDetail({
                   className={contain ? "object-contain p-4" : "object-cover"}
                 />
               </div>
-
-              <div className="p-5 flex-1 space-y-2">
-                <h3 className="font-semibold text-primary text-lg">{b.titulo}</h3>
-                <p className="text-sm text-muted-foreground leading-relaxed">
-                  {b.texto}
-                </p>
-
-                {b.checks && (
-                  <ul className="space-y-1.5 pt-1">
-                    {b.checks.map((c) => (
-                      <li
-                        key={c}
-                        className="flex items-center gap-2 text-sm text-primary"
-                      >
-                        <Check
-                          size={16}
-                          className="text-green-600 shrink-0"
-                          aria-hidden="true"
-                        />
-                        {c}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-
-                {b.link &&
-                  (externo ? (
-                    <a
-                      href={b.link.href}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 min-h-11 text-sm font-semibold text-secondary hover:underline"
-                    >
-                      {b.link.label} →
-                    </a>
-                  ) : (
-                    <Link
-                      href={b.link.href}
-                      className="inline-flex items-center gap-1 min-h-11 text-sm font-semibold text-secondary hover:underline"
-                    >
-                      {b.link.label} →
-                    </Link>
-                  ))}
-              </div>
+              <div className="p-5 flex-1 space-y-2">{corpo}</div>
             </div>
           );
         })}
