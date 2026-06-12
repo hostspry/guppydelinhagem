@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import {
   Check,
   Play,
@@ -8,13 +9,24 @@ import {
   Plus,
   ShoppingCart,
   X,
-  Truck,
-  ShieldCheck,
   Trophy,
+  Dna,
+  Droplets,
+  Clock,
+  ShieldCheck,
+  Truck,
+  Wind,
+  Headset,
+  Package,
+  ImageIcon,
+  type LucideIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 import { VideoThumb } from "@/components/admin/VideoThumb";
+import { WhatsAppIcon } from "@/components/icons/WhatsAppIcon";
 import ProductFreteEstimator from "./ProductFreteEstimator";
+import ProductFaq from "./ProductFaq";
+import WaitlistForm from "./WaitlistForm";
 import { formatBRL } from "@/lib/utils/format";
 import {
   youtubeEmbedUrl,
@@ -22,12 +34,38 @@ import {
   tiktokEmbedUrl,
 } from "@/lib/utils/video";
 import { useCart } from "@/lib/stores/cart";
-import { whatsappLink, MARCHEZI_SIGNATURE } from "@/lib/constants";
+import {
+  whatsappLink,
+  MARCHEZI_SIGNATURE,
+  stripMarcheziSignature,
+} from "@/lib/constants";
+import {
+  PROVA_SOCIAL_VENDIDOS,
+  PROVA_SOCIAL_CRIADOR,
+  SELOS_TOPO,
+  DIFERENCIAIS,
+  SEGURANCA,
+  INSTITUCIONAIS,
+  type IconKey,
+} from "@/lib/product-content";
 import { SEXO_COMPOSICAO_OPCOES } from "@/lib/validations/product";
 import type {
   ProductDetail as ProductDetailData,
   ProductDetailVideo,
+  PublicProductCard,
 } from "@/lib/queries/products";
+
+const ICONS: Record<IconKey, LucideIcon> = {
+  trophy: Trophy,
+  dna: Dna,
+  droplets: Droplets,
+  clock: Clock,
+  shield: ShieldCheck,
+  truck: Truck,
+  wind: Wind,
+  headset: Headset,
+  package: Package,
+};
 
 const PLATFORM_LABEL: Record<ProductDetailVideo["platform"], string> = {
   YOUTUBE: "YouTube",
@@ -58,7 +96,13 @@ function capFirst(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-export default function ProductDetail({ product }: { product: ProductDetailData }) {
+export default function ProductDetail({
+  product,
+  relacionados,
+}: {
+  product: ProductDetailData;
+  relacionados: PublicProductCard[];
+}) {
   const [qtd, setQtd] = useState(1);
   const [playing, setPlaying] = useState(false);
   const [selectedId, setSelectedId] = useState(product.videos[0]?.id ?? null);
@@ -78,8 +122,7 @@ export default function ProductDetail({ product }: { product: ProductDetailData 
   const valorParcela = product.preco / product.parcelasMax;
   const capa = product.videos.find((v) => v.principal)?.thumbnailUrl ?? null;
 
-  // Assinatura Marchezi vai num card destacado — separa do texto da linhagem.
-  const lineage = product.descricao.replace(MARCHEZI_SIGNATURE, "").trim();
+  const lineage = stripMarcheziSignature(product.descricao);
   const lineageParags = lineage
     .split(/\n\s*\n/)
     .map((s) => s.trim())
@@ -91,22 +134,24 @@ export default function ProductDetail({ product }: { product: ProductDetailData 
         ?.label ?? product.sexoComposicao
     : null;
 
-  // Ficha técnica — ordem do brief; só linhas com valor.
-  const ficha: [string, string | null][] = [
+  // Ficha técnica em 2 colunas (ordem do brief). Só linhas com valor.
+  type Row = [string, string | null];
+  const filtra = (rows: Row[]) =>
+    rows.filter((r): r is [string, string] => !!r[1] && r[1].trim() !== "");
+  const fichaEsq = filtra([
     ["Padrão / cor", product.padraoCor],
-    ["Cauda", product.cauda],
-    ["Característica", product.caracteristica],
     ["Sexo / composição", sexoLabel],
-    ["Origem", product.origem],
     ["Temperatura", product.temperatura],
     ["pH", product.ph],
+  ]);
+  const fichaDir = filtra([
     ["Alimentação", product.alimentacao],
     ["Expectativa de vida", product.expectativaVida],
-    ["Porte", product.porte],
-  ];
-  const fichaRows = ficha.filter(
-    (row): row is [string, string] => !!row[1] && row[1].trim() !== "",
-  );
+    ["Origem", product.origem],
+    ["Cauda", product.cauda],
+    ["Característica", product.caracteristica],
+  ]);
+  const temFicha = fichaEsq.length + fichaDir.length > 0;
 
   function selectVideo(id: string) {
     setSelectedId(id);
@@ -137,10 +182,23 @@ export default function ProductDetail({ product }: { product: ProductDetailData 
     const msg = `Olá! Quero comprar: ${product.nome} (quantidade: ${qtd}). Pode me ajudar a fechar o pedido?`;
     window.open(whatsappLink(msg), "_blank", "noopener,noreferrer");
   }
+  const duvidasHref = whatsappLink(
+    `Olá! Tenho dúvidas sobre: ${product.nome}.`,
+  );
+
+  function Selo({ icon, label }: { icon: IconKey; label: string }) {
+    const Icon = ICONS[icon];
+    return (
+      <div className="flex items-center gap-2 border border-border rounded-lg p-2.5 text-xs text-primary">
+        <Icon size={16} className="shrink-0 text-green-600" aria-hidden="true" />
+        <span className="leading-tight">{label}</span>
+      </div>
+    );
+  }
 
   return (
-    <div className="container-site py-8 space-y-10">
-      {/* ── Bloco de compra ── */}
+    <div className="container-site py-8 space-y-12">
+      {/* ═══ Bloco de compra ═══ */}
       <div className="grid grid-cols-1 lg:grid-cols-[300px_minmax(0,1fr)] gap-8 items-start">
         {/* Vídeo */}
         <div className="space-y-3">
@@ -241,123 +299,173 @@ export default function ProductDetail({ product }: { product: ProductDetailData 
             )}
           </div>
 
+          {/* Prova social honesta — sem estrelas/avaliações falsas */}
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+            <span className="flex items-center gap-1.5 font-semibold text-primary">
+              <Check size={15} className="text-green-600" aria-hidden="true" />
+              {PROVA_SOCIAL_VENDIDOS}
+            </span>
+            <span className="flex items-center gap-1.5 text-muted-foreground">
+              <Trophy size={15} className="text-accent" aria-hidden="true" />
+              {PROVA_SOCIAL_CRIADOR}
+            </span>
+          </div>
+
           {/* Preço */}
           <div className="space-y-1">
             <div className="flex items-end gap-2 flex-wrap">
               <span className="text-green-600 text-3xl font-bold leading-none">
                 {formatBRL(precoPix)}
               </span>
+              <span className="text-green-700 text-sm font-medium pb-0.5">no Pix</span>
               {temDescontoPix && (
                 <span className="text-[11px] font-bold text-green-700 bg-green-100 px-2 py-0.5 rounded-full">
-                  −{product.descontoPix}% no Pix
+                  {product.descontoPix}% OFF
                 </span>
               )}
             </div>
-            <p className="flex items-center gap-1 text-green-700 text-sm font-medium">
-              <Check size={14} className="shrink-0" aria-hidden="true" />
-              à vista no Pix
-            </p>
             {temDescontoPix && (
               <p className="text-sm text-muted-foreground">
-                <span className="line-through">{formatBRL(product.preco)}</span> no
-                cartão — em até {product.parcelasMax}x de {formatBRL(valorParcela)} sem
-                juros
+                De <span className="line-through">{formatBRL(product.preco)}</span> no
+                cartão
               </p>
             )}
+            <p className="text-sm text-muted-foreground">
+              ou em até {product.parcelasMax}x de {formatBRL(valorParcela)} sem juros
+            </p>
           </div>
 
-          {/* Quantidade */}
-          <div className="flex items-center gap-3">
-            <span className="text-sm text-muted-foreground">Quantidade</span>
-            <div className="flex items-center border border-border rounded-lg">
-              <button
-                type="button"
-                onClick={() => setQtd((q) => Math.max(1, q - 1))}
-                disabled={semEstoque || qtd <= 1}
-                aria-label="Diminuir quantidade"
-                className="flex items-center justify-center w-11 h-11 text-primary disabled:opacity-30 hover:text-accent transition-colors"
-              >
-                <Minus size={16} aria-hidden="true" />
-              </button>
-              <span className="w-10 text-center font-medium tabular-nums">{qtd}</span>
-              <button
-                type="button"
-                onClick={() => setQtd((q) => Math.min(product.estoque, q + 1))}
-                disabled={semEstoque || qtd >= product.estoque}
-                aria-label="Aumentar quantidade"
-                className="flex items-center justify-center w-11 h-11 text-primary disabled:opacity-30 hover:text-accent transition-colors"
-              >
-                <Plus size={16} aria-hidden="true" />
-              </button>
-            </div>
-            {semEstoque && (
-              <span className="text-sm font-semibold text-secondary">Sem estoque</span>
-            )}
-          </div>
-
-          {/* Botões — proporcionais (max-width no desktop, full no mobile) */}
-          <div className="flex flex-col sm:flex-row gap-3 w-full sm:max-w-md">
-            <button
-              type="button"
-              onClick={handleComprar}
-              disabled={semEstoque}
-              className="flex-1 bg-green-600 text-white font-semibold py-3 rounded-pill hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-            >
-              Comprar agora
-            </button>
-            <button
-              type="button"
-              onClick={adicionar}
-              disabled={semEstoque}
-              className="flex-1 flex items-center justify-center gap-2 border border-primary text-primary font-semibold py-3 rounded-pill hover:bg-primary/5 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-            >
-              <ShoppingCart size={17} aria-hidden="true" />
-              Adicionar ao carrinho
-            </button>
-          </div>
-
-          {/* Frete — logo abaixo dos botões */}
+          {/* Frete — logo abaixo do preço */}
           <div className="max-w-md">
             <ProductFreteEstimator qtd={qtd} />
           </div>
 
-          {/* Selos de confiança em caixinhas */}
-          <div className="grid grid-cols-2 gap-3 max-w-md">
-            <div className="flex items-center gap-2 border border-border rounded-lg p-3 text-sm text-primary">
-              <ShieldCheck size={18} className="shrink-0 text-green-600" aria-hidden="true" />
-              Chegada viva garantida
+          {/* Estoque + compra / lista de espera */}
+          {semEstoque ? (
+            <div className="max-w-md space-y-3">
+              <WaitlistForm productId={product.id} />
+              <a
+                href={duvidasHref}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center gap-2 w-full border border-primary text-primary font-semibold py-3 rounded-pill hover:bg-primary/5 transition-all"
+              >
+                <WhatsAppIcon className="w-4 h-4 text-[#25D366]" />
+                Tirar dúvidas no WhatsApp
+              </a>
             </div>
-            <div className="flex items-center gap-2 border border-border rounded-lg p-3 text-sm text-primary">
-              <Truck size={18} className="shrink-0 text-green-600" aria-hidden="true" />
-              Envio para todo o Brasil
+          ) : (
+            <div className="space-y-4 max-w-md">
+              <p className="flex items-center gap-1.5 text-sm text-green-700 font-medium">
+                <Check size={15} className="shrink-0" aria-hidden="true" />
+                Em estoque · apenas {product.estoque} disponíve
+                {product.estoque > 1 ? "is" : "l"}
+              </p>
+
+              <div className="flex items-center gap-3">
+                <span className="text-sm text-muted-foreground">Quantidade</span>
+                <div className="flex items-center border border-border rounded-lg">
+                  <button
+                    type="button"
+                    onClick={() => setQtd((q) => Math.max(1, q - 1))}
+                    disabled={qtd <= 1}
+                    aria-label="Diminuir quantidade"
+                    className="flex items-center justify-center w-11 h-11 text-primary disabled:opacity-30 hover:text-accent transition-colors"
+                  >
+                    <Minus size={16} aria-hidden="true" />
+                  </button>
+                  <span className="w-10 text-center font-medium tabular-nums">{qtd}</span>
+                  <button
+                    type="button"
+                    onClick={() => setQtd((q) => Math.min(product.estoque, q + 1))}
+                    disabled={qtd >= product.estoque}
+                    aria-label="Aumentar quantidade"
+                    className="flex items-center justify-center w-11 h-11 text-primary disabled:opacity-30 hover:text-accent transition-colors"
+                  >
+                    <Plus size={16} aria-hidden="true" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <button
+                  type="button"
+                  onClick={handleComprar}
+                  className="w-full bg-green-600 text-white font-semibold py-3 rounded-pill hover:brightness-110 transition-all"
+                >
+                  Comprar agora
+                </button>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <button
+                    type="button"
+                    onClick={adicionar}
+                    className="flex-1 flex items-center justify-center gap-2 border border-primary text-primary font-semibold py-3 rounded-pill hover:bg-primary/5 transition-all"
+                  >
+                    <ShoppingCart size={17} aria-hidden="true" />
+                    Adicionar ao carrinho
+                  </button>
+                  <a
+                    href={duvidasHref}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-1 flex items-center justify-center gap-2 border border-primary text-primary font-semibold py-3 rounded-pill hover:bg-primary/5 transition-all"
+                  >
+                    <WhatsAppIcon className="w-4 h-4 text-[#25D366]" />
+                    Tirar dúvidas
+                  </a>
+                </div>
+              </div>
             </div>
+          )}
+
+          {/* Selos de confiança (4) */}
+          <div className="grid grid-cols-2 gap-2 max-w-md">
+            {SELOS_TOPO.map((s) => (
+              <Selo key={s.label} icon={s.icon} label={s.label} />
+            ))}
           </div>
         </div>
       </div>
 
-      {/* ── Ficha técnica ── */}
-      {fichaRows.length > 0 && (
-        <section className="max-w-2xl">
+      {/* ═══ Diferenciais ═══ */}
+      <section className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {DIFERENCIAIS.map((d) => {
+          const Icon = ICONS[d.icon];
+          return (
+            <div
+              key={d.title}
+              className="rounded-xl border border-border p-4 text-center space-y-1.5"
+            >
+              <Icon size={24} className="mx-auto text-accent" aria-hidden="true" />
+              <p className="font-semibold text-primary text-sm">{d.title}</p>
+              <p className="text-xs text-muted-foreground leading-snug">{d.desc}</p>
+            </div>
+          );
+        })}
+      </section>
+
+      {/* ═══ Ficha técnica (2 colunas) ═══ */}
+      {temFicha && (
+        <section>
           <h2 className="text-primary text-lg font-semibold mb-3">Ficha técnica</h2>
-          <dl className="rounded-xl border border-border overflow-hidden">
-            {fichaRows.map(([label, value], i) => (
-              <div
-                key={label}
-                className={`flex justify-between gap-4 px-4 py-2.5 text-sm ${
-                  i % 2 === 0 ? "bg-white" : "bg-muted/40"
-                }`}
-              >
-                <dt className="text-muted-foreground">{label}</dt>
-                <dd className="text-primary font-medium text-right">
-                  {capFirst(value)}
-                </dd>
-              </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 rounded-xl border border-border p-4">
+            {[fichaEsq, fichaDir].map((col, ci) => (
+              <dl key={ci} className="divide-y divide-border/70">
+                {col.map(([label, value]) => (
+                  <div key={label} className="flex justify-between gap-4 py-2 text-sm">
+                    <dt className="text-muted-foreground">{label}</dt>
+                    <dd className="text-primary font-medium text-right">
+                      {capFirst(value)}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
             ))}
-          </dl>
+          </div>
         </section>
       )}
 
-      {/* ── Sobre a linhagem ── */}
+      {/* ═══ Sobre a linhagem ═══ */}
       {lineageParags.length > 0 && (
         <section className="max-w-2xl">
           <h2 className="text-primary text-lg font-semibold mb-3">Sobre a linhagem</h2>
@@ -384,7 +492,7 @@ export default function ProductDetail({ product }: { product: ProductDetailData 
         </section>
       )}
 
-      {/* ── Assinatura Marchezi (destacada) ── */}
+      {/* ═══ Assinatura Marchezi (card destacado, sem duplicar) ═══ */}
       <section className="max-w-2xl">
         <div className="rounded-xl border border-primary/20 bg-primary/5 p-5">
           <div className="flex items-center gap-2 mb-3">
@@ -396,6 +504,87 @@ export default function ProductDetail({ product }: { product: ProductDetailData 
               <p key={i}>{p.trim()}</p>
             ))}
           </div>
+        </div>
+      </section>
+
+      {/* ═══ Blocos institucionais (placeholder Leva 2) ═══ */}
+      <section className="grid grid-cols-1 md:grid-cols-3 gap-5">
+        {INSTITUCIONAIS.map((b) => (
+          <div
+            key={b.titulo}
+            className="rounded-xl border border-border overflow-hidden flex flex-col"
+          >
+            {/* Área de imagem — placeholder pronto para receber <Image> na Leva 2 */}
+            <div className="aspect-video bg-muted flex flex-col items-center justify-center text-muted-foreground gap-1">
+              <ImageIcon size={28} aria-hidden="true" />
+              <span className="text-[11px]">imagem em breve</span>
+            </div>
+            <div className="p-4 space-y-1.5">
+              <h3 className="font-semibold text-primary">{b.titulo}</h3>
+              <p className="text-sm text-muted-foreground leading-relaxed">{b.texto}</p>
+            </div>
+          </div>
+        ))}
+      </section>
+
+      {/* ═══ Quem viu também viu (placeholder Leva 2: mesma categoria) ═══ */}
+      {relacionados.length > 0 && (
+        <section className="space-y-4">
+          <h2 className="text-primary text-lg font-semibold">
+            Quem viu este peixe também viu
+          </h2>
+          <div className="flex gap-4 overflow-x-auto pb-2 -mx-1 px-1">
+            {relacionados.map((r) => {
+              const rPix =
+                r.descontoPix != null && r.descontoPix > 0
+                  ? r.preco * (1 - r.descontoPix / 100)
+                  : r.preco;
+              return (
+                <Link
+                  key={r.id}
+                  href={`/loja/${r.slug}`}
+                  className="shrink-0 w-40 group"
+                >
+                  <div className="relative aspect-[9/16] rounded-lg overflow-hidden bg-muted">
+                    {r.video?.thumbnailUrl ? (
+                      <VideoThumb src={r.video.thumbnailUrl} alt={r.nome} sizes="160px" />
+                    ) : (
+                      <div className="w-full h-full" />
+                    )}
+                  </div>
+                  <p className="mt-2 text-sm font-medium text-primary line-clamp-2 group-hover:text-accent transition-colors">
+                    {r.nome}
+                  </p>
+                  <p className="text-green-600 font-bold text-sm">{formatBRL(rPix)}</p>
+                </Link>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
+      {/* ═══ FAQ (placeholder Leva 2) ═══ */}
+      <section className="max-w-2xl">
+        <h2 className="text-primary text-lg font-semibold mb-3">Perguntas frequentes</h2>
+        <ProductFaq />
+      </section>
+
+      {/* ═══ Faixa "Sua compra 100% segura" ═══ */}
+      <section className="rounded-xl bg-primary/5 border border-primary/10 p-5">
+        <div className="flex items-center gap-2 mb-4">
+          <ShieldCheck size={20} className="text-green-600" aria-hidden="true" />
+          <h2 className="text-primary font-semibold">Sua compra 100% segura</h2>
+        </div>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {SEGURANCA.map((s) => {
+            const Icon = ICONS[s.icon];
+            return (
+              <div key={s.label} className="flex items-center gap-2 text-sm text-primary">
+                <Icon size={18} className="shrink-0 text-green-600" aria-hidden="true" />
+                <span className="leading-tight">{s.label}</span>
+              </div>
+            );
+          })}
         </div>
       </section>
     </div>

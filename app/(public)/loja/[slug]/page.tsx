@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { getProductBySlug } from "@/lib/queries/products";
+import { getProductBySlug, getRelacionados } from "@/lib/queries/products";
 import ProductDetail from "@/components/product/ProductDetail";
 
 // ISR: a página revalida a cada 60s, refletindo edições do admin sem redeploy.
@@ -26,5 +26,7 @@ export default async function ProdutoPage({ params }: Props) {
   const produto = await getProductBySlug(slug);
   if (!produto) notFound();
 
-  return <ProductDetail product={produto} />;
+  const relacionados = await getRelacionados(produto.categoryId, produto.id);
+
+  return <ProductDetail product={produto} relacionados={relacionados} />;
 }

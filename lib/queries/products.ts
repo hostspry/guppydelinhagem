@@ -95,6 +95,15 @@ export function getCasais(): Promise<PublicProductCard[]> {
   return findCards({ ativo: true, category: { slug: "casais" } });
 }
 
+/** Relacionados: mesma categoria, exceto o próprio (placeholder da Leva 2). */
+export function getRelacionados(
+  categoryId: string,
+  excluirId: string,
+  take = 8,
+): Promise<PublicProductCard[]> {
+  return findCards({ ativo: true, categoryId, id: { not: excluirId } }, take);
+}
+
 // ── Página de produto (/loja/[slug]) ──────────────────────────
 export type ProductDetailVideo = {
   id: string;
@@ -119,6 +128,7 @@ export type ProductDetail = {
   parcelasMax: number;
   estoque: number;
   categoria: string;
+  categoryId: string;
   // Atributos (ficha técnica). Só os preenchidos são exibidos.
   sexoComposicao: string | null;
   padraoCor: string | null;
@@ -129,7 +139,6 @@ export type ProductDetail = {
   ph: string | null;
   alimentacao: string | null;
   expectativaVida: string | null;
-  porte: string | null;
   videos: ProductDetailVideo[];
 };
 
@@ -154,6 +163,7 @@ export const getProductBySlug = cache(
         descontoPix: true,
         parcelasMax: true,
         estoque: true,
+        categoryId: true,
         sexoComposicao: true,
         padraoCor: true,
         cauda: true,
@@ -163,7 +173,6 @@ export const getProductBySlug = cache(
         ph: true,
         alimentacao: true,
         expectativaVida: true,
-        porte: true,
         category: { select: { nome: true } },
         videos: {
           orderBy: [{ principal: "desc" }, { ordem: "asc" }],
@@ -194,6 +203,7 @@ export const getProductBySlug = cache(
       parcelasMax: p.parcelasMax,
       estoque: p.estoque,
       categoria: p.category.nome,
+      categoryId: p.categoryId,
       sexoComposicao: p.sexoComposicao,
       padraoCor: p.padraoCor,
       cauda: p.cauda,
@@ -203,7 +213,6 @@ export const getProductBySlug = cache(
       ph: p.ph,
       alimentacao: p.alimentacao,
       expectativaVida: p.expectativaVida,
-      porte: p.porte,
       videos: p.videos,
     };
   },
