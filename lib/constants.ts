@@ -20,3 +20,15 @@ export const MARCHEZI_SIGNATURE = `Criados com excelência na Marchezi Guppy Far
 Mantidos em ambiente controlado, com sistemas de filtragem, qualidade de água monitorada e alimentação de alto padrão, os exemplares recebem cuidados constantes desde o nascimento. Todo o processo é conduzido por criador premiado internacionalmente no World Guppy Contest, garantindo genética, saúde, vigor e padrão estético superiores.
 
 Mais do que criar guppies, preservamos e aprimoramos linhagens através de um trabalho sério, dedicado e apaixonado, buscando oferecer peixes de qualidade excepcional para aquaristas de todo o Brasil.`;
+
+// Frase de abertura da assinatura — usada para localizar e remover a assinatura
+// da descrição de forma robusta (independe de variações de espaços/quebras de
+// linha em produtos antigos). O card destacado mostra a assinatura uma vez.
+export const MARCHEZI_SIGNATURE_START =
+  "Criados com excelência na Marchezi Guppy Farm";
+
+/** Remove a assinatura Marchezi do texto da descrição (evita duplicar com o card). */
+export function stripMarcheziSignature(texto: string): string {
+  const i = texto.indexOf(MARCHEZI_SIGNATURE_START);
+  return (i >= 0 ? texto.slice(0, i) : texto).trim();
+}
