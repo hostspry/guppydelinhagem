@@ -56,22 +56,35 @@ export const SEGURANCA: { icon: IconKey; label: string }[] = [
   { icon: "headset", label: "Suporte pós-venda no WhatsApp" },
 ];
 
-// Blocos institucionais (Leva 2 — placeholder pré-pronto: imagem + texto).
-export const INSTITUCIONAIS: { titulo: string; texto: string }[] = [
+// Nota de credibilidade compacta — integrada ao "Sobre a linhagem" (não é mais
+// o painel grande da assinatura). A assinatura completa segue em MARCHEZI_SIGNATURE
+// (usada na geração/armazenamento); aqui é a versão curta exibida.
+export const MARCHEZI_NOTA =
+  "Cada peixe é selecionado à mão na Marchezi Guppy Farm — criador premiado no World Guppy Contest, com seleção genética rigorosa e manejo diário.";
+
+// Blocos institucionais (Leva 2). imagem real quando disponível; senão placeholder.
+export const INSTITUCIONAIS: {
+  titulo: string;
+  texto: string;
+  imagem?: string;
+}[] = [
   {
     titulo: "Sobre a criação",
     texto:
       "Nossa estufa é dedicada exclusivamente à criação de guppies de linhagem, com seleção genética e acompanhamento diário de cada geração.",
+    // sem foto da estufa ainda — segue placeholder.
   },
   {
     titulo: "Como enviamos",
     texto:
       "Cada peixe vai em embalagem com oxigênio e proteção térmica, preparado para chegar com segurança em todo o Brasil.",
+    imagem: "/images/caixa.png",
   },
   {
     titulo: "Garantia de chegada viva",
     texto:
       "Se algo acontecer no transporte, a gente resolve. Sua compra é protegida pela nossa garantia de chegada viva.",
+    imagem: "/images/selo.png",
   },
 ];
 
@@ -96,5 +109,15 @@ export const FAQ: { pergunta: string; resposta: string }[] = [
     pergunta: "Posso escolher macho ou fêmea?",
     resposta:
       "A composição (macho, fêmea, casal, trio) está indicada na ficha técnica. Dúvidas? Fale com a gente no WhatsApp.",
+  },
+  {
+    pergunta: "Como é feita a embalagem?",
+    resposta:
+      "Saquinhos com água oxigenada, dentro de caixa de isopor com proteção térmica — o padrão usado por criadores para transporte seguro de peixes.",
+  },
+  {
+    pergunta: "Posso misturar com outras espécies?",
+    resposta:
+      "Guppies convivem bem com espécies pacíficas de porte similar. Evite peixes grandes ou agressivos. Podemos orientar no WhatsApp.",
   },
 ];

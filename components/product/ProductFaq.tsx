@@ -5,17 +5,30 @@ import { ChevronDown } from "lucide-react";
 import { FAQ } from "@/lib/product-content";
 
 export default function ProductFaq() {
-  const [aberto, setAberto] = useState<number | null>(0);
+  // Set de índices abertos — permite abrir perguntas independentes nas 2 colunas.
+  const [abertos, setAbertos] = useState<Set<number>>(() => new Set([0]));
+
+  function toggle(i: number) {
+    setAbertos((prev) => {
+      const next = new Set(prev);
+      if (next.has(i)) next.delete(i);
+      else next.add(i);
+      return next;
+    });
+  }
 
   return (
-    <div className="rounded-xl border border-border divide-y divide-border overflow-hidden">
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
       {FAQ.map((item, i) => {
-        const open = aberto === i;
+        const open = abertos.has(i);
         return (
-          <div key={item.pergunta}>
+          <div
+            key={item.pergunta}
+            className="rounded-xl border border-border overflow-hidden h-fit"
+          >
             <button
               type="button"
-              onClick={() => setAberto(open ? null : i)}
+              onClick={() => toggle(i)}
               aria-expanded={open}
               className="w-full flex items-center justify-between gap-3 px-4 py-3.5 text-left min-h-11"
             >
