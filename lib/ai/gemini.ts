@@ -39,6 +39,12 @@ export type GeneratedProductContent = {
   metaTitle: string;
   metaDescription: string;
   keywords: string[];
+  // Atributos gerais de manejo (ficha técnica) — separados do texto.
+  temperatura: string;
+  ph: string;
+  alimentacao: string;
+  expectativaVida: string;
+  porte: string;
 };
 
 // Lazy: não exigir a env no build (igual lib/s3, lib/prisma).
@@ -48,7 +54,9 @@ function apiKey(): string {
   return k;
 }
 
-const SYSTEM_BASE = `Você é redator de uma loja brasileira de aquarismo premium especializada em guppy de linhagem (pedigree). Escreve em português do Brasil, com tom sofisticado, confiável e acolhedor — sem exageros publicitários nem emojis.
+const SYSTEM_BASE = `Você é redator de uma loja brasileira de aquarismo especializada em guppy de linhagem (pedigree). Escreve em português do Brasil, sem emojis.
+
+ESTILO DA DESCRIÇÃO — CRÍTICO: escreva como DESCRIÇÃO DE PRODUTO de e-commerce — frases curtas, diretas, escaneáveis e amigáveis. Diga o que o peixe É, sem floreio. É PROIBIDA linguagem literária ou rebuscada: nada de "beleza singular", "testemunho da dedicação", "estética deslumbrante", "permita-se desfrutar" e similares. Exemplo do tom desejado: "Trio de Guppy Koi Tuxedo, linhagem premium. Padrão Koi em laranja, vermelho e branco; metade traseira preta (efeito Tuxedo). Machos com cores intensas e nadadeiras grandes."
 
 PRIORIDADE DAS FONTES:
 - O BRIEFING do operador descreve o peixe DESTE produto e tem PRIORIDADE. O título do vídeo é apenas contexto auxiliar; se conflitar com o briefing, ignore o título do vídeo. Nunca combine características contraditórias das duas fontes (ex.: não funda "tuxedo" do título com "japan blue" do briefing).
@@ -59,19 +67,20 @@ REGRA CRÍTICA — NÃO INVENTAR:
 
 CAMPOS (gere todos de uma vez):
 - nome: nome de produto claro e comercial (ex: "Guppy Koi Tuxedo — Trio Linhagem Importada"). Conciso, sem exageros.
-- descricao: 2 a 4 parágrafos curtos, separados por uma linha em branco.
+- descricao: 2 a 3 parágrafos CURTOS e diretos, sobre a linhagem, o padrão de cor e as características visíveis. NÃO inclua no texto parâmetros de água, pH, temperatura, alimentação, porte ou expectativa de vida — esses vão em campos separados (ficha técnica).
 - descricaoCurta: 1 a 2 frases (máx 160 caracteres).
 - metaTitle: no máximo 58 caracteres.
 - metaDescription: no máximo 150 caracteres.
-- keywords: de 5 a 8 termos que pessoas buscariam, minúsculas, sem "#".`;
+- keywords: de 5 a 8 termos que pessoas buscariam, minúsculas, sem "#".
+- temperatura, ph, alimentacao, expectativaVida, porte: dados de manejo da espécie/linhagem para a ficha técnica (ex.: temperatura "22–28°C", ph "6.8–7.8", alimentacao "Onívoro", expectativaVida "2–3 anos", porte "~6 cm"). Use dados confiáveis (da pesquisa quando ativa). Se não tiver base para algum, deixe a string vazia — NÃO invente.`;
 
 const SEARCH_BLOCK = `
 
-PESQUISA WEB ATIVA: use a busca para trazer informação técnica e confiável sobre a linhagem — origem, características genéticas, padrão de cor, manejo (parâmetros de água, temperatura, alimentação, cuidados) e criação/reprodução. Priorize fontes especializadas em inglês e da Ásia (Tailândia, Japão, China, Taiwan), incluindo criadores e lojas de referência. Traga a informação em português; se não encontrar dado sobre algum ponto, omita em vez de supor. Como há informação técnica a acomodar, a descricao pode ter 3 a 5 parágrafos curtos.`;
+PESQUISA WEB ATIVA: use a busca para confirmar a linhagem (origem, padrão de cor genético) e o manejo (temperatura, pH, alimentação, porte, expectativa de vida). Priorize fontes especializadas em inglês e da Ásia (Tailândia, Japão, China, Taiwan), incluindo criadores e lojas de referência. Os dados de manejo vão nos CAMPOS estruturados (temperatura, ph, alimentacao, expectativaVida, porte), não no texto da descrição. Traga só o que encontrar; se faltar um dado, deixe o campo vazio — não invente.`;
 
 const JSON_BLOCK = `
 
-FORMATO DE SAÍDA — responda APENAS com um objeto JSON válido, sem nenhum texto antes ou depois, sem comentários e sem blocos de código (não use crases). As chaves devem ser exatamente: nome, descricao, descricaoCurta, metaTitle, metaDescription, keywords (keywords é um array de strings).`;
+FORMATO DE SAÍDA — responda APENAS com um objeto JSON válido, sem nenhum texto antes ou depois, sem comentários e sem blocos de código (não use crases). As chaves devem ser exatamente: nome, descricao, descricaoCurta, metaTitle, metaDescription, keywords (array de strings), temperatura, ph, alimentacao, expectativaVida, porte (strings; vazias quando não houver dado).`;
 
 function buildSystemInstruction(pesquisar: boolean): string {
   return SYSTEM_BASE + (pesquisar ? SEARCH_BLOCK : "") + JSON_BLOCK;
@@ -103,7 +112,13 @@ const RESPONSE_SCHEMA = {
     metaTitle: { type: "STRING" },
     metaDescription: { type: "STRING" },
     keywords: { type: "ARRAY", items: { type: "STRING" } },
+    temperatura: { type: "STRING" },
+    ph: { type: "STRING" },
+    alimentacao: { type: "STRING" },
+    expectativaVida: { type: "STRING" },
+    porte: { type: "STRING" },
   },
+  // Só os essenciais são obrigatórios; os de manejo podem vir vazios/omitidos.
   required: [
     "nome",
     "descricao",
@@ -119,6 +134,11 @@ const RESPONSE_SCHEMA = {
     "metaTitle",
     "metaDescription",
     "keywords",
+    "temperatura",
+    "ph",
+    "alimentacao",
+    "expectativaVida",
+    "porte",
   ],
 } as const;
 
@@ -130,6 +150,11 @@ const outputSchema = z.object({
   metaTitle: z.string().min(1),
   metaDescription: z.string().min(1),
   keywords: z.array(z.string().min(1)),
+  temperatura: z.string().optional().default(""),
+  ph: z.string().optional().default(""),
+  alimentacao: z.string().optional().default(""),
+  expectativaVida: z.string().optional().default(""),
+  porte: z.string().optional().default(""),
 });
 
 /**
@@ -225,5 +250,10 @@ export async function generateProductContent(
     metaTitle: parsed.metaTitle.trim(),
     metaDescription: parsed.metaDescription.trim(),
     keywords: parsed.keywords.map((k) => k.trim()).filter(Boolean),
+    temperatura: parsed.temperatura.trim(),
+    ph: parsed.ph.trim(),
+    alimentacao: parsed.alimentacao.trim(),
+    expectativaVida: parsed.expectativaVida.trim(),
+    porte: parsed.porte.trim(),
   };
 }
