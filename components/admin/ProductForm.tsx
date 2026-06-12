@@ -12,6 +12,11 @@ import {
   productSchema,
   type ProductInput,
   type VideoDraft,
+  SEXO_COMPOSICAO_OPCOES,
+  PADRAO_COR_SUGESTOES,
+  CAUDA_SUGESTOES,
+  CARACTERISTICA_SUGESTOES,
+  ORIGEM_SUGESTOES,
 } from "@/lib/validations/product";
 import { slugify } from "@/lib/utils/slug";
 import { truncateAtWord } from "@/lib/utils/text";
@@ -20,6 +25,7 @@ import { createProduct, updateProduct } from "@/actions/products";
 import { generateContent } from "@/actions/ai";
 import { ProductVideosField } from "./ProductVideosField";
 import { KeywordsField } from "./KeywordsField";
+import { SuggestInput } from "./SuggestInput";
 
 const inputClass =
   "w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:border-[#FF035C] focus:ring-1 focus:ring-[#FF035C]";
@@ -55,6 +61,16 @@ type ProductFormProps = {
     metaTitle: string | null;
     metaDescription: string | null;
     keywords: string[];
+    sexoComposicao: string | null;
+    padraoCor: string | null;
+    cauda: string | null;
+    caracteristica: string | null;
+    origem: string | null;
+    temperatura: string | null;
+    ph: string | null;
+    alimentacao: string | null;
+    expectativaVida: string | null;
+    porte: string | null;
     videos: VideoDraft[];
   };
 };
@@ -100,6 +116,17 @@ export function ProductForm({ categorias, initialData }: ProductFormProps) {
           destaque: initialData.destaque,
           metaTitle: initialData.metaTitle ?? "",
           metaDescription: initialData.metaDescription ?? "",
+          sexoComposicao:
+            (initialData.sexoComposicao as ProductInput["sexoComposicao"]) ?? "",
+          padraoCor: initialData.padraoCor ?? "",
+          cauda: initialData.cauda ?? "",
+          caracteristica: initialData.caracteristica ?? "",
+          origem: initialData.origem ?? "",
+          temperatura: initialData.temperatura ?? "",
+          ph: initialData.ph ?? "",
+          alimentacao: initialData.alimentacao ?? "",
+          expectativaVida: initialData.expectativaVida ?? "",
+          porte: initialData.porte ?? "",
         }
       : {
           nome: "",
@@ -116,6 +143,16 @@ export function ProductForm({ categorias, initialData }: ProductFormProps) {
           destaque: false,
           metaTitle: "",
           metaDescription: "",
+          sexoComposicao: "",
+          padraoCor: "",
+          cauda: "",
+          caracteristica: "",
+          origem: "",
+          temperatura: "",
+          ph: "",
+          alimentacao: "",
+          expectativaVida: "",
+          porte: "",
         },
   });
 
@@ -193,6 +230,15 @@ export function ProductForm({ categorias, initialData }: ProductFormProps) {
       setValue("metaDescription", truncateAtWord(d.metaDescription, 160), {
         shouldValidate: true,
       });
+      // Atributos gerais (manejo) — a IA preenche; o operador revisa. Truncados
+      // por segurança (são curtos, mas garante que nunca estouram o limite).
+      setValue("temperatura", truncateAtWord(d.temperatura, 40), { shouldValidate: true });
+      setValue("ph", truncateAtWord(d.ph, 40), { shouldValidate: true });
+      setValue("alimentacao", truncateAtWord(d.alimentacao, 60), { shouldValidate: true });
+      setValue("expectativaVida", truncateAtWord(d.expectativaVida, 40), {
+        shouldValidate: true,
+      });
+      setValue("porte", truncateAtWord(d.porte, 40), { shouldValidate: true });
       setKeywords(d.keywords);
       setAiGenerated(true);
       toast.success("Conteúdo gerado. Revise antes de salvar.");
@@ -220,6 +266,17 @@ export function ProductForm({ categorias, initialData }: ProductFormProps) {
     if (data.metaDescription)
       formData.append("metaDescription", data.metaDescription);
     formData.append("keywords", JSON.stringify(keywords));
+    // Atributos (string vazia → tratada como ausente no parseForm).
+    formData.append("sexoComposicao", data.sexoComposicao ?? "");
+    formData.append("padraoCor", data.padraoCor ?? "");
+    formData.append("cauda", data.cauda ?? "");
+    formData.append("caracteristica", data.caracteristica ?? "");
+    formData.append("origem", data.origem ?? "");
+    formData.append("temperatura", data.temperatura ?? "");
+    formData.append("ph", data.ph ?? "");
+    formData.append("alimentacao", data.alimentacao ?? "");
+    formData.append("expectativaVida", data.expectativaVida ?? "");
+    formData.append("porte", data.porte ?? "");
     formData.append("videos", JSON.stringify(videos));
 
     startTransition(async () => {
@@ -405,6 +462,118 @@ export function ProductForm({ categorias, initialData }: ProductFormProps) {
             placeholder="Casal premium de linhagem importada"
           />
         </FormField>
+      </fieldset>
+
+      {/* Atributos */}
+      <fieldset className="bg-white border border-gray-200 rounded-lg p-5">
+        <legend className="px-2 text-xs font-semibold text-[#07366A] uppercase tracking-wide">
+          Atributos
+        </legend>
+
+        <FormField
+          label="Sexo / composição"
+          name="sexoComposicao"
+          error={errors.sexoComposicao?.message}
+        >
+          <select
+            id="sexoComposicao"
+            {...register("sexoComposicao")}
+            className={inputClass}
+          >
+            <option value="">—</option>
+            {SEXO_COMPOSICAO_OPCOES.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        </FormField>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4">
+          <FormField
+            label="Padrão / cor"
+            name="padraoCor"
+            error={errors.padraoCor?.message}
+            hint="Eixo principal de busca. Escolha uma sugestão ou digite a sua."
+          >
+            <SuggestInput
+              id="padraoCor"
+              listId="padraoCor-list"
+              suggestions={PADRAO_COR_SUGESTOES}
+              className={inputClass}
+              placeholder="koi, full red, tuxedo…"
+              {...register("padraoCor")}
+            />
+          </FormField>
+
+          <FormField
+            label="Cauda"
+            name="cauda"
+            error={errors.cauda?.message}
+            hint="Formato do rabo."
+          >
+            <SuggestInput
+              id="cauda"
+              listId="cauda-list"
+              suggestions={CAUDA_SUGESTOES}
+              className={inputClass}
+              placeholder="halfmoon, delta, roundtail…"
+              {...register("cauda")}
+            />
+          </FormField>
+
+          <FormField
+            label="Característica"
+            name="caracteristica"
+            error={errors.caracteristica?.message}
+            hint="Extra física (opcional)."
+          >
+            <SuggestInput
+              id="caracteristica"
+              listId="caracteristica-list"
+              suggestions={CARACTERISTICA_SUGESTOES}
+              className={inputClass}
+              placeholder="dumbo…"
+              {...register("caracteristica")}
+            />
+          </FormField>
+
+          <FormField
+            label="Origem"
+            name="origem"
+            error={errors.origem?.message}
+          >
+            <SuggestInput
+              id="origem"
+              listId="origem-list"
+              suggestions={ORIGEM_SUGESTOES}
+              className={inputClass}
+              placeholder="nacional, asiático…"
+              {...register("origem")}
+            />
+          </FormField>
+        </div>
+
+        <p className="text-xs text-gray-500 mt-3 mb-1">
+          Manejo (preenchido pela IA ao gerar — editável):
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4">
+          <FormField label="Temperatura" name="temperatura" error={errors.temperatura?.message}>
+            <input id="temperatura" {...register("temperatura")} className={inputClass} placeholder="22–28°C" />
+          </FormField>
+          <FormField label="pH" name="ph" error={errors.ph?.message}>
+            <input id="ph" {...register("ph")} className={inputClass} placeholder="6.8–7.8" />
+          </FormField>
+          <FormField label="Alimentação" name="alimentacao" error={errors.alimentacao?.message}>
+            <input id="alimentacao" {...register("alimentacao")} className={inputClass} placeholder="Onívoro" />
+          </FormField>
+          <FormField label="Expectativa de vida" name="expectativaVida" error={errors.expectativaVida?.message}>
+            <input id="expectativaVida" {...register("expectativaVida")} className={inputClass} placeholder="2–3 anos" />
+          </FormField>
+          <FormField label="Porte" name="porte" error={errors.porte?.message}>
+            <input id="porte" {...register("porte")} className={inputClass} placeholder="~6 cm" />
+          </FormField>
+        </div>
       </fieldset>
 
       {/* Vídeos */}
