@@ -128,9 +128,13 @@ export default function ProductCard({ product }: { product: PublicProductCard })
                 setPlaying(false);
               }}
               aria-label="Fechar vídeo"
-              className="absolute top-2 right-2 z-10 bg-black/60 text-white rounded-full p-1.5 hover:bg-black/80"
+              // Alvo de toque de 44x44 (mínimo mobile); o círculo visível fica no
+              // span interno, então o botão não incha além do ícone.
+              className="absolute top-0 right-0 z-10 flex items-center justify-center w-11 h-11 text-white"
             >
-              <X className="w-4 h-4" aria-hidden="true" />
+              <span className="bg-black/60 hover:bg-black/80 rounded-full p-1.5 transition-colors">
+                <X className="w-4 h-4" aria-hidden="true" />
+              </span>
             </button>
           </>
         ) : (
@@ -229,7 +233,7 @@ export default function ProductCard({ product }: { product: PublicProductCard })
                 }}
                 disabled={semEstoque || qtd <= 1}
                 aria-label="Diminuir quantidade"
-                className="p-1.5 text-primary disabled:opacity-30 hover:text-accent transition-colors"
+                className="flex items-center justify-center w-11 h-11 text-primary disabled:opacity-30 hover:text-accent transition-colors"
               >
                 <Minus size={14} aria-hidden="true" />
               </button>
@@ -244,7 +248,7 @@ export default function ProductCard({ product }: { product: PublicProductCard })
                 }}
                 disabled={semEstoque || qtd >= product.estoque}
                 aria-label="Aumentar quantidade"
-                className="p-1.5 text-primary disabled:opacity-30 hover:text-accent transition-colors"
+                className="flex items-center justify-center w-11 h-11 text-primary disabled:opacity-30 hover:text-accent transition-colors"
               >
                 <Plus size={14} aria-hidden="true" />
               </button>

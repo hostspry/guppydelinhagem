@@ -115,7 +115,7 @@ export default function CarrinhoPage() {
                       onClick={() => updateQty(item.produtoId, item.quantidade - 1)}
                       disabled={item.quantidade <= 1}
                       aria-label="Diminuir quantidade"
-                      className="p-1.5 text-primary disabled:opacity-30 hover:text-accent transition-colors"
+                      className="flex items-center justify-center w-11 h-11 text-primary disabled:opacity-30 hover:text-accent transition-colors"
                     >
                       <Minus size={14} aria-hidden="true" />
                     </button>
@@ -127,7 +127,7 @@ export default function CarrinhoPage() {
                       onClick={() => updateQty(item.produtoId, item.quantidade + 1)}
                       disabled={item.quantidade >= item.estoque}
                       aria-label="Aumentar quantidade"
-                      className="p-1.5 text-primary disabled:opacity-30 hover:text-accent transition-colors"
+                      className="flex items-center justify-center w-11 h-11 text-primary disabled:opacity-30 hover:text-accent transition-colors"
                     >
                       <Plus size={14} aria-hidden="true" />
                     </button>
