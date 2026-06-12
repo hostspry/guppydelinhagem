@@ -17,6 +17,8 @@ export type PublicProductCard = {
   video: {
     platform: "YOUTUBE" | "INSTAGRAM" | "TIKTOK";
     thumbnailUrl: string | null;
+    videoId: string | null;
+    originalUrl: string;
   } | null;
 };
 
@@ -32,7 +34,12 @@ const cardSelect = {
   videos: {
     orderBy: [{ principal: "desc" }, { ordem: "asc" }],
     take: 1,
-    select: { platform: true, thumbnailUrl: true },
+    select: {
+      platform: true,
+      thumbnailUrl: true,
+      videoId: true,
+      originalUrl: true,
+    },
   },
 } satisfies Prisma.ProductSelect;
 
@@ -48,7 +55,14 @@ function toCard(p: CardRow): PublicProductCard {
     descontoPix: p.descontoPix == null ? null : Number(p.descontoPix),
     parcelasMax: p.parcelasMax,
     estoque: p.estoque,
-    video: v ? { platform: v.platform, thumbnailUrl: v.thumbnailUrl } : null,
+    video: v
+      ? {
+          platform: v.platform,
+          thumbnailUrl: v.thumbnailUrl,
+          videoId: v.videoId,
+          originalUrl: v.originalUrl,
+        }
+      : null,
   };
 }
 

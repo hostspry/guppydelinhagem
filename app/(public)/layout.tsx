@@ -1,3 +1,4 @@
+import { Toaster } from "sonner";
 import Navbar from "@/components/site/Navbar";
 import Footer from "@/components/site/Footer";
 
@@ -11,6 +12,7 @@ export default function PublicLayout({
       <Navbar />
       <main>{children}</main>
       <Footer />
+      <Toaster position="top-right" richColors closeButton />
     </>
   );
 }
