@@ -540,23 +540,25 @@ export default function ProductDetail({
         </section>
       )}
 
-      {/* ═══ Blocos institucionais (imagem ao lado + checks + links) ═══ */}
-      <section className="space-y-5">
+      {/* ═══ Blocos institucionais (3 colunas, fundo branco) ═══ */}
+      <section className="grid grid-cols-1 md:grid-cols-3 gap-5">
         {INSTITUCIONAIS.map((b) => {
           const externo = b.link?.href.startsWith("http");
+          // Selo é emblema circular — contain p/ não cortar; demais preenchem (cover).
+          const contain = b.imagem.includes("selo");
           return (
             <div
               key={b.titulo}
-              className="rounded-xl border border-border overflow-hidden flex flex-col sm:flex-row"
+              className="rounded-xl border border-border bg-white overflow-hidden flex flex-col"
             >
-              {/* Imagem ao lado (empilha no mobile), preenchendo o espaço */}
-              <div className="relative w-full aspect-video sm:aspect-auto sm:w-2/5 sm:min-h-[200px] bg-muted shrink-0">
+              {/* Imagem no topo, fundo branco (sem retângulo cinza) */}
+              <div className="relative w-full aspect-video bg-white">
                 <Image
                   src={b.imagem}
                   alt={b.titulo}
                   fill
-                  sizes="(max-width: 640px) 100vw, 40vw"
-                  className="object-cover"
+                  sizes="(max-width: 768px) 100vw, 33vw"
+                  className={contain ? "object-contain p-4" : "object-cover"}
                 />
               </div>
 
