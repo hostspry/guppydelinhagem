@@ -540,71 +540,78 @@ export default function ProductDetail({
         </section>
       )}
 
-      {/* ═══ Blocos institucionais (imagem à esquerda + texto, sem moldura) ═══ */}
-      <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      {/* ═══ Blocos institucionais — padrão: título no topo, imagem à esquerda
+          + texto à direita, link ao final; separadores entre colunas ═══ */}
+      <section className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-border">
         {INSTITUCIONAIS.map((b) => {
           const externo = b.link?.href.startsWith("http");
           // Selo é emblema circular — contain p/ não cortar; demais são fotos (cover).
           const contain = b.imagem.includes("selo");
+          const linkClass =
+            "inline-flex items-center gap-1 min-h-11 text-sm font-semibold text-secondary hover:underline";
           return (
-            <div key={b.titulo} className="flex gap-4 items-start">
-              {/* Imagem ~40% à esquerda (generosa), sem card/moldura */}
-              <div className="relative w-2/5 shrink-0 aspect-square rounded-lg overflow-hidden">
-                <Image
-                  src={b.imagem}
-                  alt={b.titulo}
-                  fill
-                  sizes="(max-width: 768px) 40vw, 15vw"
-                  className={contain ? "object-contain" : "object-cover"}
-                />
+            <div
+              key={b.titulo}
+              className="py-5 md:py-0 md:px-6 md:first:pl-0 md:last:pr-0"
+            >
+              {/* Título no topo, largura total do bloco */}
+              <h3 className="font-semibold text-primary text-base mb-3">
+                {b.titulo}
+              </h3>
+
+              {/* Imagem à esquerda + texto à direita */}
+              <div className="flex gap-3 items-start">
+                <div className="relative w-2/5 shrink-0 aspect-square rounded-lg overflow-hidden">
+                  <Image
+                    src={b.imagem}
+                    alt={b.titulo}
+                    fill
+                    sizes="(max-width: 768px) 40vw, 15vw"
+                    className={contain ? "object-contain" : "object-cover"}
+                  />
+                </div>
+
+                <div className="flex-1 min-w-0 space-y-2">
+                  <p className="text-sm text-muted-foreground leading-relaxed">
+                    {b.texto}
+                  </p>
+
+                  {b.checks && (
+                    <ul className="space-y-1.5">
+                      {b.checks.map((c) => (
+                        <li
+                          key={c}
+                          className="flex items-center gap-2 text-sm text-primary"
+                        >
+                          <Check
+                            size={16}
+                            className="text-green-600 shrink-0"
+                            aria-hidden="true"
+                          />
+                          {c}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
               </div>
 
-              {/* Texto à direita — título de seção (médio, não enorme) */}
-              <div className="flex-1 min-w-0 space-y-1.5">
-                <h3 className="font-semibold text-primary text-base leading-snug">
-                  {b.titulo}
-                </h3>
-                <p className="text-sm text-muted-foreground leading-relaxed">
-                  {b.texto}
-                </p>
-
-                {b.checks && (
-                  <ul className="space-y-1.5 pt-1">
-                    {b.checks.map((c) => (
-                      <li
-                        key={c}
-                        className="flex items-center gap-2 text-sm text-primary"
-                      >
-                        <Check
-                          size={16}
-                          className="text-green-600 shrink-0"
-                          aria-hidden="true"
-                        />
-                        {c}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-
-                {b.link &&
-                  (externo ? (
-                    <a
-                      href={b.link.href}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 min-h-11 text-sm font-semibold text-secondary hover:underline"
-                    >
-                      {b.link.label} →
-                    </a>
-                  ) : (
-                    <Link
-                      href={b.link.href}
-                      className="inline-flex items-center gap-1 min-h-11 text-sm font-semibold text-secondary hover:underline"
-                    >
-                      {b.link.label} →
-                    </Link>
-                  ))}
-              </div>
+              {/* Link de ação ao final do bloco */}
+              {b.link &&
+                (externo ? (
+                  <a
+                    href={b.link.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={`${linkClass} mt-2`}
+                  >
+                    {b.link.label} →
+                  </a>
+                ) : (
+                  <Link href={b.link.href} className={`${linkClass} mt-2`}>
+                    {b.link.label} →
+                  </Link>
+                ))}
             </div>
           );
         })}
