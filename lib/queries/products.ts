@@ -119,6 +119,17 @@ export type ProductDetail = {
   parcelasMax: number;
   estoque: number;
   categoria: string;
+  // Atributos (ficha técnica). Só os preenchidos são exibidos.
+  sexoComposicao: string | null;
+  padraoCor: string | null;
+  cauda: string | null;
+  caracteristica: string | null;
+  origem: string | null;
+  temperatura: string | null;
+  ph: string | null;
+  alimentacao: string | null;
+  expectativaVida: string | null;
+  porte: string | null;
   videos: ProductDetailVideo[];
 };
 
@@ -143,6 +154,16 @@ export const getProductBySlug = cache(
         descontoPix: true,
         parcelasMax: true,
         estoque: true,
+        sexoComposicao: true,
+        padraoCor: true,
+        cauda: true,
+        caracteristica: true,
+        origem: true,
+        temperatura: true,
+        ph: true,
+        alimentacao: true,
+        expectativaVida: true,
+        porte: true,
         category: { select: { nome: true } },
         videos: {
           orderBy: [{ principal: "desc" }, { ordem: "asc" }],
@@ -173,6 +194,16 @@ export const getProductBySlug = cache(
       parcelasMax: p.parcelasMax,
       estoque: p.estoque,
       categoria: p.category.nome,
+      sexoComposicao: p.sexoComposicao,
+      padraoCor: p.padraoCor,
+      cauda: p.cauda,
+      caracteristica: p.caracteristica,
+      origem: p.origem,
+      temperatura: p.temperatura,
+      ph: p.ph,
+      alimentacao: p.alimentacao,
+      expectativaVida: p.expectativaVida,
+      porte: p.porte,
       videos: p.videos,
     };
   },
