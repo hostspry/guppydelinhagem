@@ -2,6 +2,16 @@ export const WHATSAPP_PHONE = "5527996024171";
 export const WHATSAPP_URL = `https://wa.me/${WHATSAPP_PHONE}`;
 export const WHATSAPP_DISPLAY = "27 99602-4171";
 
+/** Monta uma URL do WhatsApp com mensagem pré-preenchida. */
+export function whatsappLink(mensagem: string): string {
+  return `${WHATSAPP_URL}?text=${encodeURIComponent(mensagem)}`;
+}
+
+// Limite de peixes por caixa (frete único até esse número). Client-safe aqui —
+// lib/shipping.ts (server-only) reexporta no FRETE_CONFIG. Acima disso, o
+// carrinho avisa para falar no WhatsApp (sem bloquear).
+export const MAX_PEIXES_POR_CAIXA = 10;
+
 // Assinatura institucional fixa da Marchezi. NÃO é gerada nem reescrita pela IA:
 // a IA gera só a parte da linhagem e o sistema concatena este bloco ao final da
 // descrição (sempre igual). Hoje todos os produtos são peixe — aplica a todos.
