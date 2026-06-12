@@ -561,7 +561,7 @@ export default function ProductDetail({
 
               {/* Imagem à esquerda + texto à direita */}
               <div className="flex gap-3 items-start">
-                <div className="relative w-2/5 shrink-0 aspect-square rounded-lg overflow-hidden">
+                <div className="relative w-2/5 shrink-0 aspect-[5/8] rounded-lg overflow-hidden">
                   <Image
                     src={b.imagem}
                     alt={b.titulo}
