@@ -62,9 +62,13 @@ export function youtubeHqToMaxRes(url: string): string | null {
   return m ? youtubeMaxResThumbnailUrl(m[1]) : null;
 }
 
-/** URL de embed (usada no facade — iframe carregado só sob demanda). */
+/**
+ * URL de embed (usada no facade — iframe carregado só sob demanda, a partir do
+ * clique do usuário). autoplay=1 elimina o "segundo play" do YouTube (toca com
+ * um clique). playsinline=1 evita o iPhone abrir em tela cheia (toca no lugar).
+ */
 export function youtubeEmbedUrl(videoId: string): string {
-  return `https://www.youtube.com/embed/${videoId}`;
+  return `https://www.youtube.com/embed/${videoId}?autoplay=1&playsinline=1`;
 }
 
 /**
@@ -86,7 +90,8 @@ export function instagramEmbedUrl(shortcode: string): string {
   return `https://www.instagram.com/p/${shortcode}/embed`;
 }
 
-/** Embed do TikTok (id numérico do vídeo). */
+/** Embed do TikTok (id numérico do vídeo). autoplay=1 best-effort (o player
+ * pode ignorar / forçar mudo, mas não atrapalha). */
 export function tiktokEmbedUrl(videoId: string): string {
-  return `https://www.tiktok.com/embed/v2/${videoId}`;
+  return `https://www.tiktok.com/embed/v2/${videoId}?autoplay=1`;
 }
