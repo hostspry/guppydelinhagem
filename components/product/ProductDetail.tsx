@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import {
   Check,
   Play,
@@ -19,6 +20,7 @@ import {
   Headset,
   Package,
   ImageIcon,
+  Flame,
   type LucideIcon,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -34,11 +36,7 @@ import {
   tiktokEmbedUrl,
 } from "@/lib/utils/video";
 import { useCart } from "@/lib/stores/cart";
-import {
-  whatsappLink,
-  MARCHEZI_SIGNATURE,
-  stripMarcheziSignature,
-} from "@/lib/constants";
+import { whatsappLink, stripMarcheziSignature } from "@/lib/constants";
 import {
   PROVA_SOCIAL_VENDIDOS,
   PROVA_SOCIAL_CRIADOR,
@@ -46,6 +44,7 @@ import {
   DIFERENCIAIS,
   SEGURANCA,
   INSTITUCIONAIS,
+  MARCHEZI_NOTA,
   type IconKey,
 } from "@/lib/product-content";
 import { SEXO_COMPOSICAO_OPCOES } from "@/lib/validations/product";
@@ -356,11 +355,17 @@ export default function ProductDetail({
             </div>
           ) : (
             <div className="space-y-4 max-w-md">
-              <p className="flex items-center gap-1.5 text-sm text-green-700 font-medium">
-                <Check size={15} className="shrink-0" aria-hidden="true" />
-                Em estoque · apenas {product.estoque} disponíve
-                {product.estoque > 1 ? "is" : "l"}
-              </p>
+              <div className="rounded-lg bg-green-50 border border-green-200 px-3 py-2.5 flex items-center justify-between gap-2">
+                <span className="flex items-center gap-1.5 text-sm font-semibold text-green-800">
+                  <Check size={16} className="shrink-0" aria-hidden="true" />
+                  Em estoque
+                </span>
+                <span className="flex items-center gap-1 text-xs font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">
+                  <Flame size={12} className="shrink-0" aria-hidden="true" />
+                  Apenas {product.estoque} disponíve
+                  {product.estoque > 1 ? "is" : "l"}!
+                </span>
+              </div>
 
               <div className="flex items-center gap-3">
                 <span className="text-sm text-muted-foreground">Quantidade</span>
@@ -427,85 +432,90 @@ export default function ProductDetail({
         </div>
       </div>
 
-      {/* ═══ Diferenciais ═══ */}
-      <section className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {DIFERENCIAIS.map((d) => {
-          const Icon = ICONS[d.icon];
-          return (
-            <div
-              key={d.title}
-              className="rounded-xl border border-border p-4 text-center space-y-1.5"
-            >
-              <Icon size={24} className="mx-auto text-accent" aria-hidden="true" />
-              <p className="font-semibold text-primary text-sm">{d.title}</p>
-              <p className="text-xs text-muted-foreground leading-snug">{d.desc}</p>
-            </div>
-          );
-        })}
+      {/* ═══ Diferenciais (fundo delimitado) ═══ */}
+      <section className="rounded-2xl bg-bg-alt p-4 sm:p-5">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+          {DIFERENCIAIS.map((d) => {
+            const Icon = ICONS[d.icon];
+            return (
+              <div
+                key={d.title}
+                className="rounded-xl bg-white border border-border p-4 text-center space-y-1.5"
+              >
+                <Icon size={24} className="mx-auto text-accent" aria-hidden="true" />
+                <p className="font-semibold text-primary text-sm">{d.title}</p>
+                <p className="text-xs text-muted-foreground leading-snug">{d.desc}</p>
+              </div>
+            );
+          })}
+        </div>
       </section>
 
-      {/* ═══ Ficha técnica (2 colunas) ═══ */}
-      {temFicha && (
-        <section>
-          <h2 className="text-primary text-lg font-semibold mb-3">Ficha técnica</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 rounded-xl border border-border p-4">
-            {[fichaEsq, fichaDir].map((col, ci) => (
-              <dl key={ci} className="divide-y divide-border/70">
-                {col.map(([label, value]) => (
-                  <div key={label} className="flex justify-between gap-4 py-2 text-sm">
-                    <dt className="text-muted-foreground">{label}</dt>
-                    <dd className="text-primary font-medium text-right">
-                      {capFirst(value)}
-                    </dd>
-                  </div>
+      {/* ═══ Sobre a linhagem + Ficha técnica (lado a lado) ═══ */}
+      {(lineageParags.length > 0 || temFicha) && (
+        <section className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+          {/* Sobre a linhagem (esquerda) */}
+          {lineageParags.length > 0 && (
+            <div>
+              <h2 className="text-primary text-lg font-semibold mb-3">
+                Sobre a linhagem
+              </h2>
+              <div
+                className={`space-y-3 text-text leading-relaxed ${
+                  descLonga && !descExpandida ? "line-clamp-5" : ""
+                }`}
+              >
+                {lineageParags.map((p, i) => (
+                  <p key={i} className="whitespace-pre-line">
+                    {p}
+                  </p>
                 ))}
-              </dl>
-            ))}
-          </div>
-        </section>
-      )}
+              </div>
+              {descLonga && (
+                <button
+                  type="button"
+                  onClick={() => setDescExpandida((v) => !v)}
+                  className="mt-2 text-sm font-semibold text-secondary hover:underline"
+                >
+                  {descExpandida ? "Ler menos" : "Ler mais"}
+                </button>
+              )}
 
-      {/* ═══ Sobre a linhagem ═══ */}
-      {lineageParags.length > 0 && (
-        <section className="max-w-2xl">
-          <h2 className="text-primary text-lg font-semibold mb-3">Sobre a linhagem</h2>
-          <div
-            className={`space-y-3 text-text leading-relaxed ${
-              descLonga && !descExpandida ? "line-clamp-5" : ""
-            }`}
-          >
-            {lineageParags.map((p, i) => (
-              <p key={i} className="whitespace-pre-line">
-                {p}
-              </p>
-            ))}
-          </div>
-          {descLonga && (
-            <button
-              type="button"
-              onClick={() => setDescExpandida((v) => !v)}
-              className="mt-2 text-sm font-semibold text-secondary hover:underline"
-            >
-              {descExpandida ? "Ler menos" : "Ler mais"}
-            </button>
+              {/* Nota Marchezi integrada (pequena, não mais painel gigante) */}
+              <div className="mt-4 flex items-start gap-2 rounded-lg bg-primary/5 border border-primary/15 p-3">
+                <Trophy size={16} className="text-accent shrink-0 mt-0.5" aria-hidden="true" />
+                <p className="text-sm text-text leading-snug">{MARCHEZI_NOTA}</p>
+              </div>
+            </div>
+          )}
+
+          {/* Ficha técnica (direita, em 2 sub-colunas) */}
+          {temFicha && (
+            <div>
+              <h2 className="text-primary text-lg font-semibold mb-3">
+                Ficha técnica
+              </h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 rounded-xl border border-border p-4">
+                {[fichaEsq, fichaDir].map((col, ci) => (
+                  <dl key={ci} className="divide-y divide-border/70">
+                    {col.map(([label, value]) => (
+                      <div
+                        key={label}
+                        className="flex justify-between gap-4 py-2 text-sm"
+                      >
+                        <dt className="text-muted-foreground">{label}</dt>
+                        <dd className="text-primary font-medium text-right">
+                          {capFirst(value)}
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
+                ))}
+              </div>
+            </div>
           )}
         </section>
       )}
-
-      {/* ═══ Assinatura Marchezi (card destacado, sem duplicar) ═══ */}
-      <section className="max-w-2xl">
-        <div className="rounded-xl border border-primary/20 bg-primary/5 p-5">
-          <div className="flex items-center gap-2 mb-3">
-            <Trophy size={18} className="text-accent" aria-hidden="true" />
-            <h2 className="text-primary font-semibold">Criação Marchezi Guppy Farm</h2>
-          </div>
-          <div className="space-y-3 text-sm text-text leading-relaxed">
-            {MARCHEZI_SIGNATURE.split(/\n\s*\n/).map((p, i) => (
-              <p key={i}>{p.trim()}</p>
-            ))}
-          </div>
-        </div>
-      </section>
 
       {/* ═══ Blocos institucionais (placeholder Leva 2) ═══ */}
       <section className="grid grid-cols-1 md:grid-cols-3 gap-5">
@@ -514,10 +524,22 @@ export default function ProductDetail({
             key={b.titulo}
             className="rounded-xl border border-border overflow-hidden flex flex-col"
           >
-            {/* Área de imagem — placeholder pronto para receber <Image> na Leva 2 */}
-            <div className="aspect-video bg-muted flex flex-col items-center justify-center text-muted-foreground gap-1">
-              <ImageIcon size={28} aria-hidden="true" />
-              <span className="text-[11px]">imagem em breve</span>
+            {/* Imagem real quando houver; senão placeholder (ex: "Sobre a criação") */}
+            <div className="relative aspect-video bg-muted">
+              {b.imagem ? (
+                <Image
+                  src={b.imagem}
+                  alt={b.titulo}
+                  fill
+                  sizes="(max-width: 768px) 100vw, 33vw"
+                  className="object-contain p-3"
+                />
+              ) : (
+                <div className="w-full h-full flex flex-col items-center justify-center text-muted-foreground gap-1">
+                  <ImageIcon size={28} aria-hidden="true" />
+                  <span className="text-[11px]">imagem em breve</span>
+                </div>
+              )}
             </div>
             <div className="p-4 space-y-1.5">
               <h3 className="font-semibold text-primary">{b.titulo}</h3>
@@ -563,28 +585,39 @@ export default function ProductDetail({
         </section>
       )}
 
-      {/* ═══ FAQ (placeholder Leva 2) ═══ */}
-      <section className="max-w-2xl">
+      {/* ═══ FAQ (2 colunas) ═══ */}
+      <section>
         <h2 className="text-primary text-lg font-semibold mb-3">Perguntas frequentes</h2>
         <ProductFaq />
       </section>
 
-      {/* ═══ Faixa "Sua compra 100% segura" ═══ */}
-      <section className="rounded-xl bg-primary/5 border border-primary/10 p-5">
-        <div className="flex items-center gap-2 mb-4">
-          <ShieldCheck size={20} className="text-green-600" aria-hidden="true" />
-          <h2 className="text-primary font-semibold">Sua compra 100% segura</h2>
-        </div>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          {SEGURANCA.map((s) => {
-            const Icon = ICONS[s.icon];
-            return (
-              <div key={s.label} className="flex items-center gap-2 text-sm text-primary">
-                <Icon size={18} className="shrink-0 text-green-600" aria-hidden="true" />
-                <span className="leading-tight">{s.label}</span>
-              </div>
-            );
-          })}
+      {/* ═══ Faixa "Sua compra 100% segura" (navy + selo) ═══ */}
+      <section className="rounded-2xl bg-primary text-white p-6">
+        <div className="flex flex-col sm:flex-row items-center gap-6">
+          <div className="flex-1 w-full">
+            <h2 className="flex items-center gap-2 font-semibold mb-4">
+              <ShieldCheck size={20} className="text-accent" aria-hidden="true" />
+              Sua compra 100% segura
+            </h2>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+              {SEGURANCA.map((s) => {
+                const Icon = ICONS[s.icon];
+                return (
+                  <div key={s.label} className="flex items-center gap-2 text-sm text-white/90">
+                    <Icon size={18} className="shrink-0 text-accent" aria-hidden="true" />
+                    <span className="leading-tight">{s.label}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+          <Image
+            src="/images/selo.png"
+            alt="Garantia de Chegada Viva"
+            width={128}
+            height={128}
+            className="w-24 h-24 sm:w-32 sm:h-32 object-contain shrink-0"
+          />
         </div>
       </section>
     </div>
