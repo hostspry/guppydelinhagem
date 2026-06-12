@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { prisma } from "../prisma";
 import type { Prisma } from "../generated/prisma/client";
 
@@ -93,6 +94,89 @@ export function getUltimosAdicionados(): Promise<PublicProductCard[]> {
 export function getCasais(): Promise<PublicProductCard[]> {
   return findCards({ ativo: true, category: { slug: "casais" } });
 }
+
+// ── Página de produto (/loja/[slug]) ──────────────────────────
+export type ProductDetailVideo = {
+  id: string;
+  platform: "YOUTUBE" | "INSTAGRAM" | "TIKTOK";
+  videoId: string | null;
+  thumbnailUrl: string | null;
+  originalUrl: string;
+  titulo: string | null;
+  principal: boolean;
+};
+
+export type ProductDetail = {
+  id: string;
+  nome: string;
+  slug: string;
+  descricao: string;
+  descricaoCurta: string | null;
+  metaTitle: string | null;
+  metaDescription: string | null;
+  preco: number;
+  descontoPix: number | null;
+  parcelasMax: number;
+  estoque: number;
+  categoria: string;
+  videos: ProductDetailVideo[];
+};
+
+/**
+ * Produto público por slug (só ativo). Decimais → number. null se não existir
+ * ou estiver inativo (a página chama notFound). cache() dedup a query entre
+ * generateMetadata e o render da página no mesmo request.
+ */
+export const getProductBySlug = cache(
+  async (slug: string): Promise<ProductDetail | null> => {
+    const p = await prisma.product.findFirst({
+      where: { slug, ativo: true },
+      select: {
+        id: true,
+        nome: true,
+        slug: true,
+        descricao: true,
+        descricaoCurta: true,
+        metaTitle: true,
+        metaDescription: true,
+        preco: true,
+        descontoPix: true,
+        parcelasMax: true,
+        estoque: true,
+        category: { select: { nome: true } },
+        videos: {
+          orderBy: [{ principal: "desc" }, { ordem: "asc" }],
+          select: {
+            id: true,
+            platform: true,
+            videoId: true,
+            thumbnailUrl: true,
+            originalUrl: true,
+            titulo: true,
+            principal: true,
+          },
+        },
+      },
+    });
+    if (!p) return null;
+
+    return {
+      id: p.id,
+      nome: p.nome,
+      slug: p.slug,
+      descricao: p.descricao,
+      descricaoCurta: p.descricaoCurta,
+      metaTitle: p.metaTitle,
+      metaDescription: p.metaDescription,
+      preco: Number(p.preco),
+      descontoPix: p.descontoPix == null ? null : Number(p.descontoPix),
+      parcelasMax: p.parcelasMax,
+      estoque: p.estoque,
+      categoria: p.category.nome,
+      videos: p.videos,
+    };
+  },
+);
 
 export async function listProducts() {
   return prisma.product.findMany({
