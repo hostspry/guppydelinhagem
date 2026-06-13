@@ -83,7 +83,7 @@ export const INSTITUCIONAIS: {
     titulo: "Como enviamos",
     texto:
       "Cada peixe vai em embalagem preparada para chegar com segurança em todo o Brasil:",
-    imagem: "/images/caixa.png",
+    imagem: "/images/caixa.webp",
     checks: [
       "Sacos duplos reforçados",
       "Oxigênio puro",
