@@ -60,6 +60,9 @@
   html {
     scroll-behavior: smooth;
     -webkit-text-size-adjust: 100%;
+    /* Base de 17px (acima do padrão 16) para melhor legibilidade. Como as
+       classes Tailwind são em rem, escala todo o site proporcionalmente. */
+    font-size: 17px;
     @apply font-sans;
   }
 
@@ -67,7 +70,7 @@
     background-color: var(--color-background);
     color: var(--color-text);
     font-family: var(--font-sans);
-    font-weight: 300;
+    font-weight: 400;
     font-size: 1rem;
     line-height: 1.6;
     min-height: 100vh;
@@ -115,7 +118,7 @@
   }
 
   p {
-    font-weight: 300;
+    font-weight: 400;
     line-height: 1.6;
   }
 
