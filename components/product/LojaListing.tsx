@@ -53,6 +53,7 @@ export default function LojaListing({
   // empurrado para a URL com debounce.
   const [buscaInput, setBuscaInput] = useState(busca);
 
+  // A vitrine é a própria home: filtros vivem em "/" (estado na URL).
   function buildUrl(overrides: Partial<{ busca: string; categoria: string; ordem: string }>) {
     const next = { busca, categoria, ordem, ...overrides };
     const params = new URLSearchParams();
@@ -61,7 +62,7 @@ export default function LojaListing({
       params.set("categoria", next.categoria);
     if (next.ordem && next.ordem !== "recentes") params.set("ordem", next.ordem);
     const qs = params.toString();
-    return qs ? `/loja?${qs}` : "/loja";
+    return qs ? `/?${qs}` : "/";
   }
 
   function navegar(url: string) {
@@ -80,7 +81,7 @@ export default function LojaListing({
 
   function limparFiltros() {
     setBuscaInput("");
-    navegar("/loja");
+    navegar("/");
   }
 
   async function carregarMais() {
@@ -100,11 +101,11 @@ export default function LojaListing({
 
   return (
     <div className="container-site py-8 md:py-12 space-y-6">
-      {/* Cabeçalho */}
+      {/* Cabeçalho da vitrine (h2 — o h1 da página é o do hero) */}
       <header className="space-y-1">
-        <h1 className="text-primary text-3xl md:text-4xl font-bold">
+        <h2 className="text-primary text-3xl md:text-4xl font-bold">
           Nossa Loja
-        </h1>
+        </h2>
         <p className="text-muted-foreground">
           Guppies de linhagem selecionados à mão — escolha o seu.
         </p>
@@ -149,7 +150,11 @@ export default function LojaListing({
 
       {/* Pílulas de categoria (scroll horizontal no mobile) */}
       <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
-        {[{ slug: "todos", nome: "Todos" }, ...categorias].map((c) => {
+        {[
+          { slug: "todos", nome: "Todos" },
+          { slug: "destaques", nome: "Destaques" },
+          ...categorias,
+        ].map((c) => {
           const ativa = categoria === c.slug;
           return (
             <button

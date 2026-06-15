@@ -1,38 +1,76 @@
+import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import CtaWhatsapp from "@/components/site/CtaWhatsapp";
 import { HeroSection } from "@/components/site/HeroSection";
 import SectionHeader from "@/components/home/SectionHeader";
 import CategoryCard from "@/components/home/CategoryCard";
-import ProductGrid from "@/components/home/ProductGrid";
 import TestimonialsSection from "@/components/home/TestimonialsSection";
+import LojaListing from "@/components/product/LojaListing";
 import { CATEGORIES } from "@/lib/home-content";
 import {
-  getDestaques,
-  getUltimosAdicionados,
-  getCasais,
+  listProductsLoja,
+  type LojaOrdenacao,
 } from "@/lib/queries/products";
+import { listCategories } from "@/lib/queries/categories";
 
-// HeroSection e as seções de produto consultam o banco. force-dynamic faz a
-// query rodar em request-time (DATABASE_URL não existe no build do CapRover) e,
-// de quebra, a home sempre reflete o que foi cadastrado/editado no admin —
-// sem cache stale (revalidação imediata). As actions de produto também chamam
-// revalidatePath("/") como reforço explícito.
+export const metadata: Metadata = {
+  title: "Guppy de Linhagem — Loja de guppies pedigree | Criação premiada",
+  description:
+    "Compre guppies de linhagem direto do criador campeão no World Guppy Contest. Busque por nome ou linhagem (koi, full red, tuxedo…), filtre por categoria e receba em todo o Brasil com garantia de chegada viva.",
+};
+
+// A home é a vitrine: lê o banco e os filtros da URL em request-time. Mantém o
+// frescor imediato do que o admin cadastra/edita (sem cache stale).
 export const dynamic = "force-dynamic";
 
-export default async function HomePage() {
-  const [destaques, ultimos, casais] = await Promise.all([
-    getDestaques(),
-    getUltimosAdicionados(),
-    getCasais(),
+const ORDENS = new Set<LojaOrdenacao>([
+  "recentes",
+  "menor-preco",
+  "maior-preco",
+]);
+
+type Props = {
+  searchParams: Promise<{
+    busca?: string;
+    categoria?: string;
+    ordem?: string;
+  }>;
+};
+
+export default async function HomePage({ searchParams }: Props) {
+  const sp = await searchParams;
+  const busca = typeof sp.busca === "string" ? sp.busca : "";
+  const categoria =
+    typeof sp.categoria === "string" && sp.categoria ? sp.categoria : "todos";
+  const ordem: LojaOrdenacao =
+    typeof sp.ordem === "string" && ORDENS.has(sp.ordem as LojaOrdenacao)
+      ? (sp.ordem as LojaOrdenacao)
+      : "recentes";
+
+  const [{ items, total }, categorias] = await Promise.all([
+    listProductsLoja({ busca, categoriaSlug: categoria, ordenacao: ordem }),
+    listCategories(),
   ]);
 
   return (
     <>
-      {/* ── Seção 1: Hero ── */}
+      {/* ── Hero ── */}
       <HeroSection />
 
-      {/* ── Seção 2: Principais Categorias ── */}
+      {/* ── A loja (vitrine): busca + filtros + grade. Âncora do menu/hero. ── */}
+      <section id="loja" className="scroll-mt-24 bg-white">
+        <LojaListing
+          initialItems={items}
+          total={total}
+          categorias={categorias.map((c) => ({ slug: c.slug, nome: c.nome }))}
+          busca={busca}
+          categoria={categoria}
+          ordem={ordem}
+        />
+      </section>
+
+      {/* ── Principais Categorias ── */}
       <section className="bg-white py-20">
         <div className="container-site space-y-10">
           <SectionHeader
@@ -48,35 +86,7 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* ── Seção 3: Mais Procurados ── */}
-      {destaques.length > 0 && (
-        <section className="bg-[#ECE7E8]/40 py-16">
-          <div className="container-site">
-            <ProductGrid
-              title="Mais"
-              highlight="Procurados"
-              products={destaques}
-              verTudoHref="/loja?categoria=peixes-de-linhagem"
-            />
-          </div>
-        </section>
-      )}
-
-      {/* ── Seção 4: Últimos Adicionados ── */}
-      {ultimos.length > 0 && (
-        <section className="bg-white py-16">
-          <div className="container-site">
-            <ProductGrid
-              title="Últimos"
-              highlight="Adicionados"
-              products={ultimos}
-              verTudoHref="/loja"
-            />
-          </div>
-        </section>
-      )}
-
-      {/* ── Seção 5: História de Vitórias + Aprenda Sobre ── */}
+      {/* ── História de Vitórias + Aprenda Sobre ── */}
       <section className="bg-white py-20">
         <div className="container-site">
           <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
@@ -160,21 +170,7 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* ── Seção 6: Casais de Guppy ── */}
-      {casais.length > 0 && (
-        <section className="bg-[#ECE7E8]/40 py-16">
-          <div className="container-site">
-            <ProductGrid
-              title="Casais de"
-              highlight="Guppy"
-              products={casais}
-              verTudoHref="/loja?categoria=casais"
-            />
-          </div>
-        </section>
-      )}
-
-      {/* ── Seção 7: Avaliações de Clientes ── */}
+      {/* ── Avaliações de Clientes ── */}
       <TestimonialsSection />
 
       {/* ── CTA WhatsApp ── */}
