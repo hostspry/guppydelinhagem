@@ -9,7 +9,7 @@ import { WHATSAPP_URL, WHATSAPP_DISPLAY } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 
 const NAV_LINKS = [
-  { href: "/loja", label: "Loja" },
+  { href: "/#loja", label: "Loja" },
   { href: "/sobre-nos", label: "Sobre Nós" },
   { href: "/conheca-os-guppy", label: "Conheça o Guppy" },
   { href: "/blog", label: "Blog" },

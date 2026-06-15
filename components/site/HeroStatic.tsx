@@ -5,6 +5,7 @@ import Link from "next/link";
 import * as LucideIcons from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { WhatsAppIcon } from "@/components/icons/WhatsAppIcon";
+import { storeAnchorHref } from "@/lib/utils/store-href";
 import type {
   HeroSlide,
   HeroSettings,
@@ -54,6 +55,11 @@ export function HeroStatic({ slide, settings }: Props) {
   // não-WhatsApp usa ícone genérico do Lucide.
   const isPrimaryWhatsapp = slide.primaryCtaUrl.includes("wa.me");
   const isSecondaryWhatsapp = !!slide.secondaryCtaUrl?.includes("wa.me");
+  // CTA "Comprar agora" (e afins) rola até a grade da loja na home.
+  const primaryHref = storeAnchorHref(slide.primaryCtaUrl);
+  const secondaryHref = slide.secondaryCtaUrl
+    ? storeAnchorHref(slide.secondaryCtaUrl)
+    : null;
   const PrimaryFallbackIcon = LucideIcons.ShoppingCart;
   const SecondaryFallbackIcon = LucideIcons.ArrowRight;
 
@@ -127,7 +133,7 @@ export function HeroStatic({ slide, settings }: Props) {
 
             <div className="flex flex-col sm:flex-row gap-3 pt-2">
               <Link
-                href={slide.primaryCtaUrl}
+                href={primaryHref}
                 className="inline-flex items-center justify-center gap-2 w-full md:w-auto min-h-12 bg-secondary text-white hover:text-white font-semibold px-7 py-3.5 rounded-pill shadow-[0_8px_24px_-8px_rgba(255,3,92,0.6)] hover:brightness-110 transition-all"
               >
                 {isPrimaryWhatsapp ? (
@@ -138,14 +144,14 @@ export function HeroStatic({ slide, settings }: Props) {
                 {slide.primaryCtaText}
               </Link>
 
-              {slide.secondaryCtaText && slide.secondaryCtaUrl && (
+              {slide.secondaryCtaText && secondaryHref && (
                 <a
-                  href={slide.secondaryCtaUrl}
+                  href={secondaryHref}
                   target={
-                    slide.secondaryCtaUrl.startsWith("http") ? "_blank" : undefined
+                    secondaryHref.startsWith("http") ? "_blank" : undefined
                   }
                   rel={
-                    slide.secondaryCtaUrl.startsWith("http")
+                    secondaryHref.startsWith("http")
                       ? "noopener noreferrer"
                       : undefined
                   }
