@@ -24,7 +24,7 @@ const nullifyDigits = (s: string | undefined) => {
 function toClienteData(input: ClienteInput) {
   return {
     nome: input.nome.trim(),
-    telefone: onlyDigits(input.telefone),
+    telefone: nullifyDigits(input.telefone),
     email: nullify(input.email),
     cpfCnpj: nullifyDigits(input.cpfCnpj),
     cep: nullifyDigits(input.cep),

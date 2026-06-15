@@ -83,7 +83,7 @@ model Address {
 model Cliente {
   id          String  @id @default(cuid())
   nome        String
-  telefone    String // WhatsApp — obrigatório (guardado só com dígitos)
+  telefone    String? // WhatsApp — opcional (guardado só com dígitos)
   email       String?
   cpfCnpj     String? // entra na minuta Gollog (guardado só com dígitos)
   cep         String?

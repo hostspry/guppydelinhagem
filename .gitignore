@@ -43,6 +43,9 @@ yarn-error.log*
 # backups locais do banco
 /backups
 
+# scripts de importação one-off com PII (CPF/endereço/telefone reais) — NUNCA commitar
+/scripts/import-clientes-gollog.ts
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

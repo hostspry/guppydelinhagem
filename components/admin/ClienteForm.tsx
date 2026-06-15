@@ -113,9 +113,8 @@ export function ClienteForm({ initialData }: { initialData?: ClienteInitial }) {
         <FormField
           label="Telefone (WhatsApp)"
           name="telefone"
-          required
           error={errors.telefone?.message}
-          hint="Só nome e telefone são obrigatórios."
+          hint="Só o nome é obrigatório."
         >
           <input
             id="telefone"

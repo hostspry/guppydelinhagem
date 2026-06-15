@@ -93,7 +93,7 @@ export default async function ClientesPage({ searchParams }: Props) {
                       {c.nome}
                     </td>
                     <td className="px-4 py-3 text-gray-600">
-                      {formatTelefone(c.telefone)}
+                      {c.telefone ? formatTelefone(c.telefone) : "—"}
                     </td>
                     <td className="px-4 py-3 text-gray-600">{local}</td>
                     <td className="px-4 py-3 text-gray-500">{c.email || "—"}</td>

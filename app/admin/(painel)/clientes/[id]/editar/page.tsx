@@ -25,7 +25,7 @@ export default async function EditarClientePage({ params }: Props) {
         initialData={{
           id: cliente.id,
           nome: cliente.nome,
-          telefone: cliente.telefone,
+          telefone: cliente.telefone ?? "",
           email: cliente.email ?? "",
           cpfCnpj: cliente.cpfCnpj ?? "",
           cep: cliente.cep ?? "",

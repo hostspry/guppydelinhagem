@@ -2,7 +2,7 @@ import { z } from "zod";
 
 export const clienteSchema = z.object({
   nome: z.string().min(2, "Nome obrigatório"),
-  telefone: z.string().min(8, "Telefone obrigatório"),
+  telefone: z.string().optional().or(z.literal("")),
   email: z.string().email("E-mail inválido").optional().or(z.literal("")),
   cpfCnpj: z.string().optional().or(z.literal("")),
   cep: z.string().optional().or(z.literal("")),
