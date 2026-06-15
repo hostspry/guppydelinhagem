@@ -12,17 +12,17 @@ function StarIcon() {
 export default function TestimonialCard({ testimonial }: { testimonial: Testimonial }) {
   return (
     <div className="bg-white rounded-xl shadow-sm border border-border p-6 space-y-4 flex flex-col">
-      {/* Avatar + nome */}
+      {/* Avatar + nome — dimensões FIXAS (56px). Usa width/height em atributo
+          (não `fill`): o browser honra o tamanho mesmo se o CSS não carregar,
+          então a miniatura nunca estoura para tela cheia. */}
       <div className="flex items-center gap-3">
-        <div className="relative w-14 h-14 rounded-full overflow-hidden shrink-0 bg-muted">
-          <Image
-            src={testimonial.avatar}
-            alt={testimonial.nome}
-            fill
-            className="object-cover"
-            sizes="56px"
-          />
-        </div>
+        <Image
+          src={testimonial.avatar}
+          alt={testimonial.nome}
+          width={56}
+          height={56}
+          className="w-14 h-14 rounded-full object-cover shrink-0 bg-muted"
+        />
         <div>
           <p className="text-primary font-semibold text-sm">{testimonial.nome}</p>
           <p className="text-muted-foreground text-xs font-light">{testimonial.cidade}</p>
