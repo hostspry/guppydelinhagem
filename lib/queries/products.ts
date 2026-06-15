@@ -134,7 +134,11 @@ function lojaWhere({ busca, categoriaSlug }: LojaFilters): Prisma.ProductWhereIn
       { padraoCor: { contains: termo, mode: "insensitive" } },
     ];
   }
-  if (categoriaSlug && categoriaSlug !== "todos") {
+  // "destaques" = valor especial da pílula (vitrine de destaque), não uma
+  // categoria real → mapeia para destaque:true. "todos"/vazio = sem filtro.
+  if (categoriaSlug === "destaques") {
+    where.destaque = true;
+  } else if (categoriaSlug && categoriaSlug !== "todos") {
     where.category = { slug: categoriaSlug };
   }
   return where;
