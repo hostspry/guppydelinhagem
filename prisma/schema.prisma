@@ -59,6 +59,7 @@ model User {
   enderecos Address[]
   pedidos   Order[]
   waitlist  WaitlistEntry[]
+  cliente   Cliente?
 }
 
 model Address {
@@ -74,6 +75,32 @@ model Address {
   principal   Boolean @default(false)
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// Cliente: tabela própria, desacoplada do auth. Nome e telefone (WhatsApp) são
+// os únicos obrigatórios — um lead entra só com esses dois. userId opcional é
+// groundwork para plugar a conta do cliente no futuro.
+model Cliente {
+  id          String  @id @default(cuid())
+  nome        String
+  telefone    String // WhatsApp — obrigatório (guardado só com dígitos)
+  email       String?
+  cpfCnpj     String? // entra na minuta Gollog (guardado só com dígitos)
+  cep         String?
+  logradouro  String?
+  numero      String?
+  complemento String?
+  bairro      String?
+  cidade      String?
+  uf          String? @db.VarChar(2)
+  observacoes String?
+
+  userId String? @unique // futuro: conta do cliente
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  criadoEm DateTime @default(now())
+
+  @@index([nome])
 }
 
 // ─────────────────────────────────────────────

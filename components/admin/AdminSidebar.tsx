@@ -49,7 +49,7 @@ const NAV_SECTIONS: NavSection[] = [
     title: "Vendas",
     items: [
       { href: "/admin/pedidos", label: "Pedidos", icon: ShoppingCart },
-      { href: "/admin/clientes", label: "Clientes", icon: Users, prefetch: false },
+      { href: "/admin/clientes", label: "Clientes", icon: Users },
     ],
   },
   {
