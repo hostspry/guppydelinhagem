@@ -104,6 +104,63 @@ export function getRelacionados(
   return findCards({ ativo: true, categoryId, id: { not: excluirId } }, take);
 }
 
+// ── Listagem /loja (vitrine: busca + categoria + ordenação + paginação) ───────
+export type LojaOrdenacao = "recentes" | "menor-preco" | "maior-preco";
+
+export type LojaFilters = {
+  busca?: string;
+  /** slug da categoria; undefined ou "todos" = sem filtro. */
+  categoriaSlug?: string;
+  ordenacao?: LojaOrdenacao;
+};
+
+/** Tamanho do lote do "carregar mais". */
+export const LOJA_PAGE_SIZE = 12;
+
+// Tie-break por id mantém a paginação estável quando há preços iguais.
+const ordenacaoMap: Record<LojaOrdenacao, Prisma.ProductOrderByWithRelationInput[]> = {
+  recentes: [{ criadoEm: "desc" }, { id: "asc" }],
+  "menor-preco": [{ preco: "asc" }, { id: "asc" }],
+  "maior-preco": [{ preco: "desc" }, { id: "asc" }],
+};
+
+function lojaWhere({ busca, categoriaSlug }: LojaFilters): Prisma.ProductWhereInput {
+  const where: Prisma.ProductWhereInput = { ativo: true };
+  const termo = busca?.trim();
+  if (termo) {
+    // Busca parcial case-insensitive por nome OU linhagem (padraoCor).
+    where.OR = [
+      { nome: { contains: termo, mode: "insensitive" } },
+      { padraoCor: { contains: termo, mode: "insensitive" } },
+    ];
+  }
+  if (categoriaSlug && categoriaSlug !== "todos") {
+    where.category = { slug: categoriaSlug };
+  }
+  return where;
+}
+
+/**
+ * Lista produtos ativos da vitrine com filtros combináveis e paginação por
+ * offset. Retorna o lote pedido + total (para "X de Y" e saber se há mais).
+ */
+export async function listProductsLoja(
+  filters: LojaFilters & { skip?: number; take?: number },
+): Promise<{ items: PublicProductCard[]; total: number }> {
+  const where = lojaWhere(filters);
+  const [rows, total] = await Promise.all([
+    prisma.product.findMany({
+      where,
+      orderBy: ordenacaoMap[filters.ordenacao ?? "recentes"],
+      skip: filters.skip ?? 0,
+      take: filters.take ?? LOJA_PAGE_SIZE,
+      select: cardSelect,
+    }),
+    prisma.product.count({ where }),
+  ]);
+  return { items: rows.map(toCard), total };
+}
+
 // ── Página de produto (/loja/[slug]) ──────────────────────────
 export type ProductDetailVideo = {
   id: string;
