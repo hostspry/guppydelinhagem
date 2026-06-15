@@ -95,7 +95,7 @@ export const INSTITUCIONAIS: {
     titulo: "Garantia de chegada viva",
     texto:
       "Se algo acontecer no transporte, a gente resolve. Sua compra é protegida pela nossa garantia de chegada viva.",
-    imagem: "/images/selo.png",
+    imagem: "/images/selo.webp",
     link: {
       label: "Saiba mais sobre nossa garantia",
       href: whatsappLink(

@@ -545,10 +545,60 @@ export default function ProductDetail({
       <section className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-border">
         {INSTITUCIONAIS.map((b) => {
           const externo = b.link?.href.startsWith("http");
-          // Selo é emblema circular — contain p/ não cortar; demais são fotos (cover).
-          const contain = b.imagem.includes("selo");
+          // Selo é emblema — bloco "Garantia" tem layout próprio (card centralizado).
+          const isSelo = b.imagem.includes("selo");
           const linkClass =
             "inline-flex items-center gap-1 min-h-11 text-sm font-semibold text-secondary hover:underline";
+          const linkEl = b.link
+            ? externo
+              ? (
+                <a
+                  href={b.link.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`${linkClass} mt-2`}
+                >
+                  {b.link.label} →
+                </a>
+              )
+              : (
+                <Link href={b.link.href} className={`${linkClass} mt-2`}>
+                  {b.link.label} →
+                </Link>
+              )
+            : null;
+
+          // ═══ "Garantia de chegada viva": card com moldura, tudo centralizado
+          //     (título topo → selo no centro → texto → link no rodapé) ═══
+          if (isSelo) {
+            return (
+              <div
+                key={b.titulo}
+                className="py-5 md:py-0 md:px-6 md:first:pl-0 md:last:pr-0"
+              >
+                <div className="flex h-full flex-col items-center rounded-xl border border-border p-5 text-center">
+                  <h3 className="font-semibold text-primary text-base mb-3">
+                    {b.titulo}
+                  </h3>
+                  {/* Selo inteiro (object-contain, sem corte) */}
+                  <div className="relative w-32 aspect-square mb-3">
+                    <Image
+                      src={b.imagem}
+                      alt={b.titulo}
+                      fill
+                      sizes="128px"
+                      className="object-contain"
+                    />
+                  </div>
+                  <p className="text-sm text-muted-foreground leading-relaxed">
+                    {b.texto}
+                  </p>
+                  {linkEl}
+                </div>
+              </div>
+            );
+          }
+
           return (
             <div
               key={b.titulo}
@@ -567,7 +617,7 @@ export default function ProductDetail({
                     alt={b.titulo}
                     fill
                     sizes="(max-width: 768px) 40vw, 15vw"
-                    className={contain ? "object-contain" : "object-cover"}
+                    className="object-cover"
                   />
                 </div>
 
@@ -597,21 +647,7 @@ export default function ProductDetail({
               </div>
 
               {/* Link de ação ao final do bloco */}
-              {b.link &&
-                (externo ? (
-                  <a
-                    href={b.link.href}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={`${linkClass} mt-2`}
-                  >
-                    {b.link.label} →
-                  </a>
-                ) : (
-                  <Link href={b.link.href} className={`${linkClass} mt-2`}>
-                    {b.link.label} →
-                  </Link>
-                ))}
+              {linkEl}
             </div>
           );
         })}
