@@ -16,13 +16,13 @@ export async function getDashboardStats() {
     prisma.product.count({ where: { ativo: true } }),
 
     prisma.order.count({
-      where: { status: { in: ["PENDING", "PROCESSING"] } },
+      where: { status: { in: ["RASCUNHO", "AGUARDANDO_PAGAMENTO"] } },
     }),
 
     prisma.order.aggregate({
       where: {
         criadoEm: { gte: firstDayOfMonth },
-        status: { in: ["PAID", "PROCESSING", "SHIPPED", "DELIVERED"] },
+        status: { in: ["PAGO", "ENVIADO", "ENTREGUE"] },
       },
       _sum: { total: true },
     }),

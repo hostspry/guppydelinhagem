@@ -22,12 +22,47 @@ enum UserRole {
 }
 
 enum OrderStatus {
-  PENDING
-  PAID
-  PROCESSING
-  SHIPPED
-  DELIVERED
-  CANCELLED
+  RASCUNHO
+  AGUARDANDO_PAGAMENTO
+  PAGO
+  ENVIADO
+  ENTREGUE
+  CANCELADO
+}
+
+enum FormaPagamento {
+  PIX
+  BOLETO
+  CARTAO
+  DINHEIRO
+  OUTRO
+}
+
+enum Transportadora {
+  JADLOG
+  GOLLOG
+  OUTRO
+}
+
+enum ProviderPagamento {
+  MERCADO_PAGO
+  PICPAY
+}
+
+enum MetodoPagamento {
+  PIX
+  CARTAO
+  BOLETO
+  CARTEIRA
+  GOOGLE_PAY
+}
+
+enum StatusPagamento {
+  PENDENTE
+  PAGO
+  RECUSADO
+  ESTORNADO
+  EXPIRADO
 }
 
 enum ProductType {
@@ -98,6 +133,7 @@ model Cliente {
   userId String? @unique // futuro: conta do cliente
   user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
 
+  pedidos  Order[]
   criadoEm DateTime @default(now())
 
   @@index([nome])
@@ -209,40 +245,77 @@ model WaitlistEntry {
 // ─────────────────────────────────────────────
 
 model Order {
-  id              String      @id @default(cuid())
-  numero          String      @unique
-  userId          String
-  subtotal        Decimal     @db.Decimal(10, 2)
-  desconto        Decimal     @default(0) @db.Decimal(10, 2)
-  frete           Decimal     @db.Decimal(10, 2)
-  total           Decimal     @db.Decimal(10, 2)
-  metodoPagamento String
-  parcelas        Int         @default(1)
-  status          OrderStatus @default(PENDING)
+  id              String          @id @default(cuid())
+  numero          String          @unique // "#2026-0001"
+  ano             Int
+  sequencia       Int
+
+  // Vínculo: cliente obrigatório (pedido manual); user opcional (checkout futuro).
+  clienteId       String
+  cliente         Cliente         @relation(fields: [clienteId], references: [id])
+  userId          String?
+  user            User?           @relation(fields: [userId], references: [id])
+
+  status          OrderStatus     @default(RASCUNHO)
+  formaPagamento  FormaPagamento?
+  transportadora  Transportadora?
+  observacoes     String?
+  enderecoEntrega Json // SNAPSHOT do destinatário (ver lib/validations/pedido.ts)
+
+  subtotal        Decimal         @default(0) @db.Decimal(10, 2)
+  frete           Decimal         @default(0) @db.Decimal(10, 2)
+  desconto        Decimal         @default(0) @db.Decimal(10, 2)
+  total           Decimal         @default(0) @db.Decimal(10, 2)
+
+  codigoRastreio  String? // AWB (Gollog) ou código (Jadlog)
+
+  // Scaffold de checkout/integrações — dormente (reconciliado nas fases
+  // Pagamentos/Envio; não usar/não apagar). parcelas: parcelamento de cartão.
+  parcelas        Int?
   mpPaymentId     String?
   mpPreferenceId  String?
-  enderecoEntrega Json
-  codigoRastreio  String?
   meCalcId        String?
   meShipmentId    String?
-  criadoEm        DateTime    @default(now())
-  atualizadoEm    DateTime    @updatedAt
 
-  user  User        @relation(fields: [userId], references: [id])
-  items OrderItem[]
+  criadoEm        DateTime        @default(now())
+  atualizadoEm    DateTime        @updatedAt
+
+  items      OrderItem[]
+  pagamentos Pagamento[]
+
+  @@unique([ano, sequencia])
+  @@index([clienteId])
+  @@index([status])
 }
 
 model OrderItem {
-  id             String  @id @default(cuid())
+  id             String   @id @default(cuid())
   orderId        String
-  productId      String
+  productId      String? // null = item avulso
   quantidade     Int
-  precoUnitario  Decimal @db.Decimal(10, 2)
-  nomeSnapshot   String
-  imagemSnapshot String?
+  precoUnitario  Decimal  @db.Decimal(10, 2) // SNAPSHOT
+  nomeProduto    String // SNAPSHOT
+  imagemSnapshot String? // SNAPSHOT (opcional)
 
-  order   Order   @relation(fields: [orderId], references: [id])
-  product Product @relation(fields: [productId], references: [id])
+  order   Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+}
+
+model Pagamento {
+  id            String            @id @default(cuid())
+  orderId       String
+  order         Order             @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  provider      ProviderPagamento
+  metodo        MetodoPagamento
+  status        StatusPagamento   @default(PENDENTE)
+  valor         Decimal           @db.Decimal(10, 2)
+  externalId    String? // id da cobrança no gateway
+  linkPagamento String?
+  qrCode        String?
+  payloadRaw    Json?
+  criadoEm      DateTime          @default(now())
+
+  @@index([orderId])
 }
 
 // ─────────────────────────────────────────────

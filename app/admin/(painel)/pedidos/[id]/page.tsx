@@ -1,7 +1,175 @@
-export default function Page() {
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { Pencil } from "lucide-react";
+import { getPedidoById } from "@/lib/queries/pedidos";
+import { PageHeader } from "@/components/admin/PageHeader";
+import { StatusPedidoControl } from "@/components/admin/StatusPedidoControl";
+import { podeEditarItens } from "@/lib/pedido-status";
+import {
+  formatBRL,
+  formatTelefone,
+  formatCpfCnpj,
+} from "@/lib/utils/format";
+
+type Props = { params: Promise<{ id: string }> };
+
+export default async function PedidoDetalhePage({ params }: Props) {
+  const { id } = await params;
+  const pedido = await getPedidoById(id);
+  if (!pedido) notFound();
+
+  const e = pedido.enderecoEntrega;
+  const editavel = podeEditarItens(pedido.status);
+  const linhaEndereco = [e.logradouro, e.numero, e.complemento, e.bairro]
+    .filter(Boolean)
+    .join(", ");
+  const linhaCidade = [e.cidade, e.uf].filter(Boolean).join(" / ");
+
   return (
-    <main style={{ padding: "2rem" }}>
-      <p style={{ color: "#6b7280" }}>Em construção — Admin Pedido</p>
-    </main>
+    <div>
+      <PageHeader
+        title={`Pedido ${pedido.numero}`}
+        description={`Criado em ${pedido.criadoEm.toLocaleDateString("pt-BR")}`}
+        breadcrumb={[
+          { label: "Admin", href: "/admin" },
+          { label: "Pedidos", href: "/admin/pedidos" },
+          { label: pedido.numero },
+        ]}
+        action={
+          editavel ? (
+            <Link
+              href={`/admin/pedidos/${pedido.id}/editar`}
+              className="inline-flex items-center gap-1.5 border border-gray-300 text-sm font-medium text-gray-700 px-4 py-2 rounded-md hover:border-[#07366A] transition-all"
+            >
+              <Pencil className="w-4 h-4" aria-hidden="true" />
+              Editar
+            </Link>
+          ) : undefined
+        }
+      />
+
+      {/* Status + transições */}
+      <div className="bg-white border border-gray-200 rounded-lg p-5 mb-4">
+        <StatusPedidoControl id={pedido.id} status={pedido.status} />
+        {!editavel && (
+          <p className="text-xs text-gray-400 mt-2">
+            Pedido pago/enviado: itens travados (só status/rastreio mudam).
+          </p>
+        )}
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* Itens + totais */}
+        <div className="lg:col-span-2 space-y-4">
+          <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 border-b border-gray-200">
+                <tr className="text-left text-xs font-medium text-gray-500 uppercase tracking-wide">
+                  <th className="px-4 py-3">Item</th>
+                  <th className="px-4 py-3 text-right">Preço</th>
+                  <th className="px-4 py-3 text-center">Qtd</th>
+                  <th className="px-4 py-3 text-right">Subtotal</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {pedido.itens.map((it) => (
+                  <tr key={it.id}>
+                    <td className="px-4 py-3 text-[#07366A]">
+                      {it.nomeProduto}
+                      {!it.produtoId && (
+                        <span className="ml-2 text-[10px] uppercase tracking-wide text-gray-400">
+                          avulso
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-right text-gray-600">
+                      {formatBRL(it.precoUnitario)}
+                    </td>
+                    <td className="px-4 py-3 text-center text-gray-600">
+                      {it.quantidade}
+                    </td>
+                    <td className="px-4 py-3 text-right font-medium text-[#07366A]">
+                      {formatBRL(it.subtotal)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <div className="border-t border-gray-100 p-4 text-sm space-y-1 max-w-xs ml-auto">
+              <div className="flex justify-between text-gray-500">
+                <span>Subtotal</span>
+                <span>{formatBRL(pedido.subtotal)}</span>
+              </div>
+              <div className="flex justify-between text-gray-500">
+                <span>Frete</span>
+                <span>{formatBRL(pedido.frete)}</span>
+              </div>
+              <div className="flex justify-between text-gray-500">
+                <span>Desconto</span>
+                <span>− {formatBRL(pedido.desconto)}</span>
+              </div>
+              <div className="flex justify-between font-semibold text-[#07366A] text-base">
+                <span>Total</span>
+                <span>{formatBRL(pedido.total)}</span>
+              </div>
+            </div>
+          </div>
+
+          {pedido.observacoes && (
+            <div className="bg-white border border-gray-200 rounded-lg p-5">
+              <h2 className="text-xs font-semibold text-[#07366A] uppercase tracking-wide mb-1">
+                Observações
+              </h2>
+              <p className="text-sm text-gray-600 whitespace-pre-wrap">
+                {pedido.observacoes}
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Destinatário (snapshot) + envio/pagamento */}
+        <div className="space-y-4">
+          <div className="bg-white border border-gray-200 rounded-lg p-5">
+            <h2 className="text-xs font-semibold text-[#07366A] uppercase tracking-wide mb-2">
+              Destinatário
+            </h2>
+            <div className="text-sm text-gray-600 space-y-0.5">
+              <p className="font-medium text-[#07366A]">{e.nome}</p>
+              {e.cpfCnpj && <p>{formatCpfCnpj(e.cpfCnpj)}</p>}
+              {e.telefone && <p>{formatTelefone(e.telefone)}</p>}
+              {e.email && <p>{e.email}</p>}
+              {linhaEndereco && <p className="pt-1">{linhaEndereco}</p>}
+              {linhaCidade && <p>{linhaCidade}</p>}
+              {e.cep && <p>CEP {e.cep}</p>}
+            </div>
+          </div>
+
+          <div className="bg-white border border-gray-200 rounded-lg p-5 text-sm space-y-1">
+            <h2 className="text-xs font-semibold text-[#07366A] uppercase tracking-wide mb-2">
+              Envio &amp; pagamento
+            </h2>
+            <p className="text-gray-600">
+              Transportadora:{" "}
+              <span className="text-[#07366A]">
+                {pedido.transportadora ?? "—"}
+              </span>
+            </p>
+            <p className="text-gray-600">
+              Rastreio:{" "}
+              <span className="text-[#07366A]">
+                {pedido.codigoRastreio ?? "—"}
+              </span>
+            </p>
+            <p className="text-gray-600">
+              Forma de pagamento:{" "}
+              <span className="text-[#07366A]">
+                {pedido.formaPagamento ?? "—"}
+              </span>
+            </p>
+            {/* "Gerar minuta" (Envio) e "Gerar cobrança" (Pagamentos) entram aqui. */}
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
