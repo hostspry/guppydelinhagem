@@ -315,23 +315,70 @@ export const getProductBySlug = cache(
   },
 );
 
-export async function listProducts() {
-  return prisma.product.findMany({
-    orderBy: { criadoEm: "desc" },
+// ── Lista do admin (/admin/produtos): busca + categoria + ordenação ──────────
+export type ProdutoOrdem =
+  | "recentes"
+  | "preco-asc"
+  | "preco-desc"
+  | "estoque-asc"
+  | "estoque-desc";
+
+// Tie-break por id mantém ordem estável quando há preços/estoques iguais.
+const produtoOrderBy: Record<ProdutoOrdem, Prisma.ProductOrderByWithRelationInput[]> = {
+  recentes: [{ criadoEm: "desc" }, { id: "asc" }],
+  "preco-asc": [{ preco: "asc" }, { id: "asc" }],
+  "preco-desc": [{ preco: "desc" }, { id: "asc" }],
+  "estoque-asc": [{ estoque: "asc" }, { id: "asc" }],
+  "estoque-desc": [{ estoque: "desc" }, { id: "asc" }],
+};
+
+export async function listProducts(
+  args: { q?: string; categoriaSlug?: string; ordem?: ProdutoOrdem } = {},
+) {
+  const where: Prisma.ProductWhereInput = {};
+  const termo = args.q?.trim();
+  if (termo) {
+    where.OR = [
+      { nome: { contains: termo, mode: "insensitive" } },
+      { padraoCor: { contains: termo, mode: "insensitive" } },
+    ];
+  }
+  if (args.categoriaSlug && args.categoriaSlug !== "todos") {
+    where.category = { slug: args.categoriaSlug };
+  }
+
+  const rows = await prisma.product.findMany({
+    where,
+    orderBy: produtoOrderBy[args.ordem ?? "recentes"],
     include: {
-      category: { select: { nome: true } },
+      category: { select: { nome: true, slug: true } },
       // Vídeo principal (capa) para a thumbnail da listagem.
       videos: {
         where: { principal: true },
         take: 1,
         select: { thumbnailUrl: true, platform: true },
       },
+      // Chips de composição: variantes ativas (padrão primeiro).
+      variantes: {
+        where: { ativo: true },
+        orderBy: [{ padrao: "desc" }, { ordem: "asc" }],
+        select: { composicao: true, padrao: true },
+      },
       _count: {
         select: { imagens: true, videos: true, orderItems: true, waitlist: true },
       },
     },
   });
+
+  // Decimal → number (preço/desconto). Estoque/preço exibidos vêm do Product.
+  return rows.map((p) => ({
+    ...p,
+    preco: Number(p.preco),
+    descontoPix: p.descontoPix == null ? null : Number(p.descontoPix),
+  }));
 }
+
+export type ProdutoListItem = Awaited<ReturnType<typeof listProducts>>[number];
 
 /**
  * Busca um produto para edição. Converte os campos Decimal para number antes de
