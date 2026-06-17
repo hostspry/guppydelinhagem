@@ -221,9 +221,12 @@ export type ProductDetail = {
  * generateMetadata e o render da página no mesmo request.
  */
 export const getProductBySlug = cache(
-  async (slug: string): Promise<ProductDetail | null> => {
+  async (
+    slug: string,
+    includeInactive = false,
+  ): Promise<ProductDetail | null> => {
     const p = await prisma.product.findFirst({
-      where: { slug, ativo: true },
+      where: includeInactive ? { slug } : { slug, ativo: true },
       select: {
         id: true,
         nome: true,

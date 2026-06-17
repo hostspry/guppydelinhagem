@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { auth } from "@/lib/auth";
 import {
   getProductBySlug,
   getRelacionados,
@@ -27,17 +28,40 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function ProdutoPage({ params }: Props) {
   const { slug } = await params;
-  const produto = await getProductBySlug(slug);
+  let produto = await getProductBySlug(slug);
+
+  // Pré-visualização de inativo: só quando o ativo não existe E há sessão de
+  // admin (não-CUSTOMER). O auth() só roda nesse ramo raro — produtos ativos
+  // continuam renderizáveis sem tocar cookies (mantém o cache ISR). Visitante
+  // comum recebe 404 normal.
+  let preview = false;
+  if (!produto) {
+    const session = await auth();
+    const role = session?.user?.role;
+    if (role && role !== "CUSTOMER") {
+      produto = await getProductBySlug(slug, true);
+      preview = produto != null;
+    }
+  }
   if (!produto) notFound();
+  const prod = produto;
 
   // Mesma categoria; se a categoria só tem este produto, cai para recentes (sem
   // o atual) — evita o carrossel vazio.
-  let relacionados = await getRelacionados(produto.categoryId, produto.id);
+  let relacionados = await getRelacionados(prod.categoryId, prod.id);
   if (relacionados.length === 0) {
-    relacionados = (await getUltimosAdicionados()).filter(
-      (p) => p.id !== produto.id,
-    );
+    relacionados = (await getUltimosAdicionados()).filter((p) => p.id !== prod.id);
   }
 
-  return <ProductDetail product={produto} relacionados={relacionados} />;
+  return (
+    <>
+      {preview && (
+        <div className="bg-amber-50 border-b border-amber-200 text-amber-800 text-sm text-center py-2 px-4">
+          Pré-visualização — produto <strong>inativo</strong> (não visível na
+          loja).
+        </div>
+      )}
+      <ProductDetail product={prod} relacionados={relacionados} />
+    </>
+  );
 }

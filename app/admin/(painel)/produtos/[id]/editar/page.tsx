@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { ExternalLink } from "lucide-react";
 import { PageHeader } from "@/components/admin/PageHeader";
 import { ProductForm } from "@/components/admin/ProductForm";
 import { getProductById, getProductFormData } from "@/lib/queries/products";
@@ -24,6 +25,17 @@ export default async function EditarProdutoPage({ params }: Props) {
           { label: "Produtos", href: "/admin/produtos" },
           { label: produto.nome },
         ]}
+        action={
+          <a
+            href={`/loja/${produto.slug}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 border border-gray-300 text-sm font-medium text-gray-700 px-4 py-2 rounded-md hover:border-[#07366A] transition-all"
+          >
+            <ExternalLink className="w-4 h-4" aria-hidden="true" />
+            Ver na loja
+          </a>
+        }
       />
       <ProductForm
         categorias={categorias}

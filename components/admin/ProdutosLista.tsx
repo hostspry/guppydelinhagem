@@ -12,6 +12,7 @@ import {
   ArrowUpDown,
   Pencil,
   AlertTriangle,
+  Eye,
 } from "lucide-react";
 import { VideoThumb } from "@/components/admin/VideoThumb";
 import { DeleteProductButton } from "@/components/admin/DeleteProductButton";
@@ -283,6 +284,24 @@ export function ProdutosLista({
                     </td>
                     <td className="px-4 py-2.5 text-right">
                       <div className="flex justify-end gap-1">
+                        <a
+                          href={`/loja/${p.slug}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title={
+                            p.ativo
+                              ? "Ver na loja"
+                              : "Inativo — não aparece na loja (pré-visualização)"
+                          }
+                          aria-label={
+                            p.ativo
+                              ? `Ver ${p.nome} na loja`
+                              : `Pré-visualizar ${p.nome} (inativo)`
+                          }
+                          className={`p-1 ${p.ativo ? "text-gray-400 hover:text-[#07366A]" : "text-amber-400 hover:text-amber-600"}`}
+                        >
+                          <Eye className="w-4 h-4" aria-hidden="true" />
+                        </a>
                         <Link
                           href={`/admin/produtos/${p.id}/editar`}
                           className="text-gray-400 hover:text-[#07366A] p-1"
