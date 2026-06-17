@@ -83,7 +83,7 @@ export default function CarrinhoPage() {
         {/* Lista de itens */}
         <div className="lg:col-span-2 bg-white border border-border rounded-xl divide-y divide-border">
           {items.map((item) => (
-            <div key={item.produtoId} className="flex gap-4 p-4">
+            <div key={item.variantId} className="flex gap-4 p-4">
               <div className="relative w-16 shrink-0 aspect-[9/16] rounded-lg overflow-hidden bg-muted">
                 {item.thumbnail ? (
                   <VideoThumb src={item.thumbnail} alt={item.nome} sizes="64px" />
@@ -101,6 +101,11 @@ export default function CarrinhoPage() {
                 >
                   {item.nome}
                 </Link>
+                {item.composicaoLabel && (
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {item.composicaoLabel}
+                  </p>
+                )}
                 <p className="text-green-600 font-bold mt-1">
                   {formatBRL(item.precoPix)}{" "}
                   <span className="text-xs text-muted-foreground font-normal">
@@ -112,7 +117,7 @@ export default function CarrinhoPage() {
                   <div className="flex items-center border border-border rounded-lg">
                     <button
                       type="button"
-                      onClick={() => updateQty(item.produtoId, item.quantidade - 1)}
+                      onClick={() => updateQty(item.variantId, item.quantidade - 1)}
                       disabled={item.quantidade <= 1}
                       aria-label="Diminuir quantidade"
                       className="flex items-center justify-center w-11 h-11 text-primary disabled:opacity-30 hover:text-accent transition-colors"
@@ -124,7 +129,7 @@ export default function CarrinhoPage() {
                     </span>
                     <button
                       type="button"
-                      onClick={() => updateQty(item.produtoId, item.quantidade + 1)}
+                      onClick={() => updateQty(item.variantId, item.quantidade + 1)}
                       disabled={item.quantidade >= item.estoque}
                       aria-label="Aumentar quantidade"
                       className="flex items-center justify-center w-11 h-11 text-primary disabled:opacity-30 hover:text-accent transition-colors"
@@ -138,7 +143,7 @@ export default function CarrinhoPage() {
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
-                      removeItem(item.produtoId);
+                      removeItem(item.variantId);
                     }}
                     aria-label={`Remover ${item.nome}`}
                     // Alvo de toque de 44x44 (mínimo mobile) — o ícone de 16px

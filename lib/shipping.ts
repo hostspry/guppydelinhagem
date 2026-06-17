@@ -1,5 +1,27 @@
 import "server-only";
 import { MAX_PEIXES_POR_CAIXA } from "@/lib/constants";
+import type { ProductType } from "@/lib/generated/prisma/enums";
+
+// Comportamento de frete por tipo de produto (mapa central — não espalhar `if`).
+// PEIXE é o caminho completo desta fase; os demais usam Product.peso (sem a regra
+// de caixa por nº de peixes). DIGITAL não calcula frete.
+export const FRETE_POR_TIPO: Record<
+  ProductType,
+  {
+    calculaFrete: boolean;
+    cargaViva: boolean;
+    regraCaixaPeixe: boolean;
+    avisoIdade: boolean;
+  }
+> = {
+  PEIXE: { calculaFrete: true, cargaViva: true, regraCaixaPeixe: true, avisoIdade: true },
+  CORAL: { calculaFrete: true, cargaViva: true, regraCaixaPeixe: false, avisoIdade: true },
+  PLANTA: { calculaFrete: true, cargaViva: true, regraCaixaPeixe: false, avisoIdade: false },
+  ALIMENTO_VIVO: { calculaFrete: true, cargaViva: true, regraCaixaPeixe: false, avisoIdade: false },
+  RACAO: { calculaFrete: true, cargaViva: false, regraCaixaPeixe: false, avisoIdade: false },
+  ACESSORIO: { calculaFrete: true, cargaViva: false, regraCaixaPeixe: false, avisoIdade: false },
+  DIGITAL: { calculaFrete: false, cargaViva: false, regraCaixaPeixe: false, avisoIdade: false },
+};
 
 // Config interna de frete. NUNCA importar de Client Component — o `server-only`
 // quebra o build se isso acontecer, evitando vazar markup/regras pro browser.

@@ -45,7 +45,8 @@ import {
   MARCHEZI_NOTA,
   type IconKey,
 } from "@/lib/product-content";
-import { SEXO_COMPOSICAO_OPCOES } from "@/lib/validations/product";
+import { COMPOSICAO_LABEL, ORDEM_COMPOSICAO } from "@/lib/composicoes";
+import type { TipoComposicao } from "@/lib/generated/prisma/enums";
 import type {
   ProductDetail as ProductDetailData,
   ProductDetailVideo,
@@ -111,22 +112,40 @@ export default function ProductDetail({
     product.videos.find((v) => v.id === selectedId) ?? product.videos[0] ?? null;
   const embedSrc = selected ? embedSrcFor(selected) : null;
 
-  const semEstoque = product.estoque <= 0;
+  // Composição: peixe tem variantes (trio padrão pré-selecionado); não-peixe não.
+  const temVariantes = product.variantes.length > 0;
+  const [composicaoSel, setComposicaoSel] = useState<TipoComposicao | null>(
+    product.variantes[0]?.composicao ?? null,
+  );
+  const variant = temVariantes
+    ? (product.variantes.find((v) => v.composicao === composicaoSel) ??
+      product.variantes[0])
+    : null;
+
+  function escolherComposicao(c: TipoComposicao) {
+    setComposicaoSel(c);
+    setQtd(1); // estoque pode diferir entre composições
+  }
+
+  const precoBase = variant ? variant.preco : product.preco;
+  const estoqueAtual = variant ? variant.estoque : product.estoque;
+  const qtdPeixesUnit = variant ? variant.qtdPeixes : 1; // alimenta o frete
+  const semEstoque = estoqueAtual <= 0;
   const temDescontoPix =
     product.descontoPix != null && product.descontoPix > 0;
   const precoPix = temDescontoPix
-    ? product.preco * (1 - product.descontoPix! / 100)
-    : product.preco;
-  const valorParcela = product.preco / product.parcelasMax;
+    ? precoBase * (1 - product.descontoPix! / 100)
+    : precoBase;
+  const valorParcela = precoBase / product.parcelasMax;
   const capa = product.videos.find((v) => v.principal)?.thumbnailUrl ?? null;
 
   // Barra de disponibilidade estilo tanque: cheia em 50 unidades; o nível (cor +
-  // rótulo) vem do estoque real, mas o número exato nunca é exibido.
-  const fillPct = Math.min(product.estoque / 50, 1) * 100;
+  // rótulo) vem do estoque real da composição, mas o número exato nunca é exibido.
+  const fillPct = Math.min(estoqueAtual / 50, 1) * 100;
   const nivel =
-    product.estoque >= 25
+    estoqueAtual >= 25
       ? { bar: "bg-green-500", text: "text-green-700", label: "Em estoque" }
-      : product.estoque >= 10
+      : estoqueAtual >= 10
         ? { bar: "bg-amber-500", text: "text-amber-700", label: "Estoque limitado" }
         : { bar: "bg-red-500", text: "text-red-600", label: "Últimas unidades!" };
   useEffect(() => setBarFill(fillPct), [fillPct]);
@@ -138,18 +157,12 @@ export default function ProductDetail({
     .filter(Boolean);
   const descLonga = lineage.length > 320;
 
-  const sexoLabel = product.sexoComposicao
-    ? SEXO_COMPOSICAO_OPCOES.find((o) => o.value === product.sexoComposicao)
-        ?.label ?? product.sexoComposicao
-    : null;
-
   // Ficha técnica em 2 colunas (ordem do brief). Só linhas com valor.
   type Row = [string, string | null];
   const filtra = (rows: Row[]) =>
     rows.filter((r): r is [string, string] => !!r[1] && r[1].trim() !== "");
   const fichaEsq = filtra([
     ["Padrão / cor", product.padraoCor],
-    ["Sexo / composição", sexoLabel],
     ["Temperatura", product.temperatura],
     ["pH", product.ph],
   ]);
@@ -175,12 +188,16 @@ export default function ProductDetail({
     addItem(
       {
         produtoId: product.id,
+        variantId: variant ? variant.id : product.id,
+        composicao: variant ? variant.composicao : null,
+        composicaoLabel: variant ? COMPOSICAO_LABEL[variant.composicao] : null,
         nome: product.nome,
         slug: product.slug,
         precoPix,
-        precoCheio: product.preco,
+        precoCheio: precoBase,
+        qtdPeixes: variant ? variant.qtdPeixes : 0,
         thumbnail: capa,
-        estoque: product.estoque,
+        estoque: estoqueAtual,
       },
       qtd,
     );
@@ -188,7 +205,8 @@ export default function ProductDetail({
   }
   function handleComprar() {
     adicionar();
-    const msg = `Olá! Quero comprar: ${product.nome} (quantidade: ${qtd}). Pode me ajudar a fechar o pedido?`;
+    const comp = variant ? ` — ${COMPOSICAO_LABEL[variant.composicao]}` : "";
+    const msg = `Olá! Quero comprar: ${product.nome}${comp} (quantidade: ${qtd}). Pode me ajudar a fechar o pedido?`;
     window.open(whatsappLink(msg), "_blank", "noopener,noreferrer");
   }
   const duvidasHref = whatsappLink(
@@ -320,6 +338,43 @@ export default function ProductDetail({
             </span>
           </div>
 
+          {/* Composição (só peixe) — trio pré-selecionado */}
+          {temVariantes && (
+            <div className="space-y-1.5">
+              <span className="text-sm font-medium text-primary">Composição</span>
+              <div className="flex flex-wrap gap-2">
+                {ORDEM_COMPOSICAO.filter((c) =>
+                  product.variantes.some((v) => v.composicao === c),
+                ).map((c) => {
+                  const v = product.variantes.find((x) => x.composicao === c)!;
+                  const ativo = v.composicao === composicaoSel;
+                  const zerado = v.estoque <= 0;
+                  return (
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() => escolherComposicao(c)}
+                      disabled={zerado}
+                      className={`rounded-lg border px-3 py-2 text-left text-sm transition-colors ${
+                        ativo
+                          ? "border-secondary bg-secondary/5"
+                          : "border-border hover:border-primary"
+                      } ${zerado ? "opacity-40 cursor-not-allowed" : ""}`}
+                    >
+                      <span className="block font-semibold text-primary">
+                        {COMPOSICAO_LABEL[c]}
+                        {v.rotulo ? ` · ${v.rotulo}` : ""}
+                      </span>
+                      <span className="block text-xs text-muted-foreground">
+                        {zerado ? "Sem estoque" : formatBRL(v.preco)}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* Preço */}
           <div className="space-y-1">
             <div className="flex items-end gap-2 flex-wrap">
@@ -346,7 +401,7 @@ export default function ProductDetail({
 
           {/* Frete — logo abaixo do preço */}
           <div className="max-w-md">
-            <ProductFreteEstimator qtd={qtd} />
+            <ProductFreteEstimator qtd={qtdPeixesUnit * qtd} />
           </div>
 
           {/* Estoque + compra / lista de espera */}
@@ -402,8 +457,8 @@ export default function ProductDetail({
                   <span className="w-10 text-center font-medium tabular-nums">{qtd}</span>
                   <button
                     type="button"
-                    onClick={() => setQtd((q) => Math.min(product.estoque, q + 1))}
-                    disabled={qtd >= product.estoque}
+                    onClick={() => setQtd((q) => Math.min(estoqueAtual, q + 1))}
+                    disabled={qtd >= estoqueAtual}
                     aria-label="Aumentar quantidade"
                     className="flex items-center justify-center w-11 h-11 text-primary disabled:opacity-30 hover:text-accent transition-colors"
                   >

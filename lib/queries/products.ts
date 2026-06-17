@@ -1,6 +1,7 @@
 import { cache } from "react";
 import { prisma } from "../prisma";
 import type { Prisma } from "../generated/prisma/client";
+import type { ProductType, TipoComposicao } from "../generated/prisma/enums";
 
 // ─────────────────────────────────────────────────────────────
 // Queries públicas (loja) — só produtos ativos. Decimais convertidos para
@@ -190,8 +191,9 @@ export type ProductDetail = {
   estoque: number;
   categoria: string;
   categoryId: string;
+  tipo: ProductType;
+  peso: number | null; // frete de não-peixe
   // Atributos (ficha técnica). Só os preenchidos são exibidos.
-  sexoComposicao: string | null;
   padraoCor: string | null;
   cauda: string | null;
   caracteristica: string | null;
@@ -201,6 +203,16 @@ export type ProductDetail = {
   alimentacao: string | null;
   expectativaVida: string | null;
   videos: ProductDetailVideo[];
+  // Composições ativas (TRIO/padrão primeiro). Vazio em produtos não-peixe.
+  variantes: {
+    id: string;
+    composicao: TipoComposicao;
+    preco: number;
+    estoque: number;
+    qtdPeixes: number;
+    rotulo: string | null;
+    padrao: boolean;
+  }[];
 };
 
 /**
@@ -225,7 +237,8 @@ export const getProductBySlug = cache(
         parcelasMax: true,
         estoque: true,
         categoryId: true,
-        sexoComposicao: true,
+        tipo: true,
+        peso: true,
         padraoCor: true,
         cauda: true,
         caracteristica: true,
@@ -247,6 +260,19 @@ export const getProductBySlug = cache(
             principal: true,
           },
         },
+        variantes: {
+          where: { ativo: true },
+          orderBy: [{ padrao: "desc" }, { ordem: "asc" }],
+          select: {
+            id: true,
+            composicao: true,
+            preco: true,
+            estoque: true,
+            qtdPeixes: true,
+            rotulo: true,
+            padrao: true,
+          },
+        },
       },
     });
     if (!p) return null;
@@ -265,7 +291,8 @@ export const getProductBySlug = cache(
       estoque: p.estoque,
       categoria: p.category.nome,
       categoryId: p.categoryId,
-      sexoComposicao: p.sexoComposicao,
+      tipo: p.tipo,
+      peso: p.peso == null ? null : Number(p.peso),
       padraoCor: p.padraoCor,
       cauda: p.cauda,
       caracteristica: p.caracteristica,
@@ -275,6 +302,15 @@ export const getProductBySlug = cache(
       alimentacao: p.alimentacao,
       expectativaVida: p.expectativaVida,
       videos: p.videos,
+      variantes: p.variantes.map((v) => ({
+        id: v.id,
+        composicao: v.composicao,
+        preco: Number(v.preco),
+        estoque: v.estoque,
+        qtdPeixes: v.qtdPeixes,
+        rotulo: v.rotulo,
+        padrao: v.padrao,
+      })),
     };
   },
 );
@@ -307,6 +343,7 @@ export async function getProductById(id: string) {
     include: {
       // Principal primeiro, depois pela ordem dos adicionais.
       videos: { orderBy: [{ principal: "desc" }, { ordem: "asc" }] },
+      variantes: { orderBy: [{ padrao: "desc" }, { ordem: "asc" }] },
     },
   });
   if (!p) return null;
@@ -319,6 +356,15 @@ export async function getProductById(id: string) {
     comprimento: p.comprimento == null ? null : Number(p.comprimento),
     largura: p.largura == null ? null : Number(p.largura),
     altura: p.altura == null ? null : Number(p.altura),
+    variantes: p.variantes.map((v) => ({
+      composicao: v.composicao,
+      preco: Number(v.preco),
+      estoque: v.estoque,
+      qtdPeixes: v.qtdPeixes,
+      rotulo: v.rotulo,
+      padrao: v.padrao,
+      ativo: v.ativo,
+    })),
   };
 }
 

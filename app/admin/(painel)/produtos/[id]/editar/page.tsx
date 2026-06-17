@@ -44,7 +44,6 @@ export default async function EditarProdutoPage({ params }: Props) {
           metaTitle: produto.metaTitle,
           metaDescription: produto.metaDescription,
           keywords: produto.keywords,
-          sexoComposicao: produto.sexoComposicao,
           padraoCor: produto.padraoCor,
           cauda: produto.cauda,
           caracteristica: produto.caracteristica,
@@ -62,6 +61,7 @@ export default async function EditarProdutoPage({ params }: Props) {
             thumbnailUrl: v.thumbnailUrl ?? "",
             principal: v.principal,
           })),
+          variantes: produto.variantes,
         }}
       />
     </div>

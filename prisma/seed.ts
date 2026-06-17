@@ -66,8 +66,25 @@ async function seedAdmin() {
   console.log(`[seed] Admin upserted: ${user.email} (${user.role})`);
 }
 
+// Categorias finais (nível de linhagem). Idempotente.
+async function seedCategorias() {
+  const cats = [
+    { slug: "linhagens-exclusivas", nome: "Linhagens Exclusivas", ordem: 0 },
+    { slug: "sem-linhagem", nome: "Sem Linhagem", ordem: 1 },
+  ];
+  for (const c of cats) {
+    await prisma.category.upsert({
+      where: { slug: c.slug },
+      create: c,
+      update: { nome: c.nome, ordem: c.ordem },
+    });
+  }
+  console.log(`[seed] Categorias upserted: ${cats.map((c) => c.slug).join(", ")}`);
+}
+
 async function main() {
   await seedAdmin();
+  await seedCategorias();
 
   const slide = await prisma.heroSlide.upsert({
     where: { id: BLUE_DRAGON_ID },

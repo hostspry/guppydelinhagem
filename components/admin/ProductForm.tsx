@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -12,12 +12,20 @@ import {
   productSchema,
   type ProductInput,
   type VideoDraft,
-  SEXO_COMPOSICAO_OPCOES,
+  TIPO_PRODUTO_OPCOES,
   PADRAO_COR_SUGESTOES,
   CAUDA_SUGESTOES,
   CARACTERISTICA_SUGESTOES,
   ORIGEM_SUGESTOES,
 } from "@/lib/validations/product";
+import {
+  COMPOSICAO_LABEL,
+  ORDEM_COMPOSICAO,
+  QTD_PEIXES_PADRAO,
+  COMPOSICAO_PADRAO_LIGADA,
+  sugerirPrecos,
+} from "@/lib/composicoes";
+import type { ProductType, TipoComposicao } from "@/lib/generated/prisma/enums";
 import { slugify } from "@/lib/utils/slug";
 import { truncateAtWord } from "@/lib/utils/text";
 import { MARCHEZI_SIGNATURE } from "@/lib/constants";
@@ -30,8 +38,6 @@ import { SuggestInput } from "./SuggestInput";
 const inputClass =
   "w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:border-[#FF035C] focus:ring-1 focus:ring-[#FF035C]";
 
-// Templates de briefing clicáveis. `pesquisar` liga o grounding na geração.
-// Por enquanto só um; o array deixa fácil adicionar outros depois.
 const BRIEFING_TEMPLATES: { label: string; texto: string; pesquisar: boolean }[] =
   [
     {
@@ -41,6 +47,25 @@ const BRIEFING_TEMPLATES: { label: string; texto: string; pesquisar: boolean }[]
         "Pesquise a origem, características genéticas, padrão de cor, manejo (parâmetros de água, temperatura, alimentação, cuidados) e como criar esta linhagem. Priorize fontes especializadas em inglês e da Ásia (Tailândia, Japão, China, Taiwan), incluindo criadores e lojas de referência. Traga a informação técnica e confiável em português, sem inventar — se não encontrar dado sobre algum ponto, omita em vez de supor.",
     },
   ];
+
+// Linha do editor de composições (estado local; campos como string p/ inputs).
+type VarRow = {
+  composicao: TipoComposicao;
+  ativo: boolean;
+  preco: string;
+  estoque: string;
+  qtdPeixes: string;
+  rotulo: string;
+};
+
+type InitVariante = {
+  composicao: TipoComposicao;
+  preco: number;
+  estoque: number;
+  qtdPeixes: number;
+  rotulo: string | null;
+  ativo: boolean;
+};
 
 type ProductFormProps = {
   categorias: { id: string; nome: string }[];
@@ -53,7 +78,7 @@ type ProductFormProps = {
     preco: number;
     descontoPix: number | null;
     parcelasMax: number;
-    tipo: "FISICO" | "DIGITAL";
+    tipo: ProductType;
     estoque: number;
     categoryId: string;
     ativo: boolean;
@@ -61,7 +86,6 @@ type ProductFormProps = {
     metaTitle: string | null;
     metaDescription: string | null;
     keywords: string[];
-    sexoComposicao: string | null;
     padraoCor: string | null;
     cauda: string | null;
     caracteristica: string | null;
@@ -71,6 +95,7 @@ type ProductFormProps = {
     alimentacao: string | null;
     expectativaVida: string | null;
     videos: VideoDraft[];
+    variantes: InitVariante[];
   };
 };
 
@@ -78,18 +103,45 @@ export function ProductForm({ categorias, initialData }: ProductFormProps) {
   const [isPending, startTransition] = useTransition();
   const [slugManuallyEdited, setSlugManuallyEdited] = useState(!!initialData);
   const [videos, setVideos] = useState<VideoDraft[]>(initialData?.videos ?? []);
-  // keywords fora do react-hook-form (array gerenciado como os vídeos):
-  // serializado p/ FormData no submit; a IA preenche via setKeywords.
   const [keywords, setKeywords] = useState<string[]>(
     initialData?.keywords ?? [],
   );
-  // Estado da geração com IA. Loading próprio (useState, não useTransition —
-  // lição da 6c: server action em transition trava o botão).
   const [briefing, setBriefing] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
   const [aiGenerated, setAiGenerated] = useState(false);
-  // Pesquisa web (grounding) sob demanda: liga ao aplicar o template de pesquisa.
   const [pesquisarAtivo, setPesquisarAtivo] = useState(false);
+
+  // ── Composições (estado local, sincronizado ao RHF p/ validação) ──
+  const [variantes, setVariantes] = useState<VarRow[]>(() => {
+    const existentes = new Map(
+      (initialData?.variantes ?? []).map((v) => [v.composicao, v]),
+    );
+    return ORDEM_COMPOSICAO.map((c) => {
+      const ex = existentes.get(c);
+      if (ex) {
+        return {
+          composicao: c,
+          ativo: ex.ativo,
+          preco: String(ex.preco),
+          estoque: String(ex.estoque),
+          qtdPeixes: String(ex.qtdPeixes),
+          rotulo: ex.rotulo ?? "",
+        };
+      }
+      return {
+        composicao: c,
+        ativo: c === "TRIO" ? true : COMPOSICAO_PADRAO_LIGADA[c],
+        preco: "",
+        estoque: "0",
+        qtdPeixes: String(QTD_PEIXES_PADRAO[c]),
+        rotulo: "",
+      };
+    });
+  });
+  // Preços de casal/macho/fêmea editados à mão não são sobrescritos pelo auto-fill.
+  const [precoTouched, setPrecoTouched] = useState<Set<TipoComposicao>>(
+    () => new Set(),
+  );
 
   const {
     register,
@@ -105,18 +157,17 @@ export function ProductForm({ categorias, initialData }: ProductFormProps) {
           slug: initialData.slug,
           descricao: initialData.descricao,
           descricaoCurta: initialData.descricaoCurta ?? "",
-          preco: initialData.preco,
+          preco: initialData.tipo === "PEIXE" ? "" : initialData.preco,
           descontoPix: initialData.descontoPix ?? undefined,
           parcelasMax: initialData.parcelasMax,
           tipo: initialData.tipo,
-          estoque: initialData.estoque,
+          estoque: initialData.tipo === "PEIXE" ? "" : initialData.estoque,
           categoryId: initialData.categoryId,
           ativo: initialData.ativo,
           destaque: initialData.destaque,
           metaTitle: initialData.metaTitle ?? "",
           metaDescription: initialData.metaDescription ?? "",
-          sexoComposicao:
-            (initialData.sexoComposicao as ProductInput["sexoComposicao"]) ?? "",
+          variantes: [],
           padraoCor: initialData.padraoCor ?? "",
           cauda: initialData.cauda ?? "",
           caracteristica: initialData.caracteristica ?? "",
@@ -134,14 +185,14 @@ export function ProductForm({ categorias, initialData }: ProductFormProps) {
           preco: "",
           descontoPix: "",
           parcelasMax: 3,
-          tipo: "FISICO",
-          estoque: 0,
+          tipo: "PEIXE",
+          estoque: "",
           categoryId: "",
           ativo: true,
           destaque: false,
           metaTitle: "",
           metaDescription: "",
-          sexoComposicao: "",
+          variantes: [],
           padraoCor: "",
           cauda: "",
           caracteristica: "",
@@ -152,6 +203,31 @@ export function ProductForm({ categorias, initialData }: ProductFormProps) {
           expectativaVida: "",
         },
   });
+
+  const tipo = watch("tipo");
+  const isPeixe = tipo === "PEIXE";
+
+  // Payload das variantes ativas (TRIO sempre é o padrão). Não-peixe → [].
+  function variantPayload() {
+    if (!isPeixe) return [];
+    return variantes
+      .filter((v) => v.ativo)
+      .map((v) => ({
+        composicao: v.composicao,
+        preco: Number(v.preco) || 0,
+        estoque: Number(v.estoque) || 0,
+        qtdPeixes: Number(v.qtdPeixes) || QTD_PEIXES_PADRAO[v.composicao],
+        rotulo: v.rotulo,
+        padrao: v.composicao === "TRIO",
+        ativo: true,
+      }));
+  }
+
+  // Mantém o array do RHF em sincronia com o estado local (p/ o superRefine).
+  useEffect(() => {
+    setValue("variantes", variantPayload());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [variantes, tipo]);
 
   function handleNomeChange(e: React.ChangeEvent<HTMLInputElement>) {
     const novoNome = e.target.value;
@@ -166,18 +242,50 @@ export function ProductForm({ categorias, initialData }: ProductFormProps) {
     setValue("slug", e.target.value, { shouldValidate: true });
   }
 
+  // ── Editor de composições ──
+  function setVar(comp: TipoComposicao, patch: Partial<VarRow>) {
+    setVariantes((prev) =>
+      prev.map((v) => (v.composicao === comp ? { ...v, ...patch } : v)),
+    );
+  }
+  function toggleAtivo(comp: TipoComposicao) {
+    if (comp === "TRIO") return; // trio é sempre presente (o padrão)
+    setVar(comp, { ativo: !variantes.find((v) => v.composicao === comp)?.ativo });
+  }
+  function onPrecoChange(comp: TipoComposicao, value: string) {
+    setVar(comp, { preco: value });
+    if (comp === "TRIO") {
+      const trio = Number(value);
+      if (trio > 0) {
+        const sug = sugerirPrecos(trio);
+        // Pré-preenche casal/macho/fêmea só se o operador não editou à mão.
+        setVariantes((prev) =>
+          prev.map((v) => {
+            if (v.composicao === "CASAL" && !precoTouched.has("CASAL"))
+              return { ...v, preco: String(sug.CASAL) };
+            if (v.composicao === "MACHO" && !precoTouched.has("MACHO"))
+              return { ...v, preco: String(sug.MACHO) };
+            if (v.composicao === "FEMEA" && !precoTouched.has("FEMEA"))
+              return { ...v, preco: String(sug.FEMEA) };
+            return v;
+          }),
+        );
+      }
+    } else {
+      setPrecoTouched((s) => new Set(s).add(comp));
+    }
+  }
+
   const primaryVideo = videos.find((v) => v.principal) ?? videos[0];
   const canGenerate = !!primaryVideo?.titulo?.trim() || !!briefing.trim();
 
   function applyTemplate(t: (typeof BRIEFING_TEMPLATES)[number]) {
-    setBriefing(t.texto); // substitui o conteúdo; operador edita depois
+    setBriefing(t.texto);
     if (t.pesquisar) setPesquisarAtivo(true);
   }
-
   function handleBriefingChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
     const v = e.target.value;
     setBriefing(v);
-    // Se o operador apagou tudo, a pesquisa deixa de fazer sentido — reseta.
     if (v.trim() === "") setPesquisarAtivo(false);
   }
 
@@ -203,17 +311,10 @@ export function ProductForm({ categorias, initialData }: ProductFormProps) {
         return;
       }
       const d = res.data;
-      // Rede de segurança: a IA não conta caracteres com precisão e pode estourar
-      // os limites do Zod, travando o save. Truncamos na última palavra inteira
-      // antes do limite ANTES de preencher os campos. (números do schema)
       const nome = truncateAtWord(d.nome, 120);
-      // Descrição final = parte da linhagem (IA) + assinatura fixa da Marchezi.
-      // A assinatura nunca é gerada/reescrita pela IA; é colada ao final.
       const descricao = `${d.descricao.trim()}\n\n${MARCHEZI_SIGNATURE}`;
 
       setValue("nome", nome, { shouldValidate: true });
-      // Slug deriva do nome pelo mecanismo existente — só recalcula se o operador
-      // ainda não editou o slug à mão (mesma regra do handleNomeChange).
       if (!slugManuallyEdited) {
         setValue("slug", slugify(nome), { shouldValidate: true });
       }
@@ -227,8 +328,6 @@ export function ProductForm({ categorias, initialData }: ProductFormProps) {
       setValue("metaDescription", truncateAtWord(d.metaDescription, 160), {
         shouldValidate: true,
       });
-      // Atributos gerais (manejo) — a IA preenche; o operador revisa. Truncados
-      // por segurança (são curtos, mas garante que nunca estouram o limite).
       setValue("temperatura", truncateAtWord(d.temperatura, 40), { shouldValidate: true });
       setValue("ph", truncateAtWord(d.ph, 40), { shouldValidate: true });
       setValue("alimentacao", truncateAtWord(d.alimentacao, 60), { shouldValidate: true });
@@ -249,12 +348,14 @@ export function ProductForm({ categorias, initialData }: ProductFormProps) {
     formData.append("slug", data.slug);
     formData.append("descricao", data.descricao);
     if (data.descricaoCurta) formData.append("descricaoCurta", data.descricaoCurta);
-    formData.append("preco", String(data.preco));
+    if (data.preco !== undefined && data.preco !== null)
+      formData.append("preco", String(data.preco));
     if (data.descontoPix !== undefined)
       formData.append("descontoPix", String(data.descontoPix));
     formData.append("parcelasMax", String(data.parcelasMax));
     formData.append("tipo", data.tipo);
-    formData.append("estoque", String(data.estoque));
+    if (data.estoque !== undefined && data.estoque !== null)
+      formData.append("estoque", String(data.estoque));
     formData.append("categoryId", data.categoryId);
     formData.append("ativo", String(data.ativo));
     formData.append("destaque", String(data.destaque));
@@ -262,8 +363,7 @@ export function ProductForm({ categorias, initialData }: ProductFormProps) {
     if (data.metaDescription)
       formData.append("metaDescription", data.metaDescription);
     formData.append("keywords", JSON.stringify(keywords));
-    // Atributos (string vazia → tratada como ausente no parseForm).
-    formData.append("sexoComposicao", data.sexoComposicao ?? "");
+    formData.append("variantes", JSON.stringify(variantPayload()));
     formData.append("padraoCor", data.padraoCor ?? "");
     formData.append("cauda", data.cauda ?? "");
     formData.append("caracteristica", data.caracteristica ?? "");
@@ -278,17 +378,20 @@ export function ProductForm({ categorias, initialData }: ProductFormProps) {
       const result = initialData
         ? await updateProduct(initialData.id, formData)
         : await createProduct(formData);
-
-      // Em sucesso, a action faz redirect — só chegamos aqui em erro.
       if (result?.success === false) {
         toast.error(result.error);
       }
     });
   });
 
+  const variantesError =
+    typeof errors.variantes?.message === "string"
+      ? errors.variantes.message
+      : undefined;
+
   return (
     <form onSubmit={onSubmit} className="max-w-2xl space-y-5">
-      {/* Gerar conteúdo com IA — rascunha descrição/SEO/keywords; o operador revisa */}
+      {/* Gerar conteúdo com IA */}
       <fieldset className="bg-white border border-gray-200 rounded-lg p-5">
         <legend className="px-2 text-xs font-semibold text-[#07366A] uppercase tracking-wide">
           Gerar conteúdo com IA
@@ -317,7 +420,6 @@ export function ProductForm({ categorias, initialData }: ProductFormProps) {
           Briefing <span className="text-gray-400">(opcional)</span>
         </label>
 
-        {/* Templates clicáveis de briefing */}
         <div className="flex flex-wrap gap-2 mb-2">
           {BRIEFING_TEMPLATES.map((t) => (
             <button
@@ -422,10 +524,19 @@ export function ProductForm({ categorias, initialData }: ProductFormProps) {
           </select>
         </FormField>
 
-        <FormField label="Tipo" name="tipo" required error={errors.tipo?.message}>
+        <FormField
+          label="Tipo"
+          name="tipo"
+          required
+          error={errors.tipo?.message}
+          hint="Peixe usa composições (trio/casal/…). Os demais usam preço e estoque do produto."
+        >
           <select id="tipo" {...register("tipo")} className={inputClass}>
-            <option value="FISICO">Físico</option>
-            <option value="DIGITAL">Digital</option>
+            {TIPO_PRODUTO_OPCOES.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
           </select>
         </FormField>
 
@@ -464,25 +575,6 @@ export function ProductForm({ categorias, initialData }: ProductFormProps) {
         <legend className="px-2 text-xs font-semibold text-[#07366A] uppercase tracking-wide">
           Atributos
         </legend>
-
-        <FormField
-          label="Sexo / composição"
-          name="sexoComposicao"
-          error={errors.sexoComposicao?.message}
-        >
-          <select
-            id="sexoComposicao"
-            {...register("sexoComposicao")}
-            className={inputClass}
-          >
-            <option value="">—</option>
-            {SEXO_COMPOSICAO_OPCOES.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-        </FormField>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4">
           <FormField
@@ -533,11 +625,7 @@ export function ProductForm({ categorias, initialData }: ProductFormProps) {
             />
           </FormField>
 
-          <FormField
-            label="Origem"
-            name="origem"
-            error={errors.origem?.message}
-          >
+          <FormField label="Origem" name="origem" error={errors.origem?.message}>
             <SuggestInput
               id="origem"
               listId="origem-list"
@@ -571,78 +659,188 @@ export function ProductForm({ categorias, initialData }: ProductFormProps) {
       {/* Vídeos */}
       <ProductVideosField value={videos} onChange={setVideos} />
 
-      {/* Preço & estoque */}
+      {/* Preço / Composições */}
       <fieldset className="bg-white border border-gray-200 rounded-lg p-5">
         <legend className="px-2 text-xs font-semibold text-[#07366A] uppercase tracking-wide">
-          Preço &amp; estoque
+          {isPeixe ? "Composições & preço" : "Preço & estoque"}
         </legend>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4">
-          <FormField
-            label="Preço (R$)"
-            name="preco"
-            required
-            error={errors.preco?.message}
-          >
-            <input
-              id="preco"
-              type="number"
-              step="0.01"
-              min="0"
-              {...register("preco")}
-              className={inputClass}
-              placeholder="49.90"
-            />
-          </FormField>
+        {isPeixe ? (
+          <div className="space-y-3">
+            <p className="text-xs text-gray-500">
+              O <strong>Trio</strong> é a composição padrão (pré-selecionada na
+              compra). Ao digitar o preço do trio, casal/macho/fêmea são sugeridos
+              (75% / R$99 / R$89) — tudo editável.
+            </p>
+            {variantesError && (
+              <p className="text-xs text-[#FF035C]">{variantesError}</p>
+            )}
 
-          <FormField
-            label="Desconto Pix (%)"
-            name="descontoPix"
-            error={errors.descontoPix?.message}
-            hint="Opcional. Deixe vazio para não aplicar."
-          >
-            <input
-              id="descontoPix"
-              type="number"
-              step="0.01"
-              min="0"
-              max="100"
-              {...register("descontoPix")}
-              className={inputClass}
-              placeholder="5"
-            />
-          </FormField>
+            <div className="space-y-2">
+              {ORDEM_COMPOSICAO.map((comp) => {
+                const v = variantes.find((x) => x.composicao === comp)!;
+                const isTrio = comp === "TRIO";
+                const isLote = comp === "LOTE";
+                return (
+                  <div
+                    key={comp}
+                    className={`rounded-md border p-3 ${v.ativo ? "border-gray-300" : "border-gray-200 bg-gray-50"}`}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium text-[#07366A]">
+                        {COMPOSICAO_LABEL[comp]}
+                        {isTrio && (
+                          <span className="ml-2 text-[10px] uppercase tracking-wide text-[#FF035C]">
+                            padrão
+                          </span>
+                        )}
+                      </span>
+                      <label className="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={v.ativo}
+                          disabled={isTrio}
+                          onChange={() => toggleAtivo(comp)}
+                          className="w-4 h-4 accent-[#FF035C] disabled:opacity-50"
+                        />
+                        {isTrio ? "Sempre ativo" : v.ativo ? "Ativo" : "Inativo"}
+                      </label>
+                    </div>
 
-          <FormField
-            label="Parcelas máx."
-            name="parcelasMax"
-            error={errors.parcelasMax?.message}
-          >
-            <input
-              id="parcelasMax"
-              type="number"
-              min="1"
-              max="12"
-              {...register("parcelasMax")}
-              className={inputClass}
-            />
-          </FormField>
+                    {v.ativo && (
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        <label className="block">
+                          <span className="block text-[10px] text-gray-400 mb-0.5">Preço (R$)</span>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={v.preco}
+                            onChange={(e) => onPrecoChange(comp, e.target.value)}
+                            className={inputClass}
+                          />
+                        </label>
+                        <label className="block">
+                          <span className="block text-[10px] text-gray-400 mb-0.5">Estoque</span>
+                          <input
+                            type="number"
+                            min="0"
+                            value={v.estoque}
+                            onChange={(e) => setVar(comp, { estoque: e.target.value })}
+                            className={inputClass}
+                          />
+                        </label>
+                        <label className="block">
+                          <span className="block text-[10px] text-gray-400 mb-0.5">Qtd peixes</span>
+                          <input
+                            type="number"
+                            min="1"
+                            value={v.qtdPeixes}
+                            onChange={(e) => setVar(comp, { qtdPeixes: e.target.value })}
+                            className={inputClass}
+                          />
+                        </label>
+                        {isLote && (
+                          <label className="block col-span-2 sm:col-span-1">
+                            <span className="block text-[10px] text-gray-400 mb-0.5">Rótulo</span>
+                            <input
+                              type="text"
+                              value={v.rotulo}
+                              onChange={(e) => setVar(comp, { rotulo: e.target.value })}
+                              className={inputClass}
+                              placeholder="8 machos e 2 fêmeas"
+                            />
+                          </label>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
 
-          <FormField
-            label="Estoque"
-            name="estoque"
-            required
-            error={errors.estoque?.message}
-          >
-            <input
-              id="estoque"
-              type="number"
-              min="0"
-              {...register("estoque")}
-              className={inputClass}
-            />
-          </FormField>
-        </div>
+            {/* Desconto Pix e parcelas valem para o produto (todas as composições) */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 pt-1">
+              <FormField
+                label="Desconto Pix (%)"
+                name="descontoPix"
+                error={errors.descontoPix?.message}
+                hint="Opcional. Aplica a todas as composições."
+              >
+                <input
+                  id="descontoPix"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  max="100"
+                  {...register("descontoPix")}
+                  className={inputClass}
+                  placeholder="5"
+                />
+              </FormField>
+              <FormField label="Parcelas máx." name="parcelasMax" error={errors.parcelasMax?.message}>
+                <input
+                  id="parcelasMax"
+                  type="number"
+                  min="1"
+                  max="12"
+                  {...register("parcelasMax")}
+                  className={inputClass}
+                />
+              </FormField>
+            </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4">
+            <FormField label="Preço (R$)" name="preco" required error={errors.preco?.message}>
+              <input
+                id="preco"
+                type="number"
+                step="0.01"
+                min="0"
+                {...register("preco")}
+                className={inputClass}
+                placeholder="49.90"
+              />
+            </FormField>
+            <FormField
+              label="Desconto Pix (%)"
+              name="descontoPix"
+              error={errors.descontoPix?.message}
+              hint="Opcional. Deixe vazio para não aplicar."
+            >
+              <input
+                id="descontoPix"
+                type="number"
+                step="0.01"
+                min="0"
+                max="100"
+                {...register("descontoPix")}
+                className={inputClass}
+                placeholder="5"
+              />
+            </FormField>
+            <FormField label="Parcelas máx." name="parcelasMax" error={errors.parcelasMax?.message}>
+              <input
+                id="parcelasMax"
+                type="number"
+                min="1"
+                max="12"
+                {...register("parcelasMax")}
+                className={inputClass}
+              />
+            </FormField>
+            <FormField label="Estoque" name="estoque" required error={errors.estoque?.message}>
+              <input
+                id="estoque"
+                type="number"
+                min="0"
+                {...register("estoque")}
+                className={inputClass}
+              />
+            </FormField>
+          </div>
+        )}
       </fieldset>
 
       {/* Publicação */}

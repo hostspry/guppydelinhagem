@@ -1,23 +1,30 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import type { TipoComposicao } from "@/lib/generated/prisma/enums";
 
 export type CartItem = {
   produtoId: string;
+  // Chave do item: variante (peixe) ou id do produto (não-peixe). Mesmo produto
+  // em composições diferentes = linhas distintas.
+  variantId: string;
+  composicao: TipoComposicao | null;
+  composicaoLabel: string | null;
   nome: string;
   slug: string;
   precoPix: number;
   precoCheio: number;
+  qtdPeixes: number; // alimenta a regra dos >10; 0 em não-peixe
   thumbnail: string | null;
-  estoque: number; // teto de quantidade
+  estoque: number; // teto de quantidade (da variante)
   quantidade: number;
 };
 
 type CartState = {
   items: CartItem[];
-  /** Adiciona (ou soma) respeitando o estoque do produto. */
+  /** Adiciona (ou soma) respeitando o estoque da variante. Chave = variantId. */
   addItem: (item: Omit<CartItem, "quantidade">, qtd: number) => void;
-  removeItem: (produtoId: string) => void;
-  updateQty: (produtoId: string, qtd: number) => void;
+  removeItem: (variantId: string) => void;
+  updateQty: (variantId: string, qtd: number) => void;
   clear: () => void;
 };
 
@@ -29,12 +36,12 @@ export const useCart = create<CartState>()(
         set((s) => {
           const teto = Math.max(0, item.estoque);
           if (teto === 0 || qtd <= 0) return s;
-          const existente = s.items.find((i) => i.produtoId === item.produtoId);
+          const existente = s.items.find((i) => i.variantId === item.variantId);
           if (existente) {
             const novaQtd = Math.min(existente.quantidade + qtd, teto);
             return {
               items: s.items.map((i) =>
-                i.produtoId === item.produtoId
+                i.variantId === item.variantId
                   ? // Atualiza preço/thumb/estoque (podem ter mudado) + qtd.
                     { ...i, ...item, quantidade: novaQtd }
                   : i,
@@ -45,14 +52,14 @@ export const useCart = create<CartState>()(
             items: [...s.items, { ...item, quantidade: Math.min(qtd, teto) }],
           };
         }),
-      removeItem: (produtoId) =>
+      removeItem: (variantId) =>
         set((s) => ({
-          items: s.items.filter((i) => i.produtoId !== produtoId),
+          items: s.items.filter((i) => i.variantId !== variantId),
         })),
-      updateQty: (produtoId, qtd) =>
+      updateQty: (variantId, qtd) =>
         set((s) => ({
           items: s.items.map((i) =>
-            i.produtoId === produtoId
+            i.variantId === variantId
               ? { ...i, quantidade: Math.max(1, Math.min(qtd, i.estoque)) }
               : i,
           ),
@@ -64,12 +71,12 @@ export const useCart = create<CartState>()(
 );
 
 // ── Selectors derivados ──────────────────────────────────────
-// Total de itens = soma das quantidades. Hoje "peixe" == unidade, então o total
-// de peixes (regra das 10) usa a mesma soma; separamos por clareza semântica.
 export const selectTotalItens = (s: CartState) =>
   s.items.reduce((acc, i) => acc + i.quantidade, 0);
 
-export const selectTotalPeixes = selectTotalItens;
+// Total de PEIXES (regra das 10) = Σ(qtdPeixes × quantidade) — não-peixe soma 0.
+export const selectTotalPeixes = (s: CartState) =>
+  s.items.reduce((acc, i) => acc + i.qtdPeixes * i.quantidade, 0);
 
 export const selectSubtotalPix = (s: CartState) =>
   s.items.reduce((acc, i) => acc + i.precoPix * i.quantidade, 0);

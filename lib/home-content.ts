@@ -18,6 +18,8 @@ export type Testimonial = {
   texto: string;
 };
 
+// slug/href alinhados às categorias reais do banco (linhagens-exclusivas /
+// sem-linhagem). A home é a vitrine: o card filtra a grade (#loja) por categoria.
 export const CATEGORIES: HomeCategory[] = [
   {
     slug: "linhagens-exclusivas",
@@ -25,7 +27,7 @@ export const CATEGORIES: HomeCategory[] = [
     descricao:
       "Navegue e filtre por todas as linhagens selecionadas e premium que trabalhamos.",
     imagem: "/assets/home/categoria-linhagens.png",
-    href: "/loja?categoria=peixes-de-linhagem",
+    href: "/?categoria=linhagens-exclusivas#loja",
   },
   {
     slug: "sem-linhagem",
@@ -33,15 +35,7 @@ export const CATEGORIES: HomeCategory[] = [
     descricao:
       "Explore e descubra nossos guppys comuns, cheios de cores e personalidades únicas.",
     imagem: "/assets/home/categoria-sem-linhagem.png",
-    href: "/loja?categoria=peixes-sem-linhagem",
-  },
-  {
-    slug: "casais",
-    nome: "Casais",
-    descricao:
-      "Encontre casais de guppys ideais para iniciar ou reforçar sua criação com harmonia e beleza.",
-    imagem: "/assets/home/categoria-linhagens.png",
-    href: "/loja?categoria=casais",
+    href: "/?categoria=sem-linhagem#loja",
   },
 ];
 

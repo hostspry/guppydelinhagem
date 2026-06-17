@@ -7,6 +7,8 @@ import {
   productSchema,
   videosSchema,
   type VideoDraft,
+  type VariantInput,
+  type ProductInput,
 } from "@/lib/validations/product";
 import {
   parseVideoUrl,
@@ -20,8 +22,8 @@ import {
   isPrismaError,
 } from "@/lib/utils/action-result";
 
-/** Keywords chegam como JSON (array serializado pelo form). Falha → []. */
-function parseKeywordsField(raw: FormDataEntryValue | null): string[] {
+/** Campo JSON (array serializado pelo form). Falha → []. */
+function parseJsonArrayField(raw: FormDataEntryValue | null): unknown[] {
   if (typeof raw !== "string" || raw.trim() === "") return [];
   try {
     const json = JSON.parse(raw);
@@ -47,8 +49,8 @@ function parseForm(formData: FormData) {
     destaque: formData.get("destaque"),
     metaTitle: formData.get("metaTitle") || undefined,
     metaDescription: formData.get("metaDescription") || undefined,
-    keywords: parseKeywordsField(formData.get("keywords")),
-    sexoComposicao: formData.get("sexoComposicao") || undefined,
+    keywords: parseJsonArrayField(formData.get("keywords")),
+    variantes: parseJsonArrayField(formData.get("variantes")),
     padraoCor: formData.get("padraoCor") || undefined,
     cauda: formData.get("cauda") || undefined,
     caracteristica: formData.get("caracteristica") || undefined,
@@ -65,25 +67,36 @@ function orNull(v: string | undefined | null): string | null {
   return v ? v : null;
 }
 
-/** Monta o objeto persistível (campos escalares) a partir dos dados validados. */
-function toData(input: ReturnType<typeof productSchema.parse>) {
+/**
+ * Campos escalares do Product. Em PEIXE, `preco`/`estoque` ESPELHAM a variante
+ * padrão (trio) — a coluna `preco` é NOT NULL e os cards leem dela. Em não-peixe,
+ * usa os campos do próprio produto.
+ */
+function scalarData(input: ProductInput) {
+  const isPeixe = input.tipo === "PEIXE";
+  const ativas = input.variantes.filter((v) => v.ativo);
+  const padrao = ativas.find((v) => v.padrao) ?? ativas[0];
+  const preco = isPeixe ? (padrao?.preco ?? 0) : (input.preco ?? 0);
+  const estoque = isPeixe
+    ? ativas.reduce((s, v) => s + v.estoque, 0)
+    : (input.estoque ?? 0);
+
   return {
     nome: input.nome,
     slug: input.slug,
     descricao: input.descricao,
     descricaoCurta: input.descricaoCurta ? input.descricaoCurta : null,
-    preco: input.preco,
+    preco,
     descontoPix: input.descontoPix ?? null,
     parcelasMax: input.parcelasMax,
     tipo: input.tipo,
-    estoque: input.estoque,
+    estoque,
     categoryId: input.categoryId,
     ativo: input.ativo,
     destaque: input.destaque,
     metaTitle: input.metaTitle ? input.metaTitle : null,
     metaDescription: input.metaDescription ? input.metaDescription : null,
     keywords: input.keywords,
-    sexoComposicao: orNull(input.sexoComposicao),
     padraoCor: orNull(input.padraoCor),
     cauda: orNull(input.cauda),
     caracteristica: orNull(input.caracteristica),
@@ -93,6 +106,20 @@ function toData(input: ReturnType<typeof productSchema.parse>) {
     alimentacao: orNull(input.alimentacao),
     expectativaVida: orNull(input.expectativaVida),
   };
+}
+
+/** Variantes → input de create aninhado (ordem pela posição). */
+function buildVariantCreates(variantes: VariantInput[]) {
+  return variantes.map((v, i) => ({
+    composicao: v.composicao,
+    preco: v.preco,
+    estoque: v.estoque,
+    qtdPeixes: v.qtdPeixes,
+    rotulo: v.rotulo ? v.rotulo : null,
+    padrao: v.padrao,
+    ativo: v.ativo,
+    ordem: i,
+  }));
 }
 
 /** Lê e valida o array de vídeos serializado (JSON) pelo ProductForm. */
@@ -153,11 +180,12 @@ export async function createProduct(formData: FormData): Promise<ActionResult> {
   }
 
   try {
-    // Nested create: produto + vídeos numa única transação implícita.
+    // Nested create: produto + vídeos + variantes numa única transação implícita.
     await prisma.product.create({
       data: {
-        ...toData(parsed.data),
+        ...scalarData(parsed.data),
         videos: { create: buildVideoCreates(videos.videos) },
+        variantes: { create: buildVariantCreates(parsed.data.variantes) },
       },
     });
   } catch (e) {
@@ -172,6 +200,7 @@ export async function createProduct(formData: FormData): Promise<ActionResult> {
   // detalhe + edição), não só a rota da listagem — assim a tela de edição não
   // serve RSC em cache stale ao voltar para o produto.
   revalidatePath("/admin/produtos", "layout");
+  revalidatePath("/loja/[slug]", "page"); // página de produto
   revalidatePath("/"); // home pública reflete o novo produto
   redirect("/admin/produtos");
 }
@@ -196,19 +225,56 @@ export async function updateProduct(
     return { success: false, error: "Dados de vídeo inválidos." };
   }
 
+  // Variantes: reconcilia por COMPOSIÇÃO (upsert) — NÃO recria IDs (mantém o
+  // variantId estável p/ carrinhos salvos no localStorage). Composições ausentes
+  // viram ativo:false (soft-delete), não delete. Vídeos seguem por substituição.
+  const enviadas = parsed.data.variantes.map((v) => v.composicao);
   try {
-    // Reconcilia por substituição total: remove os vídeos atuais e recria a
-    // partir do array enviado (ProductVideo não tem referências externas).
-    await prisma.product.update({
-      where: { id },
-      data: {
-        ...toData(parsed.data),
-        videos: {
-          deleteMany: {},
-          create: buildVideoCreates(videos.videos),
+    await prisma.$transaction([
+      prisma.product.update({
+        where: { id },
+        data: {
+          ...scalarData(parsed.data),
+          videos: {
+            deleteMany: {},
+            create: buildVideoCreates(videos.videos),
+          },
         },
-      },
-    });
+      }),
+      ...parsed.data.variantes.map((v, i) =>
+        prisma.productVariant.upsert({
+          where: { productId_composicao: { productId: id, composicao: v.composicao } },
+          create: {
+            productId: id,
+            composicao: v.composicao,
+            preco: v.preco,
+            estoque: v.estoque,
+            qtdPeixes: v.qtdPeixes,
+            rotulo: v.rotulo ? v.rotulo : null,
+            padrao: v.padrao,
+            ativo: v.ativo,
+            ordem: i,
+          },
+          update: {
+            preco: v.preco,
+            estoque: v.estoque,
+            qtdPeixes: v.qtdPeixes,
+            rotulo: v.rotulo ? v.rotulo : null,
+            padrao: v.padrao,
+            ativo: v.ativo,
+            ordem: i,
+          },
+        }),
+      ),
+      // Composições não enviadas → soft-delete (não-peixe: zera todas).
+      prisma.productVariant.updateMany({
+        where: {
+          productId: id,
+          ...(enviadas.length ? { composicao: { notIn: enviadas } } : {}),
+        },
+        data: { ativo: false },
+      }),
+    ]);
   } catch (e) {
     if (isPrismaError(e)) {
       if (e.code === "P2002") {
@@ -223,6 +289,7 @@ export async function updateProduct(
   }
 
   revalidatePath("/admin/produtos", "layout");
+  revalidatePath("/loja/[slug]", "page"); // página de produto
   revalidatePath("/"); // home pública reflete a edição
   redirect("/admin/produtos");
 }
