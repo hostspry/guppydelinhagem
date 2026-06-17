@@ -171,7 +171,8 @@ export default function Footer() {
         {/* Barra de copyright */}
         <div className="border-t border-accent/30">
           <div className="container-site py-4 text-center text-xs font-light text-white/60">
-            © {new Date().getFullYear()} Guppy de Linhagem — Todos os direitos reservados.
+            © {new Date().getFullYear()} Guppy de Linhagem. Todos os direitos
+            reservados. Desenvolvido por Manassés Marchezi.
           </div>
         </div>
       </div>

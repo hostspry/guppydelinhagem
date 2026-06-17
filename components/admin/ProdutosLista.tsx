@@ -34,6 +34,59 @@ const CHIP_CLASS: Record<TipoComposicao, string> = {
 
 const VIEW_KEY = "admin:produtos:view";
 
+// Célula de estoque: PEIXE mostra o pool (♂/♀, "Esgotado", "negativo");
+// não-PEIXE mostra número (Esgotado/alerta ≤5). Fora do componente (static-components).
+function EstoqueCell({
+  tipo,
+  estoque,
+  machos,
+  femeas,
+}: {
+  tipo: string;
+  estoque: number;
+  machos: number;
+  femeas: number;
+}) {
+  if (tipo === "PEIXE") {
+    if (machos < 0 || femeas < 0) {
+      return (
+        <span className="inline-block px-2 py-0.5 rounded-full bg-red-100 text-red-700 text-xs font-medium">
+          Estoque negativo
+        </span>
+      );
+    }
+    if (machos === 0 && femeas === 0) {
+      return (
+        <span className="inline-block px-2 py-0.5 rounded-full bg-red-100 text-red-700 text-xs font-medium">
+          Esgotado
+        </span>
+      );
+    }
+    return (
+      <span className="text-gray-600 text-xs tabular-nums">
+        {machos + femeas} · ♂{machos} ♀{femeas}
+      </span>
+    );
+  }
+  // Não-peixe: número simples.
+  if (estoque <= 0) {
+    return (
+      <span className="inline-block px-2 py-0.5 rounded-full bg-red-100 text-red-700 text-xs font-medium">
+        Esgotado
+      </span>
+    );
+  }
+  if (estoque <= 5) {
+    return (
+      <span className="inline-flex items-center gap-1 text-amber-700 font-medium tabular-nums">
+        <AlertTriangle size={13} aria-hidden="true" />
+        {estoque}
+      </span>
+    );
+  }
+  return <span className="text-gray-600 tabular-nums">{estoque}</span>;
+}
+
 // Fora do componente (regra static-components): seta direção pela ordem atual.
 function SortIcon({
   campo,
@@ -263,18 +316,12 @@ export function ProdutosLista({
                       {formatBRL(p.preco)}
                     </td>
                     <td className="px-4 py-2.5 text-center whitespace-nowrap">
-                      {p.estoque <= 0 ? (
-                        <span className="inline-block px-2 py-0.5 rounded-full bg-red-100 text-red-700 text-xs font-medium">
-                          Esgotado
-                        </span>
-                      ) : p.estoque <= 5 ? (
-                        <span className="inline-flex items-center gap-1 text-amber-700 font-medium tabular-nums">
-                          <AlertTriangle size={13} aria-hidden="true" />
-                          {p.estoque}
-                        </span>
-                      ) : (
-                        <span className="text-gray-600 tabular-nums">{p.estoque}</span>
-                      )}
+                      <EstoqueCell
+                        tipo={p.tipo}
+                        estoque={p.estoque}
+                        machos={p.estoqueMachos}
+                        femeas={p.estoqueFemeas}
+                      />
                     </td>
                     <td className="px-4 py-2.5 text-center">
                       <AtivoToggle id={p.id} value={p.ativo} />
