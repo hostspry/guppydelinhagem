@@ -66,8 +66,21 @@ enum StatusPagamento {
 }
 
 enum ProductType {
-  FISICO
+  PEIXE
+  CORAL
+  PLANTA
+  ALIMENTO_VIVO
+  RACAO
+  ACESSORIO
   DIGITAL
+}
+
+enum TipoComposicao {
+  TRIO
+  CASAL
+  MACHO
+  FEMEA
+  LOTE
 }
 
 enum VideoPlatform {
@@ -164,7 +177,7 @@ model Product {
 
   // Atributos específicos do peixe (preenchidos manualmente no admin). São eixos
   // distintos — um peixe pode ser koi + halfmoon + dumbo ao mesmo tempo.
-  sexoComposicao  String? // lista fixa: MACHO, FEMEA, CASAL, TRIO, LOTE
+  // (composição saiu para ProductVariant.)
   padraoCor       String? // eixo principal de busca (koi, full red, tuxedo…) — livre
   cauda           String? // formato do rabo (halfmoon, delta, roundtail…) — livre
   caracteristica  String? // extra física (dumbo…) — livre, opcional
@@ -178,7 +191,7 @@ model Product {
   preco           Decimal     @db.Decimal(10, 2)
   descontoPix     Decimal?    @db.Decimal(5, 2)
   parcelasMax     Int         @default(3)
-  tipo            ProductType @default(FISICO)
+  tipo            ProductType @default(PEIXE)
   estoque         Int         @default(0)
   peso            Decimal?    @db.Decimal(8, 3)
   comprimento     Decimal?    @db.Decimal(8, 2)
@@ -195,6 +208,26 @@ model Product {
   videos     ProductVideo[]
   waitlist   WaitlistEntry[]
   orderItems OrderItem[]
+  variantes  ProductVariant[]
+}
+
+// Composição de venda (trio/casal/macho/fêmea/lote). Só produtos PEIXE têm
+// variantes — preço/estoque por composição. Não-peixe usa Product.preco/estoque.
+model ProductVariant {
+  id         String         @id @default(cuid())
+  productId  String
+  composicao TipoComposicao
+  preco      Decimal        @db.Decimal(10, 2)
+  estoque    Int            @default(0)
+  qtdPeixes  Int // alimenta o frete: TRIO 3, CASAL 2, MACHO/FEMEA 1, LOTE configurável
+  rotulo     String? // só LOTE: "8 machos e 2 fêmeas"
+  padrao     Boolean        @default(false) // TRIO = true (pré-selecionado na compra)
+  ativo      Boolean        @default(true)
+  ordem      Int            @default(0)
+  product    Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, composicao])
+  @@index([productId])
 }
 
 model ProductImage {
