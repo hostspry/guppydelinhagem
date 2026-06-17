@@ -293,3 +293,46 @@
   --sidebar-border: #e2e8f0;
   --sidebar-ring: #07366a;
 }
+
+/* ─────────────────────────────────────────────
+   Lista de produtos (admin) — alternador Mini/Gigante
+   Puramente visual: muda o tamanho do thumb + respiro + tamanho do nome via
+   data-view (gerenciado fora do React: script inline no parse + clique).
+   Default = Mini (sem atributo). Gigante quando data-view="gigante".
+───────────────────────────────────────────── */
+.produtos-lista .produto-thumb {
+  width: 90px;
+  height: 90px;
+}
+.produtos-lista[data-view="gigante"] .produto-thumb {
+  width: 200px;
+  height: 200px;
+}
+.produtos-lista .produto-nome {
+  font-size: 15px;
+}
+.produtos-lista[data-view="gigante"] .produto-nome {
+  font-size: 16px;
+}
+.produtos-lista[data-view="gigante"] .produto-linha > td {
+  padding-top: 0.9rem;
+  padding-bottom: 0.9rem;
+}
+
+/* Segmentado Mini/Gigante: ativo = Mini por padrão; troca quando data-view="gigante" */
+.produtos-lista .seg-mini {
+  background: #07366a;
+  color: #fff;
+}
+.produtos-lista .seg-gigante {
+  background: transparent;
+  color: #6b7280;
+}
+.produtos-lista[data-view="gigante"] .seg-mini {
+  background: transparent;
+  color: #6b7280;
+}
+.produtos-lista[data-view="gigante"] .seg-gigante {
+  background: #07366a;
+  color: #fff;
+}

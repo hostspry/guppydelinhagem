@@ -1,13 +1,46 @@
 import Link from "next/link";
-import { Plus, Pencil } from "lucide-react";
-import { listProducts } from "@/lib/queries/products";
-import { formatBRL } from "@/lib/utils/format";
+import { Plus } from "lucide-react";
+import { listProducts, type ProdutoOrdem } from "@/lib/queries/products";
+import { listCategories } from "@/lib/queries/categories";
 import { PageHeader } from "@/components/admin/PageHeader";
-import { DeleteProductButton } from "@/components/admin/DeleteProductButton";
-import { VideoThumb } from "@/components/admin/VideoThumb";
+import { ProdutosLista } from "@/components/admin/ProdutosLista";
 
-export default async function ProdutosPage() {
-  const produtos = await listProducts();
+const ORDENS = new Set<ProdutoOrdem>([
+  "recentes",
+  "preco-asc",
+  "preco-desc",
+  "estoque-asc",
+  "estoque-desc",
+]);
+
+// Aplica o modo Mini/Gigante salvo ANTES do paint (evita flash). Roda no parse,
+// quando o container #admin-produtos-lista já está no DOM (script vem depois dele).
+const VIEW_INIT = `(function(){try{var v=localStorage.getItem('admin:produtos:view');var el=document.getElementById('admin-produtos-lista');if(el&&(v==='gigante'||v==='mini'))el.setAttribute('data-view',v);}catch(e){}})();`;
+
+type Props = {
+  searchParams: Promise<{ q?: string; categoria?: string; ordem?: string }>;
+};
+
+export default async function ProdutosPage({ searchParams }: Props) {
+  const sp = await searchParams;
+  const q = typeof sp.q === "string" ? sp.q : "";
+  const categoria =
+    typeof sp.categoria === "string" && sp.categoria ? sp.categoria : "todos";
+  const ordem: ProdutoOrdem =
+    typeof sp.ordem === "string" && ORDENS.has(sp.ordem as ProdutoOrdem)
+      ? (sp.ordem as ProdutoOrdem)
+      : "recentes";
+
+  const [produtos, categoriasRaw] = await Promise.all([
+    listProducts({ q, categoriaSlug: categoria, ordem }),
+    listCategories(),
+  ]);
+  const categorias = categoriasRaw.map((c) => ({
+    id: c.id,
+    nome: c.nome,
+    slug: c.slug,
+    count: c._count.produtos,
+  }));
 
   return (
     <div>
@@ -26,111 +59,14 @@ export default async function ProdutosPage() {
         }
       />
 
-      {produtos.length === 0 ? (
-        <div className="bg-white border border-gray-200 rounded-lg p-8 text-center">
-          <p className="text-sm text-gray-500 mb-3">
-            Nenhum produto cadastrado ainda.
-          </p>
-          <Link
-            href="/admin/produtos/novo"
-            className="text-sm text-[#FF035C] hover:underline font-medium"
-          >
-            Cadastrar primeiro produto →
-          </Link>
-        </div>
-      ) : (
-        <div className="bg-white border border-gray-200 rounded-lg overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr className="text-left text-xs font-medium text-gray-500 uppercase tracking-wide">
-                <th className="px-4 py-3 w-24"></th>
-                <th className="px-4 py-3">Nome</th>
-                <th className="px-4 py-3">Categoria</th>
-                <th className="px-4 py-3 text-right">Preço</th>
-                <th className="px-4 py-3 text-center">Estoque</th>
-                <th className="px-4 py-3 text-center">Ativo</th>
-                <th className="px-4 py-3 text-center">Destaque</th>
-                <th className="px-4 py-3 text-right w-24">Ações</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {produtos.map((p) => (
-                <tr key={p.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3">
-                    <div className="relative w-16 aspect-[9/16] rounded bg-gray-100 overflow-hidden">
-                      {p.videos[0]?.thumbnailUrl ? (
-                        <VideoThumb
-                          src={p.videos[0].thumbnailUrl}
-                          alt=""
-                          sizes="64px"
-                        />
-                      ) : null}
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 font-medium text-[#07366A]">{p.nome}</td>
-                  <td className="px-4 py-3 text-gray-600">{p.category.nome}</td>
-                  <td className="px-4 py-3 text-right text-gray-700 tabular-nums">
-                    {formatBRL(Number(p.preco))}
-                  </td>
-                  <td className="px-4 py-3 text-center text-gray-600 tabular-nums">
-                    {p.estoque}
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    <Badge on={p.ativo} labelOn="Sim" labelOff="Não" />
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    <Badge on={p.destaque} labelOn="Sim" labelOff="—" muteOff />
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <div className="flex justify-end gap-1">
-                      <Link
-                        href={`/admin/produtos/${p.id}/editar`}
-                        className="text-gray-400 hover:text-[#07366A] p-1"
-                        aria-label={`Editar ${p.nome}`}
-                      >
-                        <Pencil className="w-4 h-4" aria-hidden="true" />
-                      </Link>
-                      <DeleteProductButton
-                        id={p.id}
-                        nome={p.nome}
-                        qtdPedidos={p._count.orderItems}
-                        qtdImagens={p._count.imagens}
-                        qtdVideos={p._count.videos}
-                        qtdWaitlist={p._count.waitlist}
-                      />
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <ProdutosLista
+        produtos={produtos}
+        categorias={categorias}
+        q={q}
+        categoria={categoria}
+        ordem={ordem}
+      />
+      <script dangerouslySetInnerHTML={{ __html: VIEW_INIT }} />
     </div>
-  );
-}
-
-function Badge({
-  on,
-  labelOn,
-  labelOff,
-  muteOff,
-}: {
-  on: boolean;
-  labelOn: string;
-  labelOff: string;
-  muteOff?: boolean;
-}) {
-  if (!on && muteOff) {
-    return <span className="text-gray-300">{labelOff}</span>;
-  }
-  return (
-    <span
-      className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${
-        on ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"
-      }`}
-    >
-      {on ? labelOn : labelOff}
-    </span>
   );
 }
