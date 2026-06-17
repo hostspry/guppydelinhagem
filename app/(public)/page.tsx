@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
-import CtaWhatsapp from "@/components/site/CtaWhatsapp";
 import { HeroSection } from "@/components/site/HeroSection";
 import TestimonialsSection from "@/components/home/TestimonialsSection";
 import LojaListing from "@/components/product/LojaListing";
@@ -151,11 +150,8 @@ export default async function HomePage({ searchParams }: Props) {
         </div>
       </section>
 
-      {/* ── Avaliações de Clientes ── */}
+      {/* ── Avaliações de Clientes (oculta enquanto não há reviews reais) ── */}
       <TestimonialsSection />
-
-      {/* ── CTA WhatsApp ── */}
-      <CtaWhatsapp />
     </>
   );
 }
