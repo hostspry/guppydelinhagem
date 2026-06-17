@@ -18,26 +18,9 @@ export type Testimonial = {
   texto: string;
 };
 
-// slug/href alinhados às categorias reais do banco (linhagens-exclusivas /
-// sem-linhagem). A home é a vitrine: o card filtra a grade (#loja) por categoria.
-export const CATEGORIES: HomeCategory[] = [
-  {
-    slug: "linhagens-exclusivas",
-    nome: "Linhagens Exclusivas",
-    descricao:
-      "Navegue e filtre por todas as linhagens selecionadas e premium que trabalhamos.",
-    imagem: "/assets/home/categoria-linhagens.png",
-    href: "/?categoria=linhagens-exclusivas#loja",
-  },
-  {
-    slug: "sem-linhagem",
-    nome: "Sem Linhagem",
-    descricao:
-      "Explore e descubra nossos guppys comuns, cheios de cores e personalidades únicas.",
-    imagem: "/assets/home/categoria-sem-linhagem.png",
-    href: "/?categoria=sem-linhagem#loja",
-  },
-];
+// CATEGORIES removido: a navegação por categoria vive nas pílulas do LojaListing
+// (a seção "Principais Categorias" duplicava a taxonomia). O tipo HomeCategory
+// segue por ora para o CategoryCard, que não é mais usado na home.
 
 export const TESTIMONIALS: Testimonial[] = [
   {

@@ -3,11 +3,8 @@ import Image from "next/image";
 import Link from "next/link";
 import CtaWhatsapp from "@/components/site/CtaWhatsapp";
 import { HeroSection } from "@/components/site/HeroSection";
-import SectionHeader from "@/components/home/SectionHeader";
-import CategoryCard from "@/components/home/CategoryCard";
 import TestimonialsSection from "@/components/home/TestimonialsSection";
 import LojaListing from "@/components/product/LojaListing";
-import { CATEGORIES } from "@/lib/home-content";
 import {
   listProductsLoja,
   type LojaOrdenacao,
@@ -68,22 +65,6 @@ export default async function HomePage({ searchParams }: Props) {
           categoria={categoria}
           ordem={ordem}
         />
-      </section>
-
-      {/* ── Principais Categorias ── */}
-      <section className="bg-white py-20">
-        <div className="container-site space-y-10">
-          <SectionHeader
-            title="Principais"
-            highlight="Categorias"
-            subtitle="Guppys exclusivos, exóticos e raros! Só na Guppy de Linhagem!"
-          />
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {CATEGORIES.map((cat) => (
-              <CategoryCard key={cat.slug} category={cat} />
-            ))}
-          </div>
-        </div>
       </section>
 
       {/* ── História de Vitórias + Aprenda Sobre ── */}
