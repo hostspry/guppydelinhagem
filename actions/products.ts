@@ -343,6 +343,46 @@ export async function deleteProduct(id: string): Promise<ActionResult> {
   return { success: true, message: "Produto excluído." };
 }
 
+// ── Toggles rápidos na lista (ativo / destaque) ────────────────────────────
+export async function toggleProductAtivo(
+  id: string,
+  value: boolean,
+): Promise<ActionResult> {
+  await assertAuthorized();
+  try {
+    await prisma.product.update({ where: { id }, data: { ativo: value } });
+  } catch (e) {
+    if (isPrismaError(e) && e.code === "P2025") {
+      return { success: false, error: "Produto não encontrado." };
+    }
+    console.error(e);
+    return { success: false, error: "Erro ao atualizar." };
+  }
+  revalidatePath("/admin/produtos", "layout");
+  revalidatePath("/"); // visibilidade na vitrine
+  revalidatePath("/loja/[slug]", "page");
+  return { success: true };
+}
+
+export async function toggleProductDestaque(
+  id: string,
+  value: boolean,
+): Promise<ActionResult> {
+  await assertAuthorized();
+  try {
+    await prisma.product.update({ where: { id }, data: { destaque: value } });
+  } catch (e) {
+    if (isPrismaError(e) && e.code === "P2025") {
+      return { success: false, error: "Produto não encontrado." };
+    }
+    console.error(e);
+    return { success: false, error: "Erro ao atualizar." };
+  }
+  revalidatePath("/admin/produtos", "layout");
+  revalidatePath("/"); // vitrine de destaque na home
+  return { success: true };
+}
+
 // ── Metadados de vídeo (botão "Adicionar" no form) ─────────────────────────
 export type VideoMetadata = {
   platform: DetectedPlatform;
