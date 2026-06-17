@@ -1,7 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
 import { Truck, MapPin, User } from "lucide-react";
-import NavSearchInput from "./NavSearchInput";
 import NavBar3 from "./NavBar3";
 import CartIcon from "./CartIcon";
 import { WHATSAPP_URL } from "@/lib/constants";
@@ -72,7 +71,7 @@ export default function Navbar() {
         </div>
       </div>
 
-      {/* ── Barra 2: middle bar (logo + busca + conta/carrinho) ── */}
+      {/* ── Barra 2: middle bar (logo + conta/carrinho) — busca fica na loja ── */}
       <div className="bg-bg-alt">
         <div className="container-site h-24 flex items-center gap-4 lg:gap-8">
           {/* Logo */}
@@ -87,13 +86,8 @@ export default function Navbar() {
             />
           </Link>
 
-          {/* Busca (client) — escondida em mobile */}
-          <div className="flex-1 hidden md:block">
-            <NavSearchInput />
-          </div>
-
           {/* Conta + Carrinho */}
-          <div className="flex items-center gap-3 ml-auto md:ml-0">
+          <div className="flex items-center gap-3 ml-auto">
             <Link
               href="/minha-conta"
               className="hidden md:flex items-center gap-2 text-primary hover:text-accent transition-colors font-medium text-sm"
