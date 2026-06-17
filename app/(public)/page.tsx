@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { HeroSection } from "@/components/site/HeroSection";
+import TrustBar from "@/components/site/TrustBar";
 import TestimonialsSection from "@/components/home/TestimonialsSection";
 import LojaListing from "@/components/product/LojaListing";
 import {
@@ -9,6 +10,7 @@ import {
   type LojaOrdenacao,
 } from "@/lib/queries/products";
 import { listCategories } from "@/lib/queries/categories";
+import { HOME_BANNERS } from "@/lib/home-content";
 
 export const metadata: Metadata = {
   title: "Guppy de Linhagem — Loja de guppies pedigree | Criação premiada",
@@ -49,10 +51,15 @@ export default async function HomePage({ searchParams }: Props) {
     listCategories(),
   ]);
 
+  const { estufa: banner1, aprenda: banner2 } = HOME_BANNERS;
+
   return (
     <>
       {/* ── Hero ── */}
       <HeroSection />
+
+      {/* ── Barra de confiança: faixa própria (clara), separada do hero ── */}
+      <TrustBar />
 
       {/* ── A loja (vitrine): busca + filtros + grade. Âncora do menu/hero. ── */}
       <section id="loja" className="scroll-mt-24 bg-white">
@@ -66,20 +73,25 @@ export default async function HomePage({ searchParams }: Props) {
         />
       </section>
 
-      {/* ── História de Vitórias + Aprenda Sobre ── */}
+      {/* ── Avaliações de Clientes (oculta enquanto não há reviews reais) ── */}
+      <TestimonialsSection />
+
+      {/* ── Conteúdo secundário: 2 banners 2-up (estufa/cuidado + aprenda) ── */}
       <section className="bg-white py-20">
         <div className="container-site">
           <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
-            {/* Card escuro — História de Vitórias (60%) */}
+            {/* Banner 1 — estufa/cuidado (escuro, 60%) */}
             <div className="md:col-span-3 relative rounded-[20px] overflow-hidden flex flex-col justify-end p-10 min-h-[400px]">
-              <Image
-                src="/assets/home/vitorias-bg.jpg"
-                alt=""
-                fill
-                className="object-cover object-center"
-                sizes="(max-width: 768px) 100vw, 60vw"
-                aria-hidden="true"
-              />
+              {banner1.imagem && (
+                <Image
+                  src={banner1.imagem}
+                  alt=""
+                  fill
+                  className="object-cover object-center"
+                  sizes="(max-width: 768px) 100vw, 60vw"
+                  aria-hidden="true"
+                />
+              )}
               <div className="absolute inset-0 bg-primary/70" />
               <div
                 className="absolute top-6 right-6 w-24 h-24 opacity-20 pointer-events-none z-10"
@@ -90,25 +102,30 @@ export default async function HomePage({ searchParams }: Props) {
               />
               <div className="relative z-10 space-y-4">
                 <h2 className="text-white text-2xl sm:text-3xl font-semibold leading-snug">
-                  História de{" "}
-                  <span className="text-secondary">Vitórias</span> e{" "}
-                  <span className="text-secondary">Guppys Campeões</span>
+                  {banner1.tituloPartes.map((parte, i) => (
+                    <span
+                      key={i}
+                      className={parte.realce ? "text-secondary" : undefined}
+                    >
+                      {parte.texto}
+                    </span>
+                  ))}
                 </h2>
-                <p className="text-white/90 font-light text-sm leading-relaxed max-w-md">
-                  Nossa trajetória é marcada por{" "}
-                  <strong className="font-medium text-white">dedicação, excelência em genética e conquistas em competições</strong>.
-                  Conheça a história por trás da criação que transforma paixão em guppys premiados.
-                </p>
+                {banner1.subtitulo && (
+                  <p className="text-white/90 font-light text-sm leading-relaxed max-w-md">
+                    {banner1.subtitulo}
+                  </p>
+                )}
                 <Link
-                  href="/sobre-nos"
+                  href={banner1.ctaHref}
                   className="inline-block bg-accent text-[#302f2f] font-semibold px-6 py-2.5 rounded-pill hover:brightness-95 transition-all text-sm"
                 >
-                  Saiba Mais
+                  {banner1.ctaLabel}
                 </Link>
               </div>
             </div>
 
-            {/* Card rosa — Aprenda Sobre (40%) */}
+            {/* Banner 2 — aprenda (rosa, 40%) */}
             <div className="md:col-span-2 relative bg-secondary rounded-[20px] overflow-hidden flex flex-col justify-end p-10 min-h-[400px]">
               <div
                 className="absolute top-6 right-6 w-24 h-24 opacity-30 pointer-events-none"
@@ -134,24 +151,25 @@ export default async function HomePage({ searchParams }: Props) {
                 <path d="M62 4 L56 12 L62 20 Z" fill="#000" />
               </svg>
               <div className="relative z-10 space-y-4">
-                <p className="text-white/80 text-sm font-light">Sobre os Guppy</p>
+                {banner2.eyebrow && (
+                  <p className="text-white/80 text-sm font-light">
+                    {banner2.eyebrow}
+                  </p>
+                )}
                 <h3 className="text-white text-2xl font-semibold leading-snug">
-                  Aprenda Sobre, Como Criar e Mais!
+                  {banner2.tituloPartes.map((parte) => parte.texto).join("")}
                 </h3>
                 <Link
-                  href="/conheca-os-guppy"
+                  href={banner2.ctaHref}
                   className="inline-block border-2 border-white text-white font-semibold px-6 py-2.5 rounded-pill hover:bg-white/10 transition-all text-sm"
                 >
-                  Conhecer
+                  {banner2.ctaLabel}
                 </Link>
               </div>
             </div>
           </div>
         </div>
       </section>
-
-      {/* ── Avaliações de Clientes (oculta enquanto não há reviews reais) ── */}
-      <TestimonialsSection />
     </>
   );
 }

@@ -23,28 +23,7 @@ function getIcon(name: string | null | undefined): LucideIcon | null {
   return Icon ?? null;
 }
 
-const FEATURES = [
-  {
-    icon: "Trophy",
-    title: "Linhagens Premiadas",
-    subtitle: "Reconhecidas em concursos",
-  },
-  {
-    icon: "Truck",
-    title: "Envio para todo o Brasil",
-    subtitle: "Embalagem segura e térmica",
-  },
-  {
-    icon: "Heart",
-    title: "Criação Responsável",
-    subtitle: "Saúde e bem-estar sempre",
-  },
-  {
-    icon: "Users",
-    title: "Clientes em todo Brasil",
-    subtitle: "Satisfação e confiança",
-  },
-] as const;
+// Barra de features movida pra <TrustBar /> (faixa própria, fora do hero).
 
 export function HeroStatic({ slide, settings }: Props) {
   const EyebrowIcon = getIcon(slide.eyebrowIcon);
@@ -200,34 +179,6 @@ export function HeroStatic({ slide, settings }: Props) {
                 </div>
               </div>
             )}
-          </div>
-        </div>
-      </div>
-
-      {/* Faixa de features no rodapé */}
-      <div className="relative z-10 bg-black/55 backdrop-blur-sm border-t border-white/10">
-        <div className="container-site py-5">
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-            {FEATURES.map((f) => {
-              const Icon = getIcon(f.icon);
-              return (
-                <div key={f.title} className="flex items-center gap-3">
-                  {Icon && (
-                    <Icon
-                      size={26}
-                      className="text-accent shrink-0"
-                      aria-hidden="true"
-                    />
-                  )}
-                  <div className="flex flex-col leading-tight">
-                    <span className="text-sm font-bold text-white">
-                      {f.title}
-                    </span>
-                    <span className="text-xs text-white/70">{f.subtitle}</span>
-                  </div>
-                </div>
-              );
-            })}
           </div>
         </div>
       </div>

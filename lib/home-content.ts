@@ -25,3 +25,42 @@ export type Testimonial = {
 // Sem prova social inventada (regra do dono): depoimentos fictícios removidos.
 // Preencher SÓ com avaliações reais — enquanto vazio, a seção não é renderizada.
 export const TESTIMONIALS: Testimonial[] = [];
+
+// ── Banners secundários (2-up abaixo das avaliações) ─────────────────────────
+// Título em partes pra realçar palavras em rosa (secondary) sem hardcode no JSX.
+export type TituloParte = { texto: string; realce?: boolean };
+
+export type HomeBanner = {
+  eyebrow?: string;
+  tituloPartes: TituloParte[];
+  subtitulo?: string;
+  ctaLabel: string;
+  ctaHref: string;
+  imagem?: string;
+};
+
+export const HOME_BANNERS: { estufa: HomeBanner; aprenda: HomeBanner } = {
+  // Banner 1 — estufa/cuidado (a história de campeão segue na barra de confiança,
+  // no badge do hero e em /sobre-nos; aqui o foco é o processo de criação).
+  estufa: {
+    tituloPartes: [
+      { texto: "Conheça nossa " },
+      { texto: "estufa", realce: true },
+      { texto: " e o " },
+      { texto: "cuidado", realce: true },
+      { texto: " com cada guppy" },
+    ],
+    subtitulo:
+      "Ambiente controlado, seleção genética rigorosa e bem-estar — veja como cada peixe é criado até chegar até você.",
+    ctaLabel: "Conhecer a estufa",
+    ctaHref: "/sobre-nos",
+    imagem: "/images/estufa.jpg",
+  },
+  // Banner 2 — aprenda (mantido).
+  aprenda: {
+    eyebrow: "Sobre os Guppy",
+    tituloPartes: [{ texto: "Aprenda Sobre, Como Criar e Mais!" }],
+    ctaLabel: "Conhecer",
+    ctaHref: "/conheca-os-guppy",
+  },
+};
