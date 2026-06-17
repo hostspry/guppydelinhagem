@@ -120,8 +120,6 @@ function buildVariantCreates(variantes: VariantInput[]) {
     preco: v.preco,
     qtdMachos: v.qtdMachos,
     qtdFemeas: v.qtdFemeas,
-    // qtdPeixes legado (NOT NULL até a migration de limpeza) — derivado da receita.
-    qtdPeixes: v.qtdMachos + v.qtdFemeas,
     rotulo: v.rotulo ? v.rotulo : null,
     padrao: v.padrao,
     ativo: v.ativo,
@@ -257,7 +255,6 @@ export async function updateProduct(
             preco: v.preco,
             qtdMachos: v.qtdMachos,
             qtdFemeas: v.qtdFemeas,
-            qtdPeixes: v.qtdMachos + v.qtdFemeas, // legado NOT NULL (sai na limpeza)
             rotulo: v.rotulo ? v.rotulo : null,
             padrao: v.padrao,
             ativo: v.ativo,
@@ -267,7 +264,6 @@ export async function updateProduct(
             preco: v.preco,
             qtdMachos: v.qtdMachos,
             qtdFemeas: v.qtdFemeas,
-            qtdPeixes: v.qtdMachos + v.qtdFemeas,
             rotulo: v.rotulo ? v.rotulo : null,
             padrao: v.padrao,
             ativo: v.ativo,

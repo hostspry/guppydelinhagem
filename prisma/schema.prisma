@@ -220,8 +220,6 @@ model ProductVariant {
   productId  String
   composicao TipoComposicao
   preco      Decimal        @db.Decimal(10, 2)
-  estoque    Int            @default(0) // legado — sai na migration de limpeza
-  qtdPeixes  Int // legado — sai na migration de limpeza
   qtdMachos  Int            @default(0) // receita: machos consumidos do pool
   qtdFemeas  Int            @default(0) // receita: fêmeas consumidas do pool
   rotulo     String? // só LOTE: "8 machos e 2 fêmeas" (exibição)
