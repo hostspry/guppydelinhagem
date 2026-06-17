@@ -9,6 +9,7 @@ import {
   type EnderecoEntrega,
 } from "@/lib/validations/pedido";
 import { TRANSICOES_PEDIDO, podeEditarItens } from "@/lib/pedido-status";
+import { COMPOSICAO_LABEL } from "@/lib/composicoes";
 import type { Prisma, OrderStatus } from "@/lib/generated/prisma/client";
 import {
   type ActionResult,
@@ -81,6 +82,10 @@ async function buildItens(itens: ItemPedidoInput[]) {
             take: 1,
             select: { thumbnailUrl: true },
           },
+          variantes: {
+            where: { ativo: true },
+            select: { composicao: true, qtdMachos: true, qtdFemeas: true },
+          },
         },
       })
     : [];
@@ -88,12 +93,23 @@ async function buildItens(itens: ItemPedidoInput[]) {
 
   return itens.map((i) => {
     const prod = i.produtoId ? map.get(i.produtoId) : undefined;
+    // Receita vem da variante (autoritativa), não do que o cliente enviou.
+    const variante =
+      prod && i.composicao
+        ? prod.variantes.find((v) => v.composicao === i.composicao)
+        : undefined;
+    const nomeBase = prod ? prod.nome : i.nomeProduto;
     return {
       productId: prod ? i.produtoId : null, // coluna real é productId; inexistente → avulso
-      nomeProduto: prod ? prod.nome : i.nomeProduto,
+      nomeProduto: variante
+        ? `${nomeBase} — ${COMPOSICAO_LABEL[variante.composicao]}`
+        : nomeBase,
       precoUnitario: i.precoUnitario,
       quantidade: i.quantidade,
       imagemSnapshot: prod?.videos[0]?.thumbnailUrl ?? null,
+      composicao: variante ? variante.composicao : null,
+      qtdMachos: variante ? variante.qtdMachos : null,
+      qtdFemeas: variante ? variante.qtdFemeas : null,
     };
   });
 }
@@ -261,7 +277,7 @@ export async function atualizarStatusPedido(
 
   const atual = await prisma.order.findUnique({
     where: { id },
-    select: { status: true },
+    select: { status: true, estoqueBaixado: true },
   });
   if (!atual) return { success: false, error: "Pedido não encontrado." };
 
@@ -272,16 +288,62 @@ export async function atualizarStatusPedido(
     };
   }
 
+  // Baixa no PAGO (uma vez, via flag estoqueBaixado); reversão no CANCELADO.
+  // ENVIADO/ENTREGUE não mexem no estoque. Permite pool negativo (não bloqueia).
+  const baixar = novoStatus === "PAGO" && !atual.estoqueBaixado;
+  const reverter = novoStatus === "CANCELADO" && atual.estoqueBaixado;
+
   try {
-    await prisma.order.update({
-      where: { id },
-      data: { status: novoStatus },
+    await prisma.$transaction(async (tx) => {
+      await tx.order.update({ where: { id }, data: { status: novoStatus } });
+
+      if (baixar || reverter) {
+        const itens = await tx.orderItem.findMany({
+          where: {
+            orderId: id,
+            productId: { not: null },
+            composicao: { not: null },
+          },
+          select: {
+            productId: true,
+            qtdMachos: true,
+            qtdFemeas: true,
+            quantidade: true,
+          },
+        });
+        const sinal = baixar ? -1 : 1; // baixa subtrai; reversão soma de volta
+        for (const it of itens) {
+          if (it.productId == null || it.qtdMachos == null || it.qtdFemeas == null) {
+            continue;
+          }
+          const prod = await tx.product.findUnique({
+            where: { id: it.productId },
+            select: { estoqueMachos: true, estoqueFemeas: true },
+          });
+          if (!prod) continue;
+          const machos = prod.estoqueMachos + sinal * it.qtdMachos * it.quantidade;
+          const femeas = prod.estoqueFemeas + sinal * it.qtdFemeas * it.quantidade;
+          await tx.product.update({
+            where: { id: it.productId },
+            data: {
+              estoqueMachos: machos,
+              estoqueFemeas: femeas,
+              estoque: machos + femeas, // re-sincroniza o espelho
+            },
+          });
+        }
+        await tx.order.update({
+          where: { id },
+          data: { estoqueBaixado: baixar }, // true ao baixar, false ao reverter
+        });
+      }
     });
   } catch (e) {
     console.error(e);
     return { success: false, error: "Erro ao atualizar o status." };
   }
 
+  revalidatePath("/admin/produtos");
   revalidatePath("/admin/pedidos");
   revalidatePath(`/admin/pedidos/${id}`);
   return { success: true, message: "Status atualizado." };

@@ -11,15 +11,33 @@ import { FormField } from "./FormField";
 import { pedidoSchema, type PedidoInput } from "@/lib/validations/pedido";
 import { createPedido, updatePedido } from "@/actions/pedidos";
 import { formatBRL } from "@/lib/utils/format";
+import { COMPOSICAO_LABEL } from "@/lib/composicoes";
+import type { TipoComposicao } from "@/lib/generated/prisma/enums";
 
+type FormVariante = {
+  composicao: TipoComposicao;
+  preco: number;
+  rotulo: string | null;
+  qtdMachos: number;
+  qtdFemeas: number;
+};
 type FormCliente = { id: string; nome: string };
-type FormProduto = { id: string; nome: string; preco: number };
+type FormProduto = {
+  id: string;
+  nome: string;
+  preco: number;
+  tipo: string;
+  variantes: FormVariante[];
+};
 
 type ItemInicial = {
   produtoId: string | null;
   nomeProduto: string;
   precoUnitario: number;
   quantidade: number;
+  composicao: TipoComposicao | null;
+  qtdMachos: number | null;
+  qtdFemeas: number | null;
 };
 
 export type PedidoInicial = {
@@ -54,6 +72,9 @@ const ITEM_VAZIO: ItemInicial = {
   nomeProduto: "",
   precoUnitario: 0,
   quantidade: 1,
+  composicao: null,
+  qtdMachos: null,
+  qtdFemeas: null,
 };
 
 export function PedidoForm({
@@ -109,21 +130,47 @@ export function PedidoForm({
   );
   const total = subtotal + num(frete) - num(desconto);
 
+  function aplicarComposicao(
+    index: number,
+    prod: FormProduto,
+    v: FormVariante,
+  ) {
+    const label =
+      COMPOSICAO_LABEL[v.composicao] + (v.rotulo ? ` (${v.rotulo})` : "");
+    setValue(`itens.${index}.composicao`, v.composicao);
+    setValue(`itens.${index}.nomeProduto`, `${prod.nome} — ${label}`, {
+      shouldValidate: true,
+    });
+    setValue(`itens.${index}.precoUnitario`, v.preco, { shouldValidate: true });
+  }
+
   function escolherProduto(index: number, produtoId: string) {
     if (!produtoId) {
       setValue(`itens.${index}.produtoId`, null);
+      setValue(`itens.${index}.composicao`, null);
       return;
     }
     const prod = produtos.find((p) => p.id === produtoId);
     setValue(`itens.${index}.produtoId`, produtoId);
-    if (prod) {
-      setValue(`itens.${index}.nomeProduto`, prod.nome, {
-        shouldValidate: true,
-      });
-      setValue(`itens.${index}.precoUnitario`, prod.preco, {
-        shouldValidate: true,
-      });
+    if (!prod) return;
+    const padrao = prod.variantes[0]; // padrão primeiro (orderBy padrao desc)
+    if (prod.tipo === "PEIXE" && padrao) {
+      aplicarComposicao(index, prod, padrao); // pré-seleciona a composição padrão
+    } else {
+      setValue(`itens.${index}.composicao`, null);
+      setValue(`itens.${index}.nomeProduto`, prod.nome, { shouldValidate: true });
+      setValue(`itens.${index}.precoUnitario`, prod.preco, { shouldValidate: true });
     }
+  }
+
+  function escolherComposicao(
+    index: number,
+    produtoId: string,
+    composicao: TipoComposicao,
+  ) {
+    const prod = produtos.find((p) => p.id === produtoId);
+    const v = prod?.variantes.find((x) => x.composicao === composicao);
+    if (prod && v) aplicarComposicao(index, prod, v);
   }
 
   const onSubmit = handleSubmit((data) => {
@@ -189,6 +236,11 @@ export function PedidoForm({
         <div className="space-y-3">
           {fields.map((field, i) => {
             const itemErr = errors.itens?.[i];
+            const prodSel = produtos.find(
+              (p) => p.id === (itens?.[i]?.produtoId as string),
+            );
+            const ehPeixe =
+              prodSel?.tipo === "PEIXE" && prodSel.variantes.length > 0;
             return (
               <div
                 key={field.id}
@@ -275,6 +327,34 @@ export function PedidoForm({
                     <Trash2 className="w-4 h-4" aria-hidden="true" />
                   </button>
                 </div>
+
+                {/* Composição (só peixe) */}
+                {ehPeixe && prodSel && (
+                  <div className="col-span-12 sm:col-span-6">
+                    <label className="block text-[10px] text-gray-400 mb-1">
+                      Composição
+                    </label>
+                    <select
+                      value={(itens?.[i]?.composicao as string) ?? ""}
+                      onChange={(e) =>
+                        escolherComposicao(
+                          i,
+                          prodSel.id,
+                          e.target.value as TipoComposicao,
+                        )
+                      }
+                      className={input}
+                    >
+                      {prodSel.variantes.map((v) => (
+                        <option key={v.composicao} value={v.composicao}>
+                          {COMPOSICAO_LABEL[v.composicao]}
+                          {v.rotulo ? ` (${v.rotulo})` : ""} —{" "}
+                          {formatBRL(v.preco)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
 
                 {/* Subtotal da linha */}
                 <div className="col-span-12 text-right text-xs text-gray-500">

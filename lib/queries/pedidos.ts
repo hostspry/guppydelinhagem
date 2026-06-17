@@ -82,6 +82,7 @@ export async function getPedidoById(id: string) {
       imagemSnapshot: it.imagemSnapshot,
       precoUnitario: Number(it.precoUnitario),
       quantidade: it.quantidade,
+      composicao: it.composicao,
       subtotal: Number(it.precoUnitario) * it.quantidade,
     })),
     pagamentos: p.pagamentos.map((pg) => ({
@@ -109,7 +110,23 @@ export async function getPedidoFormData() {
     prisma.product.findMany({
       where: { ativo: true },
       orderBy: { nome: "asc" },
-      select: { id: true, nome: true, preco: true },
+      select: {
+        id: true,
+        nome: true,
+        preco: true,
+        tipo: true,
+        variantes: {
+          where: { ativo: true },
+          orderBy: [{ padrao: "desc" }, { ordem: "asc" }],
+          select: {
+            composicao: true,
+            preco: true,
+            rotulo: true,
+            qtdMachos: true,
+            qtdFemeas: true,
+          },
+        },
+      },
     }),
   ]);
 
@@ -119,6 +136,14 @@ export async function getPedidoFormData() {
       id: p.id,
       nome: p.nome,
       preco: Number(p.preco),
+      tipo: p.tipo,
+      variantes: p.variantes.map((v) => ({
+        composicao: v.composicao,
+        preco: Number(v.preco),
+        rotulo: v.rotulo,
+        qtdMachos: v.qtdMachos,
+        qtdFemeas: v.qtdFemeas,
+      })),
     })),
   };
 }

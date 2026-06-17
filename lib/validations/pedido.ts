@@ -2,7 +2,11 @@ import { z } from "zod";
 // Enums do arquivo puro (const objects, sem o runtime do PrismaClient) — este
 // schema é importado pelo PedidoForm (client component); importar de /client
 // arrastaria o adapter pg + built-ins Node para o bundle do cliente.
-import { FormaPagamento, Transportadora } from "@/lib/generated/prisma/enums";
+import {
+  FormaPagamento,
+  Transportadora,
+  TipoComposicao,
+} from "@/lib/generated/prisma/enums";
 
 // "" / null / undefined → undefined (para selects opcionais de enum).
 const emptyToUndef = (v: unknown) =>
@@ -17,6 +21,20 @@ export const itemPedidoSchema = z.object({
   nomeProduto: z.string().min(1, "Nome do item obrigatório"),
   precoUnitario: z.coerce.number().positive("Preço deve ser maior que zero"),
   quantidade: z.coerce.number().int().min(1, "Quantidade mínima é 1"),
+  // Snapshot da composição (null em avulso/não-peixe). A receita é re-derivada
+  // do produto na action, mas aceitamos o que o form enviar.
+  composicao: z.preprocess(
+    (v) => (v ? v : null),
+    z.enum(TipoComposicao).nullable(),
+  ),
+  qtdMachos: z.preprocess(
+    (v) => (v === "" || v == null ? null : v),
+    z.coerce.number().int().min(0).nullable(),
+  ),
+  qtdFemeas: z.preprocess(
+    (v) => (v === "" || v == null ? null : v),
+    z.coerce.number().int().min(0).nullable(),
+  ),
 });
 
 export const pedidoSchema = z.object({

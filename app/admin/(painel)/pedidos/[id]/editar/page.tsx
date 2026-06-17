@@ -39,6 +39,9 @@ export default async function EditarPedidoPage({ params }: Props) {
               nomeProduto: it.nomeProduto,
               precoUnitario: it.precoUnitario,
               quantidade: it.quantidade,
+              composicao: it.composicao,
+              qtdMachos: null, // re-derivado na action ao salvar
+              qtdFemeas: null,
             })),
             frete: pedido.frete,
             desconto: pedido.desconto,
