@@ -189,6 +189,8 @@ export type ProductDetail = {
   descontoPix: number | null;
   parcelasMax: number;
   estoque: number;
+  estoqueMachos: number; // pool (PEIXE)
+  estoqueFemeas: number;
   categoria: string;
   categoryId: string;
   tipo: ProductType;
@@ -208,8 +210,8 @@ export type ProductDetail = {
     id: string;
     composicao: TipoComposicao;
     preco: number;
-    estoque: number;
-    qtdPeixes: number;
+    qtdMachos: number;
+    qtdFemeas: number;
     rotulo: string | null;
     padrao: boolean;
   }[];
@@ -239,6 +241,8 @@ export const getProductBySlug = cache(
         descontoPix: true,
         parcelasMax: true,
         estoque: true,
+        estoqueMachos: true,
+        estoqueFemeas: true,
         categoryId: true,
         tipo: true,
         peso: true,
@@ -270,8 +274,8 @@ export const getProductBySlug = cache(
             id: true,
             composicao: true,
             preco: true,
-            estoque: true,
-            qtdPeixes: true,
+            qtdMachos: true,
+            qtdFemeas: true,
             rotulo: true,
             padrao: true,
           },
@@ -292,6 +296,8 @@ export const getProductBySlug = cache(
       descontoPix: p.descontoPix == null ? null : Number(p.descontoPix),
       parcelasMax: p.parcelasMax,
       estoque: p.estoque,
+      estoqueMachos: p.estoqueMachos,
+      estoqueFemeas: p.estoqueFemeas,
       categoria: p.category.nome,
       categoryId: p.categoryId,
       tipo: p.tipo,
@@ -309,8 +315,8 @@ export const getProductBySlug = cache(
         id: v.id,
         composicao: v.composicao,
         preco: Number(v.preco),
-        estoque: v.estoque,
-        qtdPeixes: v.qtdPeixes,
+        qtdMachos: v.qtdMachos,
+        qtdFemeas: v.qtdFemeas,
         rotulo: v.rotulo,
         padrao: v.padrao,
       })),

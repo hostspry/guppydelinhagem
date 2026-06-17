@@ -45,7 +45,12 @@ import {
   MARCHEZI_NOTA,
   type IconKey,
 } from "@/lib/product-content";
-import { COMPOSICAO_LABEL, ORDEM_COMPOSICAO } from "@/lib/composicoes";
+import {
+  COMPOSICAO_LABEL,
+  ORDEM_COMPOSICAO,
+  qtdPeixesDe,
+  composicaoDisponivel,
+} from "@/lib/composicoes";
 import type { TipoComposicao } from "@/lib/generated/prisma/enums";
 import type {
   ProductDetail as ProductDetailData,
@@ -127,9 +132,19 @@ export default function ProductDetail({
     setQtd(1); // estoque pode diferir entre composições
   }
 
+  // Pool de estoque do produto (machos/fêmeas) — base da disponibilidade.
+  const pool = { machos: product.estoqueMachos, femeas: product.estoqueFemeas };
+  // Quantas unidades da composição o pool sustenta (cada uma consome a receita).
+  function unitsDoPool(v: { qtdMachos: number; qtdFemeas: number }) {
+    const byM = v.qtdMachos > 0 ? Math.floor(pool.machos / v.qtdMachos) : Infinity;
+    const byF = v.qtdFemeas > 0 ? Math.floor(pool.femeas / v.qtdFemeas) : Infinity;
+    const u = Math.min(byM, byF);
+    return Number.isFinite(u) ? Math.max(0, u) : 0;
+  }
+
   const precoBase = variant ? variant.preco : product.preco;
-  const estoqueAtual = variant ? variant.estoque : product.estoque;
-  const qtdPeixesUnit = variant ? variant.qtdPeixes : 1; // alimenta o frete
+  const estoqueAtual = variant ? unitsDoPool(variant) : product.estoque;
+  const qtdPeixesUnit = variant ? qtdPeixesDe(variant) : 1; // alimenta o frete
   const semEstoque = estoqueAtual <= 0;
   const temDescontoPix =
     product.descontoPix != null && product.descontoPix > 0;
@@ -195,7 +210,7 @@ export default function ProductDetail({
         slug: product.slug,
         precoPix,
         precoCheio: precoBase,
-        qtdPeixes: variant ? variant.qtdPeixes : 0,
+        qtdPeixes: variant ? qtdPeixesDe(variant) : 0,
         thumbnail: capa,
         estoque: estoqueAtual,
       },
@@ -348,7 +363,7 @@ export default function ProductDetail({
                 ).map((c) => {
                   const v = product.variantes.find((x) => x.composicao === c)!;
                   const ativo = v.composicao === composicaoSel;
-                  const zerado = v.estoque <= 0;
+                  const zerado = !composicaoDisponivel(v, pool);
                   return (
                     <button
                       key={c}
