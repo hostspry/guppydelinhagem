@@ -36,19 +36,24 @@ export const COMPOSICAO_PADRAO_LIGADA: Record<TipoComposicao, boolean> = {
   LOTE: false,
 };
 
-// Âncora de preço (tudo editável; só pré-preenche).
-export const PRECO = {
-  CASAL_PCT: 0.75, // do trio
-  MACHO_FIXO: 99,
-  FEMEA_FIXO: 89,
-} as const;
+// Preço de cada composição = percentual do trio (sem âncora fixa). Pré-preenche.
+export const PRECO_PCT = { CASAL: 0.75, MACHO: 0.45, FEMEA: 0.4 } as const;
 
-/** Dado o preço do trio, sugere casal/macho/fêmea (lote = livre). */
+/** Inteiro mais próximo terminado em 9 (mínimo 9). */
+export function arredonda9(x: number): number {
+  const v = Math.round((x - 9) / 10) * 10 + 9;
+  return v < 9 ? 9 : v;
+}
+
+/**
+ * Dado o preço do trio, sugere casal/macho/fêmea como % do trio, arredondado
+ * para o inteiro mais próximo terminado em 9. Lote = livre.
+ */
 export function sugerirPrecos(precoTrio: number) {
   return {
-    CASAL: Math.round(precoTrio * PRECO.CASAL_PCT * 100) / 100,
-    MACHO: PRECO.MACHO_FIXO,
-    FEMEA: PRECO.FEMEA_FIXO,
+    CASAL: arredonda9(precoTrio * PRECO_PCT.CASAL),
+    MACHO: arredonda9(precoTrio * PRECO_PCT.MACHO),
+    FEMEA: arredonda9(precoTrio * PRECO_PCT.FEMEA),
   };
 }
 

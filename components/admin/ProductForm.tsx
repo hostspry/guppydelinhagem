@@ -720,9 +720,10 @@ export function ProductForm({ categorias, initialData }: ProductFormProps) {
             <p className="text-xs text-gray-500">
               O <strong>Trio</strong> é a composição padrão (pré-selecionada na
               compra). A partir do trio, casal/macho/fêmea são sugeridos —
-              preço (75% / R$99 / R$89) e estoque (casal e macho = T, fêmea = 2T,
-              onde T é o estoque do trio). Ligar uma composição também preenche.
-              Tudo editável; o que você alterar à mão não é sobrescrito.
+              preço (75% / 45% / 40% do trio, arredondado para terminar em 9) e
+              estoque (casal e macho = T, fêmea = 2T, onde T é o estoque do trio).
+              Ligar uma composição também preenche. Tudo editável; o que você
+              alterar à mão não é sobrescrito.
             </p>
             {variantesError && (
               <p className="text-xs text-[#FF035C]">{variantesError}</p>
