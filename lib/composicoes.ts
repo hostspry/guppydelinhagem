@@ -51,3 +51,17 @@ export function sugerirPrecos(precoTrio: number) {
     FEMEA: PRECO.FEMEA_FIXO,
   };
 }
+
+// Estoque derivado do trio (T = estoque do trio). Trio = 1 macho + 2 fêmeas →
+// fêmea rende 2T. LOTE fica fora (estoque livre).
+export const ESTOQUE_POR_TRIO = { CASAL: 1, MACHO: 1, FEMEA: 2 } as const;
+
+/** Dado o estoque do trio, sugere casal/macho (= T) e fêmea (= 2T). */
+export function sugerirEstoque(trioEstoque: number) {
+  const t = Math.max(0, Math.floor(trioEstoque || 0));
+  return {
+    CASAL: t * ESTOQUE_POR_TRIO.CASAL,
+    MACHO: t * ESTOQUE_POR_TRIO.MACHO,
+    FEMEA: t * ESTOQUE_POR_TRIO.FEMEA,
+  };
+}

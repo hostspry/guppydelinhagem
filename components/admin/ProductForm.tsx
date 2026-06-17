@@ -24,6 +24,7 @@ import {
   QTD_PEIXES_PADRAO,
   COMPOSICAO_PADRAO_LIGADA,
   sugerirPrecos,
+  sugerirEstoque,
 } from "@/lib/composicoes";
 import type { ProductType, TipoComposicao } from "@/lib/generated/prisma/enums";
 import { slugify } from "@/lib/utils/slug";
@@ -138,8 +139,11 @@ export function ProductForm({ categorias, initialData }: ProductFormProps) {
       };
     });
   });
-  // Preços de casal/macho/fêmea editados à mão não são sobrescritos pelo auto-fill.
+  // Preço/estoque de casal/macho/fêmea editados à mão não são sobrescritos.
   const [precoTouched, setPrecoTouched] = useState<Set<TipoComposicao>>(
+    () => new Set(),
+  );
+  const [estoqueTouched, setEstoqueTouched] = useState<Set<TipoComposicao>>(
     () => new Set(),
   );
 
@@ -243,36 +247,82 @@ export function ProductForm({ categorias, initialData }: ProductFormProps) {
   }
 
   // ── Editor de composições ──
+  // Auto-fill é só para casal/macho/fêmea (LOTE é 100% manual).
+  const SUGERIDAS: TipoComposicao[] = ["CASAL", "MACHO", "FEMEA"];
+
   function setVar(comp: TipoComposicao, patch: Partial<VarRow>) {
     setVariantes((prev) =>
       prev.map((v) => (v.composicao === comp ? { ...v, ...patch } : v)),
     );
   }
+
+  // Preenche preço/estoque das composições-alvo a partir do TRIO atual, pulando
+  // o que o operador já editou à mão (edição manual prevalece). LOTE fica fora.
+  function preencherDoTrio(
+    rows: VarRow[],
+    alvos: TipoComposicao[],
+    opts: { preco?: boolean; estoque?: boolean },
+  ): VarRow[] {
+    const trio = rows.find((v) => v.composicao === "TRIO");
+    const sp = Number(trio?.preco) > 0 ? sugerirPrecos(Number(trio?.preco)) : null;
+    const se = sugerirEstoque(Number(trio?.estoque));
+    return rows.map((v) => {
+      if (v.composicao === "TRIO" || v.composicao === "LOTE") return v;
+      if (!alvos.includes(v.composicao)) return v;
+      const k = v.composicao as "CASAL" | "MACHO" | "FEMEA";
+      const patch: Partial<VarRow> = {};
+      if (opts.preco && sp && !precoTouched.has(v.composicao))
+        patch.preco = String(sp[k]);
+      if (opts.estoque && !estoqueTouched.has(v.composicao))
+        patch.estoque = String(se[k]);
+      return { ...v, ...patch };
+    });
+  }
+
   function toggleAtivo(comp: TipoComposicao) {
     if (comp === "TRIO") return; // trio é sempre presente (o padrão)
-    setVar(comp, { ativo: !variantes.find((v) => v.composicao === comp)?.ativo });
+    setVariantes((prev) => {
+      const ligando = !prev.find((v) => v.composicao === comp)?.ativo;
+      const next = prev.map((v) =>
+        v.composicao === comp ? { ...v, ativo: !v.ativo } : v,
+      );
+      // (b) Ao LIGAR, preenche os campos ainda não editados a partir do trio.
+      return ligando
+        ? preencherDoTrio(next, [comp], { preco: true, estoque: true })
+        : next;
+    });
   }
+
+  // (a) Mudar preço/estoque do TRIO propaga para casal/macho/fêmea não-editados.
   function onPrecoChange(comp: TipoComposicao, value: string) {
-    setVar(comp, { preco: value });
     if (comp === "TRIO") {
-      const trio = Number(value);
-      if (trio > 0) {
-        const sug = sugerirPrecos(trio);
-        // Pré-preenche casal/macho/fêmea só se o operador não editou à mão.
-        setVariantes((prev) =>
-          prev.map((v) => {
-            if (v.composicao === "CASAL" && !precoTouched.has("CASAL"))
-              return { ...v, preco: String(sug.CASAL) };
-            if (v.composicao === "MACHO" && !precoTouched.has("MACHO"))
-              return { ...v, preco: String(sug.MACHO) };
-            if (v.composicao === "FEMEA" && !precoTouched.has("FEMEA"))
-              return { ...v, preco: String(sug.FEMEA) };
-            return v;
-          }),
-        );
-      }
+      setVariantes((prev) =>
+        preencherDoTrio(
+          prev.map((v) => (v.composicao === "TRIO" ? { ...v, preco: value } : v)),
+          SUGERIDAS,
+          { preco: true },
+        ),
+      );
     } else {
       setPrecoTouched((s) => new Set(s).add(comp));
+      setVar(comp, { preco: value });
+    }
+  }
+
+  function onEstoqueChange(comp: TipoComposicao, value: string) {
+    if (comp === "TRIO") {
+      setVariantes((prev) =>
+        preencherDoTrio(
+          prev.map((v) =>
+            v.composicao === "TRIO" ? { ...v, estoque: value } : v,
+          ),
+          SUGERIDAS,
+          { estoque: true },
+        ),
+      );
+    } else {
+      setEstoqueTouched((s) => new Set(s).add(comp));
+      setVar(comp, { estoque: value });
     }
   }
 
@@ -669,8 +719,10 @@ export function ProductForm({ categorias, initialData }: ProductFormProps) {
           <div className="space-y-3">
             <p className="text-xs text-gray-500">
               O <strong>Trio</strong> é a composição padrão (pré-selecionada na
-              compra). Ao digitar o preço do trio, casal/macho/fêmea são sugeridos
-              (75% / R$99 / R$89) — tudo editável.
+              compra). A partir do trio, casal/macho/fêmea são sugeridos —
+              preço (75% / R$99 / R$89) e estoque (casal e macho = T, fêmea = 2T,
+              onde T é o estoque do trio). Ligar uma composição também preenche.
+              Tudo editável; o que você alterar à mão não é sobrescrito.
             </p>
             {variantesError && (
               <p className="text-xs text-[#FF035C]">{variantesError}</p>
@@ -726,7 +778,7 @@ export function ProductForm({ categorias, initialData }: ProductFormProps) {
                             type="number"
                             min="0"
                             value={v.estoque}
-                            onChange={(e) => setVar(comp, { estoque: e.target.value })}
+                            onChange={(e) => onEstoqueChange(comp, e.target.value)}
                             className={inputClass}
                           />
                         </label>
