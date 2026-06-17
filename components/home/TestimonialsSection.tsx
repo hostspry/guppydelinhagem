@@ -4,6 +4,9 @@ import TestimonialCard from "@/components/home/TestimonialCard";
 import { TESTIMONIALS } from "@/lib/home-content";
 
 export default function TestimonialsSection() {
+  // Só renderiza com avaliações reais (hoje 0 → a seção não aparece).
+  if (TESTIMONIALS.length === 0) return null;
+
   return (
     <>
       <WaveDivider fill="#ECE7E8" />
