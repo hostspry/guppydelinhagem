@@ -65,6 +65,7 @@ type InitVariante = {
   estoque: number;
   qtdPeixes: number;
   rotulo: string | null;
+  padrao: boolean;
   ativo: boolean;
 };
 
@@ -129,9 +130,11 @@ export function ProductForm({ categorias, initialData }: ProductFormProps) {
           rotulo: ex.rotulo ?? "",
         };
       }
+      // Composição não cadastrada no produto: em edição fica inativa (não força
+      // TRIO — o kit, p.ex., é LOTE sem trio); em produto novo, usa o padrão.
       return {
         composicao: c,
-        ativo: c === "TRIO" ? true : COMPOSICAO_PADRAO_LIGADA[c],
+        ativo: initialData ? false : COMPOSICAO_PADRAO_LIGADA[c],
         preco: "",
         estoque: "0",
         qtdPeixes: String(QTD_PEIXES_PADRAO[c]),
@@ -139,6 +142,10 @@ export function ProductForm({ categorias, initialData }: ProductFormProps) {
       };
     });
   });
+  // Composição padrão (pré-selecionada na compra): a que veio marcada `padrao`
+  // no banco (kit = LOTE); senão TRIO (produto novo). Não desligável no editor.
+  const padraoSel: TipoComposicao =
+    initialData?.variantes.find((v) => v.padrao)?.composicao ?? "TRIO";
   // Preço/estoque de casal/macho/fêmea editados à mão não são sobrescritos.
   const [precoTouched, setPrecoTouched] = useState<Set<TipoComposicao>>(
     () => new Set(),
@@ -222,7 +229,7 @@ export function ProductForm({ categorias, initialData }: ProductFormProps) {
         estoque: Number(v.estoque) || 0,
         qtdPeixes: Number(v.qtdPeixes) || QTD_PEIXES_PADRAO[v.composicao],
         rotulo: v.rotulo,
-        padrao: v.composicao === "TRIO",
+        padrao: v.composicao === padraoSel,
         ativo: true,
       }));
   }
@@ -280,7 +287,7 @@ export function ProductForm({ categorias, initialData }: ProductFormProps) {
   }
 
   function toggleAtivo(comp: TipoComposicao) {
-    if (comp === "TRIO") return; // trio é sempre presente (o padrão)
+    if (comp === padraoSel) return; // a composição padrão não desliga
     setVariantes((prev) => {
       const ligando = !prev.find((v) => v.composicao === comp)?.ativo;
       const next = prev.map((v) =>
@@ -432,6 +439,9 @@ export function ProductForm({ categorias, initialData }: ProductFormProps) {
         toast.error(result.error);
       }
     });
+  }, () => {
+    // Validação do client bloqueou o submit — dá feedback (antes era silencioso).
+    toast.error("Confira os campos destacados antes de salvar.");
   });
 
   const variantesError =
@@ -732,7 +742,7 @@ export function ProductForm({ categorias, initialData }: ProductFormProps) {
             <div className="space-y-2">
               {ORDEM_COMPOSICAO.map((comp) => {
                 const v = variantes.find((x) => x.composicao === comp)!;
-                const isTrio = comp === "TRIO";
+                const isPadrao = comp === padraoSel;
                 const isLote = comp === "LOTE";
                 return (
                   <div
@@ -742,7 +752,7 @@ export function ProductForm({ categorias, initialData }: ProductFormProps) {
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-sm font-medium text-[#07366A]">
                         {COMPOSICAO_LABEL[comp]}
-                        {isTrio && (
+                        {isPadrao && (
                           <span className="ml-2 text-[10px] uppercase tracking-wide text-[#FF035C]">
                             padrão
                           </span>
@@ -752,11 +762,11 @@ export function ProductForm({ categorias, initialData }: ProductFormProps) {
                         <input
                           type="checkbox"
                           checked={v.ativo}
-                          disabled={isTrio}
+                          disabled={isPadrao}
                           onChange={() => toggleAtivo(comp)}
                           className="w-4 h-4 accent-[#FF035C] disabled:opacity-50"
                         />
-                        {isTrio ? "Sempre ativo" : v.ativo ? "Ativo" : "Inativo"}
+                        {isPadrao ? "Sempre ativo" : v.ativo ? "Ativo" : "Inativo"}
                       </label>
                     </div>
 
