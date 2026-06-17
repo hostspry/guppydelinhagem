@@ -9,6 +9,7 @@ import {
   type EnderecoEntrega,
 } from "@/lib/validations/pedido";
 import { TRANSICOES_PEDIDO, podeEditarItens } from "@/lib/pedido-status";
+import { transicionarParaPago, ajustarPoolEstoque } from "@/lib/pedido-baixa";
 import { COMPOSICAO_LABEL } from "@/lib/composicoes";
 import type { Prisma, OrderStatus } from "@/lib/generated/prisma/client";
 import {
@@ -288,53 +289,23 @@ export async function atualizarStatusPedido(
     };
   }
 
-  // Baixa no PAGO (uma vez, via flag estoqueBaixado); reversão no CANCELADO.
-  // ENVIADO/ENTREGUE não mexem no estoque. Permite pool negativo (não bloqueia).
-  const baixar = novoStatus === "PAGO" && !atual.estoqueBaixado;
-  const reverter = novoStatus === "CANCELADO" && atual.estoqueBaixado;
-
+  // PAGO → transição + baixa do pool (uma vez, trava estoqueBaixado), via função
+  // COMPARTILHADA com o webhook do MP. CANCELADO de pedido já baixado → estorna o
+  // pool. ENVIADO/ENTREGUE não mexem no estoque. Permite pool negativo.
   try {
     await prisma.$transaction(async (tx) => {
+      if (novoStatus === "PAGO") {
+        await transicionarParaPago(tx, id); // status + baixa idempotente
+        return;
+      }
+
       await tx.order.update({ where: { id }, data: { status: novoStatus } });
 
-      if (baixar || reverter) {
-        const itens = await tx.orderItem.findMany({
-          where: {
-            orderId: id,
-            productId: { not: null },
-            composicao: { not: null },
-          },
-          select: {
-            productId: true,
-            qtdMachos: true,
-            qtdFemeas: true,
-            quantidade: true,
-          },
-        });
-        const sinal = baixar ? -1 : 1; // baixa subtrai; reversão soma de volta
-        for (const it of itens) {
-          if (it.productId == null || it.qtdMachos == null || it.qtdFemeas == null) {
-            continue;
-          }
-          const prod = await tx.product.findUnique({
-            where: { id: it.productId },
-            select: { estoqueMachos: true, estoqueFemeas: true },
-          });
-          if (!prod) continue;
-          const machos = prod.estoqueMachos + sinal * it.qtdMachos * it.quantidade;
-          const femeas = prod.estoqueFemeas + sinal * it.qtdFemeas * it.quantidade;
-          await tx.product.update({
-            where: { id: it.productId },
-            data: {
-              estoqueMachos: machos,
-              estoqueFemeas: femeas,
-              estoque: machos + femeas, // re-sincroniza o espelho
-            },
-          });
-        }
+      if (novoStatus === "CANCELADO" && atual.estoqueBaixado) {
+        await ajustarPoolEstoque(tx, id, 1); // estorna a baixa anterior
         await tx.order.update({
           where: { id },
-          data: { estoqueBaixado: baixar }, // true ao baixar, false ao reverter
+          data: { estoqueBaixado: false },
         });
       }
     });
