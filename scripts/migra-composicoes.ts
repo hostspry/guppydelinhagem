@@ -12,7 +12,14 @@ import "dotenv/config";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../lib/generated/prisma/client";
 import type { TipoComposicao } from "../lib/generated/prisma/enums";
-import { QTD_PEIXES_PADRAO } from "../lib/composicoes";
+// Inline (este one-off é histórico; QTD_PEIXES_PADRAO saiu de lib/composicoes).
+const QTD_PEIXES_PADRAO: Record<TipoComposicao, number> = {
+  TRIO: 3,
+  CASAL: 2,
+  MACHO: 1,
+  FEMEA: 1,
+  LOTE: 10,
+};
 
 const prisma = new PrismaClient({
   adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }),

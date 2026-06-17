@@ -409,8 +409,8 @@ export async function getProductById(id: string) {
     variantes: p.variantes.map((v) => ({
       composicao: v.composicao,
       preco: Number(v.preco),
-      estoque: v.estoque,
-      qtdPeixes: v.qtdPeixes,
+      qtdMachos: v.qtdMachos,
+      qtdFemeas: v.qtdFemeas,
       rotulo: v.rotulo,
       padrao: v.padrao,
       ativo: v.ativo,

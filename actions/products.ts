@@ -44,6 +44,8 @@ function parseForm(formData: FormData) {
     parcelasMax: formData.get("parcelasMax"),
     tipo: formData.get("tipo"),
     estoque: formData.get("estoque"),
+    estoqueMachos: formData.get("estoqueMachos"),
+    estoqueFemeas: formData.get("estoqueFemeas"),
     categoryId: formData.get("categoryId"),
     ativo: formData.get("ativo"),
     destaque: formData.get("destaque"),
@@ -77,9 +79,10 @@ function scalarData(input: ProductInput) {
   const ativas = input.variantes.filter((v) => v.ativo);
   const padrao = ativas.find((v) => v.padrao) ?? ativas[0];
   const preco = isPeixe ? (padrao?.preco ?? 0) : (input.preco ?? 0);
-  const estoque = isPeixe
-    ? ativas.reduce((s, v) => s + v.estoque, 0)
-    : (input.estoque ?? 0);
+  // Pool real (PEIXE); espelho `estoque` = machos + fêmeas.
+  const machos = isPeixe ? (input.estoqueMachos ?? 0) : 0;
+  const femeas = isPeixe ? (input.estoqueFemeas ?? 0) : 0;
+  const estoque = isPeixe ? machos + femeas : (input.estoque ?? 0);
 
   return {
     nome: input.nome,
@@ -91,6 +94,8 @@ function scalarData(input: ProductInput) {
     parcelasMax: input.parcelasMax,
     tipo: input.tipo,
     estoque,
+    estoqueMachos: machos,
+    estoqueFemeas: femeas,
     categoryId: input.categoryId,
     ativo: input.ativo,
     destaque: input.destaque,
@@ -113,8 +118,10 @@ function buildVariantCreates(variantes: VariantInput[]) {
   return variantes.map((v, i) => ({
     composicao: v.composicao,
     preco: v.preco,
-    estoque: v.estoque,
-    qtdPeixes: v.qtdPeixes,
+    qtdMachos: v.qtdMachos,
+    qtdFemeas: v.qtdFemeas,
+    // qtdPeixes legado (NOT NULL até a migration de limpeza) — derivado da receita.
+    qtdPeixes: v.qtdMachos + v.qtdFemeas,
     rotulo: v.rotulo ? v.rotulo : null,
     padrao: v.padrao,
     ativo: v.ativo,
@@ -248,8 +255,9 @@ export async function updateProduct(
             productId: id,
             composicao: v.composicao,
             preco: v.preco,
-            estoque: v.estoque,
-            qtdPeixes: v.qtdPeixes,
+            qtdMachos: v.qtdMachos,
+            qtdFemeas: v.qtdFemeas,
+            qtdPeixes: v.qtdMachos + v.qtdFemeas, // legado NOT NULL (sai na limpeza)
             rotulo: v.rotulo ? v.rotulo : null,
             padrao: v.padrao,
             ativo: v.ativo,
@@ -257,8 +265,9 @@ export async function updateProduct(
           },
           update: {
             preco: v.preco,
-            estoque: v.estoque,
-            qtdPeixes: v.qtdPeixes,
+            qtdMachos: v.qtdMachos,
+            qtdFemeas: v.qtdFemeas,
+            qtdPeixes: v.qtdMachos + v.qtdFemeas,
             rotulo: v.rotulo ? v.rotulo : null,
             padrao: v.padrao,
             ativo: v.ativo,

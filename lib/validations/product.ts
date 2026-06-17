@@ -18,11 +18,14 @@ const numOpt = <T extends z.ZodTypeAny>(schema: T) =>
 export const variantSchema = z.object({
   composicao: z.enum(TipoComposicao),
   preco: z.coerce.number().positive("Preço deve ser maior que zero"),
-  estoque: z.coerce.number().int().min(0, "Não pode ser negativo"),
-  qtdPeixes: z.coerce.number().int().min(1, "Mínimo 1 peixe"),
+  qtdMachos: z.coerce.number().int().min(0, "Não pode ser negativo"),
+  qtdFemeas: z.coerce.number().int().min(0, "Não pode ser negativo"),
   rotulo: z.string().max(80, "Máx 80 caracteres").optional().or(z.literal("")),
   padrao: z.boolean().default(false),
   ativo: z.boolean().default(true),
+}).refine((v) => v.qtdMachos + v.qtdFemeas >= 1, {
+  message: "A receita precisa de ao menos 1 peixe (macho ou fêmea).",
+  path: ["qtdMachos"],
 });
 export type VariantInput = z.infer<typeof variantSchema>;
 
@@ -51,6 +54,13 @@ export const productSchema = z
     parcelasMax: z.coerce.number().int().min(1).max(12).default(3),
     tipo: z.enum(ProductType),
     estoque: numOpt(
+      z.coerce.number().int("Deve ser número inteiro").min(0, "Não pode ser negativo").optional(),
+    ),
+    // Pool de estoque (só PEIXE): o operador digita machos e fêmeas.
+    estoqueMachos: numOpt(
+      z.coerce.number().int("Deve ser número inteiro").min(0, "Não pode ser negativo").optional(),
+    ),
+    estoqueFemeas: numOpt(
       z.coerce.number().int("Deve ser número inteiro").min(0, "Não pode ser negativo").optional(),
     ),
     categoryId: z.string().min(1, "Selecione uma categoria"),
@@ -105,6 +115,21 @@ export const productSchema = z
           code: "custom",
           path: ["variantes"],
           message: "Composição repetida.",
+        });
+      }
+      // Pool de machos/fêmeas obrigatório para peixe.
+      if (data.estoqueMachos == null) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["estoqueMachos"],
+          message: "Informe o estoque de machos.",
+        });
+      }
+      if (data.estoqueFemeas == null) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["estoqueFemeas"],
+          message: "Informe o estoque de fêmeas.",
         });
       }
     } else {

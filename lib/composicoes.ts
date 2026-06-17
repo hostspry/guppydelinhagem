@@ -11,13 +11,25 @@ export const COMPOSICAO_LABEL: Record<TipoComposicao, string> = {
   LOTE: "Lote",
 };
 
-export const QTD_PEIXES_PADRAO: Record<TipoComposicao, number> = {
-  TRIO: 3,
-  CASAL: 2,
-  MACHO: 1,
-  FEMEA: 1,
-  LOTE: 10,
+// Receita de cada composição: quantos machos/fêmeas consome do pool do produto.
+// (LOTE editável; aqui o default genérico.)
+export const RECEITA_PADRAO: Record<TipoComposicao, { m: number; f: number }> = {
+  TRIO: { m: 1, f: 2 },
+  CASAL: { m: 1, f: 1 },
+  MACHO: { m: 1, f: 0 },
+  FEMEA: { m: 0, f: 1 },
+  LOTE: { m: 1, f: 0 },
 };
+
+/** Quantidade de peixes (p/ frete) = machos + fêmeas da receita. */
+export const qtdPeixesDe = (v: { qtdMachos: number; qtdFemeas: number }) =>
+  v.qtdMachos + v.qtdFemeas;
+
+/** Composição disponível quando o pool cobre a receita (machos E fêmeas). */
+export const composicaoDisponivel = (
+  v: { qtdMachos: number; qtdFemeas: number },
+  pool: { machos: number; femeas: number },
+) => pool.machos >= v.qtdMachos && pool.femeas >= v.qtdFemeas;
 
 export const ORDEM_COMPOSICAO: TipoComposicao[] = [
   "TRIO",
@@ -54,19 +66,5 @@ export function sugerirPrecos(precoTrio: number) {
     CASAL: arredonda9(precoTrio * PRECO_PCT.CASAL),
     MACHO: arredonda9(precoTrio * PRECO_PCT.MACHO),
     FEMEA: arredonda9(precoTrio * PRECO_PCT.FEMEA),
-  };
-}
-
-// Estoque derivado do trio (T = estoque do trio). Trio = 1 macho + 2 fêmeas →
-// fêmea rende 2T. LOTE fica fora (estoque livre).
-export const ESTOQUE_POR_TRIO = { CASAL: 1, MACHO: 1, FEMEA: 2 } as const;
-
-/** Dado o estoque do trio, sugere casal/macho (= T) e fêmea (= 2T). */
-export function sugerirEstoque(trioEstoque: number) {
-  const t = Math.max(0, Math.floor(trioEstoque || 0));
-  return {
-    CASAL: t * ESTOQUE_POR_TRIO.CASAL,
-    MACHO: t * ESTOQUE_POR_TRIO.MACHO,
-    FEMEA: t * ESTOQUE_POR_TRIO.FEMEA,
   };
 }

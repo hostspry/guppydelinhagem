@@ -50,6 +50,8 @@ export default async function EditarProdutoPage({ params }: Props) {
           parcelasMax: produto.parcelasMax,
           tipo: produto.tipo,
           estoque: produto.estoque,
+          estoqueMachos: produto.estoqueMachos,
+          estoqueFemeas: produto.estoqueFemeas,
           categoryId: produto.categoryId,
           ativo: produto.ativo,
           destaque: produto.destaque,

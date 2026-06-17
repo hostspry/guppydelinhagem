@@ -68,14 +68,12 @@ async function main() {
     SELECT id, nome, tipo::text AS tipo FROM "Product" ORDER BY nome`;
 
   // 1) Receitas das variantes (qtdMachos/qtdFemeas).
-  let varAtualizadas = 0;
   for (const v of variantes) {
     const r = receita(v.composicao, v.rotulo, v.qtdPeixes);
     await prisma.productVariant.update({
       where: { id: v.id },
       data: { qtdMachos: r.m, qtdFemeas: r.f },
     });
-    varAtualizadas++;
   }
 
   // 2) Pool dos produtos PEIXE.

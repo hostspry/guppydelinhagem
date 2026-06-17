@@ -21,10 +21,9 @@ import {
 import {
   COMPOSICAO_LABEL,
   ORDEM_COMPOSICAO,
-  QTD_PEIXES_PADRAO,
+  RECEITA_PADRAO,
   COMPOSICAO_PADRAO_LIGADA,
   sugerirPrecos,
-  sugerirEstoque,
 } from "@/lib/composicoes";
 import type { ProductType, TipoComposicao } from "@/lib/generated/prisma/enums";
 import { slugify } from "@/lib/utils/slug";
@@ -54,16 +53,16 @@ type VarRow = {
   composicao: TipoComposicao;
   ativo: boolean;
   preco: string;
-  estoque: string;
-  qtdPeixes: string;
+  qtdMachos: string; // receita
+  qtdFemeas: string; // receita
   rotulo: string;
 };
 
 type InitVariante = {
   composicao: TipoComposicao;
   preco: number;
-  estoque: number;
-  qtdPeixes: number;
+  qtdMachos: number;
+  qtdFemeas: number;
   rotulo: string | null;
   padrao: boolean;
   ativo: boolean;
@@ -82,6 +81,8 @@ type ProductFormProps = {
     parcelasMax: number;
     tipo: ProductType;
     estoque: number;
+    estoqueMachos: number;
+    estoqueFemeas: number;
     categoryId: string;
     ativo: boolean;
     destaque: boolean;
@@ -125,19 +126,20 @@ export function ProductForm({ categorias, initialData }: ProductFormProps) {
           composicao: c,
           ativo: ex.ativo,
           preco: String(ex.preco),
-          estoque: String(ex.estoque),
-          qtdPeixes: String(ex.qtdPeixes),
+          qtdMachos: String(ex.qtdMachos),
+          qtdFemeas: String(ex.qtdFemeas),
           rotulo: ex.rotulo ?? "",
         };
       }
       // Composição não cadastrada no produto: em edição fica inativa (não força
       // TRIO — o kit, p.ex., é LOTE sem trio); em produto novo, usa o padrão.
+      // Receita pré-preenchida por RECEITA_PADRAO (editável).
       return {
         composicao: c,
         ativo: initialData ? false : COMPOSICAO_PADRAO_LIGADA[c],
         preco: "",
-        estoque: "0",
-        qtdPeixes: String(QTD_PEIXES_PADRAO[c]),
+        qtdMachos: String(RECEITA_PADRAO[c].m),
+        qtdFemeas: String(RECEITA_PADRAO[c].f),
         rotulo: "",
       };
     });
@@ -146,11 +148,8 @@ export function ProductForm({ categorias, initialData }: ProductFormProps) {
   // no banco (kit = LOTE); senão TRIO (produto novo). Não desligável no editor.
   const padraoSel: TipoComposicao =
     initialData?.variantes.find((v) => v.padrao)?.composicao ?? "TRIO";
-  // Preço/estoque de casal/macho/fêmea editados à mão não são sobrescritos.
+  // Preço de casal/macho/fêmea editado à mão não é sobrescrito pelo auto-fill.
   const [precoTouched, setPrecoTouched] = useState<Set<TipoComposicao>>(
-    () => new Set(),
-  );
-  const [estoqueTouched, setEstoqueTouched] = useState<Set<TipoComposicao>>(
     () => new Set(),
   );
 
@@ -173,6 +172,10 @@ export function ProductForm({ categorias, initialData }: ProductFormProps) {
           parcelasMax: initialData.parcelasMax,
           tipo: initialData.tipo,
           estoque: initialData.tipo === "PEIXE" ? "" : initialData.estoque,
+          estoqueMachos:
+            initialData.tipo === "PEIXE" ? initialData.estoqueMachos : "",
+          estoqueFemeas:
+            initialData.tipo === "PEIXE" ? initialData.estoqueFemeas : "",
           categoryId: initialData.categoryId,
           ativo: initialData.ativo,
           destaque: initialData.destaque,
@@ -198,6 +201,8 @@ export function ProductForm({ categorias, initialData }: ProductFormProps) {
           parcelasMax: 3,
           tipo: "PEIXE",
           estoque: "",
+          estoqueMachos: "",
+          estoqueFemeas: "",
           categoryId: "",
           ativo: true,
           destaque: false,
@@ -217,8 +222,13 @@ export function ProductForm({ categorias, initialData }: ProductFormProps) {
 
   const tipo = watch("tipo");
   const isPeixe = tipo === "PEIXE";
+  // Pool p/ o texto "dá para N trios · M casais" (só conferência).
+  const poolMachos = Number(watch("estoqueMachos")) || 0;
+  const poolFemeas = Number(watch("estoqueFemeas")) || 0;
+  const podeTrios = Math.min(poolMachos, Math.floor(poolFemeas / 2));
+  const podeCasais = Math.min(poolMachos, poolFemeas);
 
-  // Payload das variantes ativas (TRIO sempre é o padrão). Não-peixe → [].
+  // Payload das variantes ativas (a padrão é padraoSel). Não-peixe → [].
   function variantPayload() {
     if (!isPeixe) return [];
     return variantes
@@ -226,8 +236,8 @@ export function ProductForm({ categorias, initialData }: ProductFormProps) {
       .map((v) => ({
         composicao: v.composicao,
         preco: Number(v.preco) || 0,
-        estoque: Number(v.estoque) || 0,
-        qtdPeixes: Number(v.qtdPeixes) || QTD_PEIXES_PADRAO[v.composicao],
+        qtdMachos: Number(v.qtdMachos) || 0,
+        qtdFemeas: Number(v.qtdFemeas) || 0,
         rotulo: v.rotulo,
         padrao: v.composicao === padraoSel,
         ativo: true,
@@ -263,26 +273,21 @@ export function ProductForm({ categorias, initialData }: ProductFormProps) {
     );
   }
 
-  // Preenche preço/estoque das composições-alvo a partir do TRIO atual, pulando
-  // o que o operador já editou à mão (edição manual prevalece). LOTE fica fora.
-  function preencherDoTrio(
+  // Preenche o PREÇO das composições-alvo a partir do trio, pulando o que o
+  // operador já editou à mão. (Auto-fill de estoque saiu — pool é no produto.)
+  function preencherPrecoDoTrio(
     rows: VarRow[],
     alvos: TipoComposicao[],
-    opts: { preco?: boolean; estoque?: boolean },
   ): VarRow[] {
     const trio = rows.find((v) => v.composicao === "TRIO");
     const sp = Number(trio?.preco) > 0 ? sugerirPrecos(Number(trio?.preco)) : null;
-    const se = sugerirEstoque(Number(trio?.estoque));
+    if (!sp) return rows;
     return rows.map((v) => {
       if (v.composicao === "TRIO" || v.composicao === "LOTE") return v;
       if (!alvos.includes(v.composicao)) return v;
+      if (precoTouched.has(v.composicao)) return v;
       const k = v.composicao as "CASAL" | "MACHO" | "FEMEA";
-      const patch: Partial<VarRow> = {};
-      if (opts.preco && sp && !precoTouched.has(v.composicao))
-        patch.preco = String(sp[k]);
-      if (opts.estoque && !estoqueTouched.has(v.composicao))
-        patch.estoque = String(se[k]);
-      return { ...v, ...patch };
+      return { ...v, preco: String(sp[k]) };
     });
   }
 
@@ -293,43 +298,23 @@ export function ProductForm({ categorias, initialData }: ProductFormProps) {
       const next = prev.map((v) =>
         v.composicao === comp ? { ...v, ativo: !v.ativo } : v,
       );
-      // (b) Ao LIGAR, preenche os campos ainda não editados a partir do trio.
-      return ligando
-        ? preencherDoTrio(next, [comp], { preco: true, estoque: true })
-        : next;
+      // (b) Ao LIGAR, sugere o preço a partir do trio (se não editado à mão).
+      return ligando ? preencherPrecoDoTrio(next, [comp]) : next;
     });
   }
 
-  // (a) Mudar preço/estoque do TRIO propaga para casal/macho/fêmea não-editados.
+  // (a) Mudar o preço do TRIO propaga p/ casal/macho/fêmea não-editados.
   function onPrecoChange(comp: TipoComposicao, value: string) {
     if (comp === "TRIO") {
       setVariantes((prev) =>
-        preencherDoTrio(
+        preencherPrecoDoTrio(
           prev.map((v) => (v.composicao === "TRIO" ? { ...v, preco: value } : v)),
           SUGERIDAS,
-          { preco: true },
         ),
       );
     } else {
       setPrecoTouched((s) => new Set(s).add(comp));
       setVar(comp, { preco: value });
-    }
-  }
-
-  function onEstoqueChange(comp: TipoComposicao, value: string) {
-    if (comp === "TRIO") {
-      setVariantes((prev) =>
-        preencherDoTrio(
-          prev.map((v) =>
-            v.composicao === "TRIO" ? { ...v, estoque: value } : v,
-          ),
-          SUGERIDAS,
-          { estoque: true },
-        ),
-      );
-    } else {
-      setEstoqueTouched((s) => new Set(s).add(comp));
-      setVar(comp, { estoque: value });
     }
   }
 
@@ -413,6 +398,10 @@ export function ProductForm({ categorias, initialData }: ProductFormProps) {
     formData.append("tipo", data.tipo);
     if (data.estoque !== undefined && data.estoque !== null)
       formData.append("estoque", String(data.estoque));
+    if (data.estoqueMachos !== undefined && data.estoqueMachos !== null)
+      formData.append("estoqueMachos", String(data.estoqueMachos));
+    if (data.estoqueFemeas !== undefined && data.estoqueFemeas !== null)
+      formData.append("estoqueFemeas", String(data.estoqueFemeas));
     formData.append("categoryId", data.categoryId);
     formData.append("ativo", String(data.ativo));
     formData.append("destaque", String(data.destaque));
@@ -727,13 +716,48 @@ export function ProductForm({ categorias, initialData }: ProductFormProps) {
 
         {isPeixe ? (
           <div className="space-y-3">
+            {/* Pool real de estoque (machos + fêmeas) */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4">
+              <FormField
+                label="Estoque de machos ♂"
+                name="estoqueMachos"
+                required
+                error={errors.estoqueMachos?.message}
+              >
+                <input
+                  id="estoqueMachos"
+                  type="number"
+                  min="0"
+                  {...register("estoqueMachos")}
+                  className={inputClass}
+                />
+              </FormField>
+              <FormField
+                label="Estoque de fêmeas ♀"
+                name="estoqueFemeas"
+                required
+                error={errors.estoqueFemeas?.message}
+              >
+                <input
+                  id="estoqueFemeas"
+                  type="number"
+                  min="0"
+                  {...register("estoqueFemeas")}
+                  className={inputClass}
+                />
+              </FormField>
+            </div>
+            <p className="text-xs text-gray-500 -mt-1">
+              Dá para <strong>{podeTrios}</strong> trio(s) ·{" "}
+              <strong>{podeCasais}</strong> casal(is). O estoque é um pool de
+              machos e fêmeas; cada composição abaixo consome sua receita.
+            </p>
+
             <p className="text-xs text-gray-500">
-              O <strong>Trio</strong> é a composição padrão (pré-selecionada na
-              compra). A partir do trio, casal/macho/fêmea são sugeridos —
-              preço (75% / 45% / 40% do trio, arredondado para terminar em 9) e
-              estoque (casal e macho = T, fêmea = 2T, onde T é o estoque do trio).
-              Ligar uma composição também preenche. Tudo editável; o que você
-              alterar à mão não é sobrescrito.
+              O <strong>{COMPOSICAO_LABEL[padraoSel]}</strong> é a composição padrão
+              (pré-selecionada na compra). O preço de casal/macho/fêmea é sugerido a
+              partir do trio (75% / 45% / 40%, arredondado para terminar em 9) — tudo
+              editável; o que você alterar à mão não é sobrescrito.
             </p>
             {variantesError && (
               <p className="text-xs text-[#FF035C]">{variantesError}</p>
@@ -784,22 +808,22 @@ export function ProductForm({ categorias, initialData }: ProductFormProps) {
                           />
                         </label>
                         <label className="block">
-                          <span className="block text-[10px] text-gray-400 mb-0.5">Estoque</span>
+                          <span className="block text-[10px] text-gray-400 mb-0.5">Receita ♂</span>
                           <input
                             type="number"
                             min="0"
-                            value={v.estoque}
-                            onChange={(e) => onEstoqueChange(comp, e.target.value)}
+                            value={v.qtdMachos}
+                            onChange={(e) => setVar(comp, { qtdMachos: e.target.value })}
                             className={inputClass}
                           />
                         </label>
                         <label className="block">
-                          <span className="block text-[10px] text-gray-400 mb-0.5">Qtd peixes</span>
+                          <span className="block text-[10px] text-gray-400 mb-0.5">Receita ♀</span>
                           <input
                             type="number"
-                            min="1"
-                            value={v.qtdPeixes}
-                            onChange={(e) => setVar(comp, { qtdPeixes: e.target.value })}
+                            min="0"
+                            value={v.qtdFemeas}
+                            onChange={(e) => setVar(comp, { qtdFemeas: e.target.value })}
                             className={inputClass}
                           />
                         </label>
