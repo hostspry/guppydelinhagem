@@ -1,5 +1,6 @@
 import { cache } from "react";
 import { prisma } from "../prisma";
+import { ordenarVitrine } from "../estoque";
 import type { Prisma } from "../generated/prisma/client";
 import type { ProductType, TipoComposicao } from "../generated/prisma/enums";
 
@@ -32,6 +33,11 @@ const cardSelect = {
   descontoPix: true,
   parcelasMax: true,
   estoque: true,
+  // Para ordenar a vitrine (esgotados por último; destaque entre disponíveis).
+  // Não vão para o card — só alimentam ordenarVitrine.
+  destaque: true,
+  estoqueMachos: true,
+  estoqueFemeas: true,
   // Vídeo de capa: principal primeiro, senão o de menor ordem. Só ativos (loja).
   videos: {
     where: { ativo: true },
@@ -154,17 +160,23 @@ export async function listProductsLoja(
   filters: LojaFilters & { skip?: number; take?: number },
 ): Promise<{ items: PublicProductCard[]; total: number }> {
   const where = lojaWhere(filters);
-  const [rows, total] = await Promise.all([
-    prisma.product.findMany({
-      where,
-      orderBy: ordenacaoMap[filters.ordenacao ?? "recentes"],
-      skip: filters.skip ?? 0,
-      take: filters.take ?? LOJA_PAGE_SIZE,
-      select: cardSelect,
-    }),
-    prisma.product.count({ where }),
-  ]);
-  return { items: rows.map(toCard), total };
+  // "Esgotado" depende de DOIS campos (machos & fêmeas) — o orderBy do Prisma
+  // não expressa isso. Como o catálogo é pequeno, buscamos o conjunto filtrado
+  // inteiro já ordenado pelo critério escolhido, reordenamos em memória para
+  // jogar esgotados ao fim (destaque entre disponíveis) e paginamos por slice.
+  // Assim a paginação/contagem continua correta (total = conjunto inteiro).
+  const rows = await prisma.product.findMany({
+    where,
+    orderBy: ordenacaoMap[filters.ordenacao ?? "recentes"],
+    select: cardSelect,
+  });
+  const ordenados = ordenarVitrine(rows);
+  const skip = filters.skip ?? 0;
+  const take = filters.take ?? LOJA_PAGE_SIZE;
+  return {
+    items: ordenados.slice(skip, skip + take).map(toCard),
+    total: ordenados.length,
+  };
 }
 
 // ── Página de produto (/loja/[slug]) ──────────────────────────
@@ -479,6 +491,7 @@ export async function getVideoFeed(): Promise<FeedProduto[]> {
   const rows = await prisma.product.findMany({
     where: { ativo: true, videos: { some: { ativo: true } } },
     // Destaques primeiro; depois recentes. Tie-break por id (ordem estável).
+    // (A reordenação final que joga esgotados pro fim é em memória, abaixo.)
     orderBy: [{ destaque: "desc" }, { criadoEm: "desc" }, { id: "asc" }],
     select: {
       id: true,
@@ -491,6 +504,7 @@ export async function getVideoFeed(): Promise<FeedProduto[]> {
       estoque: true,
       estoqueMachos: true,
       estoqueFemeas: true,
+      destaque: true, // p/ ordenarVitrine (destaque entre disponíveis)
       variantes: {
         where: { ativo: true },
         orderBy: [{ padrao: "desc" }, { ordem: "asc" }],
@@ -518,7 +532,8 @@ export async function getVideoFeed(): Promise<FeedProduto[]> {
     },
   });
 
-  return rows.map((p) => ({
+  // Esgotados (pool 0/0) por último; destaque só conta entre disponíveis.
+  return ordenarVitrine(rows).map((p) => ({
     id: p.id,
     nome: p.nome,
     slug: p.slug,
