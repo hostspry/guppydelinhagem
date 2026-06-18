@@ -12,6 +12,8 @@ import { calcularPesoECaixa, cotarFrete } from "@/lib/shipping";
 import { getPaymentProvider } from "@/lib/payments/registry";
 import { mensagemRecusa } from "@/lib/payments/mercadopago";
 import { transicionarParaPago } from "@/lib/pedido-baixa";
+import { calcularPrecos } from "@/lib/precos";
+import { getConfigPreco } from "@/lib/queries/config";
 import { COMPOSICAO_LABEL } from "@/lib/composicoes";
 import { MAX_PEIXES_POR_CAIXA } from "@/lib/constants";
 import type { EnderecoEntrega } from "@/lib/validations/pedido";
@@ -115,10 +117,159 @@ export type PagadorCheckout = {
 export type OrderCriado = {
   orderId: string;
   numero: string;
-  valor: number; // total recalculado no servidor
+  valorPix: number; // total a cobrar no Pix (com desconto) — recalculado no servidor
+  valorCartao: number; // total a cobrar no cartão (cheio) — recalculado no servidor
   pagador: PagadorCheckout;
   reused: boolean; // true = reaproveitou um AGUARDANDO existente (não deletar em erro)
 };
+
+// Item precificado no servidor (fonte da verdade). precoCheio = cartão à vista;
+// precoPix = com desconto efetivo. Reusado por criarOrderDoCheckout (cobrança) e
+// precificarCheckout (exibição).
+type ItemPrecificado = {
+  productId: string;
+  nomeProduto: string;
+  precoCheio: number;
+  precoPix: number;
+  descontoPixPercent: number;
+  quantidade: number;
+  imagemSnapshot: string | null;
+  composicao: CheckoutInput["itens"][number]["composicao"];
+  qtdMachos: number | null;
+  qtdFemeas: number | null;
+  qtdPeixes: number;
+};
+
+type PrecificacaoResult =
+  | {
+      ok: true;
+      itens: ItemPrecificado[];
+      totalPeixes: number;
+      subtotalCheio: number;
+      subtotalPix: number;
+    }
+  | { ok: false; error: string };
+
+/**
+ * Recalcula preço de cada item DO BANCO (cheio + Pix com desconto efetivo via
+ * lib/precos + ConfiguracaoLoja). Fonte única da verdade — nunca confia no client.
+ */
+async function precificarItens(
+  itens: CheckoutInput["itens"],
+): Promise<PrecificacaoResult> {
+  const produtoIds = [...new Set(itens.map((i) => i.produtoId))];
+  const [produtos, config] = await Promise.all([
+    prisma.product.findMany({
+      where: { id: { in: produtoIds }, ativo: true },
+      select: {
+        id: true,
+        nome: true,
+        preco: true,
+        descontoPix: true,
+        usarDescontoPixGlobal: true,
+        videos: {
+          where: { principal: true },
+          take: 1,
+          select: { thumbnailUrl: true },
+        },
+        variantes: {
+          where: { ativo: true },
+          select: {
+            composicao: true,
+            preco: true,
+            qtdMachos: true,
+            qtdFemeas: true,
+          },
+        },
+      },
+    }),
+    getConfigPreco(),
+  ]);
+  const pmap = new Map(produtos.map((p) => [p.id, p]));
+
+  const out: ItemPrecificado[] = [];
+  let totalPeixes = 0;
+  let subtotalCheio = 0;
+  let subtotalPix = 0;
+
+  for (const item of itens) {
+    const prod = pmap.get(item.produtoId);
+    if (!prod) {
+      return { ok: false, error: "Um dos produtos não está mais disponível." };
+    }
+    const descontoProprio =
+      prod.descontoPix == null ? null : Number(prod.descontoPix);
+
+    if (item.composicao) {
+      const variante = prod.variantes.find(
+        (v) => v.composicao === item.composicao,
+      );
+      if (!variante) {
+        return {
+          ok: false,
+          error: `A composição escolhida de "${prod.nome}" não está mais disponível.`,
+        };
+      }
+      const calc = calcularPrecos(
+        {
+          precoBase: Number(variante.preco),
+          descontoPixProprio: descontoProprio,
+          usarDescontoPixGlobal: prod.usarDescontoPixGlobal,
+        },
+        config,
+      );
+      const qtdPeixes = variante.qtdMachos + variante.qtdFemeas;
+      totalPeixes += qtdPeixes * item.quantidade;
+      subtotalCheio += calc.precoCartao * item.quantidade;
+      subtotalPix += calc.precoPix * item.quantidade;
+      out.push({
+        productId: prod.id,
+        nomeProduto: `${prod.nome} — ${COMPOSICAO_LABEL[item.composicao]}`,
+        precoCheio: calc.precoCartao,
+        precoPix: calc.precoPix,
+        descontoPixPercent: calc.descontoPixPercent,
+        quantidade: item.quantidade,
+        imagemSnapshot: prod.videos[0]?.thumbnailUrl ?? null,
+        composicao: item.composicao,
+        qtdMachos: variante.qtdMachos,
+        qtdFemeas: variante.qtdFemeas,
+        qtdPeixes,
+      });
+    } else {
+      const calc = calcularPrecos(
+        {
+          precoBase: Number(prod.preco),
+          descontoPixProprio: descontoProprio,
+          usarDescontoPixGlobal: prod.usarDescontoPixGlobal,
+        },
+        config,
+      );
+      subtotalCheio += calc.precoCartao * item.quantidade;
+      subtotalPix += calc.precoPix * item.quantidade;
+      out.push({
+        productId: prod.id,
+        nomeProduto: prod.nome,
+        precoCheio: calc.precoCartao,
+        precoPix: calc.precoPix,
+        descontoPixPercent: calc.descontoPixPercent,
+        quantidade: item.quantidade,
+        imagemSnapshot: prod.videos[0]?.thumbnailUrl ?? null,
+        composicao: null,
+        qtdMachos: null,
+        qtdFemeas: null,
+        qtdPeixes: 0,
+      });
+    }
+  }
+
+  return {
+    ok: true,
+    itens: out,
+    totalPeixes,
+    subtotalCheio: round2(subtotalCheio),
+    subtotalPix: round2(subtotalPix),
+  };
+}
 
 type OrderResult =
   | { ok: true; data: OrderCriado }
@@ -147,86 +298,23 @@ export async function criarOrderDoCheckout(
   }
   const data = parsed.data;
 
-  // ── 1. Recalcular preços do banco (ignora o preço do client) ──────────────
-  const produtoIds = [...new Set(data.itens.map((i) => i.produtoId))];
-  const produtos = await prisma.product.findMany({
-    where: { id: { in: produtoIds }, ativo: true },
-    select: {
-      id: true,
-      nome: true,
-      preco: true,
-      videos: {
-        where: { principal: true },
-        take: 1,
-        select: { thumbnailUrl: true },
-      },
-      variantes: {
-        where: { ativo: true },
-        select: {
-          composicao: true,
-          preco: true,
-          qtdMachos: true,
-          qtdFemeas: true,
-        },
-      },
-    },
-  });
-  const pmap = new Map(produtos.map((p) => [p.id, p]));
+  // ── 1. Recalcular preços DO BANCO (cheio + Pix) — ignora o preço do client ──
+  const prec = await precificarItens(data.itens);
+  if (!prec.ok) return { ok: false, error: prec.error };
+  const { totalPeixes, subtotalCheio, subtotalPix } = prec;
 
-  const itensData: {
-    productId: string;
-    nomeProduto: string;
-    precoUnitario: number;
-    quantidade: number;
-    imagemSnapshot: string | null;
-    composicao: CheckoutInput["itens"][number]["composicao"];
-    qtdMachos: number | null;
-    qtdFemeas: number | null;
-  }[] = [];
-  let totalPeixes = 0;
-
-  for (const item of data.itens) {
-    const prod = pmap.get(item.produtoId);
-    if (!prod) {
-      return { ok: false, error: "Um dos produtos não está mais disponível." };
-    }
-
-    if (item.composicao) {
-      const variante = prod.variantes.find(
-        (v) => v.composicao === item.composicao,
-      );
-      if (!variante) {
-        return {
-          ok: false,
-          error: `A composição escolhida de "${prod.nome}" não está mais disponível.`,
-        };
-      }
-      const qtdPeixes = variante.qtdMachos + variante.qtdFemeas;
-      totalPeixes += qtdPeixes * item.quantidade;
-      itensData.push({
-        productId: prod.id,
-        nomeProduto: `${prod.nome} — ${COMPOSICAO_LABEL[item.composicao]}`,
-        precoUnitario: Number(variante.preco), // PREÇO DO BANCO
-        quantidade: item.quantidade,
-        imagemSnapshot: prod.videos[0]?.thumbnailUrl ?? null,
-        composicao: item.composicao,
-        qtdMachos: variante.qtdMachos,
-        qtdFemeas: variante.qtdFemeas,
-      });
-    } else {
-      // Não-peixe (sem composição): usa Product.preco.
-      itensData.push({
-        productId: prod.id,
-        nomeProduto: prod.nome,
-        precoUnitario: Number(prod.preco),
-        quantidade: item.quantidade,
-        imagemSnapshot: prod.videos[0]?.thumbnailUrl ?? null,
-        composicao: null,
-        qtdMachos: null,
-        qtdFemeas: null,
-      });
-    }
-  }
+  // Snapshots a persistir: precoUnitario = CHEIO (canônico). O valor efetivamente
+  // cobrado por forma (Pix com desconto vs cartão cheio) vai na linha Pagamento.
+  const itensData = prec.itens.map((it) => ({
+    productId: it.productId,
+    nomeProduto: it.nomeProduto,
+    precoUnitario: it.precoCheio,
+    quantidade: it.quantidade,
+    imagemSnapshot: it.imagemSnapshot,
+    composicao: it.composicao,
+    qtdMachos: it.qtdMachos,
+    qtdFemeas: it.qtdFemeas,
+  }));
 
   // >10 peixes → não dá pra cobrar frete automático: fecha no WhatsApp.
   if (totalPeixes > MAX_PEIXES_POR_CAIXA) {
@@ -235,10 +323,6 @@ export async function criarOrderDoCheckout(
       error: `Pedidos acima de ${MAX_PEIXES_POR_CAIXA} peixes têm o frete calculado manualmente — finalize no WhatsApp.`,
     };
   }
-
-  const subtotal = round2(
-    itensData.reduce((s, it) => s + it.precoUnitario * it.quantidade, 0),
-  );
 
   // ── 2. Re-cotar o frete no servidor (anti-tamper) ─────────────────────────
   // Só Jadlog é auto-cobrável; Gollog é faixa/manual. Re-cota pra esse CEP+peso.
@@ -263,7 +347,8 @@ export async function criarOrderDoCheckout(
     };
   }
   const frete = round2(jad.price);
-  const total = round2(subtotal + frete);
+  const totalCheio = round2(subtotalCheio + frete);
+  const totalPix = round2(subtotalPix + frete);
 
   // ── 3. Cliente (guest): cria/reusa por CPF, depois email, depois telefone ──
   const session = await auth();
@@ -372,10 +457,10 @@ export async function criarOrderDoCheckout(
           data: {
             enderecoEntrega: endereco as unknown as Prisma.InputJsonValue,
             transportadora: Transportadora.JADLOG,
-            subtotal,
+            subtotal: subtotalCheio,
             frete,
             desconto: 0,
-            total,
+            total: totalCheio,
           },
           select: { id: true, numero: true },
         });
@@ -403,10 +488,10 @@ export async function criarOrderDoCheckout(
           formaPagamento: FormaPagamento.PIX,
           transportadora: Transportadora.JADLOG,
           enderecoEntrega: endereco as unknown as Prisma.InputJsonValue,
-          subtotal,
+          subtotal: subtotalCheio,
           frete,
           desconto: 0,
-          total,
+          total: totalCheio,
           items: { create: itensData },
         },
         select: { id: true, numero: true },
@@ -427,7 +512,8 @@ export async function criarOrderDoCheckout(
     data: {
       orderId,
       numero,
-      valor: total,
+      valorPix: totalPix,
+      valorCartao: totalCheio,
       reused,
       pagador: {
         nome: partesNome[0],
@@ -453,7 +539,7 @@ export async function criarPedidoCheckout(
     const pixData = await emitirPix({
       orderId: order.data.orderId,
       numero: order.data.numero,
-      valor: order.data.valor,
+      valor: order.data.valorPix, // Pix cobra o total COM desconto
       pagador: order.data.pagador,
     });
     return { ok: true, data: pixData };
@@ -505,8 +591,12 @@ export async function gerarNovoPix(numero: string): Promise<CheckoutResult> {
       id: true,
       numero: true,
       total: true,
+      frete: true,
       status: true,
       enderecoEntrega: true,
+      items: {
+        select: { productId: true, composicao: true, quantidade: true },
+      },
     },
   });
   if (!order) return { ok: false, error: "Pedido não encontrado." };
@@ -517,13 +607,28 @@ export async function gerarNovoPix(numero: string): Promise<CheckoutResult> {
     };
   }
 
+  // Recalcula o total PIX (com desconto) dos itens do pedido + frete salvo. O
+  // Order.total guarda o CHEIO (cartão); o Pix cobra o descontado.
+  const prec = await precificarItens(
+    order.items
+      .filter((it) => it.productId)
+      .map((it) => ({
+        produtoId: it.productId as string,
+        composicao: it.composicao,
+        quantidade: it.quantidade,
+      })),
+  );
+  const valorPix = prec.ok
+    ? round2(prec.subtotalPix + Number(order.frete))
+    : Number(order.total);
+
   const end = order.enderecoEntrega as unknown as EnderecoEntrega;
   const partes = (end.nome ?? "").trim().split(/\s+/);
   try {
     const pixData = await emitirPix({
       orderId: order.id,
       numero: order.numero,
-      valor: Number(order.total),
+      valor: valorPix,
       pagador: {
         nome: partes[0],
         sobrenome: partes.slice(1).join(" ") || null,
@@ -539,6 +644,50 @@ export async function gerarNovoPix(numero: string): Promise<CheckoutResult> {
       error: e instanceof Error ? e.message : "Não foi possível gerar o Pix.",
     };
   }
+}
+
+// ── Precificação do checkout (exibição: servidor é a fonte da verdade) ───────
+
+export type CheckoutPrecoLinha = {
+  produtoId: string;
+  composicao: CheckoutInput["itens"][number]["composicao"];
+  precoCheio: number;
+  precoPix: number;
+};
+
+export type CheckoutPreco = {
+  itens: CheckoutPrecoLinha[];
+  subtotalCheio: number;
+  subtotalPix: number;
+  descontoPixPercentMax: number; // p/ o selo "no Pix • X% OFF"
+};
+
+/**
+ * Preços autoritativos do carrinho (cheio + Pix), p/ o resumo do checkout mostrar
+ * os DOIS totais corretos por aba. Não confia no client — recalcula do banco.
+ * Devolve null se algum item sumiu (o cliente revê o carrinho).
+ */
+export async function precificarCheckout(
+  itens: CheckoutFormInput["itens"],
+): Promise<CheckoutPreco | null> {
+  const parsed = checkoutSchema.shape.itens.safeParse(itens);
+  if (!parsed.success) return null;
+  const prec = await precificarItens(parsed.data);
+  if (!prec.ok) return null;
+  return {
+    itens: prec.itens.map((it) => ({
+      produtoId: it.productId,
+      composicao: it.composicao,
+      precoCheio: it.precoCheio,
+      precoPix: it.precoPix,
+    })),
+    subtotalCheio: prec.subtotalCheio,
+    subtotalPix: prec.subtotalPix,
+    descontoPixPercentMax: prec.itens.reduce(
+      (m, it) => Math.max(m, it.descontoPixPercent),
+      0,
+    ),
+  };
 }
 
 // ── Cartão de crédito ────────────────────────────────────────────────────────
@@ -620,7 +769,7 @@ export async function pagarComCartao(
       fieldErrors: order.fieldErrors,
     };
   }
-  const { orderId, numero, valor, pagador } = order.data;
+  const { orderId, numero, valorCartao: valor, pagador } = order.data; // cartão cobra o CHEIO
 
   // payer fiel ao Brick: usa o e-mail/CPF que vieram do formulário seguro do MP;
   // só cai no checkout se o Brick não devolver (ex.: campo oculto).

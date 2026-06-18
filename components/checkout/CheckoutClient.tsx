@@ -23,13 +23,16 @@ import {
   useCart,
   selectTotalPeixes,
   selectSubtotalPix,
+  selectSubtotalCheio,
 } from "@/lib/stores/cart";
 import {
   criarPedidoCheckout,
   pagarComCartao,
   calcularTetoParcelas,
+  precificarCheckout,
   type CheckoutPixData,
   type CartaoInput,
+  type CheckoutPreco,
 } from "@/actions/checkout";
 import PixPanel from "@/components/checkout/PixPanel";
 import CardPaymentBrick from "@/components/checkout/CardPaymentBrick";
@@ -154,7 +157,8 @@ export default function CheckoutClient({
 
   const items = useCart((s) => s.items);
   const totalPeixes = useCart(selectTotalPeixes);
-  const subtotalPix = useCart(selectSubtotalPix);
+  const subtotalPixCart = useCart(selectSubtotalPix);
+  const subtotalCheioCart = useCart(selectSubtotalCheio);
 
   const router = useRouter();
   const {
@@ -176,6 +180,8 @@ export default function CheckoutClient({
   const [aba, setAba] = useState<"pix" | "cartao">("pix");
   const [teto, setTeto] = useState(1);
   const [recusa, setRecusa] = useState<string | null>(null);
+  // Preços autoritativos do servidor (cheio + Pix). Fallback no cart até carregar.
+  const [preco, setPreco] = useState<CheckoutPreco | null>(null);
 
   // Frete
   const [freteLoading, setFreteLoading] = useState(false);
@@ -197,7 +203,27 @@ export default function CheckoutClient({
     [frete],
   );
   const freteValor = freteSel?.price ?? null;
-  const total = subtotalPix + (freteValor ?? 0);
+
+  // Subtotais: servidor manda; cart é fallback até o servidor responder.
+  const subtotalPixView = preco?.subtotalPix ?? subtotalPixCart;
+  const subtotalCheioView = preco?.subtotalCheio ?? subtotalCheioCart;
+  const descontoMax = preco?.descontoPixPercentMax ?? 0;
+  const precoMap = useMemo(() => {
+    const m = new Map<string, { precoCheio: number; precoPix: number }>();
+    preco?.itens.forEach((it) =>
+      m.set(`${it.produtoId}|${it.composicao ?? ""}`, {
+        precoCheio: it.precoCheio,
+        precoPix: it.precoPix,
+      }),
+    );
+    return m;
+  }, [preco]);
+
+  // Total exibido segue a ABA (Pix descontado × Cartão cheio). O cartão é cobrado
+  // pelo cheio (Brick usa totalCartao); juros do parcelado vêm do MP.
+  const subtotalView = aba === "pix" ? subtotalPixView : subtotalCheioView;
+  const total = subtotalView + (freteValor ?? 0);
+  const totalCartao = subtotalCheioView + (freteValor ?? 0);
 
   // Frete obrigatório: depois de uma tentativa de envio, sem valor e ≤10 peixes.
   const freteFaltando = isSubmitted && !excedeCaixa && freteValor == null;
@@ -266,6 +292,23 @@ export default function CheckoutClient({
       composicao: i.composicao,
       quantidade: i.quantidade,
     }));
+
+  // Preços autoritativos (cheio + Pix) do servidor — refaz quando o carrinho muda.
+  const itensKey = items
+    .map((i) => `${i.produtoId}|${i.composicao ?? ""}|${i.quantidade}`)
+    .join(";");
+  useEffect(() => {
+    if (items.length === 0) return;
+    let ativo = true;
+    precificarCheckout(itensPedido()).then((p) => {
+      if (ativo) setPreco(p);
+    });
+    return () => {
+      ativo = false;
+    };
+    // itensKey resume ids+composição+qtd do carrinho.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [itensKey]);
 
   function onValid(data: CamposOutput) {
     // O submit do form é só do Pix; na aba Cartão o Brick tem botão próprio.
@@ -658,29 +701,36 @@ export default function CheckoutClient({
           )}
 
           <ul className="divide-y divide-border text-sm">
-            {items.map((i) => (
-              <li key={i.variantId} className="py-2 flex justify-between gap-3">
-                <span className="text-primary">
-                  {i.nome}
-                  {i.composicaoLabel ? (
-                    <span className="text-muted-foreground">
-                      {" "}
-                      · {i.composicaoLabel}
-                    </span>
-                  ) : null}
-                  <span className="text-muted-foreground"> ×{i.quantidade}</span>
-                </span>
-                <span className="text-primary font-medium shrink-0 tabular-nums">
-                  {formatBRL(i.precoPix * i.quantidade)}
-                </span>
-              </li>
-            ))}
+            {items.map((i) => {
+              const srv = precoMap.get(`${i.produtoId}|${i.composicao ?? ""}`);
+              const unit =
+                aba === "pix"
+                  ? (srv?.precoPix ?? i.precoPix)
+                  : (srv?.precoCheio ?? i.precoCheio);
+              return (
+                <li key={i.variantId} className="py-2 flex justify-between gap-3">
+                  <span className="text-primary">
+                    {i.nome}
+                    {i.composicaoLabel ? (
+                      <span className="text-muted-foreground">
+                        {" "}
+                        · {i.composicaoLabel}
+                      </span>
+                    ) : null}
+                    <span className="text-muted-foreground"> ×{i.quantidade}</span>
+                  </span>
+                  <span className="text-primary font-medium shrink-0 tabular-nums">
+                    {formatBRL(unit * i.quantidade)}
+                  </span>
+                </li>
+              );
+            })}
           </ul>
 
           <div className="space-y-1 border-t border-border pt-3 text-sm">
             <div className="flex justify-between text-muted-foreground">
               <span>Subtotal</span>
-              <span className="tabular-nums">{formatBRL(subtotalPix)}</span>
+              <span className="tabular-nums">{formatBRL(subtotalView)}</span>
             </div>
             <div className="flex justify-between text-muted-foreground">
               <span>Frete</span>
@@ -689,11 +739,31 @@ export default function CheckoutClient({
               </span>
             </div>
             <div className="flex items-end justify-between pt-2">
-              <span className="text-sm font-medium text-primary">Total</span>
+              <span className="text-sm font-medium text-primary">
+                Total {aba === "pix" ? "no Pix" : "no cartão"}
+              </span>
               <span className="text-green-600 text-2xl font-bold tabular-nums">
                 {formatBRL(total)}
               </span>
             </div>
+            {/* Selo por forma: Pix com desconto × Cartão cheio/parcelas */}
+            {aba === "pix" ? (
+              descontoMax > 0 ? (
+                <p className="text-[11px] text-green-700 text-right font-medium">
+                  no Pix • {descontoMax}% OFF · cartão à vista{" "}
+                  {formatBRL(totalCartao)}
+                </p>
+              ) : (
+                <p className="text-[11px] text-muted-foreground text-right">
+                  Pix à vista (sem desconto neste pedido).
+                </p>
+              )
+            ) : (
+              <p className="text-[11px] text-muted-foreground text-right">
+                À vista no crédito
+                {teto > 1 ? ` ou em até ${teto}x com juros` : ""}.
+              </p>
+            )}
           </div>
 
           {/* Forma de pagamento: Pix (padrão) | Cartão */}
@@ -772,7 +842,7 @@ export default function CheckoutClient({
                   </p>
                   <CardPaymentBrick
                     publicKey={mpPublicKey}
-                    amount={total}
+                    amount={totalCartao}
                     maxInstallments={teto}
                     payerEmail={watch("email")}
                     onPagar={onCartao}
