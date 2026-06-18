@@ -437,3 +437,107 @@ export async function getProductFormData() {
   });
   return { categorias };
 }
+
+// ── Feed de vídeo (Leva B) ─────────────────────────────────────
+// Todos os produtos ATIVOS que têm ao menos um vídeo ativo, com destaques
+// primeiro. Traz variantes (composição) + pool de estoque + insumos de preço +
+// os vídeos ativos ordenados (principal → ordem). Decimais → number.
+export type FeedVideo = {
+  platform: "YOUTUBE" | "INSTAGRAM" | "TIKTOK";
+  videoId: string | null;
+  originalUrl: string;
+  thumbnailUrl: string | null;
+  titulo: string | null;
+};
+
+export type FeedVariante = {
+  id: string;
+  composicao: TipoComposicao;
+  preco: number;
+  qtdMachos: number;
+  qtdFemeas: number;
+  rotulo: string | null;
+  padrao: boolean;
+};
+
+export type FeedProduto = {
+  id: string;
+  nome: string;
+  slug: string;
+  preco: number;
+  descontoPix: number | null;
+  usarDescontoPixGlobal: boolean;
+  parcelasMax: number;
+  estoque: number;
+  estoqueMachos: number;
+  estoqueFemeas: number;
+  variantes: FeedVariante[];
+  videos: FeedVideo[];
+};
+
+export async function getVideoFeed(): Promise<FeedProduto[]> {
+  const rows = await prisma.product.findMany({
+    where: { ativo: true, videos: { some: { ativo: true } } },
+    // Destaques primeiro; depois recentes. Tie-break por id (ordem estável).
+    orderBy: [{ destaque: "desc" }, { criadoEm: "desc" }, { id: "asc" }],
+    select: {
+      id: true,
+      nome: true,
+      slug: true,
+      preco: true,
+      descontoPix: true,
+      usarDescontoPixGlobal: true,
+      parcelasMax: true,
+      estoque: true,
+      estoqueMachos: true,
+      estoqueFemeas: true,
+      variantes: {
+        where: { ativo: true },
+        orderBy: [{ padrao: "desc" }, { ordem: "asc" }],
+        select: {
+          id: true,
+          composicao: true,
+          preco: true,
+          qtdMachos: true,
+          qtdFemeas: true,
+          rotulo: true,
+          padrao: true,
+        },
+      },
+      videos: {
+        where: { ativo: true },
+        orderBy: [{ principal: "desc" }, { ordem: "asc" }],
+        select: {
+          platform: true,
+          videoId: true,
+          originalUrl: true,
+          thumbnailUrl: true,
+          titulo: true,
+        },
+      },
+    },
+  });
+
+  return rows.map((p) => ({
+    id: p.id,
+    nome: p.nome,
+    slug: p.slug,
+    preco: Number(p.preco),
+    descontoPix: p.descontoPix == null ? null : Number(p.descontoPix),
+    usarDescontoPixGlobal: p.usarDescontoPixGlobal,
+    parcelasMax: p.parcelasMax,
+    estoque: p.estoque,
+    estoqueMachos: p.estoqueMachos,
+    estoqueFemeas: p.estoqueFemeas,
+    variantes: p.variantes.map((v) => ({
+      id: v.id,
+      composicao: v.composicao,
+      preco: Number(v.preco),
+      qtdMachos: v.qtdMachos,
+      qtdFemeas: v.qtdFemeas,
+      rotulo: v.rotulo,
+      padrao: v.padrao,
+    })),
+    videos: p.videos,
+  }));
+}
