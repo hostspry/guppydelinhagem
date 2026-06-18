@@ -15,6 +15,14 @@ RUN apk add --no-cache libc6-compat openssl && \
 
 ENV NEXT_TELEMETRY_DISABLED=1
 
+# NEXT_PUBLIC_* são inlinadas em BUILD-TIME (viram literal no bundle do client),
+# então PRECISAM existir aqui — a env só de runtime do Coolify NÃO chega ao
+# `next build`. Recebida como build arg e promovida a ENV antes do build.
+# Definir no Coolify como BUILD VARIABLE (não só runtime). Bônus: mudar o valor
+# invalida o cache deste layer → re-inlina a chave nova (sem chave velha grudada).
+ARG NEXT_PUBLIC_MP_PUBLIC_KEY
+ENV NEXT_PUBLIC_MP_PUBLIC_KEY=$NEXT_PUBLIC_MP_PUBLIC_KEY
+
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
