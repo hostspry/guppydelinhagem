@@ -270,14 +270,19 @@ export default function VideoFeed({
   // do dispositivo; fallback copia o link. No mobile esse link reabre o feed.
   async function compartilhar() {
     const url = `${window.location.origin}/loja/${p.slug}`;
-    if (typeof navigator !== "undefined" && navigator.share) {
+    // Tenta o share nativo; só cai no fallback se ele NÃO existir ou FALHAR
+    // (exceto cancelamento do usuário = AbortError, que é silencioso).
+    if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
       try {
         await navigator.share({ url });
-      } catch {
-        /* usuário cancelou — ignora */
+        return; // compartilhado com sucesso
+      } catch (e) {
+        if (e instanceof DOMException && e.name === "AbortError") return; // cancelou
+        // qualquer outro erro → cai no fallback (copiar)
       }
-      return;
     }
+
+    // Fallback: copiar o link.
     try {
       await navigator.clipboard.writeText(url);
       toast.success("Link copiado");
@@ -354,8 +359,8 @@ export default function VideoFeed({
         </div>
       </div>
 
-      {/* Top bar: fechar + plataforma + "X de N" */}
-      <div className="absolute top-0 inset-x-0 z-20 flex items-center justify-between p-3">
+      {/* Top bar: fechar + plataforma + "X de N" — acima da gaveta (z-30) */}
+      <div className="absolute top-0 inset-x-0 z-30 flex items-center justify-between p-3">
         <button
           type="button"
           onClick={() => router.back()}
@@ -389,8 +394,8 @@ export default function VideoFeed({
         </div>
       </div>
 
-      {/* Setas ↑/↓ (lado direito) */}
-      <div className="absolute right-2 top-1/2 -translate-y-1/2 z-20 flex flex-col gap-3">
+      {/* Setas ↑/↓ + compartilhar (lado direito) — acima da gaveta (z-30) */}
+      <div className="absolute right-2 top-1/2 -translate-y-1/2 z-30 flex flex-col gap-3">
         <button
           type="button"
           onClick={anterior}
@@ -420,13 +425,15 @@ export default function VideoFeed({
       {/* Gaveta de compra (parte de baixo, vídeo visível acima) — degradê escuro
           pra o texto ficar legível sobre qualquer vídeo (claro ou escuro). */}
       <div
-        className="absolute bottom-0 inset-x-0 z-20 pt-12 pb-4 px-4"
+        className="absolute bottom-0 inset-x-0 z-20 pt-12 pb-4 px-4 pointer-events-none"
         style={{
           background:
             "linear-gradient(to top, rgba(0,0,0,0.9) 55%, rgba(0,0,0,0.5) 78%, transparent)",
         }}
       >
-        <div className="max-w-[480px] mx-auto space-y-3 text-white">
+        {/* pointer-events-auto só no conteúdo: a área transparente do degradê não
+            intercepta cliques dos controles atrás (ex.: botão compartilhar). */}
+        <div className="max-w-[480px] mx-auto space-y-3 text-white pointer-events-auto">
           <div>
             <h2 className="text-base font-bold leading-tight">{p.nome}</h2>
             {/* Preço: Pix com desconto + cheio do cartão legível (lib/precos) */}
