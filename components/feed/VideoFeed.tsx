@@ -40,22 +40,51 @@ const PLATFORM_LABEL: Record<FeedVideo["platform"], string> = {
   TIKTOK: "TikTok",
 };
 
-// Embed do feed: autoplay (mudo por padrão — navegador bloqueia autoplay com som)
-// + loop + playsinline. mute=0 só quando o usuário ativa o som (gesto). IG/TikTok
-// não suportam esses params, então caem no embed normal.
-function feedEmbedSrc(v: FeedVideo, muted: boolean): string | null {
+// Embed do feed — UI limpa: esconde ao máximo os controles nativos do YouTube.
+// Sempre entra MUDO (autoplay exige) + loop; play/pause e mute passam a ser
+// controlados por código via postMessage (enablejsapi=1). IG/TikTok caem no
+// embed padrão (não aceitam esses params).
+//  controls=0      — sem barra de controles
+//  modestbranding=1 — sem logo grande
+//  rel=0           — sem "vídeos relacionados" de outros canais
+//  iv_load_policy=3 — sem anotações
+//  fs=0            — SEM botão de tela cheia (o "azul" que vazava sobre o Comprar)
+//  playsinline=1   — toca embutido no iOS (não abre fullscreen)
+//  cc_load_policy=0 — sem legendas automáticas
+//  enablejsapi=1   — habilita comandos via postMessage (play/pause/mute)
+function feedEmbedSrc(v: FeedVideo): string | null {
   if (!v.videoId) return null;
-  const m = muted ? 1 : 0;
-  switch (v.platform) {
-    case "YOUTUBE":
-      return `https://www.youtube.com/embed/${v.videoId}?autoplay=1&mute=${m}&playsinline=1&loop=1&playlist=${v.videoId}&rel=0&modestbranding=1`;
-    case "INSTAGRAM":
-      return instagramEmbedUrl(v.videoId);
-    case "TIKTOK":
-      return tiktokEmbedUrl(v.videoId);
-    default:
-      return null;
+  if (v.platform === "YOUTUBE") {
+    const params = new URLSearchParams({
+      autoplay: "1",
+      mute: "1",
+      loop: "1",
+      playlist: v.videoId, // loop de vídeo único exige playlist = o próprio id
+      controls: "0",
+      modestbranding: "1",
+      rel: "0",
+      iv_load_policy: "3",
+      fs: "0",
+      playsinline: "1",
+      cc_load_policy: "0",
+      enablejsapi: "1",
+    });
+    return `https://www.youtube.com/embed/${v.videoId}?${params.toString()}`;
   }
+  if (v.platform === "INSTAGRAM") return instagramEmbedUrl(v.videoId);
+  if (v.platform === "TIKTOK") return tiktokEmbedUrl(v.videoId);
+  return null;
+}
+
+// Comando à YouTube IFrame API via postMessage (sem carregar a lib).
+function postCmd(
+  iframe: HTMLIFrameElement | null,
+  func: "playVideo" | "pauseVideo" | "mute" | "unMute",
+) {
+  iframe?.contentWindow?.postMessage(
+    JSON.stringify({ event: "command", func, args: [] }),
+    "*",
+  );
 }
 
 // Quantas unidades da composição o pool (machos/fêmeas) sustenta. Igual à página
@@ -105,6 +134,8 @@ export default function VideoFeed({
   // Som desligado por padrão → autoplay mudo (navegador bloqueia autoplay c/ som).
   // O usuário liga o som com um toque (gesto). Persiste entre slides.
   const [som, setSom] = useState(false);
+  const [pausado, setPausado] = useState(false); // play/pause por toque (postMessage)
+  const iframeRef = useRef<HTMLIFrameElement>(null);
   const current = slides[idx];
 
   // Composição/quantidade da gaveta (do produto atual).
@@ -137,6 +168,7 @@ export default function VideoFeed({
   function irPara(novo: number) {
     const alvo = slides[novo];
     setIdx(novo); // novo slide autoplaya (o iframe re-monta pela key=idx)
+    setPausado(false); // novo vídeo começa tocando
     // Trocou de PRODUTO → reseta composição/quantidade da gaveta.
     if (alvo.p.id !== current.p.id) {
       setComposicaoSel(alvo.p.variantes[0]?.composicao ?? null);
@@ -177,7 +209,24 @@ export default function VideoFeed({
   const estoqueAtual = variant ? unitsDoPool(p, variant) : p.estoque;
   const semEstoque = estoqueAtual <= 0;
   const pool = { machos: p.estoqueMachos, femeas: p.estoqueFemeas };
-  const embedSrc = feedEmbedSrc(current.video, !som); // autoplay (mudo até ligar som)
+  const embedSrc = feedEmbedSrc(current.video); // sempre entra mudo (autoplay)
+
+  // Play/pause e som por código (postMessage). unMute precisa de gesto → ok (vem
+  // de um clique). Ao trocar de slide o iframe re-monta mudo; reaplica o som no
+  // onLoad se já estava ligado.
+  function togglePlay() {
+    const novo = !pausado;
+    setPausado(novo);
+    postCmd(iframeRef.current, novo ? "pauseVideo" : "playVideo");
+  }
+  function toggleSom() {
+    const novo = !som;
+    setSom(novo);
+    postCmd(iframeRef.current, novo ? "unMute" : "mute");
+  }
+  function onIframeLoad() {
+    if (som) postCmd(iframeRef.current, "unMute"); // reaplica som no novo slide
+  }
 
   function escolherComposicao(c: TipoComposicao) {
     setComposicaoSel(c);
@@ -238,32 +287,32 @@ export default function VideoFeed({
 
           {embedSrc ? (
             <>
-              {/* Embed SOB DEMANDA: só o slide atual monta iframe; autoplay (mudo
-                  até o usuário ligar o som). key={idx+som} re-monta ao trocar. */}
+              {/* Embed SOB DEMANDA: só o slide atual monta iframe (autoplay mudo).
+                  key={idx} re-monta ao trocar. Controles nativos escondidos pelos
+                  params; play/pause e som por postMessage. */}
               <iframe
-                key={`${idx}-${som ? "som" : "mudo"}`}
+                key={idx}
+                ref={iframeRef}
                 src={embedSrc}
                 title={current.video.titulo || p.nome}
+                onLoad={onIframeLoad}
                 className="absolute inset-0 w-full h-full"
                 allow="autoplay; accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
               />
-              {/* Enquanto mudo: camada de toque para ativar o som (e o swipe
-                  continua funcionando por cima). Ao ligar o som, some e libera os
-                  controles do player. */}
-              {!som && (
-                <button
-                  type="button"
-                  onClick={() => setSom(true)}
-                  aria-label="Ativar som"
-                  className="absolute inset-0 z-10 flex items-end justify-center pb-40"
-                >
-                  <span className="flex items-center gap-2 bg-black/55 text-white text-xs font-medium rounded-full px-3 py-2">
-                    <VolumeX className="w-4 h-4" aria-hidden="true" />
-                    Toque para ativar o som
+              {/* Camada de toque = play/pause (fica sobre o iframe, então o swipe
+                  também funciona por cima dela). Ícone de play só quando pausado. */}
+              <button
+                type="button"
+                onClick={togglePlay}
+                aria-label={pausado ? "Tocar" : "Pausar"}
+                className="absolute inset-0 z-10 flex items-center justify-center"
+              >
+                {pausado && (
+                  <span className="bg-black/45 rounded-full p-5">
+                    <Play className="w-9 h-9 text-white fill-white" aria-hidden="true" />
                   </span>
-                </button>
-              )}
+                )}
+              </button>
             </>
           ) : (
             // Sem embed (id não resolvido) → poster com play que abre no destino.
@@ -290,7 +339,7 @@ export default function VideoFeed({
           type="button"
           onClick={() => router.back()}
           aria-label="Fechar"
-          className="flex items-center justify-center w-11 h-11 rounded-full bg-black/50 text-white hover:bg-black/70 transition-colors"
+          className="flex items-center justify-center w-11 h-11 rounded-full bg-black/40 text-white hover:bg-black/60 transition-colors"
         >
           <X className="w-5 h-5" aria-hidden="true" />
         </button>
@@ -303,12 +352,12 @@ export default function VideoFeed({
           <span className="text-white/90 text-[11px] font-semibold bg-black/50 rounded-full px-2.5 py-1">
             {PLATFORM_LABEL[current.video.platform]}
           </span>
-          {/* Liga/desliga o som (autoplay entra mudo). */}
+          {/* Liga/desliga o som (autoplay entra mudo; unMute via postMessage). */}
           <button
             type="button"
-            onClick={() => setSom((s) => !s)}
+            onClick={toggleSom}
             aria-label={som ? "Desativar som" : "Ativar som"}
-            className="flex items-center justify-center w-11 h-11 rounded-full bg-black/50 text-white hover:bg-black/70 transition-colors"
+            className="flex items-center justify-center w-11 h-11 rounded-full bg-black/40 text-white hover:bg-black/60 transition-colors"
           >
             {som ? (
               <Volume2 className="w-5 h-5" aria-hidden="true" />
@@ -325,7 +374,7 @@ export default function VideoFeed({
           type="button"
           onClick={anterior}
           aria-label="Vídeo anterior"
-          className="flex items-center justify-center w-11 h-11 rounded-full bg-black/50 text-white hover:bg-black/70 transition-colors"
+          className="flex items-center justify-center w-11 h-11 rounded-full bg-black/40 text-white hover:bg-black/60 transition-colors"
         >
           <ChevronUp className="w-5 h-5" aria-hidden="true" />
         </button>
@@ -333,14 +382,21 @@ export default function VideoFeed({
           type="button"
           onClick={proximo}
           aria-label="Próximo vídeo"
-          className="flex items-center justify-center w-11 h-11 rounded-full bg-black/50 text-white hover:bg-black/70 transition-colors"
+          className="flex items-center justify-center w-11 h-11 rounded-full bg-black/40 text-white hover:bg-black/60 transition-colors"
         >
           <ChevronDown className="w-5 h-5" aria-hidden="true" />
         </button>
       </div>
 
-      {/* Gaveta de compra (parte de baixo, vídeo visível acima) */}
-      <div className="absolute bottom-0 inset-x-0 z-20 bg-gradient-to-t from-black via-black/95 to-black/0 pt-10 pb-4 px-4">
+      {/* Gaveta de compra (parte de baixo, vídeo visível acima) — degradê escuro
+          pra o texto ficar legível sobre qualquer vídeo (claro ou escuro). */}
+      <div
+        className="absolute bottom-0 inset-x-0 z-20 pt-12 pb-4 px-4"
+        style={{
+          background:
+            "linear-gradient(to top, rgba(0,0,0,0.9) 55%, rgba(0,0,0,0.5) 78%, transparent)",
+        }}
+      >
         <div className="max-w-[480px] mx-auto space-y-3 text-white">
           <div>
             <h2 className="text-base font-bold leading-tight">{p.nome}</h2>
