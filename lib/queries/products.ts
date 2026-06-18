@@ -32,8 +32,9 @@ const cardSelect = {
   descontoPix: true,
   parcelasMax: true,
   estoque: true,
-  // Vídeo de capa: principal primeiro, senão o de menor ordem.
+  // Vídeo de capa: principal primeiro, senão o de menor ordem. Só ativos (loja).
   videos: {
+    where: { ativo: true },
     orderBy: [{ principal: "desc" }, { ordem: "asc" }],
     take: 1,
     select: {
@@ -258,6 +259,7 @@ export const getProductBySlug = cache(
         expectativaVida: true,
         category: { select: { nome: true } },
         videos: {
+          where: { ativo: true }, // loja mostra só vídeos ativos
           orderBy: [{ principal: "desc" }, { ordem: "asc" }],
           select: {
             id: true,
