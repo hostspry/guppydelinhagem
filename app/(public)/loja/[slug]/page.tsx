@@ -6,6 +6,7 @@ import {
   getRelacionados,
   getUltimosAdicionados,
 } from "@/lib/queries/products";
+import { getConfigPreco } from "@/lib/queries/config";
 import ProductDetail from "@/components/product/ProductDetail";
 
 // ISR: a página revalida a cada 60s, refletindo edições do admin sem redeploy.
@@ -53,6 +54,10 @@ export default async function ProdutoPage({ params }: Props) {
     relacionados = (await getUltimosAdicionados()).filter((p) => p.id !== prod.id);
   }
 
+  // Desconto Pix global (lib/precos é a fonte única; o ProductDetail calcula o
+  // preço efetivo com isso, igual ao checkout).
+  const { descontoPixGlobalPercent } = await getConfigPreco();
+
   return (
     <>
       {preview && (
@@ -61,7 +66,11 @@ export default async function ProdutoPage({ params }: Props) {
           loja).
         </div>
       )}
-      <ProductDetail product={prod} relacionados={relacionados} />
+      <ProductDetail
+        product={prod}
+        relacionados={relacionados}
+        descontoPixGlobalPercent={descontoPixGlobalPercent}
+      />
     </>
   );
 }

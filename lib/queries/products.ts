@@ -187,6 +187,7 @@ export type ProductDetail = {
   metaDescription: string | null;
   preco: number;
   descontoPix: number | null;
+  usarDescontoPixGlobal: boolean;
   parcelasMax: number;
   estoque: number;
   estoqueMachos: number; // pool (PEIXE)
@@ -239,6 +240,7 @@ export const getProductBySlug = cache(
         metaDescription: true,
         preco: true,
         descontoPix: true,
+        usarDescontoPixGlobal: true,
         parcelasMax: true,
         estoque: true,
         estoqueMachos: true,
@@ -294,6 +296,7 @@ export const getProductBySlug = cache(
       metaDescription: p.metaDescription,
       preco: Number(p.preco),
       descontoPix: p.descontoPix == null ? null : Number(p.descontoPix),
+      usarDescontoPixGlobal: p.usarDescontoPixGlobal,
       parcelasMax: p.parcelasMax,
       estoque: p.estoque,
       estoqueMachos: p.estoqueMachos,

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import {
   Check,
   Play,
@@ -28,6 +29,7 @@ import ProductFreteEstimator from "./ProductFreteEstimator";
 import ProductFaq from "./ProductFaq";
 import WaitlistForm from "./WaitlistForm";
 import { formatBRL } from "@/lib/utils/format";
+import { calcularPrecos } from "@/lib/precos";
 import {
   youtubeEmbedUrl,
   instagramEmbedUrl,
@@ -102,10 +104,13 @@ function capFirst(s: string): string {
 export default function ProductDetail({
   product,
   relacionados,
+  descontoPixGlobalPercent,
 }: {
   product: ProductDetailData;
   relacionados: PublicProductCard[];
+  descontoPixGlobalPercent: number;
 }) {
+  const router = useRouter();
   const [qtd, setQtd] = useState(1);
   const [playing, setPlaying] = useState(false);
   const [selectedId, setSelectedId] = useState(product.videos[0]?.id ?? null);
@@ -146,12 +151,21 @@ export default function ProductDetail({
   const estoqueAtual = variant ? unitsDoPool(variant) : product.estoque;
   const qtdPeixesUnit = variant ? qtdPeixesDe(variant) : 1; // alimenta o frete
   const semEstoque = estoqueAtual <= 0;
-  const temDescontoPix =
-    product.descontoPix != null && product.descontoPix > 0;
-  const precoPix = temDescontoPix
-    ? precoBase * (1 - product.descontoPix! / 100)
-    : precoBase;
-  const valorParcela = precoBase / product.parcelasMax;
+  // Fonte única (lib/precos): cheio (cartão) + Pix com desconto efetivo (próprio
+  // ou global), igual ao checkout. Não recalcula à mão.
+  const precos = calcularPrecos(
+    {
+      precoBase,
+      descontoPixProprio: product.descontoPix,
+      usarDescontoPixGlobal: product.usarDescontoPixGlobal,
+    },
+    { descontoPixGlobalPercent },
+  );
+  const precoCheio = precos.precoCartao;
+  const precoPix = precos.precoPix;
+  const descontoPercent = precos.descontoPixPercent;
+  const temDescontoPix = descontoPercent > 0;
+  const valorParcela = precoCheio / product.parcelasMax;
   const capa = product.videos.find((v) => v.principal)?.thumbnailUrl ?? null;
 
   // Barra de disponibilidade estilo tanque: cheia em 50 unidades; o nível (cor +
@@ -209,7 +223,7 @@ export default function ProductDetail({
         nome: product.nome,
         slug: product.slug,
         precoPix,
-        precoCheio: precoBase,
+        precoCheio,
         qtdPeixes: variant ? qtdPeixesDe(variant) : 0,
         thumbnail: capa,
         estoque: estoqueAtual,
@@ -218,11 +232,11 @@ export default function ProductDetail({
     );
     toast.success("Adicionado ao carrinho ✓");
   }
+  // "Comprar agora" (opção B): adiciona ao carrinho (sem esvaziar o que já havia)
+  // e vai direto ao checkout — pula a revisão do /carrinho. O frete é no checkout.
   function handleComprar() {
     adicionar();
-    const comp = variant ? ` — ${COMPOSICAO_LABEL[variant.composicao]}` : "";
-    const msg = `Olá! Quero comprar: ${product.nome}${comp} (quantidade: ${qtd}). Pode me ajudar a fechar o pedido?`;
-    window.open(whatsappLink(msg), "_blank", "noopener,noreferrer");
+    router.push("/checkout");
   }
   const duvidasHref = whatsappLink(
     `Olá! Tenho dúvidas sobre: ${product.nome}.`,
@@ -390,28 +404,47 @@ export default function ProductDetail({
             </div>
           )}
 
-          {/* Preço */}
-          <div className="space-y-1">
-            <div className="flex items-end gap-2 flex-wrap">
-              <span className="text-green-600 text-3xl font-bold leading-none">
-                {formatBRL(precoPix)}
-              </span>
-              <span className="text-green-700 text-sm font-medium pb-0.5">no Pix</span>
-              {temDescontoPix && (
-                <span className="text-[11px] font-bold text-green-700 bg-green-100 px-2 py-0.5 rounded-full">
-                  {product.descontoPix}% OFF
-                </span>
-              )}
-            </div>
-            {temDescontoPix && (
-              <p className="text-sm text-muted-foreground">
-                De <span className="line-through">{formatBRL(product.preco)}</span> no
-                cartão
-              </p>
+          {/* Preço — cheio (cartão) bem legível; Pix em destaque como desconto */}
+          <div className="space-y-1.5">
+            {temDescontoPix ? (
+              <>
+                {/* Preço normal (cartão) — claro e legível, não escondido */}
+                <p className="text-lg text-primary font-semibold leading-tight">
+                  {formatBRL(precoCheio)}{" "}
+                  <span className="text-sm font-normal text-muted-foreground">
+                    no cartão · em até {product.parcelasMax}x de{" "}
+                    {formatBRL(valorParcela)} sem juros
+                  </span>
+                </p>
+                {/* Desconto Pix à vista — grande, em verde (destaque) */}
+                <div className="flex items-end gap-2 flex-wrap">
+                  <span className="text-green-600 text-3xl font-bold leading-none">
+                    {formatBRL(precoPix)}
+                  </span>
+                  <span className="text-green-700 text-sm font-semibold pb-0.5">
+                    à vista no Pix
+                  </span>
+                  <span className="text-[11px] font-bold text-green-700 bg-green-100 px-2 py-0.5 rounded-full">
+                    {descontoPercent}% OFF
+                  </span>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="flex items-end gap-2 flex-wrap">
+                  <span className="text-primary text-3xl font-bold leading-none">
+                    {formatBRL(precoCheio)}
+                  </span>
+                  <span className="text-muted-foreground text-sm pb-0.5">
+                    à vista
+                  </span>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  em até {product.parcelasMax}x de {formatBRL(valorParcela)} sem
+                  juros
+                </p>
+              </>
             )}
-            <p className="text-sm text-muted-foreground">
-              ou em até {product.parcelasMax}x de {formatBRL(valorParcela)} sem juros
-            </p>
           </div>
 
           {/* Frete — logo abaixo do preço */}
@@ -482,33 +515,34 @@ export default function ProductDetail({
                 </div>
               </div>
 
-              <div className="space-y-2">
+              <div className="space-y-2.5">
+                {/* PRIMÁRIO — ação dominante (rosa da marca, maior, com sombra) */}
                 <button
                   type="button"
                   onClick={handleComprar}
-                  className="w-full bg-green-600 text-white font-semibold py-3 rounded-pill hover:brightness-110 transition-all"
+                  className="w-full bg-secondary text-white text-base font-bold py-3.5 rounded-pill shadow-[0_8px_24px_-8px_rgba(255,3,92,0.5)] hover:brightness-110 transition-all"
                 >
                   Comprar agora
                 </button>
-                <div className="flex flex-col sm:flex-row gap-2">
-                  <button
-                    type="button"
-                    onClick={adicionar}
-                    className="flex-1 flex items-center justify-center gap-2 border border-primary text-primary font-semibold py-3 rounded-pill hover:bg-primary/5 transition-all"
-                  >
-                    <ShoppingCart size={17} aria-hidden="true" />
-                    Adicionar ao carrinho
-                  </button>
-                  <a
-                    href={duvidasHref}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex-1 flex items-center justify-center gap-2 border border-primary text-primary font-semibold py-3 rounded-pill hover:bg-primary/5 transition-all"
-                  >
-                    <WhatsAppIcon className="w-4 h-4 text-[#25D366]" />
-                    Tirar dúvidas
-                  </a>
-                </div>
+                {/* SECUNDÁRIO — adicionar ao carrinho (outline, menos peso) */}
+                <button
+                  type="button"
+                  onClick={adicionar}
+                  className="w-full flex items-center justify-center gap-2 border-2 border-secondary text-secondary font-semibold py-3 rounded-pill hover:bg-secondary/5 transition-all"
+                >
+                  <ShoppingCart size={17} aria-hidden="true" />
+                  Adicionar ao carrinho
+                </button>
+                {/* TERCIÁRIO — suporte, discreto (link com alvo de 44px) */}
+                <a
+                  href={duvidasHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-center gap-1.5 min-h-11 text-sm text-muted-foreground hover:text-primary transition-colors"
+                >
+                  <WhatsAppIcon className="w-4 h-4 text-[#25D366]" />
+                  Tirar dúvidas no WhatsApp
+                </a>
               </div>
             </div>
           )}
