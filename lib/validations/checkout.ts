@@ -39,6 +39,9 @@ export const checkoutSchema = z.object({
   uf: z.string().trim().length(2, "UF deve ter 2 letras"),
   // Frete escolhido (o VALOR é re-cotado no servidor; só a transportadora importa)
   transportadora: z.enum(Transportadora),
+  // Modalidade escolhida pelo cliente: terrestre (Jadlog) ou aéreo (Gollog). O
+  // valor é sempre recalculado no servidor conforme a modalidade.
+  modalidadeFrete: z.enum(["TERRESTRE", "AEREO"]).default("TERRESTRE"),
   itens: z.array(checkoutItemSchema).min(1, "Seu carrinho está vazio"),
 });
 

@@ -12,12 +12,17 @@ import {
   CreditCard,
   Loader2,
   MapPin,
+  Plane,
   QrCode,
   ShoppingCart,
 } from "lucide-react";
 import { WhatsAppIcon } from "@/components/icons/WhatsAppIcon";
 import { formatBRL } from "@/lib/utils/format";
-import { whatsappLink, MAX_PEIXES_POR_CAIXA } from "@/lib/constants";
+import {
+  whatsappLink,
+  MAX_PEIXES_POR_CAIXA,
+  freteGollog,
+} from "@/lib/constants";
 import { checkoutSchema } from "@/lib/validations/checkout";
 import {
   useCart,
@@ -53,7 +58,11 @@ export type CheckoutPrefill = {
 
 // Só os campos visíveis do formulário (transportadora/itens vêm do carrinho e da
 // regra de frete, não do form). Reusa as mensagens PT do checkoutSchema.
-const camposSchema = checkoutSchema.omit({ transportadora: true, itens: true });
+const camposSchema = checkoutSchema.omit({
+  transportadora: true,
+  modalidadeFrete: true,
+  itens: true,
+});
 type CamposInput = z.input<typeof camposSchema>;
 type CamposOutput = z.output<typeof camposSchema>;
 
@@ -178,6 +187,10 @@ export default function CheckoutClient({
 
   // Forma de pagamento (Pix padrão) + teto de parcelas (do servidor) + recusa.
   const [aba, setAba] = useState<"pix" | "cartao">("pix");
+  // Modalidade de frete escolhida (Jadlog terrestre padrão | Gollog aéreo).
+  const [modalidade, setModalidade] = useState<"TERRESTRE" | "AEREO">(
+    "TERRESTRE",
+  );
   const [teto, setTeto] = useState(1);
   const [recusa, setRecusa] = useState<string | null>(null);
   // Preços autoritativos do servidor (cheio + Pix). Fallback no cart até carregar.
@@ -197,12 +210,21 @@ export default function CheckoutClient({
   const cepValido = /^\d{8}$/.test(cepDigits);
   const excedeCaixa = totalPeixes > MAX_PEIXES_POR_CAIXA;
 
-  // Opção de frete cobrável = Jadlog .Com (id 4). Gollog é faixa/manual.
-  const freteSel = useMemo(
+  // Terrestre = Jadlog .Com (id 4, via Melhor Envio). Aéreo = Gollog fixo por UF.
+  const jadlogSel = useMemo(
     () => frete?.jadlog.find((j) => j.id === 4) ?? frete?.jadlog[0] ?? null,
     [frete],
   );
-  const freteValor = freteSel?.price ?? null;
+  const ufAtual = (watch("uf") ?? "").toUpperCase();
+  const gollogInfo = freteGollog(ufAtual); // {preco, regiao} | null
+  // Valor do frete conforme a modalidade escolhida.
+  const freteValor =
+    modalidade === "AEREO"
+      ? (gollogInfo?.preco ?? null)
+      : (jadlogSel?.price ?? null);
+  // Há opções a mostrar quando o frete foi calculado (Jadlog) — aí a UF também já
+  // foi preenchida (autofill do ViaCEP), liberando o Gollog.
+  const freteCalculado = frete != null;
 
   // Subtotais: servidor manda; cart é fallback até o servidor responder.
   const subtotalPixView = preco?.subtotalPix ?? subtotalPixCart;
@@ -327,7 +349,8 @@ export default function CheckoutClient({
       const res = await criarPedidoCheckout({
         ...data,
         complemento: data.complemento ?? "",
-        transportadora: "JADLOG",
+        transportadora: modalidade === "AEREO" ? "GOLLOG" : "JADLOG",
+        modalidadeFrete: modalidade,
         itens: itensPedido(),
       });
       if (res.ok) {
@@ -369,7 +392,8 @@ export default function CheckoutClient({
       {
         ...dados,
         complemento: dados.complemento ?? "",
-        transportadora: "JADLOG",
+        transportadora: modalidade === "AEREO" ? "GOLLOG" : "JADLOG",
+        modalidadeFrete: modalidade,
         itens: itensPedido(),
       },
       cartao,
@@ -662,25 +686,82 @@ export default function CheckoutClient({
                   </a>
                 </div>
               )}
-              {!excedeCaixa && freteSel && (
-                <div className="rounded-lg border border-primary/40 bg-primary/5 p-3 text-sm">
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="flex items-center gap-1.5 text-primary">
-                      <Clock size={14} aria-hidden="true" />
-                      {freteSel.name} · {freteSel.deliveryTime} dias úteis
+              {!excedeCaixa && (freteCalculado || !!gollogInfo) && (
+                <fieldset className="space-y-2">
+                  <legend className="text-xs font-medium text-primary mb-1">
+                    Escolha o frete
+                  </legend>
+
+                  {/* Terrestre — Jadlog (via Melhor Envio) */}
+                  <label
+                    className={`flex items-center gap-3 rounded-lg border p-3 text-sm cursor-pointer transition-all ${
+                      modalidade === "TERRESTRE"
+                        ? "border-primary/60 bg-primary/5"
+                        : "border-border hover:border-primary/40"
+                    } ${jadlogSel ? "" : "opacity-60"}`}
+                  >
+                    <input
+                      type="radio"
+                      name="modalidadeFrete"
+                      className="accent-secondary"
+                      checked={modalidade === "TERRESTRE"}
+                      disabled={!jadlogSel}
+                      onChange={() => setModalidade("TERRESTRE")}
+                    />
+                    <span className="flex-1">
+                      <span className="flex items-center gap-1.5 text-primary font-medium">
+                        <Clock size={14} aria-hidden="true" />
+                        JADLOG (terrestre)
+                      </span>
+                      <span className="block text-xs text-muted-foreground">
+                        {jadlogSel
+                          ? `${jadlogSel.deliveryTime} dias úteis`
+                          : "indisponível para esse CEP"}
+                      </span>
                     </span>
                     <span className="font-bold text-primary shrink-0">
-                      {formatBRL(freteSel.price)}
+                      {jadlogSel ? formatBRL(jadlogSel.price) : "—"}
                     </span>
-                  </div>
+                  </label>
+
+                  {/* Aéreo — Gollog (tabela fixa por região) */}
+                  <label
+                    className={`flex items-center gap-3 rounded-lg border p-3 text-sm cursor-pointer transition-all ${
+                      modalidade === "AEREO"
+                        ? "border-primary/60 bg-primary/5"
+                        : "border-border hover:border-primary/40"
+                    } ${gollogInfo ? "" : "opacity-60"}`}
+                  >
+                    <input
+                      type="radio"
+                      name="modalidadeFrete"
+                      className="accent-secondary"
+                      checked={modalidade === "AEREO"}
+                      disabled={!gollogInfo}
+                      onChange={() => setModalidade("AEREO")}
+                    />
+                    <span className="flex-1">
+                      <span className="flex items-center gap-1.5 text-primary font-medium">
+                        <Plane size={14} aria-hidden="true" />
+                        Gollog (aéreo)
+                      </span>
+                      <span className="block text-xs text-muted-foreground">
+                        {gollogInfo ? "1–2 dias úteis" : "informe a UF do endereço"}
+                      </span>
+                    </span>
+                    <span className="font-bold text-primary shrink-0">
+                      {gollogInfo ? formatBRL(gollogInfo.preco) : "—"}
+                    </span>
+                  </label>
+
                   {frete?.endereco?.cidade && (
-                    <p className="flex items-center gap-1.5 text-xs text-muted-foreground mt-1">
+                    <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
                       <MapPin size={12} aria-hidden="true" />
                       {frete.endereco.cidade}
                       {frete.endereco.uf ? ` - ${frete.endereco.uf}` : ""}
                     </p>
                   )}
-                </div>
+                </fieldset>
               )}
             </div>
           </section>

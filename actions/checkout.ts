@@ -15,7 +15,7 @@ import { transicionarParaPago } from "@/lib/pedido-baixa";
 import { calcularPrecos } from "@/lib/precos";
 import { getConfigPreco } from "@/lib/queries/config";
 import { COMPOSICAO_LABEL } from "@/lib/composicoes";
-import { MAX_PEIXES_POR_CAIXA } from "@/lib/constants";
+import { MAX_PEIXES_POR_CAIXA, freteGollog } from "@/lib/constants";
 import type { EnderecoEntrega } from "@/lib/validations/pedido";
 import {
   ProviderPagamento,
@@ -324,29 +324,49 @@ export async function criarOrderDoCheckout(
     };
   }
 
-  // ── 2. Re-cotar o frete no servidor (anti-tamper) ─────────────────────────
-  // Só Jadlog é auto-cobrável; Gollog é faixa/manual. Re-cota pra esse CEP+peso.
-  const { pesoGramas, caixa } = calcularPesoECaixa(Math.max(1, totalPeixes));
-  const cot = await cotarFrete({ cepDestino: data.cep, pesoGramas, caixa });
-  if (!cot.ok) {
-    return { ok: false, error: cot.error };
+  // ── 2. Frete no servidor conforme a MODALIDADE escolhida (anti-tamper) ─────
+  const modalidade = data.modalidadeFrete ?? "TERRESTRE";
+  let frete: number;
+  let transportadora: Transportadora;
+
+  if (modalidade === "AEREO") {
+    // Gollog: tabela fixa por região (UF). Até 10 peixes (o >10 já barrou acima).
+    const g = freteGollog(data.uf);
+    if (!g) {
+      return {
+        ok: false,
+        error:
+          "Frete aéreo indisponível para essa UF. Finalize no WhatsApp para combinarmos o envio.",
+      };
+    }
+    frete = round2(g.preco);
+    transportadora = Transportadora.GOLLOG;
+  } else {
+    // Terrestre: re-cota Jadlog via Melhor Envio pra esse CEP + peso/caixa.
+    const { pesoGramas, caixa } = calcularPesoECaixa(Math.max(1, totalPeixes));
+    const cot = await cotarFrete({ cepDestino: data.cep, pesoGramas, caixa });
+    if (!cot.ok) {
+      return { ok: false, error: cot.error };
+    }
+    const jad = cot.data.jadlog.find((j) => j.id === 4) ?? cot.data.jadlog[0];
+    if (!jad) {
+      return {
+        ok: false,
+        error:
+          "Não há frete terrestre automático para esse CEP. Escolha o aéreo ou finalize no WhatsApp.",
+      };
+    }
+    if (jad.requerAvaliacao) {
+      return {
+        ok: false,
+        error:
+          "O prazo de entrega terrestre para esse CEP exige avaliação — escolha o aéreo ou finalize no WhatsApp.",
+      };
+    }
+    frete = round2(jad.price);
+    transportadora = Transportadora.JADLOG;
   }
-  const jad = cot.data.jadlog.find((j) => j.id === 4) ?? cot.data.jadlog[0];
-  if (!jad) {
-    return {
-      ok: false,
-      error:
-        "Não há frete automático para esse CEP. Finalize no WhatsApp para combinarmos o envio.",
-    };
-  }
-  if (jad.requerAvaliacao) {
-    return {
-      ok: false,
-      error:
-        "O prazo de entrega para esse CEP exige avaliação — finalize no WhatsApp.",
-    };
-  }
-  const frete = round2(jad.price);
+
   const totalCheio = round2(subtotalCheio + frete);
   const totalPix = round2(subtotalPix + frete);
 
@@ -456,7 +476,8 @@ export async function criarOrderDoCheckout(
           where: { id: reusar.id },
           data: {
             enderecoEntrega: endereco as unknown as Prisma.InputJsonValue,
-            transportadora: Transportadora.JADLOG,
+            transportadora,
+            modalidadeFrete: modalidade,
             subtotal: subtotalCheio,
             frete,
             desconto: 0,
@@ -486,7 +507,8 @@ export async function criarOrderDoCheckout(
           userId: userId ?? undefined,
           status: "AGUARDANDO_PAGAMENTO", // sem baixar estoque (só no PAGO)
           formaPagamento: FormaPagamento.PIX,
-          transportadora: Transportadora.JADLOG,
+          transportadora,
+          modalidadeFrete: modalidade,
           enderecoEntrega: endereco as unknown as Prisma.InputJsonValue,
           subtotal: subtotalCheio,
           frete,
