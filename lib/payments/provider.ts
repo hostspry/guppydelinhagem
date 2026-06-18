@@ -35,6 +35,7 @@ export interface PixCriado {
 export interface PixConsulta {
   externalId: string;
   status: StatusPagamento;
+  externalReference: string | null; // = orderId (external_reference no gateway)
 }
 
 export interface PaymentProvider {

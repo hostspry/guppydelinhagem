@@ -122,6 +122,7 @@ type MpPaymentResponse = {
   id: number | string;
   status?: string;
   status_detail?: string;
+  external_reference?: string;
   date_of_expiration?: string;
   point_of_interaction?: {
     transaction_data?: {
@@ -191,6 +192,7 @@ export const mercadoPagoProvider: PaymentProvider = {
     return {
       externalId: String(data.id),
       status: mapStatus(data.status, data.status_detail),
+      externalReference: data.external_reference ?? null,
     };
   },
 };
