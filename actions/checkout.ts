@@ -117,6 +117,7 @@ export type OrderCriado = {
   numero: string;
   valor: number; // total recalculado no servidor
   pagador: PagadorCheckout;
+  reused: boolean; // true = reaproveitou um AGUARDANDO existente (não deletar em erro)
 };
 
 type OrderResult =
@@ -286,6 +287,7 @@ export async function criarOrderDoCheckout(
 
   let orderId = "";
   let numero = "";
+  let reused = false;
   try {
     const created = await prisma.$transaction(async (tx) => {
       // Reuso de cliente por identidade forte → fraca.
@@ -323,6 +325,63 @@ export async function criarOrderDoCheckout(
             select: { id: true },
           });
 
+      // ── Reuso do MESMO checkout (Opção A via hash de itens + comprador) ──
+      // Em vez de criar um Order novo a cada tentativa/recusa, reusa um pedido
+      // AGUARDANDO_PAGAMENTO recente (≤2h) do mesmo cliente com os MESMOS itens.
+      // Assim, recusar e tentar de novo gera UM pedido com várias linhas
+      // Pagamento — não vários pedidos órfãos. Nunca toca PAGO/ENVIADO/etc.
+      const assinatura = (
+        its: {
+          productId: string | null;
+          composicao: string | null;
+          quantidade: number;
+        }[],
+      ) =>
+        its
+          .map((i) => `${i.productId ?? ""}|${i.composicao ?? ""}|${i.quantidade}`)
+          .sort()
+          .join(";");
+      const assinaturaAtual = assinatura(itensData);
+
+      const limite2h = new Date(Date.now() - 2 * 60 * 60 * 1000);
+      const candidatos = await tx.order.findMany({
+        where: {
+          clienteId: cliente.id,
+          status: "AGUARDANDO_PAGAMENTO",
+          criadoEm: { gte: limite2h },
+        },
+        orderBy: { criadoEm: "desc" },
+        select: {
+          id: true,
+          numero: true,
+          items: {
+            select: { productId: true, composicao: true, quantidade: true },
+          },
+        },
+      });
+      const reusar = candidatos.find(
+        (c) => assinatura(c.items) === assinaturaAtual,
+      );
+
+      if (reusar) {
+        // Mesmo checkout: atualiza endereço/frete/total (anti-fraude recalculado);
+        // mantém numero e os itens (snapshots iguais). A nova tentativa de
+        // Pagamento é anexada depois pelo chamador (Pix/Cartão).
+        const upd = await tx.order.update({
+          where: { id: reusar.id },
+          data: {
+            enderecoEntrega: endereco as unknown as Prisma.InputJsonValue,
+            transportadora: Transportadora.JADLOG,
+            subtotal,
+            frete,
+            desconto: 0,
+            total,
+          },
+          select: { id: true, numero: true },
+        });
+        return { ...upd, reused: true };
+      }
+
       // Número sequencial por ano (igual ao pedido manual).
       const ano = new Date().getFullYear();
       const ultimo = await tx.order.findFirst({
@@ -333,7 +392,7 @@ export async function criarOrderDoCheckout(
       const sequencia = (ultimo?.sequencia ?? 0) + 1;
       const num = `#${ano}-${String(sequencia).padStart(4, "0")}`;
 
-      const order = await tx.order.create({
+      const novo = await tx.order.create({
         data: {
           numero: num,
           ano,
@@ -352,10 +411,11 @@ export async function criarOrderDoCheckout(
         },
         select: { id: true, numero: true },
       });
-      return order;
+      return { ...novo, reused: false };
     });
     orderId = created.id;
     numero = created.numero;
+    reused = created.reused;
   } catch (e) {
     console.error("[checkout] criar pedido", e);
     return { ok: false, error: "Não foi possível criar o pedido. Tente novamente." };
@@ -368,6 +428,7 @@ export async function criarOrderDoCheckout(
       orderId,
       numero,
       valor: total,
+      reused,
       pagador: {
         nome: partesNome[0],
         sobrenome: partesNome.slice(1).join(" ") || null,
@@ -398,8 +459,13 @@ export async function criarPedidoCheckout(
     return { ok: true, data: pixData };
   } catch (e) {
     console.error("[checkout] criar Pix", e);
-    // Sem pagamento não há pedido útil → remove o rascunho pra não poluir o admin.
-    await prisma.order.delete({ where: { id: order.data.orderId } }).catch(() => {});
+    // Pedido recém-criado sem pagamento → remove pra não poluir o admin. Pedido
+    // REUSADO não se apaga (tem tentativas anteriores); a varredura limpa depois.
+    if (!order.data.reused) {
+      await prisma.order
+        .delete({ where: { id: order.data.orderId } })
+        .catch(() => {});
+    }
     return {
       ok: false,
       error:
@@ -579,8 +645,11 @@ export async function pagarComCartao(
     });
   } catch (e) {
     console.error("[checkout] cobrar cartão", e);
-    // Erro de comunicação → sem pagamento → remove o pedido órfão.
-    await prisma.order.delete({ where: { id: orderId } }).catch(() => {});
+    // Erro de comunicação → sem pagamento. Remove só se foi recém-criado; pedido
+    // REUSADO (com tentativas anteriores) não se apaga — a varredura limpa depois.
+    if (!order.data.reused) {
+      await prisma.order.delete({ where: { id: orderId } }).catch(() => {});
+    }
     return {
       resultado: "erro",
       mensagem:
