@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import {
@@ -9,6 +10,8 @@ import {
 } from "@/lib/validations/checkout";
 import { calcularPesoECaixa, cotarFrete } from "@/lib/shipping";
 import { getPaymentProvider } from "@/lib/payments/registry";
+import { mensagemRecusa } from "@/lib/payments/mercadopago";
+import { transicionarParaPago } from "@/lib/pedido-baixa";
 import { COMPOSICAO_LABEL } from "@/lib/composicoes";
 import { MAX_PEIXES_POR_CAIXA } from "@/lib/constants";
 import type { EnderecoEntrega } from "@/lib/validations/pedido";
@@ -20,6 +23,8 @@ import {
   Transportadora,
 } from "@/lib/generated/prisma/enums";
 import type { Prisma, OrderStatus } from "@/lib/generated/prisma/client";
+
+const TETO_PARCELAS = 12;
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
@@ -468,4 +473,150 @@ export async function gerarNovoPix(numero: string): Promise<CheckoutResult> {
       error: e instanceof Error ? e.message : "Não foi possível gerar o Pix.",
     };
   }
+}
+
+// ── Cartão de crédito ────────────────────────────────────────────────────────
+
+export type CartaoInput = {
+  token: string;
+  paymentMethodId: string;
+  issuerId: string | null;
+  installments: number;
+};
+
+export type CartaoDesfecho =
+  | { resultado: "aprovado"; numero: string }
+  | { resultado: "analise"; numero: string }
+  | { resultado: "recusado"; mensagem: string }
+  | {
+      resultado: "erro";
+      mensagem: string;
+      fieldErrors?: Record<string, string[]>;
+    };
+
+/**
+ * Teto de parcelas = min(12, menor parcelasMax entre os produtos do carrinho).
+ * Calculado NO SERVIDOR — alimenta o Brick (maxInstallments) e valida a tentativa
+ * (anti-tamper). Sem produtos → 1.
+ */
+export async function calcularTetoParcelas(
+  produtoIds: string[],
+): Promise<number> {
+  const ids = [...new Set((produtoIds ?? []).filter(Boolean))];
+  if (ids.length === 0) return 1;
+  const prods = await prisma.product.findMany({
+    where: { id: { in: ids } },
+    select: { parcelasMax: true },
+  });
+  if (prods.length === 0) return 1;
+  const menor = Math.min(...prods.map((p) => p.parcelasMax));
+  return Math.max(1, Math.min(TETO_PARCELAS, menor));
+}
+
+/**
+ * Cartão: cria o Order (helper compartilhado) e cobra no cartão com o TOKEN
+ * (gerado no navegador pelo Brick — o servidor nunca vê PAN/CVV). Três desfechos
+ * (status sempre da API do MP):
+ *  - approved → grava Pagamento PAGO + transiciona o pedido (baixa com trava;
+ *    o webhook depois não baixa de novo). Devolve "aprovado".
+ *  - in_process → grava Pagamento EM_ANALISE, pedido segue AGUARDANDO (sem baixa);
+ *    devolve "analise" (o webhook confirma depois).
+ *  - rejected → grava Pagamento RECUSADO, pedido segue aguardando; devolve
+ *    "recusado" + mensagem amigável (deixa tentar de novo).
+ */
+export async function pagarComCartao(
+  input: CheckoutFormInput,
+  cartao: CartaoInput,
+): Promise<CartaoDesfecho> {
+  // Valida o parcelamento ANTES de criar o pedido (anti-tamper, evita órfão).
+  const parcelas = Number(cartao.installments);
+  const teto = await calcularTetoParcelas(
+    (input.itens ?? []).map((i) => i.produtoId),
+  );
+  if (!Number.isInteger(parcelas) || parcelas < 1 || parcelas > teto) {
+    return { resultado: "erro", mensagem: "Opção de parcelamento inválida." };
+  }
+  if (!cartao.token || !cartao.paymentMethodId) {
+    return { resultado: "erro", mensagem: "Dados do cartão incompletos." };
+  }
+
+  const order = await criarOrderDoCheckout(input);
+  if (!order.ok) {
+    return {
+      resultado: "erro",
+      mensagem: order.error,
+      fieldErrors: order.fieldErrors,
+    };
+  }
+  const { orderId, numero, valor, pagador } = order.data;
+
+  // Cobrança no cartão (fora de transação de DB, igual ao Pix).
+  let pago;
+  try {
+    const provider = getPaymentProvider(ProviderPagamento.MERCADO_PAGO);
+    pago = await provider.criarPagamentoCartao({
+      orderId,
+      valor,
+      descricao: `Pedido ${numero} — Guppy de Linhagem`,
+      token: cartao.token,
+      paymentMethodId: cartao.paymentMethodId,
+      issuerId: cartao.issuerId,
+      installments: parcelas,
+      pagador: { email: pagador.email, cpfCnpj: pagador.cpfCnpj },
+    });
+  } catch (e) {
+    console.error("[checkout] cobrar cartão", e);
+    // Erro de comunicação → sem pagamento → remove o pedido órfão.
+    await prisma.order.delete({ where: { id: orderId } }).catch(() => {});
+    return {
+      resultado: "erro",
+      mensagem:
+        e instanceof Error ? e.message : "Não foi possível processar o cartão.",
+    };
+  }
+
+  // Grava a linha Pagamento em TODOS os casos (PAGO/EM_ANALISE/RECUSADO).
+  try {
+    await prisma.pagamento.create({
+      data: {
+        orderId,
+        provider: ProviderPagamento.MERCADO_PAGO,
+        metodo: MetodoPagamento.CARTAO,
+        status: pago.status,
+        valor,
+        externalId: pago.externalId,
+        parcelas: pago.parcelas,
+        bandeira: pago.bandeira,
+        // Só motivo da recusa (não sensível). NUNCA token/PAN/CVV.
+        payloadRaw: { statusDetail: pago.statusDetail } as Prisma.InputJsonValue,
+      },
+    });
+    await prisma.order.update({
+      where: { id: orderId },
+      data: { mpPaymentId: pago.externalId, parcelas: pago.parcelas },
+    });
+  } catch (e) {
+    console.error("[checkout] gravar Pagamento cartão", e);
+  }
+
+  // ── Desfechos ──
+  if (pago.status === StatusPagamento.PAGO) {
+    // approved já vem na hora → transiciona aqui (trava evita baixa dupla quando
+    // o webhook chegar com a mesma aprovação).
+    try {
+      await prisma.$transaction((tx) => transicionarParaPago(tx, orderId));
+      revalidatePath("/admin/produtos");
+      revalidatePath("/admin/pedidos");
+    } catch (e) {
+      console.error("[checkout] transicionar cartão aprovado", e);
+    }
+    return { resultado: "aprovado", numero };
+  }
+
+  if (pago.status === StatusPagamento.EM_ANALISE) {
+    return { resultado: "analise", numero };
+  }
+
+  // RECUSADO (ou qualquer não-pago): pedido segue aguardando; tenta de novo.
+  return { resultado: "recusado", mensagem: mensagemRecusa(pago.statusDetail) };
 }

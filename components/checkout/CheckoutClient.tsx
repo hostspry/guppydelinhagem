@@ -2,14 +2,17 @@
 
 import { useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useForm, type SubmitErrorHandler } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import {
   AlertTriangle,
   Clock,
+  CreditCard,
   Loader2,
   MapPin,
+  QrCode,
   ShoppingCart,
 } from "lucide-react";
 import { WhatsAppIcon } from "@/components/icons/WhatsAppIcon";
@@ -23,9 +26,15 @@ import {
 } from "@/lib/stores/cart";
 import {
   criarPedidoCheckout,
+  pagarComCartao,
+  calcularTetoParcelas,
   type CheckoutPixData,
+  type CartaoInput,
 } from "@/actions/checkout";
 import PixPanel from "@/components/checkout/PixPanel";
+import CardPaymentBrick from "@/components/checkout/CardPaymentBrick";
+
+const MP_PUBLIC_KEY = process.env.NEXT_PUBLIC_MP_PUBLIC_KEY;
 
 export type CheckoutPrefill = {
   nome: string;
@@ -147,18 +156,26 @@ export default function CheckoutClient({
   const totalPeixes = useCart(selectTotalPeixes);
   const subtotalPix = useCart(selectSubtotalPix);
 
+  const router = useRouter();
   const {
     register,
     handleSubmit,
     setValue,
     getValues,
     watch,
+    trigger,
+    getFieldState,
     formState: { errors, isSubmitted },
   } = useForm<CamposInput, unknown, CamposOutput>({
     resolver: zodResolver(camposSchema),
     defaultValues: prefill,
     shouldFocusError: false, // foco/scroll manual e suave (abaixo)
   });
+
+  // Forma de pagamento (Pix padrão) + teto de parcelas (do servidor) + recusa.
+  const [aba, setAba] = useState<"pix" | "cartao">("pix");
+  const [teto, setTeto] = useState(1);
+  const [recusa, setRecusa] = useState<string | null>(null);
 
   // Frete
   const [freteLoading, setFreteLoading] = useState(false);
@@ -227,7 +244,32 @@ export default function CheckoutClient({
     }
   }
 
+  // Teto de parcelas (servidor) p/ o Brick — min(12, menor parcelasMax do carrinho).
+  const produtoIdsKey = items.map((i) => i.produtoId).join(",");
+  useEffect(() => {
+    if (items.length === 0) return;
+    let ativo = true;
+    calcularTetoParcelas(items.map((i) => i.produtoId)).then((t) => {
+      if (ativo) setTeto(t);
+    });
+    return () => {
+      ativo = false;
+    };
+    // produtoIdsKey resume os ids do carrinho (evita refazer a cada render).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [produtoIdsKey]);
+
+  // Itens do carrinho no formato da action (reuso Pix/Cartão).
+  const itensPedido = () =>
+    items.map((i) => ({
+      produtoId: i.produtoId,
+      composicao: i.composicao,
+      quantidade: i.quantidade,
+    }));
+
   function onValid(data: CamposOutput) {
+    // O submit do form é só do Pix; na aba Cartão o Brick tem botão próprio.
+    if (aba === "cartao") return;
     // Frete entra como “erro” do mesmo jeito: sem ele, não submete.
     if (excedeCaixa) {
       focarCampo("cep");
@@ -243,11 +285,7 @@ export default function CheckoutClient({
         ...data,
         complemento: data.complemento ?? "",
         transportadora: "JADLOG",
-        itens: items.map((i) => ({
-          produtoId: i.produtoId,
-          composicao: i.composicao,
-          quantidade: i.quantidade,
-        })),
+        itens: itensPedido(),
       });
       if (res.ok) {
         setPix(res.data);
@@ -264,6 +302,51 @@ export default function CheckoutClient({
   };
 
   const submeter = handleSubmit(onValid, onInvalid);
+
+  // Pagamento com cartão: o Brick chama isto no onSubmit. Valida o checkout
+  // (mesma UX do Pix) ANTES de cobrar; depois trata os três desfechos. Lança em
+  // erro/recusa pra o Brick reabilitar o botão e deixar tentar de novo.
+  async function onCartao(cartao: CartaoInput) {
+    setErro(null);
+    setRecusa(null);
+
+    const valido = await trigger();
+    if (!valido) {
+      const primeiro = FIELD_ORDER.find((f) => getFieldState(f).invalid);
+      if (primeiro) focarCampo(primeiro);
+      throw new Error("Revise os campos destacados.");
+    }
+    if (excedeCaixa || freteValor == null) {
+      focarCampo("cep");
+      throw new Error("Calcule o frete pelo seu CEP para continuar.");
+    }
+
+    const dados = getValues();
+    const res = await pagarComCartao(
+      {
+        ...dados,
+        complemento: dados.complemento ?? "",
+        transportadora: "JADLOG",
+        itens: itensPedido(),
+      },
+      cartao,
+    );
+
+    if (res.resultado === "aprovado") {
+      router.push(`/pedido/${res.numero.replace(/^#/, "")}/sucesso`);
+      return;
+    }
+    if (res.resultado === "analise") {
+      router.push(`/pedido/${res.numero.replace(/^#/, "")}/analise`);
+      return;
+    }
+    if (res.resultado === "recusado") {
+      setRecusa(res.mensagem);
+      throw new Error(res.mensagem);
+    }
+    setErro(res.mensagem);
+    throw new Error(res.mensagem);
+  }
 
   // ── Hidratação / carrinho vazio ──
   if (!mounted) {
@@ -613,28 +696,100 @@ export default function CheckoutClient({
             </div>
           </div>
 
+          {/* Forma de pagamento: Pix (padrão) | Cartão */}
+          <div className="grid grid-cols-2 gap-2 rounded-lg bg-bg-alt p-1">
+            <button
+              type="button"
+              onClick={() => setAba("pix")}
+              className={`inline-flex items-center justify-center gap-1.5 py-2 rounded-md text-sm font-semibold transition-all ${
+                aba === "pix"
+                  ? "bg-white text-primary shadow-sm"
+                  : "text-muted-foreground hover:text-primary"
+              }`}
+            >
+              <QrCode size={15} aria-hidden="true" />
+              Pix
+            </button>
+            <button
+              type="button"
+              onClick={() => setAba("cartao")}
+              className={`inline-flex items-center justify-center gap-1.5 py-2 rounded-md text-sm font-semibold transition-all ${
+                aba === "cartao"
+                  ? "bg-white text-primary shadow-sm"
+                  : "text-muted-foreground hover:text-primary"
+              }`}
+            >
+              <CreditCard size={15} aria-hidden="true" />
+              Cartão
+            </button>
+          </div>
+
           {erro && (
             <p role="alert" className="text-xs text-red-700 bg-red-50 rounded-md p-2">
               {erro}
             </p>
           )}
 
-          <button
-            type="submit"
-            disabled={pending}
-            className="w-full inline-flex items-center justify-center gap-2 bg-secondary text-white text-sm font-semibold py-3 rounded-pill hover:brightness-110 disabled:opacity-60 disabled:cursor-not-allowed transition-all"
-          >
-            {pending ? (
-              <Loader2 size={16} className="animate-spin" aria-hidden="true" />
-            ) : null}
-            {pending ? "Gerando Pix…" : "Pagar com Pix"}
-          </button>
+          {aba === "pix" ? (
+            <>
+              <button
+                type="submit"
+                disabled={pending}
+                className="w-full inline-flex items-center justify-center gap-2 bg-secondary text-white text-sm font-semibold py-3 rounded-pill hover:brightness-110 disabled:opacity-60 disabled:cursor-not-allowed transition-all"
+              >
+                {pending ? (
+                  <Loader2 size={16} className="animate-spin" aria-hidden="true" />
+                ) : null}
+                {pending ? "Gerando Pix…" : "Pagar com Pix"}
+              </button>
 
-          {!freteValor && !excedeCaixa && !freteFaltando && (
-            <p className="text-[11px] text-muted-foreground text-center leading-snug flex items-center justify-center gap-1">
-              <AlertTriangle size={12} aria-hidden="true" />
-              Calcule o frete pelo CEP para concluir.
-            </p>
+              {!freteValor && !excedeCaixa && !freteFaltando && (
+                <p className="text-[11px] text-muted-foreground text-center leading-snug flex items-center justify-center gap-1">
+                  <AlertTriangle size={12} aria-hidden="true" />
+                  Calcule o frete pelo CEP para concluir.
+                </p>
+              )}
+            </>
+          ) : (
+            <div className="space-y-2">
+              {!MP_PUBLIC_KEY ? (
+                <p className="text-xs text-amber-700">
+                  Pagamento com cartão indisponível no momento. Use o Pix.
+                </p>
+              ) : excedeCaixa ? (
+                <p className="text-xs text-amber-700">
+                  Acima de {MAX_PEIXES_POR_CAIXA} peixes, finalize no WhatsApp.
+                </p>
+              ) : freteValor == null ? (
+                <p className="text-[11px] text-muted-foreground flex items-center gap-1 leading-snug">
+                  <AlertTriangle size={12} aria-hidden="true" />
+                  Calcule o frete pelo seu CEP para ver as parcelas do cartão.
+                </p>
+              ) : (
+                <>
+                  <p className="text-[11px] text-muted-foreground text-center">
+                    Em até {teto}x com juros.
+                  </p>
+                  <CardPaymentBrick
+                    publicKey={MP_PUBLIC_KEY}
+                    amount={total}
+                    maxInstallments={teto}
+                    payerEmail={watch("email")}
+                    onPagar={onCartao}
+                    onErro={(m) => setErro(m)}
+                  />
+                </>
+              )}
+
+              {recusa && (
+                <p
+                  role="alert"
+                  className="text-xs text-red-700 bg-red-50 border border-red-200 rounded-md p-2"
+                >
+                  {recusa}
+                </p>
+              )}
+            </div>
           )}
 
           <Link
