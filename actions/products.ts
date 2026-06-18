@@ -165,6 +165,7 @@ function buildVideoCreates(videos: VideoDraft[]) {
     titulo: v.titulo ? v.titulo : null,
     thumbnailUrl: v.thumbnailUrl ? v.thumbnailUrl : null,
     principal: i === principalIdx,
+    ativo: v.ativo ?? true, // default ativo; admin pode ocultar
     ordem: i,
   }));
 }

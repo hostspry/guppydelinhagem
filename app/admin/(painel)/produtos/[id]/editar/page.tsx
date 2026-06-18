@@ -75,6 +75,7 @@ export default async function EditarProdutoPage({ params }: Props) {
             titulo: v.titulo ?? "",
             thumbnailUrl: v.thumbnailUrl ?? "",
             principal: v.principal,
+            ativo: v.ativo,
           })),
           variantes: produto.variantes,
         }}

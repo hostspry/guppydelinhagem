@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
-import { Plus, Eye, Trash2, Star, X, ImageUp } from "lucide-react";
+import { Plus, Eye, EyeOff, Play, Trash2, Star, X, ImageUp } from "lucide-react";
 import { toast } from "sonner";
 import type { VideoDraft } from "@/lib/validations/product";
 import { fetchVideoMetadata } from "@/actions/products";
@@ -240,6 +240,7 @@ function VideoRow({
   onPatch: (partial: Partial<VideoDraft>) => void;
 }) {
   const manual = video.platform !== "YOUTUBE";
+  const ativo = video.ativo !== false; // undefined (novo) = ativo
   // Loading próprio (useState), não useTransition: chamar a Server Action dentro
   // de uma transition acopla o pending ao auto-refresh de rota do Next, deixando
   // o botão travado em "Enviando…" mesmo após o upload concluir. Com estado
@@ -268,7 +269,7 @@ function VideoRow({
     <div
       className={`flex gap-3 p-2.5 rounded-md border ${
         featured ? "border-2 border-[#0EA5E9]" : "border-gray-200"
-      }`}
+      } ${ativo ? "" : "opacity-60"}`}
     >
       {/* Thumbnail 9:16 */}
       <div className="relative w-[110px] shrink-0 aspect-[9/16] bg-gray-100 rounded overflow-hidden">
@@ -291,6 +292,11 @@ function VideoRow({
           <PlatformBadge platform={video.platform} />
           {manual && (
             <span className="text-[10px] text-amber-600">thumb manual</span>
+          )}
+          {!ativo && (
+            <span className="text-[10px] font-semibold text-amber-600 uppercase tracking-wide">
+              Oculto na loja
+            </span>
           )}
         </div>
 
@@ -388,7 +394,27 @@ function VideoRow({
           aria-label="Ver vídeo"
           className="text-gray-400 hover:text-[#07366A] p-1"
         >
-          <Eye className="w-4 h-4" aria-hidden="true" />
+          <Play className="w-4 h-4" aria-hidden="true" />
+        </button>
+        {/* Ativar/desativar — oculta na loja sem apagar */}
+        <button
+          type="button"
+          onClick={() => onPatch({ ativo: !ativo })}
+          aria-label={ativo ? "Ocultar na loja" : "Mostrar na loja"}
+          title={
+            ativo ? "Visível na loja — clique para ocultar" : "Oculto — clique para mostrar"
+          }
+          className={
+            ativo
+              ? "text-gray-400 hover:text-[#07366A] p-1"
+              : "text-amber-500 hover:text-amber-600 p-1"
+          }
+        >
+          {ativo ? (
+            <Eye className="w-4 h-4" aria-hidden="true" />
+          ) : (
+            <EyeOff className="w-4 h-4" aria-hidden="true" />
+          )}
         </button>
         {onSetPrincipal && (
           <button

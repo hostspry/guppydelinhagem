@@ -179,6 +179,7 @@ export const videoDraftSchema = z.object({
   titulo: z.string().max(200).optional().or(z.literal("")),
   thumbnailUrl: z.string().url("Thumbnail inválida").optional().or(z.literal("")),
   principal: z.boolean().optional(),
+  ativo: z.boolean().optional(), // false = oculto na loja (sem apagar)
 });
 
 export const videosSchema = z.array(videoDraftSchema);
