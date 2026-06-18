@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Nunito } from "next/font/google";
 import "./globals.css";
 
@@ -27,6 +27,11 @@ export const metadata: Metadata = {
       type: "image/png",
     },
   },
+};
+
+// Cor da barra do navegador no mobile (navy da marca).
+export const viewport: Viewport = {
+  themeColor: "#07366A",
 };
 
 export default function RootLayout({
