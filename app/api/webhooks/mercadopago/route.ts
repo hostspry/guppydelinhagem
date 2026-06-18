@@ -9,14 +9,20 @@ import {
   StatusPagamento,
 } from "@/lib/generated/prisma/enums";
 
-// Webhook do Mercado Pago (Pix). Roda no runtime Node (Prisma + crypto).
-// Fluxo (spec §4):
+// Webhook do Mercado Pago (Pix + Cartão). Runtime Node (Prisma + crypto).
+// Fluxo (spec §4 e §6):
 //  1. Valida a ASSINATURA (x-signature/x-request-id + HMAC com MP_WEBHOOK_SECRET).
 //     Inválida → 401, sem efeito.
 //  2. NUNCA confia no corpo: re-busca o pagamento no MP pelo id e usa o status da
 //     API + external_reference (= orderId).
-//  3. Numa transação IDEMPOTENTE: atualiza a linha Pagamento e, se aprovado e o
-//     pedido ainda não está PAGO, chama transicionarParaPago (baixa com trava).
+//  3. Numa transação IDEMPOTENTE: atualiza a linha Pagamento (status do MP) e,
+//     SÓ se aprovado e o pedido ainda não está PAGO, chama transicionarParaPago
+//     (baixa com a trava estoqueBaixado). Casos do cartão:
+//       - in_process → EM_ANALISE: NÃO mexe no Order/estoque (segue aguardando);
+//       - in_process depois vira approved (nova notificação) → transiciona p/ PAGO
+//         e baixa UMA vez (a trava barra a segunda baixa, venha do webhook ou da
+//         própria action que já confirmou na hora);
+//       - rejected/cancelled → só atualiza o Pagamento.
 //  4. Responde 200 rápido (o MP reenvia; tudo é idempotente).
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -139,11 +145,13 @@ export async function POST(request: Request) {
       });
 
       if (consulta.status === StatusPagamento.PAGO) {
-        // Função COMPARTILHADA com o admin: transição → PAGO + baixa do pool,
-        // uma vez só (trava estoqueBaixado). Reenvio do MP não baixa de novo.
+        // Função COMPARTILHADA (admin/cartão/webhook): transição → PAGO + baixa
+        // do pool, uma vez só (trava estoqueBaixado). Reenvio do MP, ou o cartão
+        // que já confirmou na action, não baixam de novo.
         return transicionarParaPago(tx, orderId as string);
       }
-      // Rejeitado/expirado: só o Pagamento muda; o pedido segue aguardando.
+      // EM_ANALISE (cartão in_process), rejeitado, expirado: só o Pagamento muda;
+      // o pedido segue AGUARDANDO_PAGAMENTO, sem baixa.
       return { pago: false, baixou: false };
     });
     baixou = res.baixou;
