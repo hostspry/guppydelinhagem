@@ -100,17 +100,37 @@ async function emitirPix(args: {
   };
 }
 
+export type PagadorCheckout = {
+  nome: string;
+  sobrenome: string | null;
+  email: string;
+  cpfCnpj: string;
+};
+
+export type OrderCriado = {
+  orderId: string;
+  numero: string;
+  valor: number; // total recalculado no servidor
+  pagador: PagadorCheckout;
+};
+
+type OrderResult =
+  | { ok: true; data: OrderCriado }
+  | { ok: false; error: string; fieldErrors?: Record<string, string[]> };
+
 /**
- * Cria o pedido no checkout público (guest) e gera a cobrança Pix.
+ * Cria o Order do checkout público (guest) — COMPARTILHADO entre Pix e Cartão.
  *
  * Anti-fraude: o PREÇO de cada item e o FRETE são recalculados NO SERVIDOR a
  * partir do banco e da cotadora — nunca confia no que o client mandou. Cria/reusa
- * Cliente, cria Order AGUARDANDO_PAGAMENTO (sem baixar estoque — só no PAGO) e a
- * linha Pagamento PENDENTE com o QR. Devolve o QR/copia-e-cola pra tela do Pix.
+ * Cliente, cria Order AGUARDANDO_PAGAMENTO (sem baixar estoque — só no PAGO).
+ * NÃO gera pagamento: devolve { orderId, numero, valor, pagador } pro chamador
+ * (Pix ou Cartão) emitir a cobrança. Se a emissão falhar, o chamador remove o
+ * pedido órfão.
  */
-export async function criarPedidoCheckout(
+export async function criarOrderDoCheckout(
   input: CheckoutFormInput,
-): Promise<CheckoutResult> {
+): Promise<OrderResult> {
   const parsed = checkoutSchema.safeParse(input);
   if (!parsed.success) {
     return {
@@ -336,10 +356,10 @@ export async function criarPedidoCheckout(
     return { ok: false, error: "Não foi possível criar o pedido. Tente novamente." };
   }
 
-  // ── 4. Gerar a cobrança Pix no MP + gravar Pagamento (fora da transação) ───
   const partesNome = data.nome.trim().split(/\s+/);
-  try {
-    const pixData = await emitirPix({
+  return {
+    ok: true,
+    data: {
       orderId,
       numero,
       valor: total,
@@ -349,12 +369,32 @@ export async function criarPedidoCheckout(
         email: data.email,
         cpfCnpj: cpf,
       },
+    },
+  };
+}
+
+/**
+ * Pix: cria o Order (helper compartilhado) e gera a cobrança Pix. Se o MP falhar,
+ * remove o pedido órfão. Devolve o QR/copia-e-cola pra tela do Pix.
+ */
+export async function criarPedidoCheckout(
+  input: CheckoutFormInput,
+): Promise<CheckoutResult> {
+  const order = await criarOrderDoCheckout(input);
+  if (!order.ok) return order;
+
+  try {
+    const pixData = await emitirPix({
+      orderId: order.data.orderId,
+      numero: order.data.numero,
+      valor: order.data.valor,
+      pagador: order.data.pagador,
     });
     return { ok: true, data: pixData };
   } catch (e) {
     console.error("[checkout] criar Pix", e);
     // Sem pagamento não há pedido útil → remove o rascunho pra não poluir o admin.
-    await prisma.order.delete({ where: { id: orderId } }).catch(() => {});
+    await prisma.order.delete({ where: { id: order.data.orderId } }).catch(() => {});
     return {
       ok: false,
       error:
