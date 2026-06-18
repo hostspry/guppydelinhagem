@@ -152,17 +152,6 @@ export default function CheckoutClient({
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
-  // DIAGNÓSTICO: prefixo da public key recebida do servidor (runtime). UNDEFINED
-  // = a env MP_PUBLIC_KEY/NEXT_PUBLIC_MP_PUBLIC_KEY não está no runtime do server.
-  useEffect(() => {
-    console.log(
-      "[mp] public key (runtime):",
-      mpPublicKey
-        ? `${mpPublicKey.split("-")[0]}-… (len ${mpPublicKey.length})`
-        : "UNDEFINED",
-    );
-  }, [mpPublicKey]);
-
   const items = useCart((s) => s.items);
   const totalPeixes = useCart(selectTotalPeixes);
   const subtotalPix = useCart(selectSubtotalPix);

@@ -100,13 +100,6 @@ export default function CardPaymentBrick({
       try {
         await carregarSdk();
         if (cancelado || !window.MercadoPago) return;
-        // DIAGNÓSTICO: confirma que o SDK recebe uma key real (só o prefixo —
-        // TEST-/APP_USR-/UNDEFINED — nunca o valor). Key undefined/errada tokeniza
-        // mal e o MP recusa como "CVV incorreto".
-        console.log(
-          "[mp] init MercadoPago key:",
-          publicKey ? `${publicKey.split("-")[0]}-… (len ${publicKey.length})` : "UNDEFINED",
-        );
         const mp = new window.MercadoPago(publicKey, { locale: "pt-BR" });
         const bricks = mp.bricks();
         controller = await bricks.create("cardPayment", CONTAINER_ID, {

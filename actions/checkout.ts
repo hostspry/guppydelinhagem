@@ -657,15 +657,6 @@ export async function pagarComCartao(
     };
   }
 
-  // DIAGNÓSTICO: desfecho mapeado (correlaciona com o log cru do provider).
-  console.log("[checkout] cartão desfecho", {
-    numero,
-    status: pago.status,
-    statusDetail: pago.statusDetail,
-    parcelas: pago.parcelas,
-    bandeira: pago.bandeira,
-  });
-
   // Grava a linha Pagamento em TODOS os casos (PAGO/EM_ANALISE/RECUSADO).
   try {
     await prisma.pagamento.create({

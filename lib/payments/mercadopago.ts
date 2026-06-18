@@ -209,16 +209,6 @@ export const mercadoPagoProvider: PaymentProvider = {
     })) as MpPaymentResponse;
 
     const td = data.point_of_interaction?.transaction_data ?? {};
-    // DIAGNÓSTICO: confirma que o QR veio (e em qual conta). QR ausente +
-    // erro "Collector user without key enabled" = conta de produção sem chave
-    // Pix habilitada → "chave inexistente" no app do banco. Sem dado sensível.
-    console.log("[mercadopago] pix /v1/payments →", {
-      id: data.id,
-      status: data.status,
-      status_detail: data.status_detail,
-      has_qr_code: !!td.qr_code,
-    });
-
     return {
       externalId: String(data.id),
       status: mapStatus(data.status, data.status_detail),
@@ -263,18 +253,6 @@ export const mercadoPagoProvider: PaymentProvider = {
       body: JSON.stringify(body),
       idempotencyKey: input.idempotencyKey ?? randomUUID(),
     })) as MpPaymentResponse;
-
-    // DIAGNÓSTICO: motivo REAL do MP (status + status_detail crus). É a RESPOSTA
-    // do gateway — sem token/PAN/CVV. Sem isso, a recusa chega mascarada como a
-    // frase amigável e perde-se a causa verdadeira (ex.: account mismatch da
-    // public key gera cc_rejected_bad_filled_security_code com cartão correto).
-    console.log("[mercadopago] cartão /v1/payments →", {
-      id: data.id,
-      status: data.status,
-      status_detail: data.status_detail,
-      payment_method_id: data.payment_method_id,
-      installments: data.installments,
-    });
 
     return {
       externalId: String(data.id),
