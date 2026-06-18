@@ -226,6 +226,11 @@ export default function CheckoutClient({
   // foi preenchida (autofill do ViaCEP), liberando o Gollog.
   const freteCalculado = frete != null;
 
+  // Endereço (Seção 3): bloqueado até calcular o CEP. Quando o ViaCEP não devolve
+  // a rua (CEP genérico/sem dados ou ViaCEP fora), desbloqueia vazio p/ manual.
+  const enderecoBloqueado = !freteCalculado;
+  const viacepSemResultado = freteCalculado && !frete?.endereco?.rua;
+
   // Subtotais: servidor manda; cart é fallback até o servidor responder.
   const subtotalPixView = preco?.subtotalPix ?? subtotalPixCart;
   const subtotalCheioView = preco?.subtotalCheio ?? subtotalCheioCart;
@@ -533,126 +538,48 @@ export default function CheckoutClient({
             </div>
           </section>
 
-          {/* Entrega */}
+          {/* ── Seção 2 — Frete (o CEP e o cálculo moram aqui) ── */}
           <section className="bg-white border border-border rounded-xl p-5 space-y-4">
-            <h2 className="text-primary font-semibold">Endereço de entrega</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-6 gap-4">
-              <div className="sm:col-span-2">
-                <label className={labelCls} htmlFor="cep">
-                  CEP
-                </label>
-                <div className="flex gap-2">
-                  <input
-                    id="cep"
-                    inputMode="numeric"
-                    className={cls(errors.cep || freteFaltando)}
-                    autoComplete="postal-code"
-                    maxLength={9}
-                    aria-invalid={!!errors.cep}
-                    {...register("cep")}
-                    onChange={(e) => {
-                      setValue("cep", formatCep(e.target.value), {
-                        shouldValidate: isSubmitted,
-                      });
-                      setFrete(null);
-                    }}
-                  />
-                  <button
-                    type="button"
-                    onClick={calcularFrete}
-                    disabled={!cepValido || freteLoading}
-                    className="inline-flex items-center justify-center min-h-11 px-3 rounded-lg border border-border text-primary font-medium text-sm hover:border-primary disabled:opacity-50 transition-all whitespace-nowrap"
-                  >
-                    {freteLoading ? (
-                      <Loader2 size={15} className="animate-spin" aria-hidden="true" />
-                    ) : (
-                      "Calcular"
-                    )}
-                  </button>
-                </div>
-                <FieldError msg={errors.cep?.message} />
-              </div>
-              <div className="sm:col-span-3">
-                <label className={labelCls} htmlFor="logradouro">
-                  Endereço
-                </label>
+            <h2 className="text-primary font-semibold">Frete</h2>
+
+            {/* CEP + Calcular */}
+            <div className="max-w-xs">
+              <label className={labelCls} htmlFor="cep">
+                CEP
+              </label>
+              <div className="flex gap-2">
                 <input
-                  id="logradouro"
-                  className={cls(errors.logradouro)}
-                  autoComplete="address-line1"
-                  aria-invalid={!!errors.logradouro}
-                  {...register("logradouro")}
-                />
-                <FieldError msg={errors.logradouro?.message} />
-              </div>
-              <div className="sm:col-span-1">
-                <label className={labelCls} htmlFor="numero">
-                  Número
-                </label>
-                <input
-                  id="numero"
-                  className={cls(errors.numero)}
-                  aria-invalid={!!errors.numero}
-                  {...register("numero")}
-                />
-                <FieldError msg={errors.numero?.message} />
-              </div>
-              <div className="sm:col-span-3">
-                <label className={labelCls} htmlFor="bairro">
-                  Bairro
-                </label>
-                <input
-                  id="bairro"
-                  className={cls(errors.bairro)}
-                  aria-invalid={!!errors.bairro}
-                  {...register("bairro")}
-                />
-                <FieldError msg={errors.bairro?.message} />
-              </div>
-              <div className="sm:col-span-2">
-                <label className={labelCls} htmlFor="complemento">
-                  Complemento
-                </label>
-                <input
-                  id="complemento"
-                  className={cls(errors.complemento)}
-                  placeholder="opcional"
-                  {...register("complemento")}
-                />
-              </div>
-              <div className="sm:col-span-1">
-                <label className={labelCls} htmlFor="uf">
-                  UF
-                </label>
-                <input
-                  id="uf"
-                  className={cls(errors.uf)}
-                  maxLength={2}
-                  aria-invalid={!!errors.uf}
-                  {...register("uf")}
-                  onChange={(e) =>
-                    setValue("uf", e.target.value.toUpperCase().slice(0, 2), {
+                  id="cep"
+                  inputMode="numeric"
+                  className={cls(errors.cep || freteFaltando)}
+                  autoComplete="postal-code"
+                  maxLength={9}
+                  aria-invalid={!!errors.cep}
+                  {...register("cep")}
+                  onChange={(e) => {
+                    setValue("cep", formatCep(e.target.value), {
                       shouldValidate: isSubmitted,
-                    })
-                  }
+                    });
+                    setFrete(null); // muda CEP → bloqueia endereço de novo
+                  }}
                 />
-                <FieldError msg={errors.uf?.message} />
+                <button
+                  type="button"
+                  onClick={calcularFrete}
+                  disabled={!cepValido || freteLoading}
+                  className="inline-flex items-center justify-center min-h-11 px-4 rounded-lg border border-border text-primary font-medium text-sm hover:border-primary disabled:opacity-50 transition-all whitespace-nowrap"
+                >
+                  {freteLoading ? (
+                    <Loader2 size={15} className="animate-spin" aria-hidden="true" />
+                  ) : (
+                    "Calcular"
+                  )}
+                </button>
               </div>
-              <div className="sm:col-span-3">
-                <label className={labelCls} htmlFor="cidade">
-                  Cidade
-                </label>
-                <input
-                  id="cidade"
-                  className={cls(errors.cidade)}
-                  aria-invalid={!!errors.cidade}
-                  {...register("cidade")}
-                />
-                <FieldError msg={errors.cidade?.message} />
-              </div>
+              <FieldError msg={errors.cep?.message} />
             </div>
 
-            {/* Frete */}
+            {/* Estado / opções de frete */}
             <div aria-live="polite" className="space-y-2 empty:hidden">
               {freteErro && (
                 <p role="alert" className="text-xs text-red-700">
@@ -664,6 +591,14 @@ export default function CheckoutClient({
                   Calcule o frete pelo seu CEP para continuar.
                 </p>
               )}
+
+              {/* Estado inicial — sem CEP calculado */}
+              {!freteCalculado && !freteErro && !excedeCaixa && (
+                <p className="text-sm text-muted-foreground">
+                  Informe o CEP para ver as opções de envio.
+                </p>
+              )}
+
               {excedeCaixa && (
                 <div className="text-xs text-amber-800 bg-amber-50 rounded-lg p-3 leading-snug space-y-1">
                   <p className="font-medium">
@@ -686,6 +621,7 @@ export default function CheckoutClient({
                   </a>
                 </div>
               )}
+
               {!excedeCaixa && (freteCalculado || !!gollogInfo) && (
                 <fieldset className="space-y-2">
                   <legend className="text-xs font-medium text-primary mb-1">
@@ -715,7 +651,7 @@ export default function CheckoutClient({
                       </span>
                       <span className="block text-xs text-muted-foreground">
                         {jadlogSel
-                          ? `${jadlogSel.deliveryTime} dias úteis`
+                          ? `entrega no seu CEP · ${jadlogSel.deliveryTime} dias úteis`
                           : "indisponível para esse CEP"}
                       </span>
                     </span>
@@ -723,6 +659,33 @@ export default function CheckoutClient({
                       {jadlogSel ? formatBRL(jadlogSel.price) : "—"}
                     </span>
                   </label>
+
+                  {/* Aviso de prazo longo (>13 dias) — não bloqueia a escolha */}
+                  {jadlogSel?.requerAvaliacao && (
+                    <div className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-2.5 leading-snug space-y-1">
+                      <p className="flex items-start gap-1.5">
+                        <AlertTriangle
+                          size={13}
+                          className="shrink-0 mt-0.5"
+                          aria-hidden="true"
+                        />
+                        Prazo longo ({jadlogSel.deliveryTime} dias) é arriscado para
+                        peixe vivo. Recomendamos combinar pelo WhatsApp ou usar o
+                        aéreo.
+                      </p>
+                      <a
+                        href={whatsappLink(
+                          `Olá! O frete terrestre do meu CEP ficou em ${jadlogSel.deliveryTime} dias. Pode me ajudar com o envio?`,
+                        )}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 font-semibold underline hover:text-amber-900"
+                      >
+                        <WhatsAppIcon className="w-3.5 h-3.5 text-[#25D366]" />
+                        Combinar pelo WhatsApp
+                      </a>
+                    </div>
+                  )}
 
                   {/* Aéreo — Gollog (tabela fixa por região) */}
                   <label
@@ -754,6 +717,15 @@ export default function CheckoutClient({
                     </span>
                   </label>
 
+                  {/* Aviso Gollog — retirada na base do aeroporto */}
+                  {gollogInfo && (
+                    <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-2.5 leading-snug">
+                      <strong>Retirada na base Gollog do aeroporto</strong> (não é
+                      entregue em casa). Confirme que há uma unidade Gollog perto de
+                      você antes de escolher.
+                    </p>
+                  )}
+
                   {frete?.endereco?.cidade && (
                     <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
                       <MapPin size={12} aria-hidden="true" />
@@ -764,6 +736,112 @@ export default function CheckoutClient({
                 </fieldset>
               )}
             </div>
+          </section>
+
+          {/* ── Seção 3 — Endereço de entrega (bloqueada até calcular o CEP) ── */}
+          <section className="bg-white border border-border rounded-xl p-5 space-y-4">
+            <h2 className="text-primary font-semibold">Endereço de entrega</h2>
+
+            {enderecoBloqueado ? (
+              <p className="flex items-center gap-2 text-sm text-muted-foreground bg-bg-alt rounded-lg p-3">
+                <MapPin size={15} className="shrink-0" aria-hidden="true" />
+                Informe o CEP na seção{" "}
+                <strong className="text-primary">Frete</strong> primeiro.
+              </p>
+            ) : viacepSemResultado ? (
+              <p className="text-xs text-amber-800 bg-amber-50 rounded-lg p-2.5">
+                Não encontramos o endereço automaticamente, preencha manualmente.
+              </p>
+            ) : null}
+
+            <fieldset
+              disabled={enderecoBloqueado}
+              aria-disabled={enderecoBloqueado}
+              className={
+                enderecoBloqueado ? "opacity-50 pointer-events-none" : ""
+              }
+            >
+              <div className="grid grid-cols-1 sm:grid-cols-6 gap-4">
+                <div className="sm:col-span-4">
+                  <label className={labelCls} htmlFor="logradouro">
+                    Endereço
+                  </label>
+                  <input
+                    id="logradouro"
+                    className={cls(errors.logradouro)}
+                    autoComplete="address-line1"
+                    aria-invalid={!!errors.logradouro}
+                    {...register("logradouro")}
+                  />
+                  <FieldError msg={errors.logradouro?.message} />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className={labelCls} htmlFor="numero">
+                    Número
+                  </label>
+                  <input
+                    id="numero"
+                    className={cls(errors.numero)}
+                    aria-invalid={!!errors.numero}
+                    {...register("numero")}
+                  />
+                  <FieldError msg={errors.numero?.message} />
+                </div>
+                <div className="sm:col-span-3">
+                  <label className={labelCls} htmlFor="bairro">
+                    Bairro
+                  </label>
+                  <input
+                    id="bairro"
+                    className={cls(errors.bairro)}
+                    aria-invalid={!!errors.bairro}
+                    {...register("bairro")}
+                  />
+                  <FieldError msg={errors.bairro?.message} />
+                </div>
+                <div className="sm:col-span-3">
+                  <label className={labelCls} htmlFor="complemento">
+                    Complemento
+                  </label>
+                  <input
+                    id="complemento"
+                    className={cls(errors.complemento)}
+                    placeholder="opcional"
+                    {...register("complemento")}
+                  />
+                </div>
+                <div className="sm:col-span-4">
+                  <label className={labelCls} htmlFor="cidade">
+                    Cidade
+                  </label>
+                  <input
+                    id="cidade"
+                    className={cls(errors.cidade)}
+                    aria-invalid={!!errors.cidade}
+                    {...register("cidade")}
+                  />
+                  <FieldError msg={errors.cidade?.message} />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className={labelCls} htmlFor="uf">
+                    UF
+                  </label>
+                  <input
+                    id="uf"
+                    className={cls(errors.uf)}
+                    maxLength={2}
+                    aria-invalid={!!errors.uf}
+                    {...register("uf")}
+                    onChange={(e) =>
+                      setValue("uf", e.target.value.toUpperCase().slice(0, 2), {
+                        shouldValidate: isSubmitted,
+                      })
+                    }
+                  />
+                  <FieldError msg={errors.uf?.message} />
+                </div>
+              </div>
+            </fieldset>
           </section>
         </div>
 
