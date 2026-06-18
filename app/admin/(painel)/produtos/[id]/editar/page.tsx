@@ -47,6 +47,7 @@ export default async function EditarProdutoPage({ params }: Props) {
           descricaoCurta: produto.descricaoCurta,
           preco: produto.preco,
           descontoPix: produto.descontoPix,
+          usarDescontoPixGlobal: produto.usarDescontoPixGlobal,
           parcelasMax: produto.parcelasMax,
           tipo: produto.tipo,
           estoque: produto.estoque,

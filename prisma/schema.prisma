@@ -190,7 +190,8 @@ model Product {
   alimentacao     String? // ex: "Onívoro"
   expectativaVida String? // ex: "2–3 anos"
   preco           Decimal     @db.Decimal(10, 2)
-  descontoPix     Decimal?    @db.Decimal(5, 2)
+  descontoPix     Decimal?    @db.Decimal(5, 2) // % de desconto Pix PRÓPRIO do produto (0–100)
+  usarDescontoPixGlobal Boolean @default(false) // sem desconto próprio → usa o global da loja
   parcelasMax     Int         @default(3)
   tipo            ProductType @default(PEIXE)
   estoque         Int         @default(0) // PEIXE: espelho de machos+femeas; não-PEIXE: real
@@ -416,4 +417,12 @@ model HeroSettings {
   defaultBackgroundUrl String  @default("/images/hero/bg-aquario-plantado.webp")
 
   atualizadoEm DateTime @updatedAt
+}
+
+// Configurações globais da loja (singleton: 1 linha, id "default"). Enxuto —
+// começa só com o desconto Pix global; vamos reaproveitar para outras configs.
+model ConfiguracaoLoja {
+  id                       String   @id @default("default")
+  descontoPixGlobalPercent Int      @default(0) // 0–100, aplicado a produtos com usarDescontoPixGlobal
+  atualizadoEm             DateTime @updatedAt
 }

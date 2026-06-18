@@ -78,6 +78,7 @@ type ProductFormProps = {
     descricaoCurta: string | null;
     preco: number;
     descontoPix: number | null;
+    usarDescontoPixGlobal: boolean;
     parcelasMax: number;
     tipo: ProductType;
     estoque: number;
@@ -169,6 +170,7 @@ export function ProductForm({ categorias, initialData }: ProductFormProps) {
           descricaoCurta: initialData.descricaoCurta ?? "",
           preco: initialData.tipo === "PEIXE" ? "" : initialData.preco,
           descontoPix: initialData.descontoPix ?? undefined,
+          usarDescontoPixGlobal: initialData.usarDescontoPixGlobal,
           parcelasMax: initialData.parcelasMax,
           tipo: initialData.tipo,
           estoque: initialData.tipo === "PEIXE" ? "" : initialData.estoque,
@@ -198,6 +200,7 @@ export function ProductForm({ categorias, initialData }: ProductFormProps) {
           descricaoCurta: "",
           preco: "",
           descontoPix: "",
+          usarDescontoPixGlobal: false,
           parcelasMax: 3,
           tipo: "PEIXE",
           estoque: "",
@@ -394,6 +397,7 @@ export function ProductForm({ categorias, initialData }: ProductFormProps) {
       formData.append("preco", String(data.preco));
     if (data.descontoPix !== undefined)
       formData.append("descontoPix", String(data.descontoPix));
+    formData.append("usarDescontoPixGlobal", String(data.usarDescontoPixGlobal));
     formData.append("parcelasMax", String(data.parcelasMax));
     formData.append("tipo", data.tipo);
     if (data.estoque !== undefined && data.estoque !== null)
@@ -876,6 +880,21 @@ export function ProductForm({ categorias, initialData }: ProductFormProps) {
                 />
               </FormField>
             </div>
+
+            <label className="flex items-start gap-2.5 cursor-pointer pt-1">
+              <input
+                type="checkbox"
+                {...register("usarDescontoPixGlobal")}
+                className="mt-0.5 w-4 h-4 accent-[#FF035C]"
+              />
+              <span className="text-sm text-gray-700">
+                <span className="font-medium text-[#07366A]">
+                  Usar desconto Pix global
+                </span>{" "}
+                — aplica o % global da loja no Pix quando o produto não tem
+                desconto próprio.
+              </span>
+            </label>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4">
@@ -926,6 +945,19 @@ export function ProductForm({ categorias, initialData }: ProductFormProps) {
                 className={inputClass}
               />
             </FormField>
+            <label className="flex items-start gap-2.5 cursor-pointer sm:col-span-2 pt-1">
+              <input
+                type="checkbox"
+                {...register("usarDescontoPixGlobal")}
+                className="mt-0.5 w-4 h-4 accent-[#FF035C]"
+              />
+              <span className="text-sm text-gray-700">
+                <span className="font-medium text-[#07366A]">
+                  Usar desconto Pix global
+                </span>{" "}
+                — aplica o % global da loja no Pix quando não há desconto próprio.
+              </span>
+            </label>
           </div>
         )}
       </fieldset>

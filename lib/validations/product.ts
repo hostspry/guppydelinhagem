@@ -51,6 +51,8 @@ export const productSchema = z
     descontoPix: numOpt(
       z.coerce.number().min(0, "Não pode ser negativo").max(100, "Máx 100%").optional(),
     ),
+    // Sem desconto próprio → usa o desconto Pix global da loja (ConfiguracaoLoja).
+    usarDescontoPixGlobal: checkboxBool.default(false),
     parcelasMax: z.coerce.number().int().min(1).max(12).default(3),
     tipo: z.enum(ProductType),
     estoque: numOpt(
