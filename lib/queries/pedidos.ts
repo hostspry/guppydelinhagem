@@ -2,6 +2,28 @@ import { prisma } from "../prisma";
 import type { Prisma, OrderStatus } from "../generated/prisma/client";
 import type { EnderecoEntrega } from "../validations/pedido";
 
+const LIMITE_ORFAO_HORAS = 24;
+
+/**
+ * Varredura oportunista (sem cron): cancela pedidos AGUARDANDO_PAGAMENTO órfãos —
+ * mais velhos que 24h e SEM pagamento aprovado nem em análise (esses ainda podem
+ * virar PAGO pelo webhook). NÃO mexe em estoque (órfãos nunca baixaram — só baixa
+ * no PAGO). Idempotente; devolve quantos foram cancelados. Chamada ao abrir
+ * /admin/pedidos. Nunca toca pedidos recentes (<24h) nem pagos.
+ */
+export async function cancelarPedidosAguardandoExpirados(): Promise<number> {
+  const limite = new Date(Date.now() - LIMITE_ORFAO_HORAS * 60 * 60 * 1000);
+  const res = await prisma.order.updateMany({
+    where: {
+      status: "AGUARDANDO_PAGAMENTO",
+      criadoEm: { lt: limite },
+      pagamentos: { none: { status: { in: ["PAGO", "EM_ANALISE"] } } },
+    },
+    data: { status: "CANCELADO" },
+  });
+  return res.count;
+}
+
 // ── Lista (/admin/pedidos) ────────────────────────────────────
 export async function listPedidos({
   status,

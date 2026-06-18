@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { Plus, Pencil, Eye, Search } from "lucide-react";
-import { listPedidos } from "@/lib/queries/pedidos";
+import {
+  listPedidos,
+  cancelarPedidosAguardandoExpirados,
+} from "@/lib/queries/pedidos";
 import { PageHeader } from "@/components/admin/PageHeader";
 import { DeletePedidoButton } from "@/components/admin/DeletePedidoButton";
 import { STATUS_PEDIDO } from "@/lib/pedido-status";
@@ -28,6 +31,10 @@ export default async function PedidosPage({ searchParams }: Props) {
     typeof sp.status === "string" && STATUS_VALIDOS.includes(sp.status as OrderStatus)
       ? (sp.status as OrderStatus)
       : undefined;
+
+  // Varredura oportunista: cancela AGUARDANDO órfãos > 24h sem pagamento
+  // aprovado/em-análise. Resiliente — não quebra a lista se falhar.
+  await cancelarPedidosAguardandoExpirados().catch(() => 0);
 
   const pedidos = await listPedidos({ status, q });
 
