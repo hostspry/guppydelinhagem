@@ -10,6 +10,8 @@ import {
   Minus,
   Plus,
   ShoppingCart,
+  Volume2,
+  VolumeX,
 } from "lucide-react";
 import { toast } from "sonner";
 import { VideoThumb } from "@/components/admin/VideoThumb";
@@ -21,11 +23,7 @@ import {
   ORDEM_COMPOSICAO,
   composicaoDisponivel,
 } from "@/lib/composicoes";
-import {
-  youtubeEmbedUrl,
-  instagramEmbedUrl,
-  tiktokEmbedUrl,
-} from "@/lib/utils/video";
+import { instagramEmbedUrl, tiktokEmbedUrl } from "@/lib/utils/video";
 import type { FeedProduto, FeedVideo, FeedVariante } from "@/lib/queries/products";
 import type { TipoComposicao } from "@/lib/generated/prisma/enums";
 
@@ -42,11 +40,15 @@ const PLATFORM_LABEL: Record<FeedVideo["platform"], string> = {
   TIKTOK: "TikTok",
 };
 
-function embedSrcFor(v: FeedVideo): string | null {
+// Embed do feed: autoplay (mudo por padrão — navegador bloqueia autoplay com som)
+// + loop + playsinline. mute=0 só quando o usuário ativa o som (gesto). IG/TikTok
+// não suportam esses params, então caem no embed normal.
+function feedEmbedSrc(v: FeedVideo, muted: boolean): string | null {
   if (!v.videoId) return null;
+  const m = muted ? 1 : 0;
   switch (v.platform) {
     case "YOUTUBE":
-      return youtubeEmbedUrl(v.videoId);
+      return `https://www.youtube.com/embed/${v.videoId}?autoplay=1&mute=${m}&playsinline=1&loop=1&playlist=${v.videoId}&rel=0&modestbranding=1`;
     case "INSTAGRAM":
       return instagramEmbedUrl(v.videoId);
     case "TIKTOK":
@@ -100,7 +102,9 @@ export default function VideoFeed({
 
   const N = slides.length;
   const [idx, setIdx] = useState(startIdx);
-  const [playing, setPlaying] = useState(false);
+  // Som desligado por padrão → autoplay mudo (navegador bloqueia autoplay c/ som).
+  // O usuário liga o som com um toque (gesto). Persiste entre slides.
+  const [som, setSom] = useState(false);
   const current = slides[idx];
 
   // Composição/quantidade da gaveta (do produto atual).
@@ -132,8 +136,7 @@ export default function VideoFeed({
 
   function irPara(novo: number) {
     const alvo = slides[novo];
-    setIdx(novo);
-    setPlaying(false); // novo slide começa no poster (embed sob demanda)
+    setIdx(novo); // novo slide autoplaya (o iframe re-monta pela key=idx)
     // Trocou de PRODUTO → reseta composição/quantidade da gaveta.
     if (alvo.p.id !== current.p.id) {
       setComposicaoSel(alvo.p.variantes[0]?.composicao ?? null);
@@ -174,7 +177,7 @@ export default function VideoFeed({
   const estoqueAtual = variant ? unitsDoPool(p, variant) : p.estoque;
   const semEstoque = estoqueAtual <= 0;
   const pool = { machos: p.estoqueMachos, femeas: p.estoqueFemeas };
-  const embedSrc = embedSrcFor(current.video);
+  const embedSrc = feedEmbedSrc(current.video, !som); // autoplay (mudo até ligar som)
 
   function escolherComposicao(c: TipoComposicao) {
     setComposicaoSel(c);
@@ -208,10 +211,9 @@ export default function VideoFeed({
     toast.success("Adicionado ao carrinho ✓");
   }
 
-  function tocar() {
-    if (embedSrc) setPlaying(true);
-    else
-      window.open(current.video.originalUrl, "_blank", "noopener,noreferrer");
+  // Sem embed (ex.: id não resolvido) → abre no destino ao tocar.
+  function abrirOriginal() {
+    window.open(current.video.originalUrl, "_blank", "noopener,noreferrer");
   }
 
   return (
@@ -223,30 +225,55 @@ export default function VideoFeed({
       {/* Área do vídeo (9:16 centralizado) */}
       <div className="absolute inset-0 flex items-center justify-center">
         <div className="relative w-full h-full max-w-[480px] mx-auto bg-black">
-          {/* Embed sob demanda: só monta o iframe do slide atual ao tocar. */}
-          {playing && embedSrc ? (
-            <iframe
-              key={`${idx}-${current.video.originalUrl}`}
-              src={embedSrc}
-              title={current.video.titulo || p.nome}
-              className="absolute inset-0 w-full h-full"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-            />
+          {/* Thumbnail de fundo (poster) — aparece enquanto o iframe carrega. */}
+          {current.video.thumbnailUrl && (
+            <div className="absolute inset-0">
+              <VideoThumb
+                src={current.video.thumbnailUrl}
+                alt={p.nome}
+                sizes="(max-width: 480px) 100vw, 480px"
+              />
+            </div>
+          )}
+
+          {embedSrc ? (
+            <>
+              {/* Embed SOB DEMANDA: só o slide atual monta iframe; autoplay (mudo
+                  até o usuário ligar o som). key={idx+som} re-monta ao trocar. */}
+              <iframe
+                key={`${idx}-${som ? "som" : "mudo"}`}
+                src={embedSrc}
+                title={current.video.titulo || p.nome}
+                className="absolute inset-0 w-full h-full"
+                allow="autoplay; accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+              />
+              {/* Enquanto mudo: camada de toque para ativar o som (e o swipe
+                  continua funcionando por cima). Ao ligar o som, some e libera os
+                  controles do player. */}
+              {!som && (
+                <button
+                  type="button"
+                  onClick={() => setSom(true)}
+                  aria-label="Ativar som"
+                  className="absolute inset-0 z-10 flex items-end justify-center pb-40"
+                >
+                  <span className="flex items-center gap-2 bg-black/55 text-white text-xs font-medium rounded-full px-3 py-2">
+                    <VolumeX className="w-4 h-4" aria-hidden="true" />
+                    Toque para ativar o som
+                  </span>
+                </button>
+              )}
+            </>
           ) : (
+            // Sem embed (id não resolvido) → poster com play que abre no destino.
             <button
               type="button"
-              onClick={tocar}
-              aria-label="Tocar vídeo"
+              onClick={abrirOriginal}
+              aria-label="Abrir vídeo"
               className="absolute inset-0 w-full h-full"
             >
-              {current.video.thumbnailUrl ? (
-                <VideoThumb
-                  src={current.video.thumbnailUrl}
-                  alt={p.nome}
-                  sizes="(max-width: 480px) 100vw, 480px"
-                />
-              ) : (
+              {!current.video.thumbnailUrl && (
                 <div className="w-full h-full bg-neutral-900" />
               )}
               <span className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-black/45 rounded-full p-5">
@@ -276,6 +303,19 @@ export default function VideoFeed({
           <span className="text-white/90 text-[11px] font-semibold bg-black/50 rounded-full px-2.5 py-1">
             {PLATFORM_LABEL[current.video.platform]}
           </span>
+          {/* Liga/desliga o som (autoplay entra mudo). */}
+          <button
+            type="button"
+            onClick={() => setSom((s) => !s)}
+            aria-label={som ? "Desativar som" : "Ativar som"}
+            className="flex items-center justify-center w-11 h-11 rounded-full bg-black/50 text-white hover:bg-black/70 transition-colors"
+          >
+            {som ? (
+              <Volume2 className="w-5 h-5" aria-hidden="true" />
+            ) : (
+              <VolumeX className="w-5 h-5" aria-hidden="true" />
+            )}
+          </button>
         </div>
       </div>
 
