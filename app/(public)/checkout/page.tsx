@@ -55,5 +55,15 @@ export default async function CheckoutPage() {
     };
   }
 
-  return <CheckoutClient prefill={prefill} />;
+  // Public key do MP lida em RUNTIME no servidor e injetada por prop. Preferimos
+  // MP_PUBLIC_KEY (sem prefixo → NÃO é inlinada no build, vem do runtime do
+  // Coolish) e caímos em NEXT_PUBLIC_MP_PUBLIC_KEY (dev local / legado). Public
+  // key não é segredo — vai ao client de qualquer forma. Isso evita a fragilidade
+  // do inlining em build-time (key velha grudada / key ausente no build).
+  const mpPublicKey =
+    process.env.MP_PUBLIC_KEY ||
+    process.env.NEXT_PUBLIC_MP_PUBLIC_KEY ||
+    null;
+
+  return <CheckoutClient prefill={prefill} mpPublicKey={mpPublicKey} />;
 }

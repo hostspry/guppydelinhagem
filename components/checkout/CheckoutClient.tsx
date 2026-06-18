@@ -34,8 +34,6 @@ import {
 import PixPanel from "@/components/checkout/PixPanel";
 import CardPaymentBrick from "@/components/checkout/CardPaymentBrick";
 
-const MP_PUBLIC_KEY = process.env.NEXT_PUBLIC_MP_PUBLIC_KEY;
-
 export type CheckoutPrefill = {
   nome: string;
   telefone: string;
@@ -146,22 +144,24 @@ function focarCampo(id: string) {
 
 export default function CheckoutClient({
   prefill,
+  mpPublicKey,
 }: {
   prefill: CheckoutPrefill;
+  mpPublicKey: string | null;
 }) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
-  // DIAGNÓSTICO: prefixo da public key no client (TEST-/APP_USR-/UNDEFINED). Se
-  // UNDEFINED, NEXT_PUBLIC_MP_PUBLIC_KEY não foi inlinada no BUILD → cartão recusa.
+  // DIAGNÓSTICO: prefixo da public key recebida do servidor (runtime). UNDEFINED
+  // = a env MP_PUBLIC_KEY/NEXT_PUBLIC_MP_PUBLIC_KEY não está no runtime do server.
   useEffect(() => {
     console.log(
-      "[mp] NEXT_PUBLIC_MP_PUBLIC_KEY:",
-      MP_PUBLIC_KEY
-        ? `${MP_PUBLIC_KEY.split("-")[0]}-… (len ${MP_PUBLIC_KEY.length})`
+      "[mp] public key (runtime):",
+      mpPublicKey
+        ? `${mpPublicKey.split("-")[0]}-… (len ${mpPublicKey.length})`
         : "UNDEFINED",
     );
-  }, []);
+  }, [mpPublicKey]);
 
   const items = useCart((s) => s.items);
   const totalPeixes = useCart(selectTotalPeixes);
@@ -763,7 +763,7 @@ export default function CheckoutClient({
             </>
           ) : (
             <div className="space-y-2">
-              {!MP_PUBLIC_KEY ? (
+              {!mpPublicKey ? (
                 <p className="text-xs text-amber-700">
                   Pagamento com cartão indisponível no momento. Use o Pix.
                 </p>
@@ -782,7 +782,7 @@ export default function CheckoutClient({
                     Em até {teto}x com juros.
                   </p>
                   <CardPaymentBrick
-                    publicKey={MP_PUBLIC_KEY}
+                    publicKey={mpPublicKey}
                     amount={total}
                     maxInstallments={teto}
                     payerEmail={watch("email")}
