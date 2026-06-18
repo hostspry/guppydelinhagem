@@ -7,7 +7,9 @@ import {
   getUltimosAdicionados,
 } from "@/lib/queries/products";
 import { getConfigPreco } from "@/lib/queries/config";
+import { stripMarcheziSignature } from "@/lib/constants";
 import ProductDetail from "@/components/product/ProductDetail";
+import FeedAutoOpen from "@/components/feed/FeedAutoOpen";
 
 // ISR: a página revalida a cada 60s, refletindo edições do admin sem redeploy.
 // (As actions de produto não revalidam /loja/[slug] individualmente; 60s é o
@@ -20,10 +22,37 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
   const produto = await getProductBySlug(slug); // cache() dedup com o render
   if (!produto) return { title: "Produto não encontrado" };
+
+  const titulo = produto.metaTitle || `${produto.nome} — Guppy de Linhagem`;
+  // Descrição da prévia SEM preço (preço muda; link velho não pode mostrar errado).
+  const descricao =
+    produto.metaDescription ||
+    produto.descricaoCurta ||
+    stripMarcheziSignature(produto.descricao).slice(0, 155).trim() ||
+    undefined;
+  // Imagem da prévia = thumb do vídeo principal (videos já vêm principal-primeiro,
+  // só ativos). YouTube/upload já são URLs absolutas; fallback no selo da marca.
+  const imagem = produto.videos[0]?.thumbnailUrl || "/images/selo.png";
+  const url = `/loja/${slug}`;
+
   return {
-    title: produto.metaTitle || `${produto.nome} — Guppy de Linhagem`,
-    description:
-      produto.metaDescription || produto.descricaoCurta || undefined,
+    title: titulo,
+    description: descricao,
+    alternates: { canonical: url },
+    openGraph: {
+      type: "website",
+      url,
+      siteName: "Guppy de Linhagem",
+      title: produto.nome,
+      description: descricao,
+      images: [{ url: imagem, alt: produto.nome }],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: produto.nome,
+      description: descricao,
+      images: [imagem],
+    },
   };
 }
 
@@ -60,6 +89,8 @@ export default async function ProdutoPage({ params }: Props) {
 
   return (
     <>
+      {/* Mobile: deep link abre o feed neste produto (desktop ignora). */}
+      <FeedAutoOpen slug={prod.slug} />
       {preview && (
         <div className="bg-amber-50 border-b border-amber-200 text-amber-800 text-sm text-center py-2 px-4">
           Pré-visualização — produto <strong>inativo</strong> (não visível na

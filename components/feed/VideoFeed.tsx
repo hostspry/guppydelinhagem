@@ -12,6 +12,7 @@ import {
   ShoppingCart,
   Volume2,
   VolumeX,
+  Share2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { VideoThumb } from "@/components/admin/VideoThumb";
@@ -265,6 +266,26 @@ export default function VideoFeed({
     window.open(current.video.originalUrl, "_blank", "noopener,noreferrer");
   }
 
+  // Compartilhar: só o LINK da página do produto (sem texto/preço). Share nativo
+  // do dispositivo; fallback copia o link. No mobile esse link reabre o feed.
+  async function compartilhar() {
+    const url = `${window.location.origin}/loja/${p.slug}`;
+    if (typeof navigator !== "undefined" && navigator.share) {
+      try {
+        await navigator.share({ url });
+      } catch {
+        /* usuário cancelou — ignora */
+      }
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success("Link copiado");
+    } catch {
+      toast.error("Não foi possível copiar o link");
+    }
+  }
+
   return (
     <div
       className="fixed inset-0 z-[100] bg-black select-none"
@@ -385,6 +406,14 @@ export default function VideoFeed({
           className="flex items-center justify-center w-11 h-11 rounded-full bg-black/40 text-white hover:bg-black/60 transition-colors"
         >
           <ChevronDown className="w-5 h-5" aria-hidden="true" />
+        </button>
+        <button
+          type="button"
+          onClick={compartilhar}
+          aria-label="Compartilhar"
+          className="flex items-center justify-center w-11 h-11 rounded-full bg-black/40 text-white hover:bg-black/60 transition-colors"
+        >
+          <Share2 className="w-5 h-5" aria-hidden="true" />
         </button>
       </div>
 

@@ -10,6 +10,8 @@ const nunito = Nunito({
 });
 
 export const metadata: Metadata = {
+  // Base p/ resolver URLs relativas (og:url, canonical, og:image relativas).
+  metadataBase: new URL("https://www.guppydelinhagem.com.br"),
   title: "Guppy de Linhagem | Guppys Premiados",
   description:
     "Guppys de linhagem selecionados, saudáveis e com genética apurada. Campeões mundiais World Guppy Contest.",
