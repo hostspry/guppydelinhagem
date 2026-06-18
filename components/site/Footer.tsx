@@ -45,9 +45,8 @@ function IconLinkedin({ size = 20 }: { size?: number }) {
 const INSTITUCIONAL = [
   { href: "/sobre-nos", label: "Sobre Nós" },
   { href: "/conheca-os-guppy", label: "Conheça o Guppy" },
-  { href: "/blog", label: "Blog" },
   { href: "/contatos", label: "Contatos" },
-  { href: "/politica-de-privacidade", label: "Política de Privacidade" },
+  // /blog e /politica-de-privacidade removidos por ora (rotas não existem → 404).
 ];
 
 const LINKS_UTEIS = [

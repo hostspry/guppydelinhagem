@@ -12,7 +12,7 @@ const NAV_LINKS = [
   { href: "/#loja", label: "Loja" },
   { href: "/sobre-nos", label: "Sobre Nós" },
   { href: "/conheca-os-guppy", label: "Conheça o Guppy" },
-  { href: "/blog", label: "Blog" },
+  // /blog removido por ora (rota não existe → 404).
   { href: "/contatos", label: "Contatos" },
 ];
 
