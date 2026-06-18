@@ -209,6 +209,15 @@ export default function ProductDetail({
     setPlaying(false);
   }
   function handlePlay() {
+    // No mobile (<lg), o vídeo abre o feed tela cheia neste produto; no desktop
+    // mantém o comportamento atual (embed inline / abrir no destino).
+    if (
+      typeof window !== "undefined" &&
+      window.matchMedia("(max-width: 1023px)").matches
+    ) {
+      router.push(`/feed?p=${encodeURIComponent(product.slug)}`);
+      return;
+    }
     if (embedSrc) setPlaying(true);
     else if (selected)
       window.open(selected.originalUrl, "_blank", "noopener,noreferrer");
