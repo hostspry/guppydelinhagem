@@ -17,7 +17,11 @@ import {
   selectTotalPeixes,
   selectSubtotalPix,
 } from "@/lib/stores/cart";
-import { criarPedidoCheckout } from "@/actions/checkout";
+import {
+  criarPedidoCheckout,
+  type CheckoutPixData,
+} from "@/actions/checkout";
+import PixPanel from "@/components/checkout/PixPanel";
 
 export type CheckoutPrefill = {
   nome: string;
@@ -49,17 +53,6 @@ type FreteResponse = {
   } | null;
   jadlog: JadlogOpt[];
   gollog: { min: number; max: number };
-};
-
-// Resultado do Pix gerado (commit 4 transforma isto numa tela completa com
-// contagem + poll). Aqui, exibição mínima do QR.
-type PixData = {
-  numero: string;
-  valor: number;
-  qrCodeBase64: string | null;
-  copiaECola: string | null;
-  ticketUrl: string | null;
-  expiraEm: string | null;
 };
 
 function formatCep(raw: string) {
@@ -117,7 +110,7 @@ export default function CheckoutClient({
   // Submit / Pix
   const [pending, startTransition] = useTransition();
   const [erro, setErro] = useState<string | null>(null);
-  const [pix, setPix] = useState<PixData | null>(null);
+  const [pix, setPix] = useState<CheckoutPixData | null>(null);
 
   const cepDigits = form.cep.replace(/\D/g, "");
   const cepValido = /^\d{8}$/.test(cepDigits);
@@ -240,47 +233,9 @@ export default function CheckoutClient({
     );
   }
 
-  // ── Pix gerado (exibição mínima; commit 4 traz contagem + poll) ──
+  // ── Pix gerado: tela do QR + copia-e-cola + contagem + poll de status ──
   if (pix) {
-    return (
-      <div className="container-site py-12 max-w-md mx-auto text-center space-y-5">
-        <h1 className="text-primary text-2xl font-semibold">
-          Pague com Pix para confirmar
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          Pedido <strong className="text-primary">{pix.numero}</strong> ·{" "}
-          {formatBRL(pix.valor)}
-        </p>
-
-        {pix.qrCodeBase64 ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={`data:image/png;base64,${pix.qrCodeBase64}`}
-            alt="QR Code do Pix"
-            className="mx-auto w-60 h-60 rounded-lg border border-border bg-white"
-            width={240}
-            height={240}
-          />
-        ) : (
-          <p className="text-sm text-amber-700">
-            QR indisponível — use o código copia-e-cola abaixo.
-          </p>
-        )}
-
-        {pix.copiaECola && (
-          <div className="space-y-1 text-left">
-            <span className={labelCls}>Pix copia-e-cola</span>
-            <code className="block break-all rounded-lg border border-border bg-bg-alt p-3 text-xs text-primary">
-              {pix.copiaECola}
-            </code>
-          </div>
-        )}
-
-        <p className="text-xs text-muted-foreground">
-          Pague pelo app do seu banco; a confirmação é automática.
-        </p>
-      </div>
-    );
+    return <PixPanel pix={pix} />;
   }
 
   // ── Formulário de checkout ──

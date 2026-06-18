@@ -19,7 +19,7 @@ import {
   FormaPagamento,
   Transportadora,
 } from "@/lib/generated/prisma/enums";
-import type { Prisma } from "@/lib/generated/prisma/client";
+import type { Prisma, OrderStatus } from "@/lib/generated/prisma/client";
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
@@ -35,6 +35,70 @@ export type CheckoutPixData = {
 export type CheckoutResult =
   | { ok: true; data: CheckoutPixData }
   | { ok: false; error: string; fieldErrors?: Record<string, string[]> };
+
+/**
+ * Emite a cobrança Pix no MP e grava a linha Pagamento + amarra o id no pedido.
+ * Reusado por criarPedidoCheckout e gerarNovoPix. Lança se o MP falhar (o
+ * chamador decide o que fazer com o pedido); falha ao gravar a linha Pagamento é
+ * só logada (o Pix já existe no MP, não dá pra perder o QR pro cliente).
+ */
+async function emitirPix(args: {
+  orderId: string;
+  numero: string;
+  valor: number;
+  pagador: {
+    nome?: string | null;
+    sobrenome?: string | null;
+    email: string;
+    cpfCnpj?: string | null;
+  };
+}): Promise<CheckoutPixData> {
+  const provider = getPaymentProvider(ProviderPagamento.MERCADO_PAGO);
+  const pix = await provider.criarPagamentoPix({
+    orderId: args.orderId,
+    valor: args.valor,
+    descricao: `Pedido ${args.numero} — Guppy de Linhagem`,
+    pagador: args.pagador,
+  });
+
+  try {
+    await prisma.pagamento.create({
+      data: {
+        orderId: args.orderId,
+        provider: ProviderPagamento.MERCADO_PAGO,
+        metodo: MetodoPagamento.PIX,
+        status:
+          pix.status === StatusPagamento.PAGO
+            ? StatusPagamento.PAGO
+            : StatusPagamento.PENDENTE,
+        valor: args.valor,
+        externalId: pix.externalId,
+        qrCode: pix.qrCode, // copia-e-cola (EMV)
+        linkPagamento: pix.ticketUrl,
+        payloadRaw: {
+          qrCodeBase64: pix.qrCodeBase64,
+          ticketUrl: pix.ticketUrl,
+          expiraEm: pix.expiraEm ? pix.expiraEm.toISOString() : null,
+        } as Prisma.InputJsonValue,
+      },
+    });
+    await prisma.order.update({
+      where: { id: args.orderId },
+      data: { mpPaymentId: pix.externalId },
+    });
+  } catch (e) {
+    console.error("[checkout] gravar Pagamento", e);
+  }
+
+  return {
+    numero: args.numero,
+    valor: args.valor,
+    qrCodeBase64: pix.qrCodeBase64,
+    copiaECola: pix.copiaECola ?? pix.qrCode,
+    ticketUrl: pix.ticketUrl,
+    expiraEm: pix.expiraEm ? pix.expiraEm.toISOString() : null,
+  };
+}
 
 /**
  * Cria o pedido no checkout público (guest) e gera a cobrança Pix.
@@ -272,15 +336,13 @@ export async function criarPedidoCheckout(
     return { ok: false, error: "Não foi possível criar o pedido. Tente novamente." };
   }
 
-  // ── 4. Criar a cobrança Pix no Mercado Pago (fora da transação de DB) ──────
+  // ── 4. Gerar a cobrança Pix no MP + gravar Pagamento (fora da transação) ───
   const partesNome = data.nome.trim().split(/\s+/);
-  const provider = getPaymentProvider(ProviderPagamento.MERCADO_PAGO);
-  let pix;
   try {
-    pix = await provider.criarPagamentoPix({
+    const pixData = await emitirPix({
       orderId,
+      numero,
       valor: total,
-      descricao: `Pedido ${numero} — Guppy de Linhagem`,
       pagador: {
         nome: partesNome[0],
         sobrenome: partesNome.slice(1).join(" ") || null,
@@ -288,6 +350,7 @@ export async function criarPedidoCheckout(
         cpfCnpj: cpf,
       },
     });
+    return { ok: true, data: pixData };
   } catch (e) {
     console.error("[checkout] criar Pix", e);
     // Sem pagamento não há pedido útil → remove o rascunho pra não poluir o admin.
@@ -298,47 +361,71 @@ export async function criarPedidoCheckout(
         e instanceof Error ? e.message : "Não foi possível gerar o Pix agora.",
     };
   }
+}
 
-  // ── 5. Gravar a linha Pagamento + amarrar o id do MP no pedido ─────────────
-  try {
-    await prisma.pagamento.create({
-      data: {
-        orderId,
-        provider: ProviderPagamento.MERCADO_PAGO,
-        metodo: MetodoPagamento.PIX,
-        status:
-          pix.status === StatusPagamento.PAGO
-            ? StatusPagamento.PAGO
-            : StatusPagamento.PENDENTE,
-        valor: total,
-        externalId: pix.externalId,
-        qrCode: pix.qrCode, // copia-e-cola (EMV)
-        linkPagamento: pix.ticketUrl,
-        payloadRaw: {
-          qrCodeBase64: pix.qrCodeBase64,
-          ticketUrl: pix.ticketUrl,
-          expiraEm: pix.expiraEm ? pix.expiraEm.toISOString() : null,
-        } as Prisma.InputJsonValue,
-      },
-    });
-    await prisma.order.update({
-      where: { id: orderId },
-      data: { mpPaymentId: pix.externalId },
-    });
-  } catch (e) {
-    // O Pix já existe no MP; logar e seguir com o que devolvemos ao client.
-    console.error("[checkout] gravar Pagamento", e);
+/**
+ * Poll do status do pedido a partir do BANCO (o webhook é quem confirma o
+ * pagamento e atualiza o status). NÃO chama o MP — público, leve, idempotente.
+ * `pago` cobre PAGO e os status posteriores (ENVIADO/ENTREGUE).
+ */
+export async function consultarStatusPedido(
+  numero: string,
+): Promise<{ pago: boolean; status: OrderStatus } | null> {
+  const order = await prisma.order.findUnique({
+    where: { numero },
+    select: { status: true },
+  });
+  if (!order) return null;
+  const pago =
+    order.status === "PAGO" ||
+    order.status === "ENVIADO" ||
+    order.status === "ENTREGUE";
+  return { pago, status: order.status };
+}
+
+/**
+ * Gera um novo Pix para um pedido que ainda aguarda pagamento (Pix anterior
+ * expirou). Reusa o cliente/endereço/total do pedido — não recria o Order.
+ */
+export async function gerarNovoPix(numero: string): Promise<CheckoutResult> {
+  const order = await prisma.order.findUnique({
+    where: { numero },
+    select: {
+      id: true,
+      numero: true,
+      total: true,
+      status: true,
+      enderecoEntrega: true,
+    },
+  });
+  if (!order) return { ok: false, error: "Pedido não encontrado." };
+  if (order.status !== "AGUARDANDO_PAGAMENTO") {
+    return {
+      ok: false,
+      error: "Este pedido não está mais aguardando pagamento.",
+    };
   }
 
-  return {
-    ok: true,
-    data: {
-      numero,
-      valor: total,
-      qrCodeBase64: pix.qrCodeBase64,
-      copiaECola: pix.copiaECola ?? pix.qrCode,
-      ticketUrl: pix.ticketUrl,
-      expiraEm: pix.expiraEm ? pix.expiraEm.toISOString() : null,
-    },
-  };
+  const end = order.enderecoEntrega as unknown as EnderecoEntrega;
+  const partes = (end.nome ?? "").trim().split(/\s+/);
+  try {
+    const pixData = await emitirPix({
+      orderId: order.id,
+      numero: order.numero,
+      valor: Number(order.total),
+      pagador: {
+        nome: partes[0],
+        sobrenome: partes.slice(1).join(" ") || null,
+        email: end.email ?? "",
+        cpfCnpj: end.cpfCnpj,
+      },
+    });
+    return { ok: true, data: pixData };
+  } catch (e) {
+    console.error("[checkout] gerar novo Pix", e);
+    return {
+      ok: false,
+      error: e instanceof Error ? e.message : "Não foi possível gerar o Pix.",
+    };
+  }
 }
