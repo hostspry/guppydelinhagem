@@ -2,6 +2,9 @@
 
 import { useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
+import { useForm, type SubmitErrorHandler } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import {
   AlertTriangle,
   Clock,
@@ -12,6 +15,7 @@ import {
 import { WhatsAppIcon } from "@/components/icons/WhatsAppIcon";
 import { formatBRL } from "@/lib/utils/format";
 import { whatsappLink, MAX_PEIXES_POR_CAIXA } from "@/lib/constants";
+import { checkoutSchema } from "@/lib/validations/checkout";
 import {
   useCart,
   selectTotalPeixes,
@@ -36,6 +40,26 @@ export type CheckoutPrefill = {
   cidade: string;
   uf: string;
 };
+
+// Só os campos visíveis do formulário (transportadora/itens vêm do carrinho e da
+// regra de frete, não do form). Reusa as mensagens PT do checkoutSchema.
+const camposSchema = checkoutSchema.omit({ transportadora: true, itens: true });
+type CamposInput = z.input<typeof camposSchema>;
+type CamposOutput = z.output<typeof camposSchema>;
+
+// Ordem visual dos campos — para focar o PRIMEIRO com erro.
+const FIELD_ORDER: (keyof CamposInput)[] = [
+  "nome",
+  "email",
+  "telefone",
+  "cpfCnpj",
+  "cep",
+  "logradouro",
+  "numero",
+  "bairro",
+  "uf",
+  "cidade",
+];
 
 type JadlogOpt = {
   id: number;
@@ -82,9 +106,34 @@ function formatCpf(raw: string) {
     .replace(/(\d{4})(\d{1,2})$/, "$1-$2");
 }
 
-const inputCls =
-  "w-full min-h-11 px-3 rounded-lg border border-border bg-white text-sm text-primary placeholder:text-muted-foreground focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/30 transition-all";
+const inputBase =
+  "w-full min-h-11 px-3 rounded-lg border bg-white text-sm text-primary placeholder:text-muted-foreground focus:outline-none focus:ring-1 transition-all";
+const inputOk =
+  "border-border focus:border-primary focus:ring-primary/30";
+const inputErr =
+  "border-red-500 focus:border-red-500 focus:ring-red-500/30";
 const labelCls = "block text-xs font-medium text-primary mb-1";
+
+function cls(hasError: unknown) {
+  return `${inputBase} ${hasError ? inputErr : inputOk}`;
+}
+
+// Componente de mensagem de erro — no topo do módulo (regra static-components).
+function FieldError({ msg }: { msg?: string }) {
+  return msg ? (
+    <p role="alert" className="mt-1 text-xs text-red-600">
+      {msg}
+    </p>
+  ) : null;
+}
+
+// Foco + scroll suave num campo pelo id (= nome do campo no RHF).
+function focarCampo(id: string) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.scrollIntoView({ behavior: "smooth", block: "center" });
+  (el as HTMLElement).focus({ preventScroll: true });
+}
 
 export default function CheckoutClient({
   prefill,
@@ -98,9 +147,18 @@ export default function CheckoutClient({
   const totalPeixes = useCart(selectTotalPeixes);
   const subtotalPix = useCart(selectSubtotalPix);
 
-  const [form, setForm] = useState<CheckoutPrefill>(prefill);
-  const set = (k: keyof CheckoutPrefill, v: string) =>
-    setForm((f) => ({ ...f, [k]: v }));
+  const {
+    register,
+    handleSubmit,
+    setValue,
+    getValues,
+    watch,
+    formState: { errors, isSubmitted },
+  } = useForm<CamposInput, unknown, CamposOutput>({
+    resolver: zodResolver(camposSchema),
+    defaultValues: prefill,
+    shouldFocusError: false, // foco/scroll manual e suave (abaixo)
+  });
 
   // Frete
   const [freteLoading, setFreteLoading] = useState(false);
@@ -112,7 +170,7 @@ export default function CheckoutClient({
   const [erro, setErro] = useState<string | null>(null);
   const [pix, setPix] = useState<CheckoutPixData | null>(null);
 
-  const cepDigits = form.cep.replace(/\D/g, "");
+  const cepDigits = (watch("cep") ?? "").replace(/\D/g, "");
   const cepValido = /^\d{8}$/.test(cepDigits);
   const excedeCaixa = totalPeixes > MAX_PEIXES_POR_CAIXA;
 
@@ -123,6 +181,10 @@ export default function CheckoutClient({
   );
   const freteValor = freteSel?.price ?? null;
   const total = subtotalPix + (freteValor ?? 0);
+
+  // Frete obrigatório: depois de uma tentativa de envio, sem valor e ≤10 peixes.
+  const freteFaltando = isSubmitted && !excedeCaixa && freteValor == null;
+  const temErros = Object.keys(errors).length > 0 || freteFaltando;
 
   async function calcularFrete() {
     if (!cepValido || freteLoading) return;
@@ -143,13 +205,18 @@ export default function CheckoutClient({
         // Autofill do endereço a partir do ViaCEP (preenche o que estiver vazio).
         const e = (data as FreteResponse).endereco;
         if (e) {
-          setForm((f) => ({
-            ...f,
-            logradouro: f.logradouro || e.rua || "",
-            bairro: f.bairro || e.bairro || "",
-            cidade: f.cidade || e.cidade || "",
-            uf: f.uf || e.uf || "",
-          }));
+          const fill = (
+            campo: "logradouro" | "bairro" | "cidade" | "uf",
+            valor: string | null,
+          ) => {
+            if (!getValues(campo) && valor) {
+              setValue(campo, valor, { shouldValidate: isSubmitted });
+            }
+          };
+          fill("logradouro", e.rua);
+          fill("bairro", e.bairro);
+          fill("cidade", e.cidade);
+          fill("uf", e.uf);
         }
       }
     } catch {
@@ -160,36 +227,21 @@ export default function CheckoutClient({
     }
   }
 
-  const camposOk =
-    form.nome.trim().length >= 2 &&
-    form.email.includes("@") &&
-    form.telefone.replace(/\D/g, "").length >= 10 &&
-    form.cpfCnpj.replace(/\D/g, "").length >= 11 &&
-    cepValido &&
-    form.logradouro.trim() &&
-    form.numero.trim() &&
-    form.bairro.trim() &&
-    form.cidade.trim() &&
-    form.uf.trim().length === 2;
-
-  const podePagar =
-    !!camposOk && !!freteValor && !excedeCaixa && !pending && items.length > 0;
-
-  function pagar() {
+  function onValid(data: CamposOutput) {
+    // Frete entra como “erro” do mesmo jeito: sem ele, não submete.
+    if (excedeCaixa) {
+      focarCampo("cep");
+      return;
+    }
+    if (freteValor == null) {
+      focarCampo("cep");
+      return;
+    }
     setErro(null);
     startTransition(async () => {
       const res = await criarPedidoCheckout({
-        nome: form.nome,
-        telefone: form.telefone,
-        email: form.email,
-        cpfCnpj: form.cpfCnpj,
-        cep: form.cep,
-        logradouro: form.logradouro,
-        numero: form.numero,
-        complemento: form.complemento,
-        bairro: form.bairro,
-        cidade: form.cidade,
-        uf: form.uf,
+        ...data,
+        complemento: data.complemento ?? "",
         transportadora: "JADLOG",
         itens: items.map((i) => ({
           produtoId: i.produtoId,
@@ -204,6 +256,14 @@ export default function CheckoutClient({
       }
     });
   }
+
+  // Form inválido: foca + rola suave pro primeiro campo com erro.
+  const onInvalid: SubmitErrorHandler<CamposInput> = (formErrors) => {
+    const primeiro = FIELD_ORDER.find((f) => formErrors[f]);
+    if (primeiro) focarCampo(primeiro);
+  };
+
+  const submeter = handleSubmit(onValid, onInvalid);
 
   // ── Hidratação / carrinho vazio ──
   if (!mounted) {
@@ -245,7 +305,11 @@ export default function CheckoutClient({
         Finalizar pedido
       </h1>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+      <form
+        noValidate
+        onSubmit={submeter}
+        className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start"
+      >
         {/* Coluna principal: dados + entrega + frete */}
         <div className="lg:col-span-2 space-y-6">
           {/* Identificação */}
@@ -258,11 +322,12 @@ export default function CheckoutClient({
                 </label>
                 <input
                   id="nome"
-                  className={inputCls}
-                  value={form.nome}
-                  onChange={(e) => set("nome", e.target.value)}
+                  className={cls(errors.nome)}
                   autoComplete="name"
+                  aria-invalid={!!errors.nome}
+                  {...register("nome")}
                 />
+                <FieldError msg={errors.nome?.message} />
               </div>
               <div>
                 <label className={labelCls} htmlFor="email">
@@ -271,11 +336,12 @@ export default function CheckoutClient({
                 <input
                   id="email"
                   type="email"
-                  className={inputCls}
-                  value={form.email}
-                  onChange={(e) => set("email", e.target.value)}
+                  className={cls(errors.email)}
                   autoComplete="email"
+                  aria-invalid={!!errors.email}
+                  {...register("email")}
                 />
+                <FieldError msg={errors.email?.message} />
               </div>
               <div>
                 <label className={labelCls} htmlFor="telefone">
@@ -284,23 +350,35 @@ export default function CheckoutClient({
                 <input
                   id="telefone"
                   inputMode="numeric"
-                  className={inputCls}
-                  value={form.telefone}
-                  onChange={(e) => set("telefone", formatTel(e.target.value))}
+                  className={cls(errors.telefone)}
                   autoComplete="tel"
+                  aria-invalid={!!errors.telefone}
+                  {...register("telefone")}
+                  onChange={(e) =>
+                    setValue("telefone", formatTel(e.target.value), {
+                      shouldValidate: isSubmitted,
+                    })
+                  }
                 />
+                <FieldError msg={errors.telefone?.message} />
               </div>
               <div>
-                <label className={labelCls} htmlFor="cpf">
+                <label className={labelCls} htmlFor="cpfCnpj">
                   CPF / CNPJ
                 </label>
                 <input
-                  id="cpf"
+                  id="cpfCnpj"
                   inputMode="numeric"
-                  className={inputCls}
-                  value={form.cpfCnpj}
-                  onChange={(e) => set("cpfCnpj", formatCpf(e.target.value))}
+                  className={cls(errors.cpfCnpj)}
+                  aria-invalid={!!errors.cpfCnpj}
+                  {...register("cpfCnpj")}
+                  onChange={(e) =>
+                    setValue("cpfCnpj", formatCpf(e.target.value), {
+                      shouldValidate: isSubmitted,
+                    })
+                  }
                 />
+                <FieldError msg={errors.cpfCnpj?.message} />
               </div>
             </div>
           </section>
@@ -317,14 +395,17 @@ export default function CheckoutClient({
                   <input
                     id="cep"
                     inputMode="numeric"
-                    className={inputCls}
-                    value={form.cep}
-                    onChange={(e) => {
-                      set("cep", formatCep(e.target.value));
-                      setFrete(null);
-                    }}
+                    className={cls(errors.cep || freteFaltando)}
                     autoComplete="postal-code"
                     maxLength={9}
+                    aria-invalid={!!errors.cep}
+                    {...register("cep")}
+                    onChange={(e) => {
+                      setValue("cep", formatCep(e.target.value), {
+                        shouldValidate: isSubmitted,
+                      });
+                      setFrete(null);
+                    }}
                   />
                   <button
                     type="button"
@@ -339,6 +420,7 @@ export default function CheckoutClient({
                     )}
                   </button>
                 </div>
+                <FieldError msg={errors.cep?.message} />
               </div>
               <div className="sm:col-span-3">
                 <label className={labelCls} htmlFor="logradouro">
@@ -346,11 +428,12 @@ export default function CheckoutClient({
                 </label>
                 <input
                   id="logradouro"
-                  className={inputCls}
-                  value={form.logradouro}
-                  onChange={(e) => set("logradouro", e.target.value)}
+                  className={cls(errors.logradouro)}
                   autoComplete="address-line1"
+                  aria-invalid={!!errors.logradouro}
+                  {...register("logradouro")}
                 />
+                <FieldError msg={errors.logradouro?.message} />
               </div>
               <div className="sm:col-span-1">
                 <label className={labelCls} htmlFor="numero">
@@ -358,10 +441,11 @@ export default function CheckoutClient({
                 </label>
                 <input
                   id="numero"
-                  className={inputCls}
-                  value={form.numero}
-                  onChange={(e) => set("numero", e.target.value)}
+                  className={cls(errors.numero)}
+                  aria-invalid={!!errors.numero}
+                  {...register("numero")}
                 />
+                <FieldError msg={errors.numero?.message} />
               </div>
               <div className="sm:col-span-3">
                 <label className={labelCls} htmlFor="bairro">
@@ -369,10 +453,11 @@ export default function CheckoutClient({
                 </label>
                 <input
                   id="bairro"
-                  className={inputCls}
-                  value={form.bairro}
-                  onChange={(e) => set("bairro", e.target.value)}
+                  className={cls(errors.bairro)}
+                  aria-invalid={!!errors.bairro}
+                  {...register("bairro")}
                 />
+                <FieldError msg={errors.bairro?.message} />
               </div>
               <div className="sm:col-span-2">
                 <label className={labelCls} htmlFor="complemento">
@@ -380,10 +465,9 @@ export default function CheckoutClient({
                 </label>
                 <input
                   id="complemento"
-                  className={inputCls}
-                  value={form.complemento}
-                  onChange={(e) => set("complemento", e.target.value)}
+                  className={cls(errors.complemento)}
                   placeholder="opcional"
+                  {...register("complemento")}
                 />
               </div>
               <div className="sm:col-span-1">
@@ -392,11 +476,17 @@ export default function CheckoutClient({
                 </label>
                 <input
                   id="uf"
-                  className={inputCls}
-                  value={form.uf}
-                  onChange={(e) => set("uf", e.target.value.toUpperCase().slice(0, 2))}
+                  className={cls(errors.uf)}
                   maxLength={2}
+                  aria-invalid={!!errors.uf}
+                  {...register("uf")}
+                  onChange={(e) =>
+                    setValue("uf", e.target.value.toUpperCase().slice(0, 2), {
+                      shouldValidate: isSubmitted,
+                    })
+                  }
                 />
+                <FieldError msg={errors.uf?.message} />
               </div>
               <div className="sm:col-span-3">
                 <label className={labelCls} htmlFor="cidade">
@@ -404,10 +494,11 @@ export default function CheckoutClient({
                 </label>
                 <input
                   id="cidade"
-                  className={inputCls}
-                  value={form.cidade}
-                  onChange={(e) => set("cidade", e.target.value)}
+                  className={cls(errors.cidade)}
+                  aria-invalid={!!errors.cidade}
+                  {...register("cidade")}
                 />
+                <FieldError msg={errors.cidade?.message} />
               </div>
             </div>
 
@@ -416,6 +507,11 @@ export default function CheckoutClient({
               {freteErro && (
                 <p role="alert" className="text-xs text-red-700">
                   {freteErro}
+                </p>
+              )}
+              {freteFaltando && !freteErro && (
+                <p role="alert" className="text-xs text-red-600">
+                  Calcule o frete pelo seu CEP para continuar.
                 </p>
               )}
               {excedeCaixa && (
@@ -468,6 +564,16 @@ export default function CheckoutClient({
         <div className="bg-white border border-border rounded-xl p-5 space-y-4 lg:sticky lg:top-4">
           <h2 className="text-primary font-semibold">Resumo</h2>
 
+          {temErros && (
+            <p
+              role="alert"
+              className="text-xs text-red-700 bg-red-50 border border-red-200 rounded-md p-2 flex items-center gap-1.5"
+            >
+              <AlertTriangle size={13} aria-hidden="true" />
+              Revise os campos destacados.
+            </p>
+          )}
+
           <ul className="divide-y divide-border text-sm">
             {items.map((i) => (
               <li key={i.variantId} className="py-2 flex justify-between gap-3">
@@ -514,10 +620,9 @@ export default function CheckoutClient({
           )}
 
           <button
-            type="button"
-            onClick={pagar}
-            disabled={!podePagar}
-            className="w-full inline-flex items-center justify-center gap-2 bg-secondary text-white text-sm font-semibold py-3 rounded-pill hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+            type="submit"
+            disabled={pending}
+            className="w-full inline-flex items-center justify-center gap-2 bg-secondary text-white text-sm font-semibold py-3 rounded-pill hover:brightness-110 disabled:opacity-60 disabled:cursor-not-allowed transition-all"
           >
             {pending ? (
               <Loader2 size={16} className="animate-spin" aria-hidden="true" />
@@ -525,10 +630,10 @@ export default function CheckoutClient({
             {pending ? "Gerando Pix…" : "Pagar com Pix"}
           </button>
 
-          {!freteValor && !excedeCaixa && (
+          {!freteValor && !excedeCaixa && !freteFaltando && (
             <p className="text-[11px] text-muted-foreground text-center leading-snug flex items-center justify-center gap-1">
               <AlertTriangle size={12} aria-hidden="true" />
-              Calcule o frete pelo CEP para liberar o pagamento.
+              Calcule o frete pelo CEP para concluir.
             </p>
           )}
 
@@ -539,7 +644,7 @@ export default function CheckoutClient({
             Voltar ao carrinho
           </Link>
         </div>
-      </div>
+      </form>
     </div>
   );
 }
