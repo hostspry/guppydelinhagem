@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Minus, Plus, Trash2, ShoppingCart } from "lucide-react";
+import { Minus, Plus, Trash2, ShoppingCart, Truck } from "lucide-react";
 import { WhatsAppIcon } from "@/components/icons/WhatsAppIcon";
 import { VideoThumb } from "@/components/admin/VideoThumb";
 import { formatBRL } from "@/lib/utils/format";
@@ -59,6 +59,11 @@ export default function CarrinhoPage() {
   }
 
   const temDescontoGlobal = subtotalCheio > subtotalPix;
+  const economiaPix = subtotalCheio - subtotalPix;
+  const pctPix =
+    temDescontoGlobal && subtotalCheio > 0
+      ? Math.round((economiaPix / subtotalCheio) * 100)
+      : 0;
   const excedeCaixa = totalPeixes > MAX_PEIXES_POR_CAIXA;
 
   function finalizarNoWhatsapp() {
@@ -83,7 +88,13 @@ export default function CarrinhoPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
         {/* Lista de itens */}
         <div className="lg:col-span-2 bg-white border border-border rounded-xl divide-y divide-border">
-          {items.map((item) => (
+          {items.map((item) => {
+            const temDesc = item.precoCheio > item.precoPix;
+            const pct =
+              temDesc && item.precoCheio > 0
+                ? Math.round((1 - item.precoPix / item.precoCheio) * 100)
+                : 0;
+            return (
             <div key={item.variantId} className="flex gap-4 p-4">
               <div className="relative w-16 shrink-0 aspect-[9/16] rounded-lg overflow-hidden bg-muted">
                 {item.thumbnail ? (
@@ -107,11 +118,21 @@ export default function CarrinhoPage() {
                     {item.composicaoLabel}
                   </p>
                 )}
-                <p className="text-green-600 font-bold mt-1">
-                  {formatBRL(item.precoPix)}{" "}
-                  <span className="text-xs text-muted-foreground font-normal">
-                    un. no Pix
+                {/* Preço unit.: cheio (cartão) legível + Pix como desconto */}
+                <p className="mt-1 text-sm leading-snug">
+                  <span className="text-primary font-semibold">
+                    {formatBRL(item.precoCheio)}
                   </span>
+                  <span className="text-muted-foreground"> no cartão</span>
+                  {temDesc && (
+                    <>
+                      <span className="text-muted-foreground"> · </span>
+                      <span className="text-green-600 font-semibold">
+                        {formatBRL(item.precoPix)} no Pix
+                      </span>
+                      <span className="text-green-700 font-medium"> ({pct}% OFF)</span>
+                    </>
+                  )}
                 </p>
 
                 <div className="flex items-center gap-4 mt-3">
@@ -159,11 +180,17 @@ export default function CarrinhoPage() {
               <div className="text-right shrink-0">
                 <p className="text-xs text-muted-foreground">Subtotal</p>
                 <p className="text-primary font-bold">
-                  {formatBRL(item.precoPix * item.quantidade)}
+                  {formatBRL(item.precoCheio * item.quantidade)}
                 </p>
+                {temDesc && (
+                  <p className="text-xs text-green-600 font-medium">
+                    {formatBRL(item.precoPix * item.quantidade)} no Pix
+                  </p>
+                )}
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
 
         {/* Resumo */}
@@ -175,21 +202,42 @@ export default function CarrinhoPage() {
             <span className="tabular-nums">{totalPeixes}</span>
           </div>
 
+          {/* Subtotal no cartão — o preço normal, legível */}
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-primary">Subtotal no cartão</span>
+            <span className="text-primary font-semibold tabular-nums">
+              {formatBRL(subtotalCheio)}
+            </span>
+          </div>
+
           {temDescontoGlobal && (
-            <div className="flex items-center justify-between text-sm text-muted-foreground">
-              <span>No cartão</span>
-              <span className="line-through tabular-nums">
-                {formatBRL(subtotalCheio)}
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-green-700">Economia no Pix</span>
+              <span className="text-green-700 font-medium tabular-nums">
+                − {formatBRL(economiaPix)}
               </span>
             </div>
           )}
 
+          {/* À vista no Pix — destaque em verde (decisão do dono) */}
           <div className="flex items-end justify-between border-t border-border pt-3">
             <span className="text-sm font-medium text-primary">
-              Subtotal no Pix
+              À vista no Pix{temDescontoGlobal ? ` (${pctPix}% OFF)` : ""}
             </span>
             <span className="text-green-600 text-2xl font-bold tabular-nums">
               {formatBRL(subtotalPix)}
+            </span>
+          </div>
+
+          {/* Frete — aviso VISÍVEL (calculado no checkout, não incluso ainda) */}
+          <div className="flex items-start gap-2 text-sm bg-bg-alt rounded-lg p-2.5">
+            <Truck size={16} className="text-primary shrink-0 mt-0.5" aria-hidden="true" />
+            <span className="text-primary leading-snug">
+              Frete{" "}
+              <span className="text-muted-foreground">
+                — calculado no checkout pelo seu CEP (ainda não incluído no total
+                acima).
+              </span>
             </span>
           </div>
 
@@ -208,7 +256,7 @@ export default function CarrinhoPage() {
           </Link>
 
           <p className="text-[11px] text-muted-foreground text-center leading-snug">
-            Pague com Pix no site. Frete calculado no checkout pelo seu CEP.
+            Pague com Pix (com desconto) ou cartão no checkout.
           </p>
 
           <button
