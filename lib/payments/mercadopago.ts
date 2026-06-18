@@ -9,6 +9,8 @@ import type {
   CriarPixInput,
   PixCriado,
   PixConsulta,
+  CriarCartaoInput,
+  CartaoCriado,
 } from "./provider";
 
 // Provider Mercado Pago — Pix via Checkout Transparente (API clássica de
@@ -40,8 +42,10 @@ function accessToken(): string {
   return t;
 }
 
-// MP status → StatusPagamento (nosso enum). status_detail distingue Pix expirado
-// (cancelled + "expired") de cancelamento/recusa comum.
+// MP status → StatusPagamento (nosso enum). Serve Pix e Cartão (e o webhook).
+// `in_process` (cartão em análise) → EM_ANALISE — NÃO baixa estoque ainda; o Pix
+// nunca cai em in_process (pending → approved). status_detail distingue Pix
+// expirado (cancelled + "expired") de cancelamento/recusa comum.
 function mapStatus(
   mpStatus: string | undefined,
   statusDetail: string | undefined,
@@ -49,8 +53,9 @@ function mapStatus(
   switch (mpStatus) {
     case "approved":
       return StatusPagamento.PAGO;
-    case "pending":
     case "in_process":
+      return StatusPagamento.EM_ANALISE;
+    case "pending":
     case "authorized":
       return StatusPagamento.PENDENTE;
     case "refunded":
@@ -64,6 +69,36 @@ function mapStatus(
       return StatusPagamento.RECUSADO;
     default:
       return StatusPagamento.PENDENTE;
+  }
+}
+
+// status_detail de recusa (MP) → frase PT amigável. Usado quando RECUSADO.
+export function mensagemRecusa(detalhe: string | null | undefined): string {
+  switch (detalhe) {
+    case "cc_rejected_insufficient_amount":
+      return "Saldo ou limite insuficiente.";
+    case "cc_rejected_bad_filled_security_code":
+      return "Código de segurança (CVV) incorreto.";
+    case "cc_rejected_bad_filled_date":
+      return "Data de validade incorreta.";
+    case "cc_rejected_bad_filled_card_number":
+      return "Número do cartão incorreto.";
+    case "cc_rejected_bad_filled_other":
+      return "Dados do cartão incorretos. Confira e tente de novo.";
+    case "cc_rejected_high_risk":
+      return "Pagamento não autorizado pelo emissor.";
+    case "cc_rejected_call_for_authorize":
+      return "Autorize o pagamento com o emissor do seu cartão e tente de novo.";
+    case "cc_rejected_card_disabled":
+      return "Cartão desabilitado. Ative-o com o emissor ou use outro.";
+    case "cc_rejected_duplicated_payment":
+      return "Pagamento duplicado. Aguarde alguns minutos antes de tentar de novo.";
+    case "cc_rejected_max_attempts":
+      return "Muitas tentativas. Tente mais tarde ou use outro cartão.";
+    case "cc_rejected_blacklist":
+      return "Pagamento não autorizado. Use outro cartão.";
+    default:
+      return "Pagamento recusado. Tente outro cartão.";
   }
 }
 
@@ -123,6 +158,8 @@ type MpPaymentResponse = {
   status?: string;
   status_detail?: string;
   external_reference?: string;
+  installments?: number;
+  payment_method_id?: string;
   date_of_expiration?: string;
   point_of_interaction?: {
     transaction_data?: {
@@ -182,6 +219,47 @@ export const mercadoPagoProvider: PaymentProvider = {
       expiraEm: data.date_of_expiration
         ? new Date(data.date_of_expiration)
         : expiraEm,
+    };
+  },
+
+  async criarPagamentoCartao(input: CriarCartaoInput): Promise<CartaoCriado> {
+    const cpfCnpj = input.pagador.cpfCnpj?.replace(/\D/g, "") || null;
+    // O corpo carrega o TOKEN (uso único) — nunca PAN/CVV; nunca logamos o body.
+    const body = {
+      transaction_amount: Math.round(input.valor * 100) / 100,
+      token: input.token,
+      description: input.descricao,
+      installments: input.installments,
+      payment_method_id: input.paymentMethodId,
+      ...(input.issuerId ? { issuer_id: input.issuerId } : {}),
+      external_reference: input.orderId,
+      notification_url: NOTIFICATION_URL,
+      payer: {
+        email: input.pagador.email,
+        ...(cpfCnpj
+          ? {
+              identification: {
+                type: cpfCnpj.length > 11 ? "CNPJ" : "CPF",
+                number: cpfCnpj,
+              },
+            }
+          : {}),
+      },
+    };
+
+    const data = (await mpFetch("/v1/payments", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      idempotencyKey: input.idempotencyKey ?? randomUUID(),
+    })) as MpPaymentResponse;
+
+    return {
+      externalId: String(data.id),
+      status: mapStatus(data.status, data.status_detail),
+      statusDetail: data.status_detail ?? null,
+      parcelas: data.installments ?? input.installments,
+      bandeira: data.payment_method_id ?? input.paymentMethodId ?? null,
     };
   },
 

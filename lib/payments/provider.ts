@@ -38,10 +38,39 @@ export interface PixConsulta {
   externalReference: string | null; // = orderId (external_reference no gateway)
 }
 
+// ── Cartão de crédito (token gerado no NAVEGADOR pelo Card Brick) ─────────────
+// O servidor recebe só o token (uso único) + dados não sensíveis — nunca PAN/CVV.
+export interface CartaoPagador {
+  email: string;
+  cpfCnpj?: string | null;
+}
+
+export interface CriarCartaoInput {
+  orderId: string; // vira external_reference
+  valor: number; // BRL (recalculado no servidor)
+  descricao: string;
+  token: string; // token de uso único do cartão (do Brick)
+  paymentMethodId: string; // bandeira: "visa"/"master"/… (do Brick)
+  issuerId?: string | null; // emissor (do Brick)
+  installments: number; // nº de parcelas escolhido
+  pagador: CartaoPagador;
+  idempotencyKey?: string;
+}
+
+export interface CartaoCriado {
+  externalId: string;
+  status: StatusPagamento; // PAGO | EM_ANALISE | RECUSADO
+  statusDetail: string | null; // motivo (mapeia p/ mensagem amigável)
+  parcelas: number;
+  bandeira: string | null; // payment_method_id (só exibição)
+}
+
 export interface PaymentProvider {
   readonly nome: ProviderPagamento;
   /** Cria a cobrança Pix no gateway e devolve QR + copia-e-cola + expiração. */
   criarPagamentoPix(input: CriarPixInput): Promise<PixCriado>;
+  /** Cria o pagamento com cartão (token do Brick) e devolve o desfecho. */
+  criarPagamentoCartao(input: CriarCartaoInput): Promise<CartaoCriado>;
   /** Re-busca a cobrança no gateway (fonte da verdade p/ webhook e poll). */
   consultarPagamento(externalId: string): Promise<PixConsulta>;
 }
