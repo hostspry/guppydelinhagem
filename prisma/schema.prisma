@@ -60,6 +60,7 @@ enum MetodoPagamento {
 enum StatusPagamento {
   PENDENTE
   PAGO
+  EM_ANALISE // cartão em análise (MP in_process) — não baixa estoque ainda
   RECUSADO
   ESTORNADO
   EXPIRADO
@@ -351,6 +352,8 @@ model Pagamento {
   externalId    String? // id da cobrança no gateway
   linkPagamento String?
   qrCode        String?
+  parcelas      Int? // cartão: nº de parcelas da tentativa (1–12)
+  bandeira      String? // cartão: "visa"/"master"/… (só exibição)
   payloadRaw    Json?
   criadoEm      DateTime          @default(now())
 
