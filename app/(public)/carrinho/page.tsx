@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Minus, Plus, Trash2, ShoppingCart } from "lucide-react";
+import { WhatsAppIcon } from "@/components/icons/WhatsAppIcon";
 import { VideoThumb } from "@/components/admin/VideoThumb";
 import { formatBRL } from "@/lib/utils/format";
 import { whatsappLink, MAX_PEIXES_POR_CAIXA } from "@/lib/constants";
@@ -199,17 +200,25 @@ export default function CarrinhoPage() {
             </p>
           )}
 
+          <Link
+            href="/checkout"
+            className="block w-full text-center bg-secondary text-white text-sm font-semibold py-3 rounded-pill hover:brightness-110 transition-all"
+          >
+            Finalizar compra
+          </Link>
+
+          <p className="text-[11px] text-muted-foreground text-center leading-snug">
+            Pague com Pix no site. Frete calculado no checkout pelo seu CEP.
+          </p>
+
           <button
             type="button"
             onClick={finalizarNoWhatsapp}
-            className="w-full bg-green-600 text-white text-sm font-semibold py-3 rounded-pill hover:brightness-110 transition-all"
+            className="w-full inline-flex items-center justify-center gap-2 text-sm font-medium text-primary py-2.5 rounded-pill border border-border hover:border-primary transition-all"
           >
-            Finalizar pedido no WhatsApp
+            <WhatsAppIcon className="w-4 h-4 text-[#25D366]" />
+            Prefiro fechar no WhatsApp
           </button>
-
-          <p className="text-[11px] text-muted-foreground text-center leading-snug">
-            O frete e o pagamento são combinados no WhatsApp.
-          </p>
 
           <Link
             href="/"
