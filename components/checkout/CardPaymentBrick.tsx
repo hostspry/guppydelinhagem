@@ -11,6 +11,10 @@ type CardBrickFormData = {
   payment_method_id: string;
   issuer_id?: string | number | null;
   installments: number | string;
+  payer?: {
+    email?: string;
+    identification?: { type?: string; number?: string };
+  };
 };
 
 type MpBrickController = { unmount: () => void };
@@ -96,6 +100,13 @@ export default function CardPaymentBrick({
       try {
         await carregarSdk();
         if (cancelado || !window.MercadoPago) return;
+        // DIAGNÓSTICO: confirma que o SDK recebe uma key real (só o prefixo —
+        // TEST-/APP_USR-/UNDEFINED — nunca o valor). Key undefined/errada tokeniza
+        // mal e o MP recusa como "CVV incorreto".
+        console.log(
+          "[mp] init MercadoPago key:",
+          publicKey ? `${publicKey.split("-")[0]}-… (len ${publicKey.length})` : "UNDEFINED",
+        );
         const mp = new window.MercadoPago(publicKey, { locale: "pt-BR" });
         const bricks = mp.bricks();
         controller = await bricks.create("cardPayment", CONTAINER_ID, {
@@ -123,6 +134,18 @@ export default function CardPaymentBrick({
                 issuerId:
                   formData.issuer_id != null ? String(formData.issuer_id) : null,
                 installments: Number(formData.installments),
+                // payer fiel ao que o Brick devolveu (sem reordenar/substituir).
+                payer: formData.payer
+                  ? {
+                      email: formData.payer.email ?? null,
+                      identification: formData.payer.identification
+                        ? {
+                            type: formData.payer.identification.type ?? null,
+                            number: formData.payer.identification.number ?? null,
+                          }
+                        : null,
+                    }
+                  : null,
               }),
           },
         });

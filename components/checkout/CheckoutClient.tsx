@@ -152,6 +152,17 @@ export default function CheckoutClient({
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
+  // DIAGNÓSTICO: prefixo da public key no client (TEST-/APP_USR-/UNDEFINED). Se
+  // UNDEFINED, NEXT_PUBLIC_MP_PUBLIC_KEY não foi inlinada no BUILD → cartão recusa.
+  useEffect(() => {
+    console.log(
+      "[mp] NEXT_PUBLIC_MP_PUBLIC_KEY:",
+      MP_PUBLIC_KEY
+        ? `${MP_PUBLIC_KEY.split("-")[0]}-… (len ${MP_PUBLIC_KEY.length})`
+        : "UNDEFINED",
+    );
+  }, []);
+
   const items = useCart((s) => s.items);
   const totalPeixes = useCart(selectTotalPeixes);
   const subtotalPix = useCart(selectSubtotalPix);

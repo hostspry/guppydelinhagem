@@ -254,6 +254,18 @@ export const mercadoPagoProvider: PaymentProvider = {
       idempotencyKey: input.idempotencyKey ?? randomUUID(),
     })) as MpPaymentResponse;
 
+    // DIAGNÓSTICO: motivo REAL do MP (status + status_detail crus). É a RESPOSTA
+    // do gateway — sem token/PAN/CVV. Sem isso, a recusa chega mascarada como a
+    // frase amigável e perde-se a causa verdadeira (ex.: account mismatch da
+    // public key gera cc_rejected_bad_filled_security_code com cartão correto).
+    console.log("[mercadopago] cartão /v1/payments →", {
+      id: data.id,
+      status: data.status,
+      status_detail: data.status_detail,
+      payment_method_id: data.payment_method_id,
+      installments: data.installments,
+    });
+
     return {
       externalId: String(data.id),
       status: mapStatus(data.status, data.status_detail),

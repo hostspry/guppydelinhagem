@@ -482,6 +482,12 @@ export type CartaoInput = {
   paymentMethodId: string;
   issuerId: string | null;
   installments: number;
+  // payer exatamente como o Brick devolveu (não reordenar/substituir): o
+  // identification (CPF) é o que o cliente digitou no formulário seguro do MP.
+  payer?: {
+    email?: string | null;
+    identification?: { type?: string | null; number?: string | null } | null;
+  } | null;
 };
 
 export type CartaoDesfecho =
@@ -550,7 +556,14 @@ export async function pagarComCartao(
   }
   const { orderId, numero, valor, pagador } = order.data;
 
-  // Cobrança no cartão (fora de transação de DB, igual ao Pix).
+  // payer fiel ao Brick: usa o e-mail/CPF que vieram do formulário seguro do MP;
+  // só cai no checkout se o Brick não devolver (ex.: campo oculto).
+  const emailPagador = cartao.payer?.email || pagador.email;
+  const cpfPagador =
+    cartao.payer?.identification?.number || pagador.cpfCnpj;
+
+  // Cobrança no cartão (fora de transação de DB, igual ao Pix). O token vai UMA
+  // vez ao /v1/payments; numa nova tentativa o Brick gera token novo.
   let pago;
   try {
     const provider = getPaymentProvider(ProviderPagamento.MERCADO_PAGO);
@@ -562,7 +575,7 @@ export async function pagarComCartao(
       paymentMethodId: cartao.paymentMethodId,
       issuerId: cartao.issuerId,
       installments: parcelas,
-      pagador: { email: pagador.email, cpfCnpj: pagador.cpfCnpj },
+      pagador: { email: emailPagador, cpfCnpj: cpfPagador },
     });
   } catch (e) {
     console.error("[checkout] cobrar cartão", e);
@@ -574,6 +587,15 @@ export async function pagarComCartao(
         e instanceof Error ? e.message : "Não foi possível processar o cartão.",
     };
   }
+
+  // DIAGNÓSTICO: desfecho mapeado (correlaciona com o log cru do provider).
+  console.log("[checkout] cartão desfecho", {
+    numero,
+    status: pago.status,
+    statusDetail: pago.statusDetail,
+    parcelas: pago.parcelas,
+    bandeira: pago.bandeira,
+  });
 
   // Grava a linha Pagamento em TODOS os casos (PAGO/EM_ANALISE/RECUSADO).
   try {
