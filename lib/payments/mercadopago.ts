@@ -209,6 +209,16 @@ export const mercadoPagoProvider: PaymentProvider = {
     })) as MpPaymentResponse;
 
     const td = data.point_of_interaction?.transaction_data ?? {};
+    // DIAGNÓSTICO: confirma que o QR veio (e em qual conta). QR ausente +
+    // erro "Collector user without key enabled" = conta de produção sem chave
+    // Pix habilitada → "chave inexistente" no app do banco. Sem dado sensível.
+    console.log("[mercadopago] pix /v1/payments →", {
+      id: data.id,
+      status: data.status,
+      status_detail: data.status_detail,
+      has_qr_code: !!td.qr_code,
+    });
+
     return {
       externalId: String(data.id),
       status: mapStatus(data.status, data.status_detail),
