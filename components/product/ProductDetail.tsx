@@ -777,31 +777,34 @@ export default function ProductDetail({
             Quem viu este peixe também viu
           </h2>
           <div className="flex gap-4 overflow-x-auto pb-2 -mx-1 px-1">
-            {relacionados.map((r) => {
-              const rPix =
-                r.descontoPix != null && r.descontoPix > 0
-                  ? r.preco * (1 - r.descontoPix / 100)
-                  : r.preco;
-              return (
-                <Link
-                  key={r.id}
-                  href={`/loja/${r.slug}`}
-                  className="shrink-0 w-40 group"
-                >
-                  <div className="relative aspect-[9/16] rounded-lg overflow-hidden bg-muted">
-                    {r.video?.thumbnailUrl ? (
-                      <VideoThumb src={r.video.thumbnailUrl} alt={r.nome} sizes="160px" />
-                    ) : (
-                      <div className="w-full h-full" />
-                    )}
-                  </div>
-                  <p className="mt-2 text-sm font-medium text-primary line-clamp-2 group-hover:text-accent transition-colors">
-                    {r.nome}
+            {relacionados.map((r) => (
+              <Link
+                key={r.id}
+                href={`/loja/${r.slug}`}
+                className="shrink-0 w-40 group"
+              >
+                <div className="relative aspect-[9/16] rounded-lg overflow-hidden bg-muted">
+                  {r.video?.thumbnailUrl ? (
+                    <VideoThumb src={r.video.thumbnailUrl} alt={r.nome} sizes="160px" />
+                  ) : (
+                    <div className="w-full h-full" />
+                  )}
+                </div>
+                <p className="mt-2 text-sm font-medium text-primary line-clamp-2 group-hover:text-accent transition-colors">
+                  {r.nome}
+                </p>
+                {/* Preço já calculado no servidor (mesmo desconto global da página) */}
+                <p className="text-green-600 font-bold text-sm">
+                  {formatBRL(r.precoPix)}
+                </p>
+                {r.descontoPixPercent > 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    <span className="line-through">{formatBRL(r.precoCheio)}</span>{" "}
+                    no cartão
                   </p>
-                  <p className="text-green-600 font-bold text-sm">{formatBRL(rPix)}</p>
-                </Link>
-              );
-            })}
+                )}
+              </Link>
+            ))}
           </div>
         </section>
       )}

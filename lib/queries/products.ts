@@ -1,6 +1,8 @@
 import { cache } from "react";
 import { prisma } from "../prisma";
 import { ordenarVitrine } from "../estoque";
+import { calcularPrecos, type ConfigPreco } from "../precos";
+import { getConfigPreco } from "./config";
 import type { Prisma } from "../generated/prisma/client";
 import type { ProductType, TipoComposicao } from "../generated/prisma/enums";
 
@@ -9,12 +11,15 @@ import type { ProductType, TipoComposicao } from "../generated/prisma/enums";
 // number (Decimal do Prisma não serializa para Client Components).
 // ─────────────────────────────────────────────────────────────
 
+// Preços JÁ CALCULADOS no servidor (fonte única lib/precos + desconto global da
+// loja), pra o card NÃO recalcular e bater com a página do produto.
 export type PublicProductCard = {
   id: string;
   nome: string;
   slug: string;
-  preco: number;
-  descontoPix: number | null;
+  precoCheio: number; // cartão à vista
+  precoPix: number; // com desconto efetivo (próprio ou global)
+  descontoPixPercent: number; // % efetivo aplicado no Pix (0 = sem desconto)
   parcelasMax: number;
   estoque: number;
   video: {
@@ -31,6 +36,7 @@ const cardSelect = {
   slug: true,
   preco: true,
   descontoPix: true,
+  usarDescontoPixGlobal: true, // p/ aplicar o desconto Pix GLOBAL no card
   parcelasMax: true,
   estoque: true,
   // Para ordenar a vitrine (esgotados por último; destaque entre disponíveis).
@@ -54,14 +60,25 @@ const cardSelect = {
 
 type CardRow = Prisma.ProductGetPayload<{ select: typeof cardSelect }>;
 
-function toCard(p: CardRow): PublicProductCard {
+function toCard(p: CardRow, config: ConfigPreco): PublicProductCard {
   const v = p.videos[0];
+  // MESMA fonte de preço da página de produto (lib/precos) com o desconto GLOBAL
+  // da loja — Pix/cartão batem entre card e página.
+  const precos = calcularPrecos(
+    {
+      precoBase: Number(p.preco),
+      descontoPixProprio: p.descontoPix == null ? null : Number(p.descontoPix),
+      usarDescontoPixGlobal: p.usarDescontoPixGlobal,
+    },
+    config,
+  );
   return {
     id: p.id,
     nome: p.nome,
     slug: p.slug,
-    preco: Number(p.preco),
-    descontoPix: p.descontoPix == null ? null : Number(p.descontoPix),
+    precoCheio: precos.precoCartao,
+    precoPix: precos.precoPix,
+    descontoPixPercent: precos.descontoPixPercent,
     parcelasMax: p.parcelasMax,
     estoque: p.estoque,
     video: v
@@ -79,13 +96,16 @@ async function findCards(
   where: Prisma.ProductWhereInput,
   take = 4,
 ): Promise<PublicProductCard[]> {
-  const rows = await prisma.product.findMany({
-    where,
-    orderBy: { criadoEm: "desc" },
-    take,
-    select: cardSelect,
-  });
-  return rows.map(toCard);
+  const [rows, config] = await Promise.all([
+    prisma.product.findMany({
+      where,
+      orderBy: { criadoEm: "desc" },
+      take,
+      select: cardSelect,
+    }),
+    getConfigPreco(),
+  ]);
+  return rows.map((r) => toCard(r, config));
 }
 
 /** "Mais Procurados" = destaque manual (sem vendas registradas ainda). */
@@ -165,16 +185,19 @@ export async function listProductsLoja(
   // inteiro já ordenado pelo critério escolhido, reordenamos em memória para
   // jogar esgotados ao fim (destaque entre disponíveis) e paginamos por slice.
   // Assim a paginação/contagem continua correta (total = conjunto inteiro).
-  const rows = await prisma.product.findMany({
-    where,
-    orderBy: ordenacaoMap[filters.ordenacao ?? "recentes"],
-    select: cardSelect,
-  });
+  const [rows, config] = await Promise.all([
+    prisma.product.findMany({
+      where,
+      orderBy: ordenacaoMap[filters.ordenacao ?? "recentes"],
+      select: cardSelect,
+    }),
+    getConfigPreco(),
+  ]);
   const ordenados = ordenarVitrine(rows);
   const skip = filters.skip ?? 0;
   const take = filters.take ?? LOJA_PAGE_SIZE;
   return {
-    items: ordenados.slice(skip, skip + take).map(toCard),
+    items: ordenados.slice(skip, skip + take).map((r) => toCard(r, config)),
     total: ordenados.length,
   };
 }

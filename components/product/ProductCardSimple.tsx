@@ -28,11 +28,9 @@ export default function ProductCardSimple({
   product: PublicProductCard;
 }) {
   const semEstoque = product.estoque <= 0;
-  const temDescontoPix =
-    product.descontoPix != null && product.descontoPix > 0;
-  const precoPix = temDescontoPix
-    ? product.preco * (1 - product.descontoPix! / 100)
-    : product.preco;
+  // Preços já vêm calculados do servidor (lib/precos + desconto global) — o card
+  // NÃO recalcula, batendo com a página do produto.
+  const temDescontoPix = product.descontoPixPercent > 0;
 
   return (
     <Link
@@ -80,18 +78,31 @@ export default function ProductCardSimple({
         </p>
 
         <div className="mt-auto">
-          <p className="text-green-600 text-xl font-bold leading-none">
-            {formatBRL(precoPix)}
-          </p>
-          <p className="flex items-center gap-1 text-green-700 text-xs font-medium mt-1">
-            <Check size={13} className="shrink-0" aria-hidden="true" />
-            à vista no Pix
-          </p>
-          {temDescontoPix && (
-            <p className="text-xs text-muted-foreground mt-1">
-              <span className="line-through">{formatBRL(product.preco)}</span> no
-              cartão
-            </p>
+          {temDescontoPix ? (
+            <>
+              {/* COM desconto: Pix em destaque + cartão riscado + % OFF */}
+              <p className="text-green-600 text-xl font-bold leading-none">
+                {formatBRL(product.precoPix)}
+              </p>
+              <p className="flex items-center gap-1 text-green-700 text-xs font-medium mt-1">
+                <Check size={13} className="shrink-0" aria-hidden="true" />
+                no Pix · {product.descontoPixPercent}% OFF
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                <span className="line-through">{formatBRL(product.precoCheio)}</span>{" "}
+                no cartão
+              </p>
+            </>
+          ) : (
+            <>
+              {/* SEM desconto: preço único, sem insinuar vantagem no Pix */}
+              <p className="text-green-600 text-xl font-bold leading-none">
+                {formatBRL(product.precoCheio)}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                à vista · até {product.parcelasMax}x no cartão
+              </p>
+            </>
           )}
         </div>
 
