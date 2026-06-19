@@ -246,7 +246,7 @@ export default function SobreNosPage() {
           {[
             { icon: <Trophy size={26} aria-hidden="true" />, titulo: "Tricampeão mundial", sub: "Linha Full Black (2023, 2024, 2025)" },
             { icon: <CalendarDays size={26} aria-hidden="true" />, titulo: "+ de 20 anos de criação", sub: "Selecionando linhagens desde 2000" },
-            { icon: <Newspaper size={26} aria-hidden="true" />, titulo: "Destaque na imprensa", sub: "Reportagem na mídia local do ES" },
+            { icon: <Newspaper size={26} aria-hidden="true" />, titulo: "Destaque n'A Tribuna", sub: "Maior jornal do Espírito Santo" },
           ].map((s) => (
             <div
               key={s.titulo}
@@ -458,12 +458,13 @@ export default function SobreNosPage() {
       <Secao bg="bege">
         <div className="max-w-3xl mx-auto text-center space-y-4">
           <h2 className="text-primary text-2xl sm:text-3xl font-bold">
-            Destaque na <span className="text-secondary">imprensa</span>
+            Destaque n&rsquo;<span className="text-secondary">A Tribuna</span>
           </h2>
           <p className="text-text font-light text-lg leading-relaxed">
-            O trabalho da Marchezi Guppy Farm foi destaque em reportagem na
-            imprensa local, mostrando a dedicação da família e o cuidado de criar
-            peixes.
+            O trabalho da Marchezi Guppy Farm foi destaque n&rsquo;A Tribuna, o
+            maior jornal do Espírito Santo e um dos principais do Brasil. A
+            reportagem mostrou a dedicação da família e o cuidado de criar peixes
+            de linhagem.
           </p>
         </div>
         {/* Matéria INTEIRA e legível (object-contain) em moldura tipo recorte. */}
@@ -472,7 +473,7 @@ export default function SobreNosPage() {
             <div className="relative w-full overflow-hidden rounded-md bg-white" style={{ aspectRatio: "1440 / 1793" }}>
               <Image
                 src={`${IMG}/materia-jornal.jpg`}
-                alt="Reportagem da imprensa local do Espírito Santo sobre a família Marchezi e a criação de guppies"
+                alt="Reportagem sobre a Marchezi Guppy Farm no jornal A Tribuna"
                 fill
                 sizes="(max-width: 768px) 90vw, 420px"
                 className="object-contain"
