@@ -1,22 +1,44 @@
 import type { Metadata } from "next";
+import type { ReactNode } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { Trophy, Award, ArrowRight, ExternalLink } from "lucide-react";
+import {
+  Trophy,
+  Award,
+  ArrowRight,
+  ExternalLink,
+  LayoutGrid,
+  Leaf,
+  Dna,
+  Eye,
+  ShieldCheck,
+  Package,
+  Sparkles,
+  HeartPulse,
+  Flag,
+  Newspaper,
+  CalendarDays,
+} from "lucide-react";
 import { WhatsAppIcon } from "@/components/icons/WhatsAppIcon";
 import { WHATSAPP_URL } from "@/lib/constants";
-import { conquistas, REDES } from "@/lib/sobre-content";
+import {
+  timeline,
+  conquistas,
+  estrutura,
+  beneficios,
+  REDES,
+} from "@/lib/sobre-content";
 
 export const metadata: Metadata = {
-  title: "Sobre Nós — Marchezi Guppy Farm | Linhagem tricampeã mundial",
+  title: "Sobre Nós — Marchezi Guppy Farm | Guppies de linhagem tricampeões mundiais",
   description:
-    "Criação familiar de guppies de linhagem em Guarapari, Espírito Santo. Três gerações da família Marchezi e uma linha Full Black tricampeã mundial.",
+    "Desde 2000, a família Marchezi cria guppies de linhagem no Espírito Santo. Criação familiar pela beleza, com títulos mundiais — incluindo o tricampeonato da linha Full Black.",
   alternates: { canonical: "/sobre-nos" },
 };
 
 const IMG = "/images/sobrenos";
 
-// Ícones de marca (lucide-react aposentou os brand icons) — SVG próprio, mesmo
-// padrão da Navbar. currentColor herda a cor do botão.
+// Ícones de marca (lucide aposentou os brand icons) — SVG próprio (padrão Navbar).
 function IconYoutube({ size = 20 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -24,7 +46,6 @@ function IconYoutube({ size = 20 }: { size?: number }) {
     </svg>
   );
 }
-
 function IconInstagram({ size = 20 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -35,12 +56,59 @@ function IconInstagram({ size = 20 }: { size?: number }) {
   );
 }
 
-// Foto com proporção NATURAL da imagem (aspectRatio = ratio real) → object-cover
-// preenche sem cortar conteúdo/rostos. Legenda opcional com faixa de contraste.
+// Resolve o nome do ícone (lib/sobre-content) → componente lucide, sem criar
+// componente em tempo de render (switch sobre elementos importados).
+function Icone({ name, className }: { name: string; className?: string }) {
+  switch (name) {
+    case "LayoutGrid":
+      return <LayoutGrid className={className} aria-hidden="true" />;
+    case "Leaf":
+      return <Leaf className={className} aria-hidden="true" />;
+    case "Dna":
+      return <Dna className={className} aria-hidden="true" />;
+    case "Eye":
+      return <Eye className={className} aria-hidden="true" />;
+    case "ShieldCheck":
+      return <ShieldCheck className={className} aria-hidden="true" />;
+    case "Package":
+      return <Package className={className} aria-hidden="true" />;
+    case "Sparkles":
+      return <Sparkles className={className} aria-hidden="true" />;
+    case "Trophy":
+      return <Trophy className={className} aria-hidden="true" />;
+    case "HeartPulse":
+      return <HeartPulse className={className} aria-hidden="true" />;
+    case "Flag":
+      return <Flag className={className} aria-hidden="true" />;
+    default:
+      return null;
+  }
+}
+
+// Seção padronizada: largura máx. 1200px, padding 48/80, fundo alternado.
+function Secao({
+  id,
+  bg = "white",
+  children,
+}: {
+  id?: string;
+  bg?: "white" | "bege" | "navy";
+  children: ReactNode;
+}) {
+  const bgClass =
+    bg === "bege" ? "bg-[#ECE7E8]" : bg === "navy" ? "bg-primary text-white" : "bg-white";
+  return (
+    <section id={id} className={bgClass}>
+      <div className="mx-auto max-w-[1200px] px-4 sm:px-6 py-12 sm:py-20">{children}</div>
+    </section>
+  );
+}
+
+// Imagem padronizada: proporção controlada + object-cover + radius 22 + sombra.
 function Figura({
   src,
   alt,
-  ratio,
+  ratio = "4 / 3",
   caption,
   priority = false,
   sizes = "(max-width: 768px) 100vw, 50vw",
@@ -48,7 +116,7 @@ function Figura({
 }: {
   src: string;
   alt: string;
-  ratio: string; // ex.: "1440 / 1784"
+  ratio?: string;
   caption?: string;
   priority?: boolean;
   sizes?: string;
@@ -56,7 +124,7 @@ function Figura({
 }) {
   return (
     <figure
-      className={`relative w-full overflow-hidden rounded-2xl shadow-sm bg-bg-alt/60 ${className}`}
+      className={`relative w-full overflow-hidden rounded-[22px] shadow-sm bg-bg-alt/60 ${className}`}
       style={{ aspectRatio: ratio }}
     >
       <Image src={src} alt={alt} fill priority={priority} sizes={sizes} className="object-cover" />
@@ -69,8 +137,12 @@ function Figura({
   );
 }
 
+const btnPrimario =
+  "inline-flex items-center justify-center gap-2 min-h-12 px-7 py-3 rounded-pill bg-secondary text-white font-semibold hover:brightness-110 transition-all";
+const btnSecundario =
+  "inline-flex items-center justify-center gap-2 min-h-12 px-7 py-3 rounded-pill border-2 border-primary text-primary font-semibold hover:bg-primary hover:text-white transition-all";
+
 export default function SobreNosPage() {
-  // JSON-LD (GEO): AboutPage → Organization; prêmios montados dos dados confirmados.
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "AboutPage",
@@ -79,8 +151,9 @@ export default function SobreNosPage() {
       "@type": "Organization",
       name: "Marchezi Guppy Farm",
       description:
-        "Criação familiar de guppies de linhagem em Guarapari, Espírito Santo, com linhas premiadas em campeonatos mundiais.",
+        "Criação familiar de guppies de linhagem em Guarapari, Espírito Santo, desde 2000. Criação pela beleza, com linhas premiadas em campeonatos mundiais.",
       founder: { "@type": "Person", name: "Manassés Marchezi" },
+      foundingDate: "2000",
       areaServed: "Brasil",
       location: {
         "@type": "Place",
@@ -100,308 +173,382 @@ export default function SobreNosPage() {
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
 
-      {/* ═══════ MOVIMENTO 1 — ABERTURA: O CORAÇÃO ═══════ */}
-      <section className="bg-white">
-        <div className="container-site py-12 sm:py-16">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-center">
-            <div className="space-y-5">
-              <span className="inline-flex items-center gap-2 text-accent font-semibold text-sm uppercase tracking-widest">
-                <Trophy size={16} aria-hidden="true" />
-                Marchezi Guppy Farm
-              </span>
-              <h1 className="text-primary text-3xl sm:text-4xl lg:text-5xl font-bold leading-tight">
-                Três gerações. Uma linhagem{" "}
-                <span className="text-secondary">tricampeã mundial</span>.
-              </h1>
-              <p className="text-text font-light text-lg leading-relaxed">
-                Uma paixão que atravessa o tempo e passou de pai para filho — e
-                agora para a neta. O que começou na beira da água, em Guarapari,
-                no Espírito Santo, virou uma criação familiar de guppies de
-                linhagem reconhecida no mundo inteiro.
-              </p>
+      {/* ═══ 1. HERO ═══ */}
+      <Secao bg="white">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-center min-h-[60vh]">
+          <div className="space-y-6">
+            <span className="inline-flex items-center gap-2 text-accent font-semibold text-sm uppercase tracking-widest">
+              <Trophy size={16} aria-hidden="true" />
+              Marchezi Guppy Farm
+            </span>
+            <h1 className="text-primary text-3xl sm:text-4xl lg:text-5xl font-bold leading-tight">
+              Criamos guppies pela beleza.{" "}
+              <span className="text-secondary">O mundo reconheceu.</span>
+            </h1>
+            <p className="text-text font-light text-lg leading-relaxed">
+              Desde 2000, a família Marchezi cria guppies de linhagem no Espírito
+              Santo. Buscamos a beleza acima de tudo — e, no caminho, vieram os
+              títulos mundiais, incluindo o tricampeonato da nossa linha Full
+              Black.
+            </p>
+            <div className="flex flex-wrap gap-3 pt-1">
+              <Link href="/" className={btnPrimario}>
+                Ver peixes disponíveis
+                <ArrowRight size={17} aria-hidden="true" />
+              </Link>
+              <a href="#estrutura" className={btnSecundario}>
+                Conhecer a estufa
+              </a>
             </div>
-            <Figura
-              src={`${IMG}/tres-geracoes.jpg`}
-              alt="Três gerações da família Marchezi — avô Vanderli, Manassés e a neta Sarah — juntos na criação de guppies em Guarapari"
-              ratio="1440 / 1784"
-              priority
-              sizes="(max-width: 1024px) 100vw, 50vw"
-              className="max-w-md mx-auto lg:max-w-none"
-            />
           </div>
+          <Figura
+            src={`${IMG}/tres-geracoes.jpg`}
+            alt="Três gerações da família Marchezi — avô Vanderli, Manassés e a neta Sarah — na criação de guppies em Guarapari"
+            ratio="4 / 5"
+            priority
+            sizes="(max-width: 1024px) 100vw, 50vw"
+            className="max-w-md mx-auto lg:max-w-none"
+          />
         </div>
-      </section>
+      </Secao>
 
-      {/* ═══════ MOVIMENTO 2 — A JORNADA: DE ONDE VEIO ═══════ */}
-      <section className="bg-bg-alt/40">
-        <div className="container-site py-14 sm:py-20 space-y-12">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-10 items-center">
-            <div className="space-y-4">
-              <h2 className="text-primary text-2xl sm:text-3xl font-semibold">
-                Começou na <span className="text-secondary">beira da água</span>
-              </h2>
-              <p className="text-text font-light leading-relaxed">
-                Tudo começou às margens das lagoas, riachos e praias do Espírito
-                Santo. Foi o pai, Vanderli José Marchezi, quem levou Manassés para
-                pescar pela primeira vez, por volta dos seis anos — e ali nasceu
-                uma paixão pela água que nunca mais o deixou.
-              </p>
-              <p className="text-text font-light leading-relaxed">
-                Hoje essa mesma paixão já alcança a terceira geração: Sarah, filha
-                de Manassés, cresce entre os aquários e explora as pedras e
-                pequenas lagoas de Guarapari, como o pai fez com o avô. Uma
-                história que rendeu até reportagem na imprensa local sobre o
-                cuidado de criar peixes.
-              </p>
-            </div>
-            <Figura
-              src={`${IMG}/sarah-aquarios.jpg`}
-              alt="Sarah, filha de Manassés e terceira geração da família, entre os aquários da criação"
-              ratio="1440 / 1784"
-              className="max-w-sm mx-auto md:max-w-none"
-            />
-          </div>
+      {/* ═══ 2. QUEM SOMOS ═══ */}
+      <Secao bg="bege">
+        <div className="max-w-3xl space-y-5">
+          <h2 className="text-primary text-2xl sm:text-3xl font-bold">
+            Uma criação familiar que virou <span className="text-secondary">referência</span>
+          </h2>
+          <p className="text-text font-light text-lg leading-relaxed">
+            A Marchezi Guppy Farm nasceu da paixão por guppies de linhagem e
+            cresceu com estudo e seleção contínua. Sempre criamos pela beleza —
+            pelo prazer de ver um peixe de cor, cauda e padrão excepcionais — e não
+            para competir. O reconhecimento veio como consequência desse cuidado:
+            nossas linhagens passaram a se destacar no cenário mundial do guppy.
+          </p>
+        </div>
+      </Secao>
 
-          {/* Matéria de jornal — INTEIRA e legível (object-contain), estilo recorte. */}
-          <figure className="max-w-md mx-auto">
-            <div className="bg-white p-2.5 rounded-xl shadow-lg ring-1 ring-black/5">
-              <div
-                className="relative w-full overflow-hidden rounded-md bg-white"
-                style={{ aspectRatio: "1440 / 1793" }}
-              >
-                <Image
-                  src={`${IMG}/materia-jornal.jpg`}
-                  alt="Reportagem da imprensa local do Espírito Santo sobre a família Marchezi e a criação de guppies"
-                  fill
-                  sizes="(max-width: 768px) 90vw, 420px"
-                  className="object-contain"
-                />
+      {/* ═══ 3. FAIXA DE CREDIBILIDADE (prova social REAL, sem estrelas) ═══ */}
+      <Secao bg="white">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {[
+            { icon: <Trophy size={26} aria-hidden="true" />, titulo: "Tricampeão mundial", sub: "Linha Full Black (2023, 2024, 2025)" },
+            { icon: <CalendarDays size={26} aria-hidden="true" />, titulo: "+ de 20 anos de criação", sub: "Selecionando linhagens desde 2000" },
+            { icon: <Newspaper size={26} aria-hidden="true" />, titulo: "Destaque na imprensa", sub: "Reportagem na mídia local do ES" },
+          ].map((s) => (
+            <div
+              key={s.titulo}
+              className="flex items-center gap-4 rounded-[22px] border border-border bg-white p-5 shadow-sm"
+            >
+              <span className="shrink-0 grid place-items-center w-12 h-12 rounded-full bg-secondary/10 text-secondary">
+                {s.icon}
+              </span>
+              <div>
+                <p className="text-primary font-bold leading-tight">{s.titulo}</p>
+                <p className="text-text/70 text-sm font-light leading-snug">{s.sub}</p>
               </div>
             </div>
-            <figcaption className="mt-3 text-center text-xs text-text/70">
-              Matéria na imprensa local do Espírito Santo
-            </figcaption>
-          </figure>
+          ))}
         </div>
-      </section>
+      </Secao>
 
-      {/* ═══════ MOVIMENTO 3 — A CONSAGRAÇÃO: ONDE CHEGOU (pico) ═══════ */}
-      <section className="bg-white">
-        <div className="container-site py-16 sm:py-24">
-          <div className="max-w-2xl mx-auto text-center space-y-5">
-            <span className="inline-flex items-center gap-2 text-accent font-semibold text-sm uppercase tracking-widest">
-              De admirador a campeão
-            </span>
-            <h2 className="text-primary text-2xl sm:text-4xl font-bold leading-tight">
-              O menino que admirava os campeões{" "}
-              <span className="text-secondary">virou um deles</span>.
-            </h2>
-            <p className="text-text font-light text-lg leading-relaxed">
-              Ainda adolescente, nos anos 90, Manassés se encantou com as
-              primeiras páginas de criadores de guppy que via na internet — entre
-              elas, as de Rodrigo Ziviani, hoje vice-presidente da World Guppy
-              Association. Criar peixes daquele nível parecia um sonho distante.
-              Décadas depois, em 2021, foi esse mesmo Rodrigo Ziviani quem visitou
-              a estufa da família em Guarapari.
-            </p>
-          </div>
-          <div className="mt-10 max-w-2xl mx-auto">
-            <Figura
-              src={`${IMG}/visita-ziviani.png`}
-              alt="Rodrigo Ziviani, vice-presidente da World Guppy Association, visitando a estufa da família Marchezi em Guarapari, 2021"
-              ratio="873 / 795"
-              sizes="(max-width: 768px) 100vw, 640px"
-              caption="Visita de Rodrigo Ziviani à estufa da família — Guarapari, 2021"
-            />
-          </div>
+      {/* ═══ 4. NOSSA TRAJETÓRIA (timeline) ═══ */}
+      <Secao bg="bege">
+        <h2 className="text-primary text-2xl sm:text-3xl font-bold mb-8">
+          Nossa <span className="text-secondary">trajetória</span>
+        </h2>
+        <ol className="relative space-y-5 before:absolute before:left-[15px] before:top-3 before:bottom-3 before:w-0.5 before:bg-secondary/30">
+          {timeline.map((t) => (
+            <li key={t.ano} className="relative pl-12">
+              <span className="absolute left-2 top-4 w-3.5 h-3.5 rounded-full bg-secondary ring-4 ring-[#ECE7E8]" />
+              <div className="rounded-[22px] bg-white shadow-sm border border-border/60 p-5">
+                <span className="inline-block text-secondary font-bold">{t.ano}</span>
+                <h3 className="text-primary font-semibold text-lg mt-0.5">{t.titulo}</h3>
+                <p className="text-text/80 font-light mt-1 leading-relaxed">{t.texto}</p>
+              </div>
+            </li>
+          ))}
+        </ol>
+      </Secao>
+
+      {/* ═══ 5. CONQUISTAS ═══ */}
+      <Secao bg="white">
+        <div className="max-w-3xl space-y-3 mb-8">
+          <span className="inline-flex items-center gap-2 text-accent font-semibold text-sm uppercase tracking-widest">
+            <Award size={16} aria-hidden="true" />
+            Reconhecimento
+          </span>
+          <h2 className="text-primary text-2xl sm:text-3xl font-bold">
+            Conquistas que confirmam a <span className="text-secondary">qualidade</span>
+          </h2>
         </div>
-      </section>
-
-      {/* ═══════ MOVIMENTO 4 — A PROVA: AUTORIDADE ═══════ */}
-      {/* 4a — Os três títulos mundiais */}
-      <section className="bg-bg-alt/40">
-        <div className="container-site py-14 sm:py-20 space-y-10">
-          <div className="max-w-3xl space-y-4">
-            <span className="inline-flex items-center gap-2 text-accent font-semibold text-sm uppercase tracking-widest">
-              <Award size={16} aria-hidden="true" />
-              Reconhecimento
-            </span>
-            <h2 className="text-primary text-2xl sm:text-3xl font-semibold">
-              Do Espírito Santo para o <span className="text-secondary">mundo</span>
-            </h2>
-            <p className="text-text font-light leading-relaxed">
-              Nosso trabalho começou a se destacar no cenário internacional do
-              guppy. A cada ano, nossas linhagens representam o Brasil — pela
-              Brazilian Guppy Association — nos campeonatos mundiais.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-            {conquistas.map((c) => (
-              <article
-                key={c.linha}
-                className={`rounded-2xl border p-6 flex flex-col gap-3 ${
-                  c.destaque
-                    ? "border-secondary bg-secondary/5 shadow-sm ring-1 ring-secondary/20"
-                    : "border-border bg-white"
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  <Trophy size={20} className={c.destaque ? "text-secondary" : "text-accent"} aria-hidden="true" />
-                  <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    {c.titulo}
-                  </span>
-                </div>
-                <h3 className={`font-bold leading-tight text-primary ${c.destaque ? "text-2xl" : "text-xl"}`}>
-                  {c.linha}
-                </h3>
-                <p className="text-sm font-semibold text-secondary">{c.anos}</p>
-                <p className="text-sm text-text/80 leading-snug">{c.evento}</p>
-                <p className="text-sm text-text font-light leading-relaxed">{c.nota}</p>
-                <div className="mt-auto pt-2 flex flex-wrap items-center gap-x-4 gap-y-1">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+          {conquistas.map((c) => (
+            <article
+              key={c.linha}
+              className={`rounded-[22px] border p-6 flex flex-col gap-3 ${
+                c.destaque
+                  ? "border-secondary bg-secondary/5 shadow-sm ring-1 ring-secondary/20"
+                  : "border-border bg-white"
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <Trophy size={20} className={c.destaque ? "text-secondary" : "text-accent"} aria-hidden="true" />
+                <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  {c.titulo}
+                </span>
+              </div>
+              <h3 className={`font-bold leading-tight text-primary ${c.destaque ? "text-2xl" : "text-xl"}`}>
+                {c.linha}
+              </h3>
+              <p className="text-sm font-semibold text-secondary">{c.anos}</p>
+              <p className="text-sm text-text/80 leading-snug">{c.evento}</p>
+              <p className="text-sm text-text font-light leading-relaxed">{c.nota}</p>
+              <div className="mt-auto pt-2 flex flex-wrap items-center gap-x-4 gap-y-1">
+                <a
+                  href={c.video}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 min-h-11 text-sm font-semibold text-primary hover:text-secondary transition-colors"
+                >
+                  Ver o vídeo
+                  <ArrowRight size={15} aria-hidden="true" />
+                </a>
+                {c.videoExtra && (
                   <a
-                    href={c.video}
+                    href={c.videoExtra}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 min-h-11 text-sm font-semibold text-primary hover:text-secondary transition-colors"
+                    className="inline-flex items-center gap-1 min-h-11 text-xs text-muted-foreground hover:text-secondary transition-colors"
                   >
-                    Ver o vídeo
-                    <ArrowRight size={15} aria-hidden="true" />
+                    vídeo extra
+                    <ExternalLink size={12} aria-hidden="true" />
                   </a>
-                  {c.videoExtra && (
-                    <a
-                      href={c.videoExtra}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 min-h-11 text-xs text-muted-foreground hover:text-secondary transition-colors"
-                    >
-                      vídeo extra
-                      <ExternalLink size={12} aria-hidden="true" />
-                    </a>
-                  )}
-                </div>
-              </article>
-            ))}
-          </div>
+                )}
+              </div>
+            </article>
+          ))}
         </div>
-      </section>
+      </Secao>
 
-      {/* 4b — Quando o hobby virou criação (expansão da estufa) */}
-      <section className="bg-white">
-        <div className="container-site py-14 sm:py-20 space-y-8">
-          <div className="max-w-3xl space-y-4">
-            <h2 className="text-primary text-2xl sm:text-3xl font-semibold">
-              Quando o hobby virou <span className="text-secondary">criação</span>
+      {/* ═══ 6. ESTRUTURA DA ESTUFA (benefício) ═══ */}
+      <Secao id="estrutura" bg="bege">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-start">
+          <div className="space-y-5">
+            <h2 className="text-primary text-2xl sm:text-3xl font-bold">
+              Estrutura pensada para saúde e <span className="text-secondary">estabilidade</span>
             </h2>
-            <p className="text-text font-light leading-relaxed">
-              Por muitos anos, a criação foi um hobby de família. Isso mudou entre
-              2023 e 2024: construímos uma estufa nova, ampliamos a estrutura para
-              dezenas de tanques e ganhamos um novo sócio, Vinícius Pirovani. O que
-              era paixão se tornou criação séria, com seleção genética rigorosa e
-              cuidado diário em cada tanque.
+            <p className="text-text font-light text-lg leading-relaxed">
+              Nossa estufa em Guarapari foi projetada para até 30 mil litros de
+              água somando aquários e caixas, sucedendo a primeira estufa de cerca
+              de 5 mil litros. O foco é estabilidade e bem-estar: filtragem
+              natural, biologia equilibrada e manejo diário para manter os guppies
+              em ótimas condições antes do envio.
             </p>
+            <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {estrutura.map((e) => (
+                <li key={e.titulo} className="flex items-center gap-3 rounded-2xl bg-white border border-border/60 p-3.5">
+                  <span className="shrink-0 grid place-items-center w-10 h-10 rounded-full bg-secondary/10 text-secondary">
+                    <Icone name={e.icon} className="w-5 h-5" />
+                  </span>
+                  <span className="text-sm font-medium text-primary leading-snug">{e.titulo}</span>
+                </li>
+              ))}
+            </ul>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 items-start">
+          <div className="grid grid-cols-2 gap-4">
             <Figura
               src={`${IMG}/pai-construindo-estufa.png`}
-              alt="Vanderli, pai de Manassés, construindo a estufa nova da criação em Guarapari"
-              ratio="889 / 893"
-              sizes="(max-width: 640px) 100vw, 33vw"
+              alt="A construção da estufa nova da Marchezi Guppy Farm em Guarapari"
+              ratio="1 / 1"
+              sizes="(max-width: 768px) 50vw, 25vw"
             />
             <Figura
               src={`${IMG}/construcao-tanques.png`}
-              alt="Construção e ampliação dos tanques da nova estufa da Marchezi Guppy Farm"
-              ratio="492 / 731"
-              sizes="(max-width: 640px) 100vw, 33vw"
+              alt="Construção e ampliação dos tanques da nova estufa em Guarapari"
+              ratio="1 / 1"
+              sizes="(max-width: 768px) 50vw, 25vw"
             />
             <Figura
               src={`${IMG}/estufa-nova-prateleiras.png`}
               alt="Estufa nova com prateleiras de tanques para a criação de guppies de linhagem"
-              ratio="895 / 504"
-              sizes="(max-width: 640px) 100vw, 33vw"
+              ratio="2 / 1"
+              sizes="(max-width: 768px) 100vw, 50vw"
+              className="col-span-2"
             />
           </div>
         </div>
-      </section>
+      </Secao>
 
-      {/* 4c — Autoridade técnica: método (Schettino) + rede (UNAQUA/Elias) */}
-      <section className="bg-bg-alt/40">
-        <div className="container-site py-14 sm:py-20 space-y-12">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-10 items-center">
-            <Figura
-              src={`${IMG}/mestre-mauro.png`}
-              alt="Manassés com o professor Mauro Schettino, referência em alimentação viva para peixes"
-              ratio="891 / 882"
-              caption="Com o professor Mauro Schettino — estudo de alimentação viva"
-              className="max-w-md mx-auto md:max-w-none"
-            />
-            <div className="space-y-4">
-              <h2 className="text-primary text-2xl sm:text-3xl font-semibold">
-                Por que nossos peixes se <span className="text-secondary">destacam</span>
-              </h2>
-              <p className="text-text font-light leading-relaxed">
-                Cor e saúde não acontecem por acaso. Parte do nosso diferencial
-                está na alimentação viva — técnica que Manassés estudou com o
-                professor Mauro Schettino, referência no assunto — somada a um
-                ambiente de criação com filtragem natural e biologia estável. E
-                quando o seu peixe vai viajar, é a própria família que seleciona e
-                embala cada exemplar à mão, com o cuidado de quem quer que ele
-                chegue vivo e perfeito na sua casa.
-              </p>
-              <a
-                href="https://www.instagram.com/reel/Cl4d8gWJX6t/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 min-h-11 text-sm font-semibold text-primary hover:text-secondary transition-colors"
-              >
-                Ver o vídeo
-                <ArrowRight size={15} aria-hidden="true" />
-              </a>
+      {/* ═══ 7. POR QUE NOSSOS GUPPIES SE DESTACAM (benefícios) ═══ */}
+      <Secao bg="white">
+        <h2 className="text-primary text-2xl sm:text-3xl font-bold mb-8">
+          Por que nossos peixes se <span className="text-secondary">destacam</span>
+        </h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          {beneficios.map((b) => (
+            <div key={b.titulo} className="rounded-[22px] border border-border bg-white p-6 shadow-sm space-y-3">
+              <span className="grid place-items-center w-12 h-12 rounded-full bg-secondary/10 text-secondary">
+                <Icone name={b.icon} className="w-6 h-6" />
+              </span>
+              <h3 className="text-primary font-bold text-lg">{b.titulo}</h3>
+              <p className="text-text/80 font-light leading-relaxed">{b.texto}</p>
+            </div>
+          ))}
+        </div>
+      </Secao>
+
+      {/* ═══ 8. RECONHECIMENTO DA MÍDIA ═══ */}
+      <Secao bg="bege">
+        <div className="max-w-3xl mx-auto text-center space-y-4">
+          <h2 className="text-primary text-2xl sm:text-3xl font-bold">
+            Destaque na <span className="text-secondary">imprensa</span>
+          </h2>
+          <p className="text-text font-light text-lg leading-relaxed">
+            O trabalho da Marchezi Guppy Farm foi destaque em reportagem na
+            imprensa local, mostrando a dedicação da família e o cuidado de criar
+            peixes.
+          </p>
+        </div>
+        {/* Matéria INTEIRA e legível (object-contain) em moldura tipo recorte. */}
+        <figure className="max-w-md mx-auto mt-8">
+          <div className="bg-white p-2.5 rounded-2xl shadow-lg ring-1 ring-black/5">
+            <div className="relative w-full overflow-hidden rounded-md bg-white" style={{ aspectRatio: "1440 / 1793" }}>
+              <Image
+                src={`${IMG}/materia-jornal.jpg`}
+                alt="Reportagem da imprensa local do Espírito Santo sobre a família Marchezi e a criação de guppies"
+                fill
+                sizes="(max-width: 768px) 90vw, 420px"
+                className="object-contain"
+              />
             </div>
           </div>
+        </figure>
+      </Secao>
 
-          {/* Rede — máx. 2 fotos, rotuladas como VISITA/encontro (≠ instalação própria). */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
-            <p className="text-text font-light leading-relaxed">
-              Ao longo do caminho, trocamos experiência com grandes nomes do guppy
-              brasileiro, como os criadores e dirigentes da UNAQUA, em Belo
-              Horizonte.
-            </p>
-            <div className="grid grid-cols-2 gap-4">
-              <Figura
-                src={`${IMG}/visita-unaqua.png`}
-                alt="Encontro com os dirigentes da UNAQUA em Belo Horizonte"
-                ratio="893 / 769"
-                sizes="(max-width: 768px) 50vw, 25vw"
-                caption="Visita à UNAQUA — Belo Horizonte (não é a nossa estufa)"
-              />
-              <Figura
-                src={`${IMG}/elias-abdalla.png`}
-                alt="Encontro com Elias Abdalla, nome de referência no guppy brasileiro"
-                ratio="894 / 889"
-                sizes="(max-width: 768px) 50vw, 25vw"
-                caption="Encontro com Elias Abdalla"
-              />
-            </div>
+      {/* ═══ 9. APRENDENDO COM OS MELHORES (rede — Brasil) ═══ */}
+      <Secao bg="white">
+        <div className="max-w-3xl space-y-4 mb-8">
+          <h2 className="text-primary text-2xl sm:text-3xl font-bold">
+            Aprendendo com criadores de <span className="text-secondary">referência</span>
+          </h2>
+          <p className="text-text font-light text-lg leading-relaxed">
+            A busca por evolução sempre fez parte da nossa história. Convivemos com
+            grandes nomes do guppy brasileiro — entre eles Rodrigo Ziviani,
+            vice-presidente da World Guppy Association, e os criadores da UNAQUA, em
+            Belo Horizonte — e estudamos técnicas como a alimentação viva com o
+            professor Mauro Schettino.
+          </p>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+          <Figura
+            src={`${IMG}/visita-ziviani.png`}
+            alt="Visita de Rodrigo Ziviani, vice-presidente da World Guppy Association, à estufa da família em Guarapari, 2021"
+            ratio="1 / 1"
+            sizes="(max-width: 768px) 100vw, 33vw"
+            caption="Visita de Rodrigo Ziviani — Guarapari, 2021"
+          />
+          <Figura
+            src={`${IMG}/visita-unaqua.png`}
+            alt="Encontro com os criadores e dirigentes da UNAQUA em Belo Horizonte"
+            ratio="1 / 1"
+            sizes="(max-width: 768px) 100vw, 33vw"
+            caption="Visita à UNAQUA — Belo Horizonte"
+          />
+          <Figura
+            src={`${IMG}/mestre-mauro.png`}
+            alt="Encontro com o professor Mauro Schettino, referência em alimentação viva para peixes"
+            ratio="1 / 1"
+            sizes="(max-width: 768px) 100vw, 33vw"
+            caption="Estudo de alimentação viva com o prof. Mauro Schettino"
+          />
+        </div>
+      </Secao>
+
+      {/* ═══ 10. ENVIO COM CUIDADO ═══ */}
+      <Secao bg="bege">
+        <div className="max-w-3xl space-y-5">
+          <h2 className="text-primary text-2xl sm:text-3xl font-bold">
+            Envio com cuidado para todo o <span className="text-secondary">Brasil</span>
+          </h2>
+          <p className="text-text font-light text-lg leading-relaxed">
+            Cada peixe é observado antes de viajar e embalado à mão pela própria
+            família, com atenção ao transporte de peixes ornamentais. Consulte
+            prazos e regras na nossa página de frete, ou fale com a gente no
+            WhatsApp.
+          </p>
+          <a
+            href="https://www.instagram.com/reel/Cl4d8gWJX6t/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 min-h-11 text-sm font-semibold text-primary hover:text-secondary transition-colors"
+          >
+            Ver o vídeo
+            <ArrowRight size={15} aria-hidden="true" />
+          </a>
+
+          {/* SLOT GARANTIA: se o dono oferecer garantia de chegada viva, colar AQUI
+              os termos exatos. Sem termos confirmados, NÃO afirmar garantia. */}
+
+          <div className="flex flex-wrap gap-3 pt-1">
+            <Link href="/frete" className={btnPrimario}>
+              Calcular frete
+              <ArrowRight size={17} aria-hidden="true" />
+            </Link>
+            <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer" className={btnSecundario}>
+              <WhatsAppIcon className="w-5 h-5" />
+              Falar no WhatsApp
+            </a>
           </div>
         </div>
-      </section>
+      </Secao>
 
-      {/* ═══════ MOVIMENTO 5 — O CONVITE ═══════ */}
-      <section className="bg-primary text-white">
-        <div className="container-site py-16 sm:py-20 text-center space-y-6">
-          <h2 className="text-2xl sm:text-3xl font-semibold">Acompanhe a estufa por dentro</h2>
-          <p className="text-white/85 font-light max-w-2xl mx-auto leading-relaxed">
-            Mostramos a criação de verdade, todo dia. Acompanhe o canal no YouTube
-            e o Instagram para ver os bastidores, as linhagens e o dia a dia da
-            estufa.
+      {/* ═══ 11. CTA FINAL ═══ */}
+      <Secao bg="navy">
+        <div className="max-w-2xl mx-auto text-center space-y-5">
+          <h2 className="text-2xl sm:text-3xl font-bold">
+            Pronto para escolher seus próximos guppies?
+          </h2>
+          <p className="text-white/85 font-light text-lg leading-relaxed">
+            Conheça os exemplares disponíveis e leve para o seu aquário peixes
+            criados com seleção, cuidado e história.
+          </p>
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            <Link
+              href="/"
+              className="inline-flex items-center justify-center gap-2 min-h-12 px-7 py-3 rounded-pill bg-secondary text-white font-semibold hover:brightness-110 transition-all"
+            >
+              Ver peixes disponíveis
+              <ArrowRight size={17} aria-hidden="true" />
+            </Link>
+            <a
+              href={WHATSAPP_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center justify-center gap-2 min-h-12 px-7 py-3 rounded-pill border-2 border-white/70 text-white font-semibold hover:bg-white/10 transition-all"
+            >
+              <WhatsAppIcon className="w-5 h-5" />
+              Chamar no WhatsApp
+            </a>
+          </div>
+        </div>
+      </Secao>
+
+      {/* ═══ 12. ACOMPANHE O DIA A DIA ═══ */}
+      <Secao bg="white">
+        <div className="max-w-2xl mx-auto text-center space-y-5">
+          <h2 className="text-primary text-2xl sm:text-3xl font-bold">
+            Acompanhe a estufa por dentro
+          </h2>
+          <p className="text-text font-light text-lg leading-relaxed">
+            Mostramos a criação de verdade, todo dia.
           </p>
           <div className="flex flex-wrap items-center justify-center gap-3">
             <a
               href={REDES.youtube}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center justify-center gap-2 min-h-11 bg-white text-primary font-semibold px-7 py-3 rounded-pill hover:bg-accent hover:text-[#302f2f] transition-all"
+              className="inline-flex items-center justify-center gap-2 min-h-12 px-7 py-3 rounded-pill bg-secondary text-white font-semibold hover:brightness-110 transition-all"
             >
               <IconYoutube size={20} />
               YouTube
@@ -410,38 +557,14 @@ export default function SobreNosPage() {
               href={REDES.instagram}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center justify-center gap-2 min-h-11 border-2 border-white/70 text-white font-semibold px-7 py-3 rounded-pill hover:bg-white/10 transition-all"
+              className="inline-flex items-center justify-center gap-2 min-h-12 px-7 py-3 rounded-pill border-2 border-primary text-primary font-semibold hover:bg-primary hover:text-white transition-all"
             >
               <IconInstagram size={20} />
               Instagram
             </a>
           </div>
-
-          <div className="pt-6 mt-2 border-t border-white/15 max-w-2xl mx-auto space-y-4">
-            <p className="text-white/85 font-light leading-relaxed">
-              Se a história te conquistou, conheça os peixes que ela produz.
-            </p>
-            <div className="flex flex-wrap items-center justify-center gap-3">
-              <Link
-                href="/"
-                className="inline-flex items-center justify-center gap-2 min-h-11 bg-secondary text-white font-semibold px-7 py-3 rounded-pill hover:brightness-110 transition-all"
-              >
-                Conheça os guppys disponíveis
-                <ArrowRight size={17} aria-hidden="true" />
-              </Link>
-              <a
-                href={WHATSAPP_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center justify-center gap-2 min-h-11 border-2 border-white/70 text-white font-semibold px-7 py-3 rounded-pill hover:bg-white/10 transition-all"
-              >
-                <WhatsAppIcon className="w-5 h-5" />
-                Falar no WhatsApp
-              </a>
-            </div>
-          </div>
         </div>
-      </section>
+      </Secao>
     </>
   );
 }
