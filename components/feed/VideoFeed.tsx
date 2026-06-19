@@ -80,10 +80,11 @@ function feedEmbedSrc(v: FeedVideo): string | null {
 // Comando à YouTube IFrame API via postMessage (sem carregar a lib).
 function postCmd(
   iframe: HTMLIFrameElement | null,
-  func: "playVideo" | "pauseVideo" | "mute" | "unMute",
+  func: "playVideo" | "pauseVideo" | "mute" | "unMute" | "setPlaybackQuality",
+  args: (string | number)[] = [],
 ) {
   iframe?.contentWindow?.postMessage(
-    JSON.stringify({ event: "command", func, args: [] }),
+    JSON.stringify({ event: "command", func, args }),
     "*",
   );
 }
@@ -251,27 +252,38 @@ export default function VideoFeed({
     setSom(novo);
     postCmd(iframeRef.current, novo ? "unMute" : "mute");
   }
-  // Aplica o estado atual (som + play/pause) ao player via postMessage. Lê os
-  // refs (não o closure) pra respeitar o que o usuário fez nesse meio-tempo.
-  function aplicarEstadoPlayer() {
+  // FASE 1 — garantir TOCANDO. O slide novo já entra MUDO pela URL (mute=1), então
+  // aqui NÃO se manda unMute: autoplay com som é bloqueado pelo navegador. Só o
+  // playVideo (com enablejsapi=1 o YouTube não honra o autoplay=1 da URL sozinho).
+  // Reenviado algumas vezes porque comando antes do player ficar "pronto" é
+  // ignorado; depois de tocando, é no-op. Também tenta subir a qualidade (o YT
+  // trata como sugestão e pode ignorar — best-effort, ver PROBLEMA 2).
+  function garantirTocando() {
     const iframe = iframeRef.current;
-    if (!iframe) return;
-    postCmd(iframe, somRef.current ? "unMute" : "mute");
-    // Só força o play se o usuário não pausou — autoplay sem brigar com o toque.
-    if (!pausadoRef.current) postCmd(iframe, "playVideo");
+    if (!iframe || pausadoRef.current) return; // respeita o pause do usuário
+    postCmd(iframe, "playVideo");
+    postCmd(iframe, "setPlaybackQuality", ["hd1080"]);
   }
 
-  // Com enablejsapi=1 o YouTube nem sempre honra o autoplay=1 da URL — ele espera
-  // um playVideo da JS API. Como aqui não há callback de onReady, mandamos o play
-  // no onLoad e reenviamos algumas vezes (comando antes de "pronto" é ignorado;
-  // depois de tocando, é no-op). É o que garante o autoplay no 1º slide e nos swipes.
+  // FASE 2 — restaurar o SOM só DEPOIS de o vídeo já estar tocando (e só se a
+  // preferência do usuário for som). Nunca inicia um vídeo com som; o unMute vem
+  // após o instante mudo inicial. Pausado → não liga (nem força play).
+  function restaurarSom() {
+    const iframe = iframeRef.current;
+    if (!iframe) return;
+    if (somRef.current && !pausadoRef.current) postCmd(iframe, "unMute");
+  }
+
+  // Ao montar/trocar de slide: [mudo (URL) → playVideo (autoplay ok) → unMute
+  // depois de tocando]. Os tempos da fase 2 ficam após os da fase 1 pra não ligar
+  // o som antes de o play pegar.
   function onIframeLoad() {
     playTimers.current.forEach(clearTimeout);
-    playTimers.current = [];
-    aplicarEstadoPlayer();
-    playTimers.current = [150, 400, 900, 1600].map((ms) =>
-      window.setTimeout(aplicarEstadoPlayer, ms),
-    );
+    garantirTocando();
+    playTimers.current = [
+      ...[150, 400, 900, 1600].map((ms) => window.setTimeout(garantirTocando, ms)),
+      ...[1100, 2000, 3200].map((ms) => window.setTimeout(restaurarSom, ms)),
+    ];
   }
 
   function escolherComposicao(c: TipoComposicao) {
