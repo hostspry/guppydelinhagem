@@ -145,6 +145,11 @@ const btnPrimario =
 const btnSecundario =
   "inline-flex items-center justify-center gap-2 min-h-12 px-7 py-3 rounded-pill border-2 border-primary text-primary font-semibold hover:bg-primary hover:text-white transition-all";
 
+// Seção "Amizades e admiração": oculta até aprovação dos retratados para usar as
+// imagens deles. Trocar para true quando autorizado (a alternância de fundo se
+// ajusta sozinha abaixo).
+const MOSTRAR_AMIZADES = false;
+
 export default function SobreNosPage() {
   // Full Black = bloco-herói (não card); demais = cards de apoio.
   const heroi = conquistas.find((c) => c.destaque);
@@ -478,6 +483,8 @@ export default function SobreNosPage() {
       </Secao>
 
       {/* ═══ 9. AMIZADES E ADMIRAÇÃO (rede — Brasil, tom de respeito entre pares) ═══ */}
+      {/* Oculta até aprovação das imagens dos retratados (MOSTRAR_AMIZADES). */}
+      {MOSTRAR_AMIZADES && (
       <Secao bg="white">
         <div className="max-w-3xl space-y-4 mb-8">
           <h2 className="text-primary text-2xl sm:text-3xl font-bold">
@@ -524,9 +531,11 @@ export default function SobreNosPage() {
           />
         </div>
       </Secao>
+      )}
 
       {/* ═══ 10. ENVIO COM CUIDADO ═══ */}
-      <Secao bg="bege">
+      {/* Fundo segue a alternância: bege quando a seção 9 aparece; senão branco. */}
+      <Secao bg={MOSTRAR_AMIZADES ? "bege" : "white"}>
         <div className="max-w-3xl space-y-5">
           <h2 className="text-primary text-2xl sm:text-3xl font-bold">
             Envio com cuidado para todo o <span className="text-secondary">Brasil</span>
