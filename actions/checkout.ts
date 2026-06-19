@@ -13,7 +13,7 @@ import { getPaymentProvider } from "@/lib/payments/registry";
 import { mensagemRecusa } from "@/lib/payments/mercadopago";
 import { transicionarParaPago } from "@/lib/pedido-baixa";
 import { calcularPrecos } from "@/lib/precos";
-import { getConfigPreco } from "@/lib/queries/config";
+import { getConfigPreco, getFreteGratisConfig } from "@/lib/queries/config";
 import { COMPOSICAO_LABEL } from "@/lib/composicoes";
 import { MAX_PEIXES_POR_CAIXA, freteGollog } from "@/lib/constants";
 import type { EnderecoEntrega } from "@/lib/validations/pedido";
@@ -365,6 +365,15 @@ export async function criarOrderDoCheckout(
     }
     frete = round2(jad.price);
     transportadora = Transportadora.JADLOG;
+  }
+
+  // ── 2b. Frete grátis (config da loja, anti-tamper) ─────────────────────────
+  // Base ÚNICA = subtotal no preço cheio (cartão). É a base canônica do pedido
+  // (Order.subtotal), não depende da forma de pagamento e mantém o Order.frete
+  // consistente (gerarNovoPix reusa esse frete salvo). Generosa: cheio ≥ Pix.
+  const freteGratis = await getFreteGratisConfig();
+  if (freteGratis.ativo && subtotalCheio >= (freteGratis.acimaDe ?? Infinity)) {
+    frete = 0;
   }
 
   const totalCheio = round2(subtotalCheio + frete);

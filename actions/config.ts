@@ -20,11 +20,27 @@ export async function salvarConfiguracaoLoja(
     ? Math.min(100, Math.max(0, Math.round(raw)))
     : 0;
 
+  // Frete grátis: toggle (checkbox) + valor mínimo em R$. Sem valor válido (>0),
+  // grava null — a regra só "liga" com ativo E valor definido.
+  const freteGratisAtivo = formData.get("freteGratisAtivo") === "on";
+  const valorRaw = Number(
+    String(formData.get("freteGratisAcimaDe") ?? "").replace(",", "."),
+  );
+  const freteGratisAcimaDe =
+    Number.isFinite(valorRaw) && valorRaw > 0
+      ? Math.round(valorRaw * 100) / 100
+      : null;
+
   try {
     await prisma.configuracaoLoja.upsert({
       where: { id: DEFAULT_ID },
-      create: { id: DEFAULT_ID, descontoPixGlobalPercent: pct },
-      update: { descontoPixGlobalPercent: pct },
+      create: {
+        id: DEFAULT_ID,
+        descontoPixGlobalPercent: pct,
+        freteGratisAtivo,
+        freteGratisAcimaDe,
+      },
+      update: { descontoPixGlobalPercent: pct, freteGratisAtivo, freteGratisAcimaDe },
     });
   } catch (e) {
     console.error(e);
@@ -33,6 +49,6 @@ export async function salvarConfiguracaoLoja(
 
   revalidatePath("/admin/configuracoes");
   revalidatePath("/checkout");
-  revalidatePath("/"); // vitrine reflete o desconto global
+  revalidatePath("/", "layout"); // vitrine (desconto global) + faixa do topo (Navbar)
   return { success: true, message: "Configurações salvas." };
 }

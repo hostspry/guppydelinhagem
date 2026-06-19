@@ -27,6 +27,7 @@ import { VideoThumb } from "@/components/admin/VideoThumb";
 import { WhatsAppIcon } from "@/components/icons/WhatsAppIcon";
 import ProductFreteEstimator from "./ProductFreteEstimator";
 import ProductFaq from "./ProductFaq";
+import ProductShare from "./ProductShare";
 import WaitlistForm from "./WaitlistForm";
 import { formatBRL } from "@/lib/utils/format";
 import { calcularPrecos } from "@/lib/precos";
@@ -363,6 +364,9 @@ export default function ProductDetail({
               <p className="text-muted-foreground text-sm">{product.descricaoCurta}</p>
             )}
           </div>
+
+          {/* Compartilhar (só o link; prévia vem das OG da página) */}
+          <ProductShare slug={product.slug} nome={product.nome} />
 
           {/* Prova social honesta — sem estrelas/avaliações falsas */}
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">

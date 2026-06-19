@@ -426,5 +426,7 @@ model HeroSettings {
 model ConfiguracaoLoja {
   id                       String   @id @default("default")
   descontoPixGlobalPercent Int      @default(0) // 0–100, aplicado a produtos com usarDescontoPixGlobal
+  freteGratisAtivo         Boolean  @default(false) // liga/desliga o frete grátis por valor
+  freteGratisAcimaDe       Decimal? @db.Decimal(10, 2) // subtotal mínimo (preço cheio/cartão) p/ frete grátis
   atualizadoEm             DateTime @updatedAt
 }

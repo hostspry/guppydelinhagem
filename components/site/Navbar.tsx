@@ -4,6 +4,8 @@ import { Truck, MapPin, User } from "lucide-react";
 import NavBar3 from "./NavBar3";
 import CartIcon from "./CartIcon";
 import { WHATSAPP_URL } from "@/lib/constants";
+import { getFreteGratisConfig } from "@/lib/queries/config";
+import { formatBRL } from "@/lib/utils/format";
 
 function IconInstagram({ size = 16 }: { size?: number }) {
   return (
@@ -23,7 +25,10 @@ function IconFacebook({ size = 16 }: { size?: number }) {
   );
 }
 
-export default function Navbar() {
+export default async function Navbar() {
+  // Faixa "Frete grátis acima de R$ X" puxa do config (some se desligado).
+  const freteGratis = await getFreteGratisConfig();
+
   return (
     <header>
       {/* ── Barra 1: top bar navy ── */}
@@ -52,11 +57,16 @@ export default function Navbar() {
             </a>
           </div>
 
-          {/* Centro: frete grátis */}
-          <div className="hidden md:flex items-center gap-2 text-sm font-light">
-            <Truck size={16} />
-            <span>Frete Grátis Para Pedidos Acima de R$&nbsp;500!</span>
-          </div>
+          {/* Centro: frete grátis (do config — some se desligado) */}
+          {freteGratis.ativo && freteGratis.acimaDe != null && (
+            <div className="hidden md:flex items-center gap-2 text-sm font-light">
+              <Truck size={16} />
+              <span>
+                Frete Grátis Para Pedidos Acima de{" "}
+                {formatBRL(freteGratis.acimaDe).replace(/\s/g, " ")}!
+              </span>
+            </div>
+          )}
 
           {/* Direita: rastreamento */}
           <a

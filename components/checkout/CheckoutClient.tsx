@@ -15,6 +15,7 @@ import {
   Plane,
   QrCode,
   ShoppingCart,
+  Truck,
 } from "lucide-react";
 import { WhatsAppIcon } from "@/components/icons/WhatsAppIcon";
 import { formatBRL } from "@/lib/utils/format";
@@ -157,9 +158,11 @@ function focarCampo(id: string) {
 export default function CheckoutClient({
   prefill,
   mpPublicKey,
+  freteGratis,
 }: {
   prefill: CheckoutPrefill;
   mpPublicKey: string | null;
+  freteGratis: { ativo: boolean; acimaDe: number | null };
 }) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
@@ -246,11 +249,20 @@ export default function CheckoutClient({
     return m;
   }, [preco]);
 
+  // Frete grátis: base ÚNICA = subtotal no CHEIO (cartão), igual ao servidor —
+  // não muda entre abas Pix/Cartão. Aplica só quando ligado e atingido o valor.
+  const freteGratisAplicado =
+    freteGratis.ativo &&
+    freteGratis.acimaDe != null &&
+    subtotalCheioView >= freteGratis.acimaDe;
+  // Valor do frete que efetivamente entra no total (0 quando frete grátis).
+  const freteEfetivo = freteGratisAplicado ? 0 : freteValor;
+
   // Total exibido segue a ABA (Pix descontado × Cartão cheio). O cartão é cobrado
   // pelo cheio (Brick usa totalCartao); juros do parcelado vêm do MP.
   const subtotalView = aba === "pix" ? subtotalPixView : subtotalCheioView;
-  const total = subtotalView + (freteValor ?? 0);
-  const totalCartao = subtotalCheioView + (freteValor ?? 0);
+  const total = subtotalView + (freteEfetivo ?? 0);
+  const totalCartao = subtotalCheioView + (freteEfetivo ?? 0);
 
   // Frete obrigatório: depois de uma tentativa de envio, sem valor e ≤10 peixes.
   const freteFaltando = isSubmitted && !excedeCaixa && freteValor == null;
@@ -542,6 +554,14 @@ export default function CheckoutClient({
           <section className="bg-white border border-border rounded-xl p-5 space-y-4">
             <h2 className="text-primary font-semibold">Frete</h2>
 
+            {freteGratisAplicado && (
+              <p className="flex items-center gap-2 text-sm font-medium text-green-700 bg-green-50 border border-green-200 rounded-lg p-3">
+                <Truck size={16} className="shrink-0" aria-hidden="true" />
+                Frete grátis neste pedido! Calcule o CEP para confirmarmos a
+                entrega — o valor fica zerado.
+              </p>
+            )}
+
             {/* CEP + Calcular */}
             <div className="max-w-xs">
               <label className={labelCls} htmlFor="cep">
@@ -655,8 +675,18 @@ export default function CheckoutClient({
                           : "indisponível para esse CEP"}
                       </span>
                     </span>
-                    <span className="font-bold text-primary shrink-0">
-                      {jadlogSel ? formatBRL(jadlogSel.price) : "—"}
+                    <span
+                      className={`font-bold shrink-0 ${
+                        freteGratisAplicado && jadlogSel
+                          ? "text-green-600"
+                          : "text-primary"
+                      }`}
+                    >
+                      {jadlogSel
+                        ? freteGratisAplicado
+                          ? "Grátis"
+                          : formatBRL(jadlogSel.price)
+                        : "—"}
                     </span>
                   </label>
 
@@ -712,8 +742,18 @@ export default function CheckoutClient({
                         {gollogInfo ? "1–2 dias úteis" : "informe a UF do endereço"}
                       </span>
                     </span>
-                    <span className="font-bold text-primary shrink-0">
-                      {gollogInfo ? formatBRL(gollogInfo.preco) : "—"}
+                    <span
+                      className={`font-bold shrink-0 ${
+                        freteGratisAplicado && gollogInfo
+                          ? "text-green-600"
+                          : "text-primary"
+                      }`}
+                    >
+                      {gollogInfo
+                        ? freteGratisAplicado
+                          ? "Grátis"
+                          : formatBRL(gollogInfo.preco)
+                        : "—"}
                     </span>
                   </label>
 
@@ -893,9 +933,15 @@ export default function CheckoutClient({
             </div>
             <div className="flex justify-between text-muted-foreground">
               <span>Frete</span>
-              <span className="tabular-nums">
-                {freteValor != null ? formatBRL(freteValor) : "calcular CEP"}
-              </span>
+              {freteGratisAplicado ? (
+                <span className="tabular-nums font-semibold text-green-600">
+                  Grátis
+                </span>
+              ) : (
+                <span className="tabular-nums">
+                  {freteValor != null ? formatBRL(freteValor) : "calcular CEP"}
+                </span>
+              )}
             </div>
             <div className="flex items-end justify-between pt-2">
               <span className="text-sm font-medium text-primary">

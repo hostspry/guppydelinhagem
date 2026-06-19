@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getFreteGratisConfig } from "@/lib/queries/config";
 import CheckoutClient, {
   type CheckoutPrefill,
 } from "@/components/checkout/CheckoutClient";
@@ -65,5 +66,15 @@ export default async function CheckoutPage() {
     process.env.NEXT_PUBLIC_MP_PUBLIC_KEY ||
     null;
 
-  return <CheckoutClient prefill={prefill} mpPublicKey={mpPublicKey} />;
+  // Regra de frete grátis (toggle + valor) p/ o resumo zerar o frete na exibição.
+  // O servidor (criarOrderDoCheckout) reaplica a mesma regra — fonte da verdade.
+  const freteGratis = await getFreteGratisConfig();
+
+  return (
+    <CheckoutClient
+      prefill={prefill}
+      mpPublicKey={mpPublicKey}
+      freteGratis={freteGratis}
+    />
+  );
 }
