@@ -137,6 +137,12 @@ export default function VideoFeed({
   const [som, setSom] = useState(false);
   const [pausado, setPausado] = useState(false); // play/pause por toque (postMessage)
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  // Espelhos de som/pausado pra usar dentro dos reenvios de play (setTimeout) sem
+  // capturar valor velho — assim o autoplay não "briga" se o usuário pausar/mutar
+  // logo após o slide carregar. Timers ficam guardados pra limpar ao trocar/sair.
+  const somRef = useRef(som);
+  const pausadoRef = useRef(pausado);
+  const playTimers = useRef<number[]>([]);
   const current = slides[idx];
 
   // Composição/quantidade da gaveta (do produto atual).
@@ -167,6 +173,16 @@ export default function VideoFeed({
       document.body.style.overflow = anterior;
     };
   }, []);
+
+  // Mantém os refs em dia (lidos nos reenvios de play assíncronos).
+  useEffect(() => {
+    somRef.current = som;
+  }, [som]);
+  useEffect(() => {
+    pausadoRef.current = pausado;
+  }, [pausado]);
+  // Limpa timers de play pendentes ao desmontar o feed.
+  useEffect(() => () => playTimers.current.forEach(clearTimeout), []);
 
   if (N === 0 || !current) {
     return (
@@ -235,8 +251,27 @@ export default function VideoFeed({
     setSom(novo);
     postCmd(iframeRef.current, novo ? "unMute" : "mute");
   }
+  // Aplica o estado atual (som + play/pause) ao player via postMessage. Lê os
+  // refs (não o closure) pra respeitar o que o usuário fez nesse meio-tempo.
+  function aplicarEstadoPlayer() {
+    const iframe = iframeRef.current;
+    if (!iframe) return;
+    postCmd(iframe, somRef.current ? "unMute" : "mute");
+    // Só força o play se o usuário não pausou — autoplay sem brigar com o toque.
+    if (!pausadoRef.current) postCmd(iframe, "playVideo");
+  }
+
+  // Com enablejsapi=1 o YouTube nem sempre honra o autoplay=1 da URL — ele espera
+  // um playVideo da JS API. Como aqui não há callback de onReady, mandamos o play
+  // no onLoad e reenviamos algumas vezes (comando antes de "pronto" é ignorado;
+  // depois de tocando, é no-op). É o que garante o autoplay no 1º slide e nos swipes.
   function onIframeLoad() {
-    if (som) postCmd(iframeRef.current, "unMute"); // reaplica som no novo slide
+    playTimers.current.forEach(clearTimeout);
+    playTimers.current = [];
+    aplicarEstadoPlayer();
+    playTimers.current = [150, 400, 900, 1600].map((ms) =>
+      window.setTimeout(aplicarEstadoPlayer, ms),
+    );
   }
 
   function escolherComposicao(c: TipoComposicao) {
