@@ -158,9 +158,19 @@ export default function VideoFeed({
     }
   }, [router, startSlug]);
 
+  // Tela cheia: trava o scroll da página de fundo enquanto o feed está aberto
+  // (restaura ao fechar). Evita o "scroll por trás" no iOS/Android.
+  useEffect(() => {
+    const anterior = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = anterior;
+    };
+  }, []);
+
   if (N === 0 || !current) {
     return (
-      <div className="fixed inset-0 z-[100] bg-black flex items-center justify-center text-white/80 text-sm">
+      <div className="fixed inset-0 z-[100] h-[100dvh] bg-black flex items-center justify-center text-white/80 text-sm">
         Nenhum vídeo disponível.
       </div>
     );
@@ -293,7 +303,10 @@ export default function VideoFeed({
 
   return (
     <div
-      className="fixed inset-0 z-[100] bg-black select-none"
+      // h-[100dvh]: no iOS Safari o 100vh ignora a barra dinâmica e estoura a
+      // viewport (gaveta cortada). O dvh acompanha a barra aparecer/sumir. Com
+      // top:0 + height:100dvh, o bottom:0 do inset-0 é ignorado (over-constrained).
+      className="fixed inset-0 z-[100] h-[100dvh] bg-black select-none"
       onTouchStart={onTouchStart}
       onTouchEnd={onTouchEnd}
     >
@@ -359,25 +372,35 @@ export default function VideoFeed({
         </div>
       </div>
 
-      {/* Top bar: fechar + plataforma + "X de N" — acima da gaveta (z-30) */}
-      <div className="absolute top-0 inset-x-0 z-30 flex items-center justify-between p-3">
-        <button
-          type="button"
-          onClick={() => router.back()}
-          aria-label="Fechar"
-          className="flex items-center justify-center w-11 h-11 rounded-full bg-black/40 text-white hover:bg-black/60 transition-colors"
-        >
-          <X className="w-5 h-5" aria-hidden="true" />
-        </button>
+      {/* Degradê superior: disfarça a marca "Shorts/YouTube" que o iOS força no
+          topo do embed (limitação do embed — não há param que remova no iOS; só
+          dá pra atenuar com a nossa UI). Também dá contraste pro X/som.
+          pointer-events-none: não bloqueia o toque de play/pause no vídeo. */}
+      <div
+        className="absolute top-0 inset-x-0 z-20 h-28 pointer-events-none"
+        style={{
+          background:
+            "linear-gradient(to bottom, rgba(0,0,0,0.78) 0%, rgba(0,0,0,0.45) 45%, transparent)",
+        }}
+      />
+
+      {/* Top bar — acima da gaveta (z-30). Esquerda: fechar + SOM (o som foi
+          movido pra cá: no iOS o YouTube vaza o ícone de som DELE no canto
+          superior DIREITO do embed; manter o nosso à esquerda evita parecer
+          duplicado). Direita: contador + plataforma. */}
+      <div
+        className="absolute top-0 inset-x-0 z-30 flex items-center justify-between p-3"
+        style={{ paddingTop: "calc(0.75rem + env(safe-area-inset-top))" }}
+      >
         <div className="flex items-center gap-2">
-          {current.vTotal > 1 && (
-            <span className="text-white text-xs font-medium bg-black/50 rounded-full px-2.5 py-1">
-              vídeo {current.vIdx + 1} de {current.vTotal}
-            </span>
-          )}
-          <span className="text-white/90 text-[11px] font-semibold bg-black/50 rounded-full px-2.5 py-1">
-            {PLATFORM_LABEL[current.video.platform]}
-          </span>
+          <button
+            type="button"
+            onClick={() => router.back()}
+            aria-label="Fechar"
+            className="flex items-center justify-center w-11 h-11 rounded-full bg-black/40 text-white hover:bg-black/60 transition-colors"
+          >
+            <X className="w-5 h-5" aria-hidden="true" />
+          </button>
           {/* Liga/desliga o som (autoplay entra mudo; unMute via postMessage). */}
           <button
             type="button"
@@ -391,6 +414,16 @@ export default function VideoFeed({
               <VolumeX className="w-5 h-5" aria-hidden="true" />
             )}
           </button>
+        </div>
+        <div className="flex items-center gap-2">
+          {current.vTotal > 1 && (
+            <span className="text-white text-xs font-medium bg-black/50 rounded-full px-2.5 py-1">
+              vídeo {current.vIdx + 1} de {current.vTotal}
+            </span>
+          )}
+          <span className="text-white/90 text-[11px] font-semibold bg-black/50 rounded-full px-2.5 py-1">
+            {PLATFORM_LABEL[current.video.platform]}
+          </span>
         </div>
       </div>
 
@@ -425,10 +458,13 @@ export default function VideoFeed({
       {/* Gaveta de compra (parte de baixo, vídeo visível acima) — degradê escuro
           pra o texto ficar legível sobre qualquer vídeo (claro ou escuro). */}
       <div
-        className="absolute bottom-0 inset-x-0 z-20 pt-12 pb-4 px-4 pointer-events-none"
+        className="absolute bottom-0 inset-x-0 z-20 pt-12 px-4 pointer-events-none"
         style={{
           background:
             "linear-gradient(to top, rgba(0,0,0,0.9) 55%, rgba(0,0,0,0.5) 78%, transparent)",
+          // pb base (1rem) + safe-area do iPhone: a gaveta não fica atrás da
+          // barra de gestos/home indicator.
+          paddingBottom: "calc(1rem + env(safe-area-inset-bottom))",
         }}
       >
         {/* pointer-events-auto só no conteúdo: a área transparente do degradê não

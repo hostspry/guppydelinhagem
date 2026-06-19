@@ -31,9 +31,11 @@ export const metadata: Metadata = {
   },
 };
 
-// Cor da barra do navegador no mobile (navy da marca).
+// Cor da barra do navegador no mobile (navy da marca). viewportFit "cover" é
+// necessário para o env(safe-area-inset-*) funcionar no iPhone (feed tela cheia).
 export const viewport: Viewport = {
   themeColor: "#07366A",
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
