@@ -80,11 +80,10 @@ function feedEmbedSrc(v: FeedVideo): string | null {
 // Comando à YouTube IFrame API via postMessage (sem carregar a lib).
 function postCmd(
   iframe: HTMLIFrameElement | null,
-  func: "playVideo" | "pauseVideo" | "mute" | "unMute" | "setPlaybackQuality",
-  args: (string | number)[] = [],
+  func: "playVideo" | "pauseVideo" | "mute" | "unMute",
 ) {
   iframe?.contentWindow?.postMessage(
-    JSON.stringify({ event: "command", func, args }),
+    JSON.stringify({ event: "command", func, args: [] }),
     "*",
   );
 }
@@ -134,7 +133,8 @@ export default function VideoFeed({
   const N = slides.length;
   const [idx, setIdx] = useState(startIdx);
   // Som desligado por padrão → autoplay mudo (navegador bloqueia autoplay c/ som).
-  // O usuário liga o som com um toque (gesto). Persiste entre slides.
+  // O usuário liga o som com um toque (gesto). Persiste entre slides no Android;
+  // no iOS volta a mudo a cada slide (lá não dá pra religar sem gesto — ver isIOSRef).
   const [som, setSom] = useState(false);
   const [pausado, setPausado] = useState(false); // play/pause por toque (postMessage)
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -144,6 +144,10 @@ export default function VideoFeed({
   const somRef = useRef(som);
   const pausadoRef = useRef(pausado);
   const playTimers = useRef<number[]>([]);
+  // iOS: unMute SEM gesto do usuário é bloqueado e PAUSA o vídeo (mata o autoplay).
+  // Por isso no iOS o som só liga por toque direto (gesto) e não persiste entre
+  // slides; no Android o unMute programático funciona e a preferência persiste.
+  const isIOSRef = useRef(false);
   const current = slides[idx];
 
   // Composição/quantidade da gaveta (do produto atual).
@@ -185,6 +189,14 @@ export default function VideoFeed({
   // Limpa timers de play pendentes ao desmontar o feed.
   useEffect(() => () => playTimers.current.forEach(clearTimeout), []);
 
+  // Detecta iOS (iPhone/iPad, incl. iPad que se reporta como Mac com touch).
+  useEffect(() => {
+    const ua = navigator.userAgent;
+    isIOSRef.current =
+      /iP(hone|ad|od)/.test(ua) ||
+      (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  }, []);
+
   if (N === 0 || !current) {
     return (
       <div className="fixed inset-0 z-[100] h-[100dvh] bg-black flex items-center justify-center text-white/80 text-sm">
@@ -197,6 +209,9 @@ export default function VideoFeed({
     const alvo = slides[novo];
     setIdx(novo); // novo slide autoplaya (o iframe re-monta pela key=idx)
     setPausado(false); // novo vídeo começa tocando
+    // iOS: o vídeo novo entra mudo (não dá pra religar sem gesto) → reflete isso
+    // no ícone de som. No Android a preferência de som persiste (auto-religa).
+    if (isIOSRef.current) setSom(false);
     // Trocou de PRODUTO → reseta composição/quantidade da gaveta.
     if (alvo.p.id !== current.p.id) {
       setComposicaoSel(alvo.p.variantes[0]?.composicao ?? null);
@@ -256,21 +271,21 @@ export default function VideoFeed({
   // aqui NÃO se manda unMute: autoplay com som é bloqueado pelo navegador. Só o
   // playVideo (com enablejsapi=1 o YouTube não honra o autoplay=1 da URL sozinho).
   // Reenviado algumas vezes porque comando antes do player ficar "pronto" é
-  // ignorado; depois de tocando, é no-op. Também tenta subir a qualidade (o YT
-  // trata como sugestão e pode ignorar — best-effort, ver PROBLEMA 2).
+  // ignorado; depois de tocando, é no-op. NÃO mando setPlaybackQuality: no iOS ele
+  // força re-buffer e exige um 2º toque pra o vídeo iniciar (ver PROBLEMA 2).
   function garantirTocando() {
     const iframe = iframeRef.current;
     if (!iframe || pausadoRef.current) return; // respeita o pause do usuário
     postCmd(iframe, "playVideo");
-    postCmd(iframe, "setPlaybackQuality", ["hd1080"]);
   }
 
   // FASE 2 — restaurar o SOM só DEPOIS de o vídeo já estar tocando (e só se a
   // preferência do usuário for som). Nunca inicia um vídeo com som; o unMute vem
-  // após o instante mudo inicial. Pausado → não liga (nem força play).
+  // após o instante mudo inicial. NO iOS é PULADO: unMute sem gesto pausa o vídeo
+  // (mata o autoplay) — lá o som só liga por toque direto no botão.
   function restaurarSom() {
     const iframe = iframeRef.current;
-    if (!iframe) return;
+    if (!iframe || isIOSRef.current) return;
     if (somRef.current && !pausadoRef.current) postCmd(iframe, "unMute");
   }
 
