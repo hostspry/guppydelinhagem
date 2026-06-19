@@ -18,6 +18,7 @@ import {
   Flag,
   Newspaper,
   CalendarDays,
+  Bug,
 } from "lucide-react";
 import { WhatsAppIcon } from "@/components/icons/WhatsAppIcon";
 import { WHATSAPP_URL } from "@/lib/constants";
@@ -72,6 +73,8 @@ function Icone({ name, className }: { name: string; className?: string }) {
       return <ShieldCheck className={className} aria-hidden="true" />;
     case "Package":
       return <Package className={className} aria-hidden="true" />;
+    case "Bug":
+      return <Bug className={className} aria-hidden="true" />;
     case "Sparkles":
       return <Sparkles className={className} aria-hidden="true" />;
     case "Trophy":
@@ -143,6 +146,10 @@ const btnSecundario =
   "inline-flex items-center justify-center gap-2 min-h-12 px-7 py-3 rounded-pill border-2 border-primary text-primary font-semibold hover:bg-primary hover:text-white transition-all";
 
 export default function SobreNosPage() {
+  // Full Black = bloco-herói (não card); demais = cards de apoio.
+  const heroi = conquistas.find((c) => c.destaque);
+  const apoio = conquistas.filter((c) => !c.destaque);
+
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "AboutPage",
@@ -282,25 +289,69 @@ export default function SobreNosPage() {
             Conquistas que confirmam a <span className="text-secondary">qualidade</span>
           </h2>
         </div>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-          {conquistas.map((c) => (
+        {/* BLOCO-HERÓI — Full Black, largura total, monumental (navy). */}
+        {heroi && (
+          <div className="relative overflow-hidden rounded-[24px] bg-primary text-white p-8 sm:p-12 shadow-md mb-6">
+            <Trophy
+              className="pointer-events-none absolute -right-6 -bottom-6 w-44 h-44 text-white/5"
+              aria-hidden="true"
+            />
+            <div className="relative space-y-4 max-w-3xl">
+              <span className="inline-flex items-center gap-2 text-accent font-bold uppercase tracking-widest text-sm">
+                <Trophy size={20} aria-hidden="true" />
+                {heroi.titulo}
+              </span>
+              <h3 className="text-4xl sm:text-6xl font-extrabold leading-none tracking-tight">
+                {heroi.linha}
+              </h3>
+              <p className="text-white/90 text-lg font-semibold">
+                2023 • 2024 • 2025 — World Guppy Contest
+              </p>
+              <p className="text-white/80 font-light leading-relaxed">
+                Linha desenvolvida na nossa estufa — três títulos mundiais
+                consecutivos. Em 2023, além do título, foi vice no Best of Show: o
+                segundo melhor peixe de todo o mundial.
+              </p>
+              <div className="flex flex-wrap items-center gap-x-5 gap-y-2 pt-2">
+                <a
+                  href={heroi.video}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center justify-center gap-2 min-h-12 px-7 py-3 rounded-pill bg-secondary text-white font-semibold hover:brightness-110 transition-all"
+                >
+                  Ver os vídeos dos títulos
+                  <ArrowRight size={17} aria-hidden="true" />
+                </a>
+                {heroi.videoExtra && (
+                  <a
+                    href={heroi.videoExtra}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 min-h-11 text-sm font-semibold text-white/90 hover:text-white transition-colors"
+                  >
+                    Best of Show 2023
+                    <ExternalLink size={14} aria-hidden="true" />
+                  </a>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Cards de apoio — Glass Tail e Half Moon, parelhos. */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+          {apoio.map((c) => (
             <article
               key={c.linha}
-              className={`rounded-[22px] border p-6 flex flex-col gap-3 ${
-                c.destaque
-                  ? "border-secondary bg-secondary/5 shadow-sm ring-1 ring-secondary/20"
-                  : "border-border bg-white"
-              }`}
+              className="rounded-[22px] border border-border bg-white p-6 flex flex-col gap-3 shadow-sm"
             >
               <div className="flex items-center gap-2">
-                <Trophy size={20} className={c.destaque ? "text-secondary" : "text-accent"} aria-hidden="true" />
+                <Trophy size={20} className="text-accent" aria-hidden="true" />
                 <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   {c.titulo}
                 </span>
               </div>
-              <h3 className={`font-bold leading-tight text-primary ${c.destaque ? "text-2xl" : "text-xl"}`}>
-                {c.linha}
-              </h3>
+              <h3 className="font-bold leading-tight text-primary text-xl">{c.linha}</h3>
               <p className="text-sm font-semibold text-secondary">{c.anos}</p>
               <p className="text-sm text-text/80 leading-snug">{c.evento}</p>
               <p className="text-sm text-text font-light leading-relaxed">{c.nota}</p>
@@ -426,41 +477,50 @@ export default function SobreNosPage() {
         </figure>
       </Secao>
 
-      {/* ═══ 9. APRENDENDO COM OS MELHORES (rede — Brasil) ═══ */}
+      {/* ═══ 9. AMIZADES E ADMIRAÇÃO (rede — Brasil, tom de respeito entre pares) ═══ */}
       <Secao bg="white">
         <div className="max-w-3xl space-y-4 mb-8">
           <h2 className="text-primary text-2xl sm:text-3xl font-bold">
-            Aprendendo com criadores de <span className="text-secondary">referência</span>
+            Amizades e admiração no mundo do <span className="text-secondary">guppy</span>
           </h2>
           <p className="text-text font-light text-lg leading-relaxed">
-            A busca por evolução sempre fez parte da nossa história. Convivemos com
-            grandes nomes do guppy brasileiro — entre eles Rodrigo Ziviani,
-            vice-presidente da World Guppy Association, e os criadores da UNAQUA, em
-            Belo Horizonte — e estudamos técnicas como a alimentação viva com o
-            professor Mauro Schettino.
+            O mundo do guppy é feito de gente, e ao longo da nossa caminhada
+            construímos amizades e trocas saudáveis com criadores que admiramos.
+            Entre eles, Rodrigo Ziviani, presidente da World Guppy Association;
+            Mário Garcia e Léia, da UNAQUA, em Belo Horizonte — pessoas de visão por
+            quem temos grande admiração; e o professor Mauro Schettino e o Sr.
+            Abdala, referências de caráter e de qualidade técnica. São encontros e
+            amizades que tornam o hobby maior.
           </p>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
           <Figura
             src={`${IMG}/visita-ziviani.png`}
-            alt="Visita de Rodrigo Ziviani, vice-presidente da World Guppy Association, à estufa da família em Guarapari, 2021"
+            alt="Encontro com Rodrigo Ziviani, presidente da World Guppy Association, na estufa da família em Guarapari"
             ratio="1 / 1"
-            sizes="(max-width: 768px) 100vw, 33vw"
-            caption="Visita de Rodrigo Ziviani — Guarapari, 2021"
+            sizes="(max-width: 768px) 100vw, 25vw"
+            caption="Com Rodrigo Ziviani — World Guppy Association"
           />
           <Figura
             src={`${IMG}/visita-unaqua.png`}
-            alt="Encontro com os criadores e dirigentes da UNAQUA em Belo Horizonte"
+            alt="Encontro com Mário Garcia e Léia, da UNAQUA, em Belo Horizonte"
             ratio="1 / 1"
-            sizes="(max-width: 768px) 100vw, 33vw"
-            caption="Visita à UNAQUA — Belo Horizonte"
+            sizes="(max-width: 768px) 100vw, 25vw"
+            caption="Com a UNAQUA — Belo Horizonte"
           />
           <Figura
             src={`${IMG}/mestre-mauro.png`}
             alt="Encontro com o professor Mauro Schettino, referência em alimentação viva para peixes"
             ratio="1 / 1"
-            sizes="(max-width: 768px) 100vw, 33vw"
-            caption="Estudo de alimentação viva com o prof. Mauro Schettino"
+            sizes="(max-width: 768px) 100vw, 25vw"
+            caption="Com o prof. Mauro Schettino"
+          />
+          <Figura
+            src={`${IMG}/elias-abdalla.png`}
+            alt="Encontro com o Sr. Abdala, referência de caráter e qualidade técnica no guppy brasileiro"
+            ratio="1 / 1"
+            sizes="(max-width: 768px) 100vw, 25vw"
+            caption="Com o Sr. Abdala"
           />
         </div>
       </Secao>

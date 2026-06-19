@@ -8,10 +8,10 @@ export const timeline = [
   { ano: "2014", titulo: "Fase de experiências", texto: "Guppy e camarão dividindo as piscinas. O amor era mesmo o guppy." },
   { ano: "2015", titulo: "Chegam os asiáticos", texto: "Dumbo, Dragon e Mosaico. Nasce a paixão por criar pela beleza." },
   { ano: "2019", titulo: "Nasce a Marchezi Guppy Farm", texto: "Primeira estufa, na casa do Sr. Marchezi, com cerca de 5 mil litros." },
-  { ano: "2023", titulo: "Título mundial e mudança para Guarapari", texto: "Primeiro mundial e nova estufa, projetada para até 30 mil litros." },
+  { ano: "2023", titulo: "Título mundial e mudança para Guarapari", texto: "Primeiro mundial e nova estufa, projetada para até 30 mil litros — ao lado do amigo Vinícius Pirovani. Ele me apresentou o aquário marinho, eu apresentei a ele o mundo dos guppys, e dessa troca nasceu a amizade." },
   { ano: "2024", titulo: "Campeões de novo", texto: "Mais um título mundial enquanto a estufa nova segue crescendo." },
   { ano: "2025", titulo: "Mais estrutura, mais títulos", texto: "Novos aquários, novas caixas, nova infraestrutura." },
-  { ano: "2026", titulo: "Nova fase", texto: "Lucas da Matta se junta à criação, somando conhecimento e paixão." },
+  { ano: "2026", titulo: "Nova fase", texto: "Chega Lucas da Matta, apaixonado por guppy, somando conhecimento e a mesma paixão que move a estufa." },
 ] as const;
 
 // Dados confirmados pelo dono. Fonte única dos cards de conquista E do award do JSON-LD.
@@ -57,6 +57,7 @@ export const estrutura = [
   { titulo: "Filtragem natural (aguapé e plantas)", icon: "Leaf" },
   { titulo: "Seleção por linhagem", icon: "Dna" },
   { titulo: "Acompanhamento diário", icon: "Eye" },
+  { titulo: "Alimentação viva no manejo", icon: "Bug" },
   { titulo: "Peixes observados antes do envio", icon: "ShieldCheck" },
   { titulo: "Embalagem feita à mão pela família", icon: "Package" },
 ] as const;
