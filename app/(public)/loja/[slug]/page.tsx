@@ -32,7 +32,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     undefined;
   // Imagem da prévia = thumb do vídeo principal (videos já vêm principal-primeiro,
   // só ativos). YouTube/upload já são URLs absolutas; fallback no selo da marca.
-  const imagem = produto.videos[0]?.thumbnailUrl || "/images/selo.png";
+  const imagem = produto.videos[0]?.thumbnailUrl || "/images/selo.webp";
   const url = `/loja/${slug}`;
 
   return {

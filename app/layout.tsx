@@ -15,6 +15,32 @@ export const metadata: Metadata = {
   title: "Guppy de Linhagem | Guppys Premiados",
   description:
     "Guppys de linhagem selecionados, saudáveis e com genética apurada. Campeões mundiais World Guppy Contest.",
+  // Fallback Open Graph/Twitter global: qualquer página sem imagem própria herda
+  // o selo da marca (WebP). Páginas indexáveis sobrescrevem com a sua imagem.
+  openGraph: {
+    type: "website",
+    siteName: "Guppy de Linhagem",
+    locale: "pt_BR",
+    url: "/",
+    title: "Guppy de Linhagem | Guppys Premiados",
+    description:
+      "Guppys de linhagem selecionados, saudáveis e com genética apurada. Campeões mundiais World Guppy Contest.",
+    images: [
+      {
+        url: "/images/selo.webp",
+        width: 797,
+        height: 760,
+        alt: "Guppy de Linhagem — Marchezi Guppy Farm",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Guppy de Linhagem | Guppys Premiados",
+    description:
+      "Guppys de linhagem selecionados, saudáveis e com genética apurada. Campeões mundiais World Guppy Contest.",
+    images: ["/images/selo.webp"],
+  },
   // Ícones de aba (navegador) e de dispositivo. O /favicon.ico vem da convenção
   // app/favicon.ico; aqui declaramos os PNG (navegadores modernos) e o ícone de
   // toque do iOS, servidos de /images.

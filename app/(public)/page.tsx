@@ -11,11 +11,28 @@ import {
 } from "@/lib/queries/products";
 import { listCategories } from "@/lib/queries/categories";
 import { HOME_BANNERS } from "@/lib/home-content";
+import { pageMeta, SITE_URL } from "@/lib/seo";
+import { organizationJsonLd } from "@/lib/sobre-content";
+import { WHATSAPP_PHONE } from "@/lib/constants";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMeta({
   title: "Guppy de Linhagem — Loja de guppies pedigree | Criação premiada",
   description:
     "Compre guppies de linhagem direto do criador campeão no World Guppy Contest. Busque por nome ou linhagem (koi, full red, tuxedo…), filtre por categoria e receba em todo o Brasil com garantia de chegada viva.",
+  path: "/",
+  image: {
+    url: "/images/hero/blue-dragon-hero.webp",
+    width: 1024,
+    height: 1024,
+    alt: "Guppy de linhagem premiado — Marchezi Guppy Farm",
+  },
+});
+
+// Organization JSON-LD (GEO) na home — fonte única em lib/sobre-content; WhatsApp
+// em E.164 a partir de lib/constants. Sem campos inventados.
+const orgJsonLd = {
+  "@context": "https://schema.org",
+  ...organizationJsonLd(SITE_URL, `+${WHATSAPP_PHONE}`),
 };
 
 // A home é a vitrine: lê o banco e os filtros da URL em request-time. Mantém o
@@ -55,6 +72,12 @@ export default async function HomePage({ searchParams }: Props) {
 
   return (
     <>
+      {/* Organization JSON-LD (GEO) */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(orgJsonLd) }}
+      />
+
       {/* ── Hero ── */}
       <HeroSection />
 

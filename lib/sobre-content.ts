@@ -76,3 +76,47 @@ export const REDES = {
   youtube: "https://www.youtube.com/@marcheziguppy",
   instagram: "https://www.instagram.com/marchezi_guppy/",
 } as const;
+
+// Fatos verificáveis da organização — FONTE ÚNICA do JSON-LD (home e /sobre-nos).
+// Sem endereço/CEP/horário (não confirmados); só o que é público e checável.
+export const ORG = {
+  nome: "Marchezi Guppy Farm",
+  fundador: "Manassés Marchezi",
+  fundacao: "2000",
+  cidade: "Guarapari",
+  uf: "ES",
+  pais: "BR",
+} as const;
+
+/**
+ * Objeto schema.org Organization montado dos dados confirmados (ORG + REDES).
+ * `siteUrl` e `whatsappE164` vêm de quem chama (sem importar constantes externas
+ * aqui, mantendo este arquivo só de dados). Campos não verificáveis ficam de fora.
+ */
+export function organizationJsonLd(siteUrl: string, whatsappE164: string) {
+  return {
+    "@type": "Organization",
+    name: ORG.nome,
+    url: siteUrl,
+    logo: `${siteUrl}/logo.png`,
+    founder: { "@type": "Person", name: ORG.fundador },
+    foundingDate: ORG.fundacao,
+    areaServed: ORG.pais,
+    location: {
+      "@type": "Place",
+      address: {
+        "@type": "PostalAddress",
+        addressLocality: ORG.cidade,
+        addressRegion: ORG.uf,
+        addressCountry: ORG.pais,
+      },
+    },
+    contactPoint: {
+      "@type": "ContactPoint",
+      telephone: whatsappE164,
+      contactType: "customer service",
+      availableLanguage: "Portuguese",
+    },
+    sameAs: [REDES.youtube, REDES.instagram],
+  };
+}

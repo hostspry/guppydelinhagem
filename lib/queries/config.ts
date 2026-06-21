@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { prisma } from "../prisma";
 import type { ConfigPreco } from "../precos";
 
@@ -19,22 +20,27 @@ export type ConfiguracaoLojaData = {
  * os defaults (sem desconto global, sem frete grátis). Leitura leve — usada pelo
  * checkout e admin. Decimal→number (não serializa pra Client Component).
  */
-export async function getConfiguracaoLoja(): Promise<ConfiguracaoLojaData> {
-  const c = await prisma.configuracaoLoja.findUnique({
-    where: { id: DEFAULT_ID },
-    select: {
-      descontoPixGlobalPercent: true,
-      freteGratisAtivo: true,
-      freteGratisAcimaDe: true,
-    },
-  });
-  return {
-    descontoPixGlobalPercent: c?.descontoPixGlobalPercent ?? 0,
-    freteGratisAtivo: c?.freteGratisAtivo ?? false,
-    freteGratisAcimaDe:
-      c?.freteGratisAcimaDe == null ? null : Number(c.freteGratisAcimaDe),
-  };
-}
+// cache() dedup por request: Navbar (layout) + checkout/cards leem config no mesmo
+// request sem repetir a consulta. NÃO persiste entre requests, então a revalidação
+// via admin (revalidatePath já existente) continua válida.
+export const getConfiguracaoLoja = cache(
+  async (): Promise<ConfiguracaoLojaData> => {
+    const c = await prisma.configuracaoLoja.findUnique({
+      where: { id: DEFAULT_ID },
+      select: {
+        descontoPixGlobalPercent: true,
+        freteGratisAtivo: true,
+        freteGratisAcimaDe: true,
+      },
+    });
+    return {
+      descontoPixGlobalPercent: c?.descontoPixGlobalPercent ?? 0,
+      freteGratisAtivo: c?.freteGratisAtivo ?? false,
+      freteGratisAcimaDe:
+        c?.freteGratisAcimaDe == null ? null : Number(c.freteGratisAcimaDe),
+    };
+  },
+);
 
 /**
  * Só a regra de frete grátis (toggle + valor). Usada na faixa do topo (Navbar),
@@ -42,13 +48,12 @@ export async function getConfiguracaoLoja(): Promise<ConfiguracaoLojaData> {
  * se ativo E com um valor definido.
  */
 export async function getFreteGratisConfig(): Promise<FreteGratisConfig> {
-  const c = await prisma.configuracaoLoja.findUnique({
-    where: { id: DEFAULT_ID },
-    select: { freteGratisAtivo: true, freteGratisAcimaDe: true },
-  });
-  const acimaDe =
-    c?.freteGratisAcimaDe == null ? null : Number(c.freteGratisAcimaDe);
-  return { ativo: (c?.freteGratisAtivo ?? false) && acimaDe != null, acimaDe };
+  // Reusa a leitura cacheada (mesma consulta da Navbar/checkout no request).
+  const c = await getConfiguracaoLoja();
+  return {
+    ativo: c.freteGratisAtivo && c.freteGratisAcimaDe != null,
+    acimaDe: c.freteGratisAcimaDe,
+  };
 }
 
 /** Atalho tipado p/ o helper de preço (lib/precos). */

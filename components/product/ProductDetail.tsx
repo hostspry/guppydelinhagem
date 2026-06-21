@@ -836,7 +836,7 @@ export default function ProductDetail({
             </div>
           </div>
           <Image
-            src="/images/selo.png"
+            src="/images/selo.webp"
             alt="Garantia de Chegada Viva"
             width={128}
             height={128}

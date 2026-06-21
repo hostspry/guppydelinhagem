@@ -121,7 +121,7 @@ export default function HeroHome() {
 
             {/* Imagem do peixe */}
             <Image
-              src="/assets/home/hero-fish.png"
+              src="/assets/home/hero-fish.webp"
               alt="Guppy de linhagem premium"
               width={380}
               height={280}

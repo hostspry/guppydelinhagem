@@ -29,13 +29,20 @@ import {
   beneficios,
   REDES,
 } from "@/lib/sobre-content";
+import { pageMeta } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMeta({
   title: "Sobre Nós — Marchezi Guppy Farm | Guppies de linhagem tricampeões mundiais",
   description:
     "Desde 2000, a família Marchezi cria guppies de linhagem no Espírito Santo. Criação familiar pela beleza, com títulos mundiais — incluindo o tricampeonato da linha Full Black.",
-  alternates: { canonical: "/sobre-nos" },
-};
+  path: "/sobre-nos",
+  image: {
+    url: "/images/sobrenos/estufa-nova-prateleiras.png",
+    width: 895,
+    height: 504,
+    alt: "Estufa da Marchezi Guppy Farm em Guarapari, ES",
+  },
+});
 
 const IMG = "/images/sobrenos";
 
@@ -412,7 +419,7 @@ export default function SobreNosPage() {
           </div>
           <div className="grid grid-cols-2 gap-4">
             <Figura
-              src={`${IMG}/pai-construindo-estufa.png`}
+              src={`${IMG}/pai-construindo-estufa.webp`}
               alt="A construção da estufa nova da Marchezi Guppy Farm em Guarapari"
               ratio="1 / 1"
               sizes="(max-width: 768px) 50vw, 25vw"
@@ -501,7 +508,7 @@ export default function SobreNosPage() {
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
           <Figura
-            src={`${IMG}/visita-ziviani.png`}
+            src={`${IMG}/visita-ziviani.webp`}
             alt="Encontro com Rodrigo Ziviani, presidente da World Guppy Association, na estufa da família em Guarapari"
             ratio="1 / 1"
             sizes="(max-width: 768px) 100vw, 25vw"

@@ -1,7 +1,16 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { ChevronDown } from "lucide-react";
 import PageBanner from "@/components/site/PageBanner";
 import CtaWhatsapp from "@/components/site/CtaWhatsapp";
+import { pageMeta } from "@/lib/seo";
+
+export const metadata: Metadata = pageMeta({
+  title: "Conheça o Guppy — cuidados, água, alimentação e linhagens | Guppy de Linhagem",
+  description:
+    "Guia do guppy (Poecilia reticulata): temperatura e pH ideais, tamanho de aquário, alimentação, convivência e dúvidas frequentes de quem cria guppies de linhagem.",
+  path: "/conheca-os-guppy",
+});
 
 const TECNICOS = [
   { label: "Nome científico", valor: "Poecilia reticulata" },
