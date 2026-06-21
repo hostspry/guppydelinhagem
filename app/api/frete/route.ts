@@ -1,9 +1,19 @@
 import { NextResponse } from "next/server";
 import { FRETE_CONFIG, calcularPesoECaixa, cotarFrete } from "@/lib/shipping";
+import { rateLimit, clientIp } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
+  // Endpoint caro (chama Melhor Envio): 20 req/min por IP.
+  const rl = rateLimit(`frete:${clientIp(req.headers)}`, 20, 60_000);
+  if (!rl.ok) {
+    return NextResponse.json(
+      { error: "Muitas requisições. Aguarde um instante e tente de novo." },
+      { status: 429, headers: { "Retry-After": String(rl.retryAfter) } },
+    );
+  }
+
   let body: { cepDestino?: string; qtd?: number };
   try {
     body = await req.json();

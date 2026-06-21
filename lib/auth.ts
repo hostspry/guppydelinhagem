@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { authConfig } from "../auth.config";
 import { prisma } from "./prisma";
+import { rateLimit, clientIp } from "./rate-limit";
 
 // Config COMPLETA (Node runtime): inclui providers reais com Prisma + bcrypt.
 // PrismaAdapter foi omitido propositadamente — strategy "jwt" + Credentials
@@ -22,7 +23,12 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
         email: { label: "Email" },
         password: { label: "Senha", type: "password" },
       },
-      authorize: async (credentials) => {
+      authorize: async (credentials, request) => {
+        // Anti brute-force: 5 tentativas/min por IP. Bloqueia ANTES do bcrypt
+        // (falha como credencial inválida, sem revelar o motivo).
+        const ip = clientIp(request.headers);
+        if (!rateLimit(`login:${ip}`, 5, 60_000).ok) return null;
+
         const parsed = loginSchema.safeParse(credentials);
         if (!parsed.success) return null;
 
