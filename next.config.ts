@@ -1,11 +1,12 @@
 import type { NextConfig } from "next";
 
-// ── Content-Security-Policy (Report-Only nesta fase) ──────────────────────────
-// Hosts de imagem/CDN derivados do remotePatterns acima (Garage/CDN do projeto:
-// media/www.guppydelinhagem.com.br, utfs.io) — não chutados. MP (Brick), YouTube
-// (feed), GA e ViaCEP liberados. 'unsafe-inline'/'unsafe-eval' tolerados AGORA
-// (report-only) porque o Brick do MP e scripts inline do Next provavelmente
-// exigem; os reports vão dizer o mínimo necessário antes do enforce.
+// ── Content-Security-Policy (ENFORCE) ─────────────────────────────────────────
+// Allowlist fechada com base nos reports de produção (Report-Only). Hosts de
+// imagem/CDN derivados do remotePatterns (Garage/CDN do projeto:
+// media/www.guppydelinhagem.com.br, utfs.io). MP/Brick (inclui http2.mlstatic.com
+// e os apex .com.br/.com dos pixels antifraude), YouTube (feed), GA e ViaCEP
+// liberados. 'unsafe-inline'/'unsafe-eval' MANTIDOS por ora (o Brick provavelmente
+// depende); endurecer fica para uma rodada futura, depois do enforce estável.
 const cspDirectives: Record<string, string[]> = {
   "default-src": ["'self'"],
   "script-src": [
@@ -15,6 +16,7 @@ const cspDirectives: Record<string, string[]> = {
     "https://*.mercadopago.com",
     "https://*.mercadolibre.com",
     "https://sdk.mercadopago.com",
+    "https://http2.mlstatic.com", // CDN de assets do Card Brick (cardPayment.js)
     "https://www.googletagmanager.com",
     "https://www.google-analytics.com",
   ],
@@ -29,6 +31,9 @@ const cspDirectives: Record<string, string[]> = {
     "https://www.guppydelinhagem.com.br",
     "https://media.guppydelinhagem.com.br",
     "https://utfs.io",
+    "https://http2.mlstatic.com", // SVGs de bandeira do Brick
+    "https://www.mercadopago.com.br", // pixels de fingerprint antifraude (TLD .com.br)
+    "https://www.mercadolibre.com", // idem (apex, fora do *.mercadolibre.com)
     "https://www.google-analytics.com",
   ],
   "font-src": ["'self'", "data:"],
@@ -37,6 +42,7 @@ const cspDirectives: Record<string, string[]> = {
     "https://viacep.com.br",
     "https://*.mercadopago.com",
     "https://*.mercadolibre.com",
+    "https://http2.mlstatic.com", // configs/i18n/SVGs do Brick via fetch
     "https://www.guppydelinhagem.com.br",
     "https://media.guppydelinhagem.com.br",
     "https://utfs.io",
@@ -58,10 +64,10 @@ const cspDirectives: Record<string, string[]> = {
   "frame-ancestors": ["'self'"],
 };
 
-const cspReportOnly = [
+const cspValue = [
   ...Object.entries(cspDirectives).map(([k, v]) => `${k} ${v.join(" ")}`),
   "upgrade-insecure-requests",
-  "report-uri /api/csp-report", // TEMP: CSP tuning
+  "report-uri /api/csp-report", // TEMP: mantido por 1 ciclo p/ pegar bordas no enforce
 ].join("; ");
 
 const nextConfig: NextConfig = {
@@ -96,12 +102,12 @@ const nextConfig: NextConfig = {
       {
         source: "/(.*)",
         headers: [
-          // CSP em REPORT-ONLY: observa violações sem bloquear nada (não quebra
-          // o checkout/Brick). Próximo passo: trocar p/ Content-Security-Policy
-          // (enforce) após dias de reports limpos.
+          // CSP em ENFORCE: allowlist fechada com base nos reports de produção
+          // (MP/mlstatic incluídos). report-uri mantido por 1 ciclo para pegar
+          // qualquer borda que só apareça bloqueando de fato.
           {
-            key: "Content-Security-Policy-Report-Only",
-            value: cspReportOnly,
+            key: "Content-Security-Policy",
+            value: cspValue,
           },
           // HSTS — HABILITAR após confirmar HTTPS forçado no proxy (Traefik/Let's
           // Encrypt) para TODAS as rotas, inclusive /admin. Antes disso pode
