@@ -33,7 +33,11 @@ export default function GoogleAnalytics() {
             ad_personalization: 'denied',
           });
           gtag('js', new Date());
-          gtag('config', '${GA_ID}', { send_page_view: true });
+          gtag('config', '${GA_ID}', {
+            send_page_view: true,
+            cookie_domain: 'guppydelinhagem.com.br',
+            cookie_flags: 'SameSite=Lax;Secure',
+          });
         `}
       </Script>
     </>
