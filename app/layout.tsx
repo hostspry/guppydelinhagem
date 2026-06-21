@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { Nunito } from "next/font/google";
 import "./globals.css";
+import GoogleAnalytics from "@/components/analytics/GoogleAnalytics";
+import ConsentBanner from "@/components/analytics/ConsentBanner";
 
 const nunito = Nunito({
   subsets: ["latin"],
@@ -72,7 +74,9 @@ export default function RootLayout({
   return (
     <html lang="pt-BR">
       <body className={`${nunito.variable} font-sans antialiased`}>
+        <GoogleAnalytics />
         {children}
+        <ConsentBanner />
       </body>
     </html>
   );

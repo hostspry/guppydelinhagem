@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useForm, type SubmitErrorHandler } from "react-hook-form";
@@ -19,6 +19,11 @@ import {
 } from "lucide-react";
 import { WhatsAppIcon } from "@/components/icons/WhatsAppIcon";
 import { formatBRL } from "@/lib/utils/format";
+import {
+  trackBeginCheckout,
+  trackAddPaymentInfo,
+  type AnalyticsItem,
+} from "@/lib/analytics";
 import {
   whatsappLink,
   MAX_PEIXES_POR_CAIXA,
@@ -268,6 +273,32 @@ export default function CheckoutClient({
   const freteFaltando = isSubmitted && !excedeCaixa && freteValor == null;
   const temErros = Object.keys(errors).length > 0 || freteFaltando;
 
+  // ── Analytics (GA4) — sem dado pessoal, só ids/valores ──
+  // Itens do carrinho no formato do GA4 (preço Pix = preço efetivo destacado).
+  function gaItens(): AnalyticsItem[] {
+    return items.map((i) => ({
+      item_id: i.produtoId,
+      item_name: i.nome,
+      price: i.precoPix,
+      quantity: i.quantidade,
+    }));
+  }
+  // begin_checkout uma vez, quando o carrinho hidratar com itens.
+  const beginFired = useRef(false);
+  useEffect(() => {
+    if (beginFired.current || items.length === 0) return;
+    beginFired.current = true;
+    trackBeginCheckout(
+      items.map((i) => ({
+        item_id: i.produtoId,
+        item_name: i.nome,
+        price: i.precoPix,
+        quantity: i.quantidade,
+      })),
+      subtotalPixCart,
+    );
+  }, [items, subtotalPixCart]);
+
   async function calcularFrete() {
     if (!cepValido || freteLoading) return;
     setFreteLoading(true);
@@ -361,6 +392,7 @@ export default function CheckoutClient({
       focarCampo("cep");
       return;
     }
+    trackAddPaymentInfo(gaItens(), total, "pix");
     setErro(null);
     startTransition(async () => {
       const res = await criarPedidoCheckout({
@@ -403,6 +435,8 @@ export default function CheckoutClient({
       focarCampo("cep");
       throw new Error("Calcule o frete pelo seu CEP para continuar.");
     }
+
+    trackAddPaymentInfo(gaItens(), totalCartao, "cartao");
 
     const dados = getValues();
     const res = await pagarComCartao(

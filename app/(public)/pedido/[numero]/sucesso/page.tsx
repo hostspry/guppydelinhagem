@@ -10,6 +10,7 @@ import {
   WHATSAPP_DISPLAY,
 } from "@/lib/constants";
 import LimparCarrinho from "@/components/checkout/LimparCarrinho";
+import PurchaseTracker from "@/components/checkout/PurchaseTracker";
 
 export const dynamic = "force-dynamic";
 
@@ -40,6 +41,7 @@ export default async function SucessoPage({
       items: {
         select: {
           id: true,
+          productId: true,
           nomeProduto: true,
           quantidade: true,
           precoUnitario: true,
@@ -54,10 +56,26 @@ export default async function SucessoPage({
   const total = Number(order.total);
   const frete = Number(order.frete);
 
+  // Itens p/ o GA4 purchase (sem dado pessoal — só id de produto, valor, qtd).
+  const gaItems = order.items.map((it) => ({
+    item_id: it.productId ?? it.id,
+    item_name: it.nomeProduto,
+    price: Number(it.precoUnitario),
+    quantity: it.quantidade,
+  }));
+
   return (
     <div className="container-site py-12 max-w-lg mx-auto">
-      {/* Pagamento confirmado → limpa o carrinho. */}
+      {/* Pagamento confirmado → limpa o carrinho + dispara purchase (dedup). */}
       {pago && <LimparCarrinho />}
+      {pago && (
+        <PurchaseTracker
+          numero={order.numero}
+          value={total}
+          shipping={frete}
+          items={gaItems}
+        />
+      )}
 
       <div className="text-center space-y-3">
         {pago ? (

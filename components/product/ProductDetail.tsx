@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -38,6 +38,7 @@ import {
 } from "@/lib/utils/video";
 import { useCart } from "@/lib/stores/cart";
 import { whatsappLink, stripMarcheziSignature } from "@/lib/constants";
+import { trackViewItem, trackAddToCart } from "@/lib/analytics";
 import {
   PROVA_SOCIAL_VENDIDOS,
   PROVA_SOCIAL_CRIADOR,
@@ -169,6 +170,19 @@ export default function ProductDetail({
   const valorParcela = precoCheio / product.parcelasMax;
   const capa = product.videos.find((v) => v.principal)?.thumbnailUrl ?? null;
 
+  // GA4 view_item — uma vez por produto (preço Pix da composição inicial).
+  const viewFired = useRef(false);
+  useEffect(() => {
+    if (viewFired.current) return;
+    viewFired.current = true;
+    trackViewItem({
+      item_id: product.id,
+      item_name: product.nome,
+      price: precoPix,
+      item_category: product.categoria,
+    });
+  }, [product.id, product.nome, product.categoria, precoPix]);
+
   // Barra de disponibilidade estilo tanque: cheia em 50 unidades; o nível (cor +
   // rótulo) vem do estoque real da composição, mas o número exato nunca é exibido.
   const fillPct = Math.min(estoqueAtual / 50, 1) * 100;
@@ -237,6 +251,15 @@ export default function ProductDetail({
         qtdPeixes: variant ? qtdPeixesDe(variant) : 0,
         thumbnail: capa,
         estoque: estoqueAtual,
+      },
+      qtd,
+    );
+    trackAddToCart(
+      {
+        item_id: product.id,
+        item_name: product.nome,
+        price: precoPix,
+        item_category: product.categoria,
       },
       qtd,
     );

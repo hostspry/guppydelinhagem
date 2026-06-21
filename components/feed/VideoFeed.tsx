@@ -15,6 +15,7 @@ import {
   Share2,
 } from "lucide-react";
 import { toast } from "sonner";
+import { trackAddToCart } from "@/lib/analytics";
 import { VideoThumb } from "@/components/admin/VideoThumb";
 import { formatBRL } from "@/lib/utils/format";
 import { calcularPrecos } from "@/lib/precos";
@@ -321,6 +322,10 @@ export default function VideoFeed({
         thumbnail: current.video.thumbnailUrl,
         estoque: estoqueAtual,
       },
+      qtd,
+    );
+    trackAddToCart(
+      { item_id: p.id, item_name: p.nome, price: precos.precoPix },
       qtd,
     );
   }
