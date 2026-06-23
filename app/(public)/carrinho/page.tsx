@@ -171,6 +171,14 @@ export default function CarrinhoPage() {
     economiaPixTotal > 0 && subtotalCheio > 0
       ? Math.round((economiaPixTotal / subtotalCheio) * 100)
       : 0;
+  // Cartão: o cupom pode descontar aqui também (depende do modo). Mostramos o
+  // preço no cartão com o cupom quando há desconto, pra não parecer Pix-only.
+  const descontoCupomCartao = cupomDesc?.descontoCartao ?? 0;
+  const totalCartaoComCupom = Math.max(0, subtotalCheio - descontoCupomCartao);
+  const pctCartao =
+    descontoCupomCartao > 0 && subtotalCheio > 0
+      ? Math.round((descontoCupomCartao / subtotalCheio) * 100)
+      : 0;
 
   function finalizarNoWhatsapp() {
     const linhas = items
@@ -399,7 +407,17 @@ export default function CarrinhoPage() {
               {formatBRL(totalPixFinal)}
             </span>
           </div>
-          {descontoCupomPix > 0 && (
+          {descontoCupomCartao > 0 && (
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-primary">
+                No cartão com o cupom{pctCartao > 0 ? ` (${pctCartao}% OFF)` : ""}
+              </span>
+              <span className="text-primary font-semibold tabular-nums">
+                {formatBRL(totalCartaoComCupom)}
+              </span>
+            </div>
+          )}
+          {cupomDesc && (
             <p className="text-[11px] text-muted-foreground -mt-2">
               O desconto exato por forma de pagamento aparece no checkout.
             </p>
