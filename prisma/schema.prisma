@@ -90,6 +90,24 @@ enum VideoPlatform {
   YOUTUBE
 }
 
+enum TipoValorCupom {
+  PERCENTUAL
+  VALOR_FIXO
+}
+
+enum EscopoCupom {
+  TODOS
+  CATEGORIAS
+  PRODUTOS
+}
+
+enum ModoAplicacaoCupom {
+  AMBOS_VENCE_MAIOR
+  AMBOS_ACUMULA
+  SO_PIX
+  SO_CARTAO
+}
+
 // ─────────────────────────────────────────────
 // Usuários e Endereços
 // ─────────────────────────────────────────────
@@ -164,6 +182,7 @@ model Category {
   ordem Int    @default(0)
 
   produtos Product[]
+  cupons   CupomDesconto[] @relation("CupomCategorias")
 }
 
 model Product {
@@ -213,6 +232,7 @@ model Product {
   waitlist   WaitlistEntry[]
   orderItems OrderItem[]
   variantes  ProductVariant[]
+  cupons     CupomDesconto[]  @relation("CupomProdutos")
 }
 
 // Composição de venda (trio/casal/macho/fêmea/lote). Só produtos PEIXE têm
@@ -308,6 +328,11 @@ model Order {
 
   modalidadeFrete String? // 'TERRESTRE' (Jadlog) | 'AEREO' (Gollog) — como despachar
   codigoRastreio  String? // AWB (Gollog) ou código (Jadlog)
+
+  // Cupom aplicado (opcional). cupomCodigo é snapshot (sobrevive à exclusão do cupom).
+  cupomId     String?
+  cupom       CupomDesconto? @relation(fields: [cupomId], references: [id], onDelete: SetNull)
+  cupomCodigo String?
 
   // Scaffold de checkout/integrações — dormente (reconciliado nas fases
   // Pagamentos/Envio; não usar/não apagar). parcelas: parcelamento de cartão.
@@ -429,4 +454,33 @@ model ConfiguracaoLoja {
   freteGratisAtivo         Boolean  @default(false) // liga/desliga o frete grátis por valor
   freteGratisAcimaDe       Decimal? @db.Decimal(10, 2) // subtotal mínimo (preço cheio/cartão) p/ frete grátis
   atualizadoEm             DateTime @updatedAt
+}
+
+// ─────────────────────────────────────────────
+// Cupons de desconto (código digitado no carrinho — não aparece na vitrine)
+// ─────────────────────────────────────────────
+
+model CupomDesconto {
+  id                      String             @id @default(cuid())
+  codigo                  String             @unique // normalizado UPPERCASE
+  descricao               String? // uso interno (admin)
+  tipoValor               TipoValorCupom
+  valor                   Decimal            @db.Decimal(10, 2) // % ou R$
+  escopo                  EscopoCupom        @default(TODOS)
+  modoAplicacao           ModoAplicacaoCupom @default(AMBOS_VENCE_MAIOR)
+  ativo                   Boolean            @default(true)
+  validoDe                DateTime?
+  validoAte               DateTime?
+  limiteUsos              Int? // null = ilimitado
+  usosRealizados          Int                @default(0)
+  encerraAoEsgotarEstoque Boolean            @default(false)
+  pedidoMinimo            Decimal?           @db.Decimal(10, 2)
+  criadoEm                DateTime           @default(now())
+  atualizadoEm            DateTime           @updatedAt
+
+  categorias Category[] @relation("CupomCategorias")
+  produtos   Product[]  @relation("CupomProdutos")
+  pedidos    Order[]
+
+  @@index([ativo])
 }
