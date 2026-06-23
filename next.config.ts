@@ -83,6 +83,9 @@ const nextConfig: NextConfig = {
   },
   experimental: {
     serverActions: { bodySizeLimit: "10mb" },
+    // Reduz o pico de memória do build (webpack) — ajuda a evitar OOM no
+    // "Collecting build traces" no VPS, que roda app+banco+storage juntos.
+    webpackMemoryOptimizations: true,
   },
   // A vitrine virou a home: /loja (listagem) redireciona permanente para "/".
   // A query é preservada (?categoria=...&busca=...), então links antigos e os
