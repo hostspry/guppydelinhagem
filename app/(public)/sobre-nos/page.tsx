@@ -262,6 +262,33 @@ export default function SobreNosPage() {
             className="max-w-md mx-auto lg:max-w-none"
           />
         </div>
+
+        {/* Reconhecimento da mídia — reportagem n'A Tribuna, dentro de "Quem somos". */}
+        <div className="max-w-3xl mx-auto text-center space-y-4 mt-16">
+          <h3 className="text-primary text-2xl sm:text-3xl font-bold">
+            Destaque n&rsquo;<span className="text-secondary">A Tribuna</span>
+          </h3>
+          <p className="text-text font-light text-lg leading-relaxed">
+            O trabalho da Marchezi Guppy Farm foi destaque n&rsquo;A Tribuna, o
+            maior jornal do Espírito Santo e um dos principais do Brasil. A
+            reportagem mostrou a dedicação da família e o cuidado de criar peixes
+            de linhagem.
+          </p>
+        </div>
+        {/* Matéria INTEIRA e legível (object-contain) em moldura tipo recorte. */}
+        <figure className="max-w-md mx-auto mt-8">
+          <div className="bg-white p-2.5 rounded-2xl shadow-lg ring-1 ring-black/5">
+            <div className="relative w-full overflow-hidden rounded-md bg-white" style={{ aspectRatio: "1440 / 1793" }}>
+              <Image
+                src={`${IMG}/materia-jornal.jpg`}
+                alt="Reportagem sobre a Marchezi Guppy Farm no jornal A Tribuna"
+                fill
+                sizes="(max-width: 768px) 90vw, 420px"
+                className="object-contain"
+              />
+            </div>
+          </div>
+        </figure>
       </Secao>
 
       {/* ═══ 3. FAIXA DE CREDIBILIDADE (prova social REAL, sem estrelas) ═══ */}
@@ -476,35 +503,6 @@ export default function SobreNosPage() {
             </div>
           ))}
         </div>
-      </Secao>
-
-      {/* ═══ 8. RECONHECIMENTO DA MÍDIA ═══ */}
-      <Secao bg="bege">
-        <div className="max-w-3xl mx-auto text-center space-y-4">
-          <h2 className="text-primary text-2xl sm:text-3xl font-bold">
-            Destaque n&rsquo;<span className="text-secondary">A Tribuna</span>
-          </h2>
-          <p className="text-text font-light text-lg leading-relaxed">
-            O trabalho da Marchezi Guppy Farm foi destaque n&rsquo;A Tribuna, o
-            maior jornal do Espírito Santo e um dos principais do Brasil. A
-            reportagem mostrou a dedicação da família e o cuidado de criar peixes
-            de linhagem.
-          </p>
-        </div>
-        {/* Matéria INTEIRA e legível (object-contain) em moldura tipo recorte. */}
-        <figure className="max-w-md mx-auto mt-8">
-          <div className="bg-white p-2.5 rounded-2xl shadow-lg ring-1 ring-black/5">
-            <div className="relative w-full overflow-hidden rounded-md bg-white" style={{ aspectRatio: "1440 / 1793" }}>
-              <Image
-                src={`${IMG}/materia-jornal.jpg`}
-                alt="Reportagem sobre a Marchezi Guppy Farm no jornal A Tribuna"
-                fill
-                sizes="(max-width: 768px) 90vw, 420px"
-                className="object-contain"
-              />
-            </div>
-          </div>
-        </figure>
       </Secao>
 
       {/* ═══ 9. AMIZADES E ADMIRAÇÃO (rede — Brasil, tom de respeito entre pares) ═══ */}
