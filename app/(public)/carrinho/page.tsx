@@ -151,10 +151,6 @@ export default function CarrinhoPage() {
 
   const temDescontoGlobal = subtotalCheio > subtotalPix;
   const economiaPix = subtotalCheio - subtotalPix;
-  const pctPix =
-    temDescontoGlobal && subtotalCheio > 0
-      ? Math.round((economiaPix / subtotalCheio) * 100)
-      : 0;
   const excedeCaixa = totalPeixes > MAX_PEIXES_POR_CAIXA;
 
   // Preview do cupom no melhor preço (Pix). O valor exato por forma de pagamento
@@ -169,6 +165,12 @@ export default function CarrinhoPage() {
   const cupomLinhaValorPix = cupomAbsorvePix
     ? economiaPix + descontoCupomPix
     : descontoCupomPix;
+  // % OFF efetivo no Pix = desconto total (base Pix + cupom) sobre o preço cheio.
+  const economiaPixTotal = subtotalCheio - totalPixFinal;
+  const pctPixEfetivo =
+    economiaPixTotal > 0 && subtotalCheio > 0
+      ? Math.round((economiaPixTotal / subtotalCheio) * 100)
+      : 0;
 
   function finalizarNoWhatsapp() {
     const linhas = items
@@ -391,7 +393,7 @@ export default function CarrinhoPage() {
           {/* À vista no Pix — destaque em verde (decisão do dono) */}
           <div className="flex items-end justify-between border-t border-border pt-3">
             <span className="text-sm font-medium text-primary">
-              À vista no Pix{temDescontoGlobal ? ` (${pctPix}% OFF)` : ""}
+              À vista no Pix{pctPixEfetivo > 0 ? ` (${pctPixEfetivo}% OFF)` : ""}
             </span>
             <span className="text-green-600 text-2xl font-bold tabular-nums">
               {formatBRL(totalPixFinal)}
