@@ -259,7 +259,8 @@ export default function CheckoutClient({
   // Subtotais: servidor manda; cart é fallback até o servidor responder.
   const subtotalPixView = preco?.subtotalPix ?? subtotalPixCart;
   const subtotalCheioView = preco?.subtotalCheio ?? subtotalCheioCart;
-  const descontoMax = preco?.descontoPixPercentMax ?? 0;
+  // Desconto-base do Pix (sem cupom) = diferença entre o cheio e o Pix.
+  const descontoPixBase = Math.max(0, subtotalCheioView - subtotalPixView);
   const precoMap = useMemo(() => {
     const m = new Map<string, { precoCheio: number; precoPix: number }>();
     preco?.itens.forEach((it) =>
@@ -1021,10 +1022,9 @@ export default function CheckoutClient({
           <ul className="divide-y divide-border text-sm">
             {items.map((i) => {
               const srv = precoMap.get(`${i.produtoId}|${i.composicao ?? ""}`);
-              const unit =
-                aba === "pix"
-                  ? (srv?.precoPix ?? i.precoPix)
-                  : (srv?.precoCheio ?? i.precoCheio);
+              // Mostra sempre o preço cheio (cartão à vista); os descontos (Pix e
+              // cupom) aparecem itemizados abaixo, no resumo.
+              const unit = srv?.precoCheio ?? i.precoCheio;
               return (
                 <li key={i.variantId} className="py-2 flex justify-between gap-3">
                   <span className="text-primary">
@@ -1098,10 +1098,20 @@ export default function CheckoutClient({
           </div>
 
           <div className="space-y-1 border-t border-border pt-3 text-sm">
+            {/* Subtotal sempre no preço CHEIO (cartão à vista) — os descontos vêm
+                listados abaixo, pra ficar claro de onde sai cada valor. */}
             <div className="flex justify-between text-muted-foreground">
               <span>Subtotal</span>
-              <span className="tabular-nums">{formatBRL(subtotalView)}</span>
+              <span className="tabular-nums">{formatBRL(subtotalCheioView)}</span>
             </div>
+            {aba === "pix" && descontoPixBase > 0 && (
+              <div className="flex justify-between text-green-700">
+                <span>Desconto no Pix</span>
+                <span className="tabular-nums font-medium">
+                  − {formatBRL(descontoPixBase)}
+                </span>
+              </div>
+            )}
             <div className="flex justify-between text-muted-foreground">
               <span>Frete</span>
               {freteGratisAplicado ? (
@@ -1130,20 +1140,7 @@ export default function CheckoutClient({
                 {formatBRL(total)}
               </span>
             </div>
-            {/* Selo por forma: Pix com desconto × Cartão cheio/parcelas. Com cupom
-                aplicado, some (o desconto do cupom já aparece na linha acima). */}
-            {aba === "pix" ? (
-              cupomDesc ? null : descontoMax > 0 ? (
-                <p className="text-[11px] text-green-700 text-right font-medium">
-                  no Pix • {descontoMax}% OFF · cartão à vista{" "}
-                  {formatBRL(totalCartao)}
-                </p>
-              ) : (
-                <p className="text-[11px] text-muted-foreground text-right">
-                  Pix à vista (sem desconto neste pedido).
-                </p>
-              )
-            ) : (
+            {aba === "cartao" && (
               <p className="text-[11px] text-muted-foreground text-right">
                 À vista no crédito
                 {teto > 1 ? ` ou em até ${teto}x com juros` : ""}.
