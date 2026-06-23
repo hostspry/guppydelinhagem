@@ -42,6 +42,9 @@ export const checkoutSchema = z.object({
   // Modalidade escolhida pelo cliente: terrestre (Jadlog) ou aéreo (Gollog). O
   // valor é sempre recalculado no servidor conforme a modalidade.
   modalidadeFrete: z.enum(["TERRESTRE", "AEREO"]).default("TERRESTRE"),
+  // Código de cupom aplicado no carrinho (opcional). O desconto é SEMPRE revalidado
+  // e recalculado no servidor — o valor do client é ignorado.
+  cupomCodigo: z.string().trim().optional().default(""),
   itens: z.array(checkoutItemSchema).min(1, "Seu carrinho está vazio"),
 });
 

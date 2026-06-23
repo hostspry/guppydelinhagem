@@ -13,6 +13,14 @@ import { getPaymentProvider } from "@/lib/payments/registry";
 import { mensagemRecusa } from "@/lib/payments/mercadopago";
 import { transicionarParaPago } from "@/lib/pedido-baixa";
 import { calcularPrecos } from "@/lib/precos";
+import {
+  normalizarCodigo,
+  cupomVigente,
+  calcularDescontoCupom,
+  type CupomCalculo,
+  type ItemPrecificadoCupom,
+} from "@/lib/cupom";
+import { getCupomByCodigo } from "@/lib/queries/cupons";
 import { getConfigPreco, getFreteGratisConfig } from "@/lib/queries/config";
 import { COMPOSICAO_LABEL } from "@/lib/composicoes";
 import { MAX_PEIXES_POR_CAIXA, freteGollog } from "@/lib/constants";
@@ -128,6 +136,7 @@ export type OrderCriado = {
 // precificarCheckout (exibição).
 type ItemPrecificado = {
   productId: string;
+  categoryId: string;
   nomeProduto: string;
   precoCheio: number;
   precoPix: number;
@@ -163,6 +172,7 @@ async function precificarItens(
       where: { id: { in: produtoIds }, ativo: true },
       select: {
         id: true,
+        categoryId: true,
         nome: true,
         preco: true,
         descontoPix: true,
@@ -224,6 +234,7 @@ async function precificarItens(
       subtotalPix += calc.precoPix * item.quantidade;
       out.push({
         productId: prod.id,
+        categoryId: prod.categoryId,
         nomeProduto: `${prod.nome} — ${COMPOSICAO_LABEL[item.composicao]}`,
         precoCheio: calc.precoCartao,
         precoPix: calc.precoPix,
@@ -248,6 +259,7 @@ async function precificarItens(
       subtotalPix += calc.precoPix * item.quantidade;
       out.push({
         productId: prod.id,
+        categoryId: prod.categoryId,
         nomeProduto: prod.nome,
         precoCheio: calc.precoCartao,
         precoPix: calc.precoPix,
@@ -268,6 +280,142 @@ async function precificarItens(
     totalPeixes,
     subtotalCheio: round2(subtotalCheio),
     subtotalPix: round2(subtotalPix),
+  };
+}
+
+// ── Cupom de desconto (revalidado e recalculado SEMPRE no servidor) ───────────
+
+type CupomResolvido = {
+  cupomId: string;
+  codigo: string;
+  descontoPix: number;
+  descontoCartao: number;
+};
+
+type ResolverCupomResult =
+  | { status: "nenhum" } // sem código informado
+  | { status: "invalido"; motivo: string }
+  | { status: "ok"; data: CupomResolvido };
+
+/**
+ * Resolve um código de cupom contra os itens JÁ precificados pelo servidor: busca,
+ * checa vigência (datas/limite/estoque do escopo) e calcula o desconto nos dois
+ * métodos (Pix e cartão). Fonte única usada pela validação no carrinho e pelo
+ * recálculo antifraude no checkout.
+ */
+async function resolverCupom(
+  codigo: string | null | undefined,
+  itens: ItemPrecificadoCupom[],
+): Promise<ResolverCupomResult> {
+  if (!codigo || !codigo.trim()) return { status: "nenhum" };
+
+  const cupom = await getCupomByCodigo(normalizarCodigo(codigo));
+  if (!cupom) return { status: "invalido", motivo: "Cupom não encontrado." };
+
+  const calc: CupomCalculo = {
+    tipoValor: cupom.tipoValor,
+    valor: Number(cupom.valor),
+    escopo: cupom.escopo,
+    modoAplicacao: cupom.modoAplicacao,
+    pedidoMinimo: cupom.pedidoMinimo == null ? null : Number(cupom.pedidoMinimo),
+    categoriaIds: cupom.categorias.map((c) => c.id),
+    produtoIds: cupom.produtos.map((p) => p.id),
+  };
+
+  // Produtos do escopo (estoque) p/ a regra "encerra ao esgotar estoque".
+  const produtosEscopo =
+    cupom.escopo === "PRODUTOS"
+      ? cupom.produtos.map((p) => ({
+          estoqueMachos: p.estoqueMachos,
+          estoqueFemeas: p.estoqueFemeas,
+        }))
+      : cupom.escopo === "CATEGORIAS"
+        ? cupom.categorias.flatMap((c) => c.produtos)
+        : [];
+
+  const vig = cupomVigente(
+    {
+      ativo: cupom.ativo,
+      validoDe: cupom.validoDe,
+      validoAte: cupom.validoAte,
+      limiteUsos: cupom.limiteUsos,
+      usosRealizados: cupom.usosRealizados,
+      encerraAoEsgotarEstoque: cupom.encerraAoEsgotarEstoque,
+    },
+    produtosEscopo,
+  );
+  if (!vig.ok) {
+    return { status: "invalido", motivo: vig.motivo ?? "Cupom indisponível." };
+  }
+
+  const pix = calcularDescontoCupom({ cupom: calc, itens, metodo: "PIX" });
+  const cartao = calcularDescontoCupom({ cupom: calc, itens, metodo: "CARTAO" });
+  if (!pix.aplicavel && !cartao.aplicavel) {
+    return {
+      status: "invalido",
+      motivo: pix.motivo ?? cartao.motivo ?? "Cupom não aplicável a este carrinho.",
+    };
+  }
+
+  return {
+    status: "ok",
+    data: {
+      cupomId: cupom.id,
+      codigo: cupom.codigo,
+      descontoPix: pix.desconto,
+      descontoCartao: cartao.desconto,
+    },
+  };
+}
+
+/** Itens precificados → forma que o cálculo de cupom consome (com categoryId). */
+function itensParaCupom(itens: ItemPrecificado[]): ItemPrecificadoCupom[] {
+  return itens.map((it) => ({
+    productId: it.productId,
+    categoryId: it.categoryId,
+    precoCheio: it.precoCheio,
+    precoPix: it.precoPix,
+    quantidade: it.quantidade,
+  }));
+}
+
+export type ValidarCupomResult =
+  | {
+      ok: true;
+      codigo: string;
+      descontoPix: number;
+      descontoCartao: number;
+    }
+  | { ok: false; motivo: string };
+
+/**
+ * Valida e precifica um cupom para o carrinho (action PÚBLICA — sem auth). Recalcula
+ * os preços do banco e devolve só o desconto por método + o código normalizado (não
+ * vaza o cupom inteiro). O checkout REvalida depois — isto é só o preview.
+ */
+export async function validarCupom(
+  codigo: string,
+  itens: CheckoutFormInput["itens"],
+): Promise<ValidarCupomResult> {
+  const parsed = checkoutSchema.shape.itens.safeParse(itens);
+  if (!parsed.success) return { ok: false, motivo: "Seu carrinho está vazio." };
+
+  const prec = await precificarItens(parsed.data);
+  if (!prec.ok) {
+    return { ok: false, motivo: "Alguns itens não estão mais disponíveis." };
+  }
+
+  const r = await resolverCupom(codigo, itensParaCupom(prec.itens));
+  if (r.status === "nenhum") {
+    return { ok: false, motivo: "Informe um código de cupom." };
+  }
+  if (r.status === "invalido") return { ok: false, motivo: r.motivo };
+
+  return {
+    ok: true,
+    codigo: r.data.codigo,
+    descontoPix: r.data.descontoPix,
+    descontoCartao: r.data.descontoCartao,
   };
 }
 
@@ -376,8 +524,26 @@ export async function criarOrderDoCheckout(
     frete = 0;
   }
 
-  const totalCheio = round2(subtotalCheio + frete);
-  const totalPix = round2(subtotalPix + frete);
+  // ── 2c. Cupom: revalida e recalcula NO SERVIDOR (anti-fraude). Se ficou
+  // inválido entre o carrinho e o checkout (expirou/esgotou/limite), segue sem
+  // desconto. Order.desconto guarda a base CHEIA (cartão), igual a subtotal/total.
+  let descontoCartao = 0;
+  let descontoPix = 0;
+  let cupomId: string | null = null;
+  let cupomCodigo: string | null = null;
+  const cupomResolvido = await resolverCupom(
+    data.cupomCodigo,
+    itensParaCupom(prec.itens),
+  );
+  if (cupomResolvido.status === "ok") {
+    descontoCartao = cupomResolvido.data.descontoCartao;
+    descontoPix = cupomResolvido.data.descontoPix;
+    cupomId = cupomResolvido.data.cupomId;
+    cupomCodigo = cupomResolvido.data.codigo;
+  }
+
+  const totalCheio = round2(subtotalCheio + frete - descontoCartao);
+  const totalPix = round2(subtotalPix + frete - descontoPix);
 
   // ── 3. Cliente (guest): cria/reusa por CPF, depois email, depois telefone ──
   const session = await auth();
@@ -489,7 +655,9 @@ export async function criarOrderDoCheckout(
             modalidadeFrete: modalidade,
             subtotal: subtotalCheio,
             frete,
-            desconto: 0,
+            desconto: descontoCartao,
+            cupomId,
+            cupomCodigo,
             total: totalCheio,
           },
           select: { id: true, numero: true },
@@ -521,7 +689,9 @@ export async function criarOrderDoCheckout(
           enderecoEntrega: endereco as unknown as Prisma.InputJsonValue,
           subtotal: subtotalCheio,
           frete,
-          desconto: 0,
+          desconto: descontoCartao,
+          cupomId,
+          cupomCodigo,
           total: totalCheio,
           items: { create: itensData },
         },
@@ -624,6 +794,7 @@ export async function gerarNovoPix(numero: string): Promise<CheckoutResult> {
       total: true,
       frete: true,
       status: true,
+      cupomCodigo: true,
       enderecoEntrega: true,
       items: {
         select: { productId: true, composicao: true, quantidade: true },
@@ -639,7 +810,8 @@ export async function gerarNovoPix(numero: string): Promise<CheckoutResult> {
   }
 
   // Recalcula o total PIX (com desconto) dos itens do pedido + frete salvo. O
-  // Order.total guarda o CHEIO (cartão); o Pix cobra o descontado.
+  // Order.total guarda o CHEIO (cartão); o Pix cobra o descontado. Reaplica o
+  // cupom salvo (se ainda vigente) sobre o preço Pix.
   const prec = await precificarItens(
     order.items
       .filter((it) => it.productId)
@@ -649,9 +821,18 @@ export async function gerarNovoPix(numero: string): Promise<CheckoutResult> {
         quantidade: it.quantidade,
       })),
   );
-  const valorPix = prec.ok
-    ? round2(prec.subtotalPix + Number(order.frete))
-    : Number(order.total);
+  let valorPix: number;
+  if (prec.ok) {
+    let descontoPix = 0;
+    const cupomRes = await resolverCupom(
+      order.cupomCodigo,
+      itensParaCupom(prec.itens),
+    );
+    if (cupomRes.status === "ok") descontoPix = cupomRes.data.descontoPix;
+    valorPix = round2(prec.subtotalPix + Number(order.frete) - descontoPix);
+  } else {
+    valorPix = Number(order.total);
+  }
 
   const end = order.enderecoEntrega as unknown as EnderecoEntrega;
   const partes = (end.nome ?? "").trim().split(/\s+/);

@@ -41,6 +41,7 @@ import {
   pagarComCartao,
   calcularTetoParcelas,
   precificarCheckout,
+  validarCupom,
   type CheckoutPixData,
   type CartaoInput,
   type CheckoutPreco,
@@ -176,6 +177,15 @@ export default function CheckoutClient({
   const totalPeixes = useCart(selectTotalPeixes);
   const subtotalPixCart = useCart(selectSubtotalPix);
   const subtotalCheioCart = useCart(selectSubtotalCheio);
+  const cupom = useCart((s) => s.cupom);
+
+  // Desconto do cupom, revalidado no servidor (preview no checkout). O valor exato
+  // é recalculado de novo ao fechar o pedido (anti-fraude); aqui é só o resumo.
+  const [cupomDesc, setCupomDesc] = useState<{
+    codigo: string;
+    descontoPix: number;
+    descontoCartao: number;
+  } | null>(null);
 
   const router = useRouter();
   const {
@@ -265,9 +275,20 @@ export default function CheckoutClient({
 
   // Total exibido segue a ABA (Pix descontado × Cartão cheio). O cartão é cobrado
   // pelo cheio (Brick usa totalCartao); juros do parcelado vêm do MP.
+  // Desconto do cupom conforme a aba (Pix × cartão). O cartão (Brick) precisa
+  // bater EXATAMENTE com o que o servidor cobra (valorCartao), então subtraímos
+  // o descontoCartao também no totalCartao.
+  const descontoCupom = cupomDesc
+    ? aba === "pix"
+      ? cupomDesc.descontoPix
+      : cupomDesc.descontoCartao
+    : 0;
   const subtotalView = aba === "pix" ? subtotalPixView : subtotalCheioView;
-  const total = subtotalView + (freteEfetivo ?? 0);
-  const totalCartao = subtotalCheioView + (freteEfetivo ?? 0);
+  const total = Math.max(0, subtotalView + (freteEfetivo ?? 0) - descontoCupom);
+  const totalCartao = Math.max(
+    0,
+    subtotalCheioView + (freteEfetivo ?? 0) - (cupomDesc?.descontoCartao ?? 0),
+  );
 
   // Frete obrigatório: depois de uma tentativa de envio, sem valor e ≤10 peixes.
   const freteFaltando = isSubmitted && !excedeCaixa && freteValor == null;
@@ -380,6 +401,32 @@ export default function CheckoutClient({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [itensKey]);
 
+  // Revalida o cupom salvo (carrinho) contra os preços do servidor — preview do
+  // resumo. Some o desconto se o cupom deixou de valer ou não cobre os itens.
+  useEffect(() => {
+    if (!cupom || items.length === 0) {
+      setCupomDesc(null);
+      return;
+    }
+    let ativo = true;
+    validarCupom(cupom, itensPedido()).then((r) => {
+      if (!ativo) return;
+      setCupomDesc(
+        r.ok
+          ? {
+              codigo: r.codigo,
+              descontoPix: r.descontoPix,
+              descontoCartao: r.descontoCartao,
+            }
+          : null,
+      );
+    });
+    return () => {
+      ativo = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [itensKey, cupom]);
+
   function onValid(data: CamposOutput) {
     // O submit do form é só do Pix; na aba Cartão o Brick tem botão próprio.
     if (aba === "cartao") return;
@@ -400,6 +447,7 @@ export default function CheckoutClient({
         complemento: data.complemento ?? "",
         transportadora: modalidade === "AEREO" ? "GOLLOG" : "JADLOG",
         modalidadeFrete: modalidade,
+        cupomCodigo: cupom ?? "",
         itens: itensPedido(),
       });
       if (res.ok) {
@@ -445,6 +493,7 @@ export default function CheckoutClient({
         complemento: dados.complemento ?? "",
         transportadora: modalidade === "AEREO" ? "GOLLOG" : "JADLOG",
         modalidadeFrete: modalidade,
+        cupomCodigo: cupom ?? "",
         itens: itensPedido(),
       },
       cartao,
@@ -977,6 +1026,14 @@ export default function CheckoutClient({
                 </span>
               )}
             </div>
+            {cupomDesc && descontoCupom > 0 && (
+              <div className="flex justify-between text-green-700">
+                <span>Cupom {cupomDesc.codigo}</span>
+                <span className="tabular-nums font-medium">
+                  − {formatBRL(descontoCupom)}
+                </span>
+              </div>
+            )}
             <div className="flex items-end justify-between pt-2">
               <span className="text-sm font-medium text-primary">
                 Total {aba === "pix" ? "no Pix" : "no cartão"}
