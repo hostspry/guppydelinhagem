@@ -32,9 +32,9 @@ import {
 import { pageMeta } from "@/lib/seo";
 
 export const metadata: Metadata = pageMeta({
-  title: "Sobre Nós — Marchezi Guppy Farm | Guppies de linhagem tricampeões mundiais",
+  title: "Sobre Nós | Marchezi Guppy Farm, guppies de linhagem tricampeões mundiais",
   description:
-    "Desde 2000, a família Marchezi cria guppies de linhagem no Espírito Santo. Criação familiar pela beleza, com títulos mundiais — incluindo o tricampeonato da linha Full Black.",
+    "Desde 2000, a família Marchezi cria guppies de linhagem no Espírito Santo. Uma criação familiar pela beleza, com títulos mundiais, entre eles o tricampeonato da linha Full Black.",
   path: "/sobre-nos",
   image: {
     url: "/images/sobrenos/og-sobre-nos.jpg",
@@ -249,10 +249,11 @@ export default function SobreNosPage() {
             </h2>
             <p className="text-text font-light text-lg leading-relaxed">
               A Marchezi Guppy Farm nasceu da paixão por guppies de linhagem e
-              cresceu com estudo e seleção contínua. Sempre criamos pela beleza —
-              pelo prazer de ver um peixe de cor, cauda e padrão excepcionais — e não
-              para competir. O reconhecimento veio como consequência desse cuidado:
-              nossas linhagens passaram a se destacar no cenário mundial do guppy.
+              cresceu com estudo e seleção, ano após ano. Sempre criamos pela
+              beleza, pelo prazer de ver um peixe de cor, cauda e padrão bonitos,
+              e não para competir. O reconhecimento veio como consequência desse
+              cuidado: nossas linhagens passaram a se destacar no cenário mundial
+              do guppy.
             </p>
           </div>
           <Figura
@@ -343,7 +344,7 @@ export default function SobreNosPage() {
             Reconhecimento
           </span>
           <h2 className="text-primary text-2xl sm:text-3xl font-bold">
-            Conquistas que confirmam a <span className="text-secondary">qualidade</span>
+            Os títulos que o trabalho <span className="text-secondary">rendeu</span>
           </h2>
         </div>
         {/* BLOCO-HERÓI — Full Black, largura total, monumental (navy). */}
@@ -362,12 +363,12 @@ export default function SobreNosPage() {
                 {heroi.linha}
               </h3>
               <p className="text-white/90 text-lg font-semibold">
-                2023 • 2024 • 2025 — World Guppy Contest
+                2023 • 2024 • 2025, World Guppy Contest
               </p>
               <p className="text-white/80 font-light leading-relaxed">
-                Linha desenvolvida na nossa estufa — três títulos mundiais
-                consecutivos. Em 2023, além do título, foi vice no Best of Show: o
-                segundo melhor peixe de todo o mundial.
+                Linha que desenvolvemos aqui na nossa estufa, com três títulos
+                mundiais seguidos. Em 2023, além do título, ficou em segundo no
+                Best of Show: o segundo melhor peixe de todo o mundial.
               </p>
               <div className="flex flex-wrap items-center gap-x-5 gap-y-2 pt-2">
                 <a
@@ -448,10 +449,10 @@ export default function SobreNosPage() {
             </h2>
             <p className="text-text font-light text-lg leading-relaxed">
               Nossa estufa em Guarapari foi projetada para até 30 mil litros de
-              água somando aquários e caixas, sucedendo a primeira estufa de cerca
-              de 5 mil litros. O foco é estabilidade e bem-estar: filtragem
-              natural, biologia equilibrada e manejo diário para manter os guppies
-              em ótimas condições antes do envio.
+              água somando aquários e caixas, e veio depois da primeira estufa, de
+              cerca de 5 mil litros. O que a gente busca é água estável e peixe
+              tranquilo: filtragem natural, biologia equilibrada e manejo todo dia
+              para deixar os guppies bem antes de viajarem.
             </p>
             <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {estrutura.map((e) => (
@@ -516,12 +517,12 @@ export default function SobreNosPage() {
           </h2>
           <p className="text-text font-light text-lg leading-relaxed">
             O mundo do guppy é feito de gente, e ao longo da nossa caminhada
-            construímos amizades e trocas saudáveis com criadores que admiramos.
+            construímos amizades e trocas boas com criadores que admiramos.
             Entre eles, Rodrigo Ziviani, presidente da World Guppy Association;
-            Mário Garcia e Léia, da UNAQUA, em Belo Horizonte — pessoas de visão por
+            Mário Garcia e Léia, da UNAQUA, em Belo Horizonte, pessoas de visão por
             quem temos grande admiração; e o professor Mauro Schettino e o Sr.
-            Abdala, referências de caráter e de qualidade técnica. São encontros e
-            amizades que tornam o hobby maior.
+            Abdala, gente de caráter e de muito conhecimento técnico. São encontros
+            e amizades que tornam o hobby maior.
           </p>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
@@ -530,14 +531,14 @@ export default function SobreNosPage() {
             alt="Encontro com Rodrigo Ziviani, presidente da World Guppy Association, na estufa da família em Guarapari"
             ratio="1 / 1"
             sizes="(max-width: 768px) 100vw, 25vw"
-            caption="Com Rodrigo Ziviani — World Guppy Association"
+            caption="Com Rodrigo Ziviani, da World Guppy Association"
           />
           <Figura
             src={`${IMG}/visita-unaqua.png`}
             alt="Encontro com Mário Garcia e Léia, da UNAQUA, em Belo Horizonte"
             ratio="1 / 1"
             sizes="(max-width: 768px) 100vw, 25vw"
-            caption="Com a UNAQUA — Belo Horizonte"
+            caption="Com a UNAQUA, em Belo Horizonte"
           />
           <Figura
             src={`${IMG}/mestre-mauro.png`}
@@ -603,8 +604,8 @@ export default function SobreNosPage() {
             Pronto para escolher seus próximos guppies?
           </h2>
           <p className="text-white/85 font-light text-lg leading-relaxed">
-            Conheça os exemplares disponíveis e leve para o seu aquário peixes
-            criados com seleção, cuidado e história.
+            Dá uma olhada nos peixes disponíveis e leve para o seu aquário um
+            guppy criado com cuidado, aqui em casa.
           </p>
           <div className="flex flex-wrap items-center justify-center gap-3">
             <Link

@@ -84,7 +84,7 @@ export default function Footer() {
                 />
               </Link>
               <p className="text-sm font-light text-white/80 leading-relaxed">
-                Peixes selecionados, saudáveis e com genética apurada para aquaristas exigentes. Envio seguro para todo o Brasil.
+                Peixes saudáveis, com boa genética e bem cuidados. A gente envia com segurança pra todo o Brasil.
               </p>
               <a
                 href={WHATSAPP_URL}
@@ -146,7 +146,7 @@ export default function Footer() {
                 />
               </div>
               <p className="text-sm font-light text-white/80 leading-relaxed">
-                Marchezi Guppy Farm — criação especializada de guppies de linhagem há mais de 10 anos.
+                Marchezi Guppy Farm. Criamos guppies de linhagem há mais de 10 anos.
               </p>
               <div className="flex items-center gap-3">
                 {SOCIAL.map(({ href, label, Icon }) => (

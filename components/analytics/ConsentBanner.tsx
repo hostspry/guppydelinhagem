@@ -78,7 +78,7 @@ export default function ConsentBanner() {
     >
       <div className="container-site py-4 flex flex-col sm:flex-row sm:items-center gap-3">
         <p className="text-sm font-light leading-snug flex-1">
-          Usamos cookies para entender o uso do site e melhorar sua experiência.
+          Usamos cookies para entender como o site é usado e deixá-lo melhor.
           Você pode aceitar ou recusar.{" "}
           {/* TODO: trocar para a página de Política de Privacidade quando existir. */}
           <Link href="/contatos" className="underline hover:text-accent">

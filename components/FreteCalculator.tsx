@@ -51,7 +51,7 @@ function formatEndereco(end: Endereco): string {
   if (!ruaBairro && !cidadeUf) return "";
   if (!ruaBairro) return cidadeUf;
   if (!cidadeUf) return ruaBairro;
-  return `${ruaBairro} — ${cidadeUf}`;
+  return `${ruaBairro}, ${cidadeUf}`;
 }
 
 export default function FreteCalculator() {
@@ -121,7 +121,7 @@ export default function FreteCalculator() {
           Calcule seu frete
         </h1>
         <p className="text-sm md:text-base text-[#555] leading-relaxed">
-          Enviamos guppies para todo o Brasil com embalagem especializada.
+          Enviamos guppies para todo o Brasil, bem embalados para a viagem.
         </p>
       </div>
 
@@ -283,8 +283,8 @@ export default function FreteCalculator() {
                   1-2 dias úteis
                 </p>
                 <p className="text-xs text-[#666]">
-                  Valor confirmado no fechamento do pedido — retirada no
-                  aeroporto mais próximo
+                  Valor confirmado no fechamento do pedido. Retirada no
+                  aeroporto mais próximo.
                 </p>
               </div>
               <div className="text-lg font-bold text-primary sm:text-right sm:shrink-0">
@@ -302,7 +302,7 @@ export default function FreteCalculator() {
             {gollogDestaque && (
               <p className="text-sm text-[#555] leading-relaxed">
                 O envio aéreo chega em 1-2 dias. Muitos criadores retiram no
-                aeroporto do seu estado — prática comum no hobby.
+                aeroporto do seu estado, é prática comum no hobby.
               </p>
             )}
             <a

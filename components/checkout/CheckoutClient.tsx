@@ -592,7 +592,7 @@ export default function CheckoutClient({
               <p className="flex items-center gap-2 text-sm font-medium text-green-700 bg-green-50 border border-green-200 rounded-lg p-3">
                 <Truck size={16} className="shrink-0" aria-hidden="true" />
                 Frete grátis neste pedido! Calcule o CEP para confirmarmos a
-                entrega — o valor fica zerado.
+                entrega. O valor fica zerado.
               </p>
             )}
 
@@ -720,7 +720,7 @@ export default function CheckoutClient({
                         ? freteGratisAplicado
                           ? "Grátis"
                           : formatBRL(jadlogSel.price)
-                        : "—"}
+                        : "-"}
                     </span>
                   </label>
 
@@ -787,7 +787,7 @@ export default function CheckoutClient({
                         ? freteGratisAplicado
                           ? "Grátis"
                           : formatBRL(gollogInfo.preco)
-                        : "—"}
+                        : "-"}
                     </span>
                   </label>
 
@@ -824,7 +824,7 @@ export default function CheckoutClient({
               </p>
             ) : viacepSemResultado ? (
               <p className="text-xs text-amber-800 bg-amber-50 rounded-lg p-2.5">
-                Não encontramos o endereço automaticamente, preencha manualmente.
+                Não encontramos o endereço automaticamente. Preencha à mão.
               </p>
             ) : null}
 

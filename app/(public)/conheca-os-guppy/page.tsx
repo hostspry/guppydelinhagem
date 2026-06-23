@@ -6,7 +6,7 @@ import CtaWhatsapp from "@/components/site/CtaWhatsapp";
 import { pageMeta } from "@/lib/seo";
 
 export const metadata: Metadata = pageMeta({
-  title: "Conheça o Guppy — cuidados, água, alimentação e linhagens | Guppy de Linhagem",
+  title: "Conheça o Guppy: cuidados, água, alimentação e linhagens | Guppy de Linhagem",
   description:
     "Guia do guppy (Poecilia reticulata): temperatura e pH ideais, tamanho de aquário, alimentação, convivência e dúvidas frequentes de quem cria guppies de linhagem.",
   path: "/conheca-os-guppy",
@@ -47,7 +47,7 @@ const FAQ = [
   {
     pergunta: "Como faço para reproduzir guppies?",
     resposta:
-      "Guppies se reproduzem com facilidade — basta ter pelo menos um par saudável. A fêmea é vivípara e dá à luz filhotes vivos após cerca de 28 dias. Para proteger os filhotes, separe-os dos adultos assim que nascerem e alimente-os com artêmia ou ração micro.",
+      "Guppies se reproduzem com facilidade. Basta ter pelo menos um par saudável. A fêmea é vivípara e dá à luz filhotes vivos após cerca de 28 dias. Para proteger os filhotes, separe-os dos adultos assim que nascerem e alimente-os com artêmia ou ração micro.",
   },
   {
     pergunta: "Qual a diferença entre guppy de linhagem e guppy comum?",
@@ -65,14 +65,14 @@ export default function ConhecaOsGuppyPage() {
       <section className="bg-white py-16">
         <div className="container-site max-w-3xl text-center space-y-4">
           <h2 className="text-primary text-2xl sm:text-3xl font-semibold leading-snug">
-            Tudo o que Você Precisa Saber sobre o Guppy:{" "}
-            <span className="text-secondary">Cuidados, Dados Técnicos e Muito Mais</span>
+            O guia do guppy:{" "}
+            <span className="text-secondary">cuidados, dados técnicos e o que mais ajuda</span>
           </h2>
           <p className="text-text font-light leading-relaxed">
-            O guppy (<em>Poecilia reticulata</em>) é um dos peixes ornamentais mais populares do mundo —
-            e por boas razões. Versátil, colorido e relativamente fácil de manter, ele encanta tanto
-            iniciantes quanto aquaristas experientes. Neste guia reunimos tudo o que você precisa saber
-            para criar guppies com saúde, qualidade e beleza duradoura.
+            O guppy (<em>Poecilia reticulata</em>) é um dos peixes ornamentais mais populares do
+            mundo, e não é à toa. Ele é colorido, fácil de manter e agrada tanto quem está
+            começando quanto quem já cria há anos. Aqui a gente juntou o que você precisa saber
+            para criar guppies saudáveis e bonitos.
           </p>
         </div>
       </section>
@@ -112,7 +112,7 @@ export default function ConhecaOsGuppyPage() {
               "Troca parcial de 20% da água semanalmente",
               "Filtragem adequada com fluxo suave (evite correnteza forte)",
               "Aquecimento estável entre 24–26 °C",
-              "Evitar superpopulação — máximo 1 cm de peixe por litro",
+              "Evitar superpopulação (no máximo 1 cm de peixe por litro)",
             ].map((item) => (
               <li key={item} className="flex items-start gap-2 text-text font-light text-sm">
                 <span className="text-accent text-base mt-0.5 shrink-0">●</span>
@@ -130,8 +130,8 @@ export default function ConhecaOsGuppyPage() {
             <span className="text-secondary">Alimentação</span>: Como Nutrir Seu Guppy
           </h2>
           <p className="text-text font-light leading-relaxed">
-            Uma dieta variada garante cores vibrantes e imunidade elevada. Ofereça pequenas porções
-            duas vezes ao dia — apenas o que os peixes consomem em 2 minutos.
+            Uma dieta variada deixa as cores mais fortes e o peixe mais resistente. Ofereça pequenas
+            porções duas vezes ao dia, só o que os peixes comem em 2 minutos.
           </p>
           <ul className="space-y-2">
             {[
@@ -211,8 +211,8 @@ export default function ConhecaOsGuppyPage() {
             Pronto para ter seu Guppy de Linhagem?
           </h3>
           <p className="text-white/80 font-light text-base max-w-md">
-            Escolha entre nossas linhagens exclusivas e leve para casa um peixe saudável, bonito e
-            com genética comprovada.
+            Escolha entre as nossas linhagens e leve para casa um peixe saudável e
+            bonito, com a genética da nossa criação.
           </p>
           <Link
             href="/loja"

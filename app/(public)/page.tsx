@@ -16,7 +16,7 @@ import { organizationJsonLd } from "@/lib/sobre-content";
 import { WHATSAPP_PHONE } from "@/lib/constants";
 
 export const metadata: Metadata = pageMeta({
-  title: "Guppy de Linhagem — Loja de guppies pedigree | Criação premiada",
+  title: "Guppy de Linhagem | Loja de guppies pedigree da Marchezi Guppy Farm",
   description:
     "Compre guppies de linhagem direto do criador campeão no World Guppy Contest. Busque por nome ou linhagem (koi, full red, tuxedo…), filtre por categoria e receba em todo o Brasil com garantia de chegada viva.",
   path: "/",
@@ -24,7 +24,7 @@ export const metadata: Metadata = pageMeta({
     url: "/images/hero/blue-dragon-hero.webp",
     width: 1024,
     height: 1024,
-    alt: "Guppy de linhagem premiado — Marchezi Guppy Farm",
+    alt: "Guppy de linhagem premiado da Marchezi Guppy Farm",
   },
 });
 

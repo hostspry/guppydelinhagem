@@ -3,9 +3,9 @@ import FreteCalculator from "@/components/FreteCalculator";
 import { pageMeta } from "@/lib/seo";
 
 export const metadata: Metadata = pageMeta({
-  title: "Calcule seu frete — Guppy de Linhagem",
+  title: "Calcule seu frete | Guppy de Linhagem",
   description:
-    "Calcule o frete para receber guppies de linhagem em qualquer lugar do Brasil. Envio especializado via Jadlog e Gollog.",
+    "Calcule o frete para receber guppies de linhagem em qualquer lugar do Brasil. Enviamos via Jadlog e Gollog, com cuidado no transporte dos peixes.",
   path: "/frete",
 });
 

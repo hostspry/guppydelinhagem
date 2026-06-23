@@ -6,10 +6,10 @@ export default function CtaWhatsapp() {
     <section className="bg-primary py-16">
       <div className="container-site flex flex-col items-center text-center space-y-5">
         <h3 className="text-white text-2xl sm:text-3xl font-semibold max-w-xl">
-          Criação especializada de guppies selecionados
+          Ficou com alguma dúvida sobre os nossos guppies?
         </h3>
         <p className="text-white/80 font-light text-base max-w-md">
-          Com foco em saúde, padrão e genética. Aqui, cada peixe conta uma história.
+          Chama a gente no WhatsApp. A gente cria esses peixes todo dia e adora falar sobre eles.
         </p>
         <div className="flex items-center gap-3 text-white text-xl font-semibold">
           <WhatsAppIcon className="w-7 h-7" />

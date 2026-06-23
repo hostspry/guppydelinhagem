@@ -11,7 +11,7 @@ import AnaliseStatusPoll from "@/components/checkout/AnaliseStatusPoll";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Pagamento em análise — Guppy de Linhagem",
+  title: "Pagamento em análise · Guppy de Linhagem",
   robots: { index: false, follow: false },
 };
 
@@ -71,7 +71,7 @@ export default async function AnalisePage({
           O pagamento do pedido{" "}
           <strong className="text-primary">{order.numero}</strong> está sendo
           analisado pelo emissor do cartão. A confirmação costuma chegar em
-          alguns minutos — você não precisa pagar de novo.
+          alguns minutos. Você não precisa pagar de novo.
         </p>
       </div>
 
@@ -104,8 +104,8 @@ export default async function AnalisePage({
       <div className="mt-4 text-sm text-muted-foreground bg-bg-alt rounded-xl p-4 leading-relaxed">
         <p>
           Assim que o pagamento for aprovado, esta página avança sozinha para a
-          confirmação. Você também recebe a confirmação por e-mail. Qualquer
-          dúvida, fale com a gente.
+          confirmação. Você também recebe um aviso por e-mail. Qualquer dúvida,
+          fale com a gente.
         </p>
       </div>
 

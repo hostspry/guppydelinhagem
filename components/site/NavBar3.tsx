@@ -59,7 +59,7 @@ export default function NavBar3() {
               className="flex items-center gap-1.5 text-accent font-semibold hover:text-secondary transition-colors"
             >
               <Star size={14} fill="currentColor" />
-              Linhagem Premium
+              Peixes de Linhagem
             </Link>
             <a
               href={WHATSAPP_URL}
@@ -126,7 +126,7 @@ export default function NavBar3() {
               className="flex items-center gap-2 text-accent font-semibold hover:text-secondary transition-colors"
             >
               <Star size={16} fill="currentColor" />
-              Linhagem Premium
+              Peixes de Linhagem
             </Link>
             <a
               href={WHATSAPP_URL}

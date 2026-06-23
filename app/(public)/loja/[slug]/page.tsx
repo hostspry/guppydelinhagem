@@ -23,7 +23,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const produto = await getProductBySlug(slug); // cache() dedup com o render
   if (!produto) return { title: "Produto não encontrado" };
 
-  const titulo = produto.metaTitle || `${produto.nome} — Guppy de Linhagem`;
+  const titulo = produto.metaTitle || `${produto.nome} · Guppy de Linhagem`;
   // Descrição da prévia SEM preço (preço muda; link velho não pode mostrar errado).
   const descricao =
     produto.metaDescription ||
@@ -93,7 +93,7 @@ export default async function ProdutoPage({ params }: Props) {
       <FeedAutoOpen slug={prod.slug} />
       {preview && (
         <div className="bg-amber-50 border-b border-amber-200 text-amber-800 text-sm text-center py-2 px-4">
-          Pré-visualização — produto <strong>inativo</strong> (não visível na
+          Pré-visualização: produto <strong>inativo</strong> (não visível na
           loja).
         </div>
       )}

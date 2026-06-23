@@ -147,7 +147,7 @@ export default function ProductFreteEstimator({ qtd }: { qtd: number }) {
                 {opt.requerAvaliacao && (
                   <p className="flex items-start gap-1.5 text-xs text-amber-700">
                     <AlertTriangle size={13} className="shrink-0 mt-0.5" aria-hidden="true" />
-                    Prazo longo ({opt.deliveryTime} dias) — confirme a avaliação no
+                    Prazo longo ({opt.deliveryTime} dias). Confirme a avaliação no
                     WhatsApp ao fechar.
                   </p>
                 )}
@@ -166,12 +166,12 @@ export default function ProductFreteEstimator({ qtd }: { qtd: number }) {
 
             <p className="text-[11px] text-muted-foreground leading-snug">
               Estimativa para {qtd} peixe{qtd > 1 ? "s" : ""}. O frete final do pedido
-              completo é calculado no checkout (vários peixes na mesma caixa).
+              completo sai no checkout (vários peixes vão na mesma caixa).
             </p>
 
             {excedeCaixa && (
               <p className="text-[11px] text-amber-700 leading-snug">
-                Mais de {MAX_PEIXES_POR_CAIXA} peixes: frete recalculado.{" "}
+                Mais de {MAX_PEIXES_POR_CAIXA} peixes: a gente recalcula o frete.{" "}
                 <a
                   href={whatsappLink(
                     `Olá! Tenho ${qtd} peixes e gostaria de recalcular o frete para fechar o pedido.`,

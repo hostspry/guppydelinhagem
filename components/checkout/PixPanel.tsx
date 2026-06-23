@@ -76,7 +76,7 @@ export default function PixPanel({ pix: pixInicial }: { pix: CheckoutPixData }) 
       setCopiado(true);
       setTimeout(() => setCopiado(false), 2000);
     } catch {
-      setErro("Não foi possível copiar — selecione o código manualmente.");
+      setErro("Não deu para copiar. Selecione o código manualmente.");
     }
   }, [pix.copiaECola]);
 
@@ -121,7 +121,7 @@ export default function PixPanel({ pix: pixInicial }: { pix: CheckoutPixData }) 
             />
           ) : (
             <p className="text-sm text-amber-700">
-              QR indisponível — use o código copia-e-cola abaixo.
+              O QR não carregou. Use o código copia-e-cola abaixo.
             </p>
           )}
 
@@ -161,7 +161,7 @@ export default function PixPanel({ pix: pixInicial }: { pix: CheckoutPixData }) 
 
           <p className="text-xs text-muted-foreground leading-snug">
             Pague pelo app do seu banco lendo o QR ou colando o código. A
-            confirmação é automática — não feche esta página.
+            confirmação é automática, então não feche esta página.
           </p>
         </>
       ) : (

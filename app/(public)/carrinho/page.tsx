@@ -45,7 +45,7 @@ export default function CarrinhoPage() {
             Seu carrinho está vazio
           </h1>
           <p className="text-muted-foreground text-sm mt-1">
-            Explore nossos guppys e adicione seus favoritos.
+            Dá uma olhada nos nossos guppys e adicione os que você gostar.
           </p>
         </div>
         <Link
@@ -70,7 +70,7 @@ export default function CarrinhoPage() {
     const linhas = items
       .map(
         (i) =>
-          `- ${i.nome} (${i.quantidade}x) — ${formatBRL(i.precoPix * i.quantidade)}`,
+          `- ${i.nome} (${i.quantidade}x): ${formatBRL(i.precoPix * i.quantidade)}`,
       )
       .join("\n");
     const msg = `Olá! Quero fechar este pedido:\n${linhas}\nSubtotal Pix: ${formatBRL(
@@ -235,7 +235,7 @@ export default function CarrinhoPage() {
             <span className="text-primary leading-snug">
               Frete{" "}
               <span className="text-muted-foreground">
-                — calculado no checkout pelo seu CEP (ainda não incluído no total
+                calculado no checkout pelo seu CEP (ainda não incluído no total
                 acima).
               </span>
             </span>

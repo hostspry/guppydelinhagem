@@ -35,18 +35,18 @@ export const DIFERENCIAIS: { icon: IconKey; title: string; desc: string }[] = [
   },
   {
     icon: "dna",
-    title: "Seleção genética rigorosa",
-    desc: "Linhagens trabalhadas geração após geração.",
+    title: "Linhagens selecionadas",
+    desc: "Trabalhadas com critério, geração após geração.",
   },
   {
     icon: "droplets",
-    title: "Ambiente controlado",
-    desc: "Água monitorada e manejo criterioso.",
+    title: "Ambiente cuidado",
+    desc: "Água monitorada e manejo de perto.",
   },
   {
     icon: "clock",
     title: "+10 anos de experiência",
-    desc: "Dedicação diária à criação de guppies.",
+    desc: "Todo dia cuidando dos guppys.",
   },
 ];
 
@@ -62,7 +62,7 @@ export const SEGURANCA: { icon: IconKey; label: string }[] = [
 // o painel grande da assinatura). A assinatura completa segue em MARCHEZI_SIGNATURE
 // (usada na geração/armazenamento); aqui é a versão curta exibida.
 export const MARCHEZI_NOTA =
-  "Cada peixe é selecionado à mão na Marchezi Guppy Farm — criador premiado no World Guppy Contest, com seleção genética rigorosa e manejo diário.";
+  "Cada peixe é escolhido à mão na Marchezi Guppy Farm, por um criador premiado no World Guppy Contest, com seleção feita com critério e manejo diário.";
 
 // Blocos institucionais — imagem ao lado do texto, com checks/link conforme o bloco.
 export const INSTITUCIONAIS: {
@@ -75,7 +75,7 @@ export const INSTITUCIONAIS: {
   {
     titulo: "Sobre a criação",
     texto:
-      "Nossa estufa é dedicada exclusivamente à criação de guppies de linhagem, com seleção genética e acompanhamento diário de cada geração.",
+      "Nossa estufa é só para guppies de linhagem. A gente seleciona com critério e acompanha cada geração de perto, todo dia.",
     imagem: "/images/estufa.jpg",
     link: { label: "Conheça nossa estrutura", href: "/sobre-nos" },
   },
@@ -130,7 +130,7 @@ export const FAQ: { pergunta: string; resposta: string }[] = [
   {
     pergunta: "Como é feita a embalagem?",
     resposta:
-      "Saquinhos com água oxigenada, dentro de caixa de isopor com proteção térmica — o padrão usado por criadores para transporte seguro de peixes.",
+      "Saquinhos com água oxigenada, dentro de caixa de isopor com proteção térmica. É o mesmo padrão que os criadores usam para transportar peixe com segurança.",
   },
   {
     pergunta: "Posso misturar com outras espécies?",

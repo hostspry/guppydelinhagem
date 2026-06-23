@@ -48,20 +48,30 @@ export function freteGollog(
 // Assinatura institucional fixa da Marchezi. NÃO é gerada nem reescrita pela IA:
 // a IA gera só a parte da linhagem e o sistema concatena este bloco ao final da
 // descrição (sempre igual). Hoje todos os produtos são peixe — aplica a todos.
-export const MARCHEZI_SIGNATURE = `Criados com excelência na Marchezi Guppy Farm, em Guarapari/ES, em uma estrutura profissional projetada exclusivamente para a criação de guppies de linhagem. Nossos peixes são resultado de anos de seleção genética rigorosa, manejo criterioso e acompanhamento diário de cada geração.
+export const MARCHEZI_SIGNATURE = `Criados na Marchezi Guppy Farm, em Guarapari/ES, numa estrutura feita só para guppies de linhagem. Cada peixe vem de anos de seleção, manejo atento e acompanhamento diário, geração após geração.
 
-Mantidos em ambiente controlado, com sistemas de filtragem, qualidade de água monitorada e alimentação de alto padrão, os exemplares recebem cuidados constantes desde o nascimento. Todo o processo é conduzido por criador premiado internacionalmente no World Guppy Contest, garantindo genética, saúde, vigor e padrão estético superiores.
+A água é monitorada, o ambiente é controlado e a alimentação é caprichada desde o nascimento. Quem cuida de tudo é um criador premiado no World Guppy Contest, então o peixe chega até você saudável, forte e no padrão da linhagem.
 
-Mais do que criar guppies, preservamos e aprimoramos linhagens através de um trabalho sério, dedicado e apaixonado, buscando oferecer peixes de qualidade excepcional para aquaristas de todo o Brasil.`;
+Mais do que criar, a gente preserva e melhora cada linhagem com trabalho sério e muita paixão, para levar bons guppys a aquaristas do Brasil inteiro.`;
 
 // Frase de abertura da assinatura — usada para localizar e remover a assinatura
 // da descrição de forma robusta (independe de variações de espaços/quebras de
 // linha em produtos antigos). O card destacado mostra a assinatura uma vez.
-export const MARCHEZI_SIGNATURE_START =
-  "Criados com excelência na Marchezi Guppy Farm";
+export const MARCHEZI_SIGNATURE_START = "Criados na Marchezi Guppy Farm";
+
+// Aberturas de assinaturas ANTIGAS ainda presentes em produtos salvos no banco.
+// O strip precisa reconhecê-las até que uma migração atualize as descrições.
+const MARCHEZI_SIGNATURE_STARTS_LEGADO = [
+  "Criados com excelência na Marchezi Guppy Farm",
+];
 
 /** Remove a assinatura Marchezi do texto da descrição (evita duplicar com o card). */
 export function stripMarcheziSignature(texto: string): string {
-  const i = texto.indexOf(MARCHEZI_SIGNATURE_START);
-  return (i >= 0 ? texto.slice(0, i) : texto).trim();
+  const candidatos = [MARCHEZI_SIGNATURE_START, ...MARCHEZI_SIGNATURE_STARTS_LEGADO];
+  let corte = -1;
+  for (const inicio of candidatos) {
+    const i = texto.indexOf(inicio);
+    if (i >= 0 && (corte === -1 || i < corte)) corte = i;
+  }
+  return (corte >= 0 ? texto.slice(0, corte) : texto).trim();
 }

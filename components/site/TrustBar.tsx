@@ -7,8 +7,8 @@ import type { LucideIcon } from "lucide-react";
 const FEATURES: { Icon: LucideIcon; title: string; subtitle: string }[] = [
   { Icon: Trophy, title: "Linhagens Premiadas", subtitle: "Reconhecidas em concursos" },
   { Icon: Truck, title: "Envio para todo o Brasil", subtitle: "Embalagem segura e térmica" },
-  { Icon: Heart, title: "Criação Responsável", subtitle: "Saúde e bem-estar sempre" },
-  { Icon: Users, title: "Clientes em todo Brasil", subtitle: "Satisfação e confiança" },
+  { Icon: Heart, title: "Criação Responsável", subtitle: "Cuidamos da saúde dos peixes" },
+  { Icon: Users, title: "Clientes em todo Brasil", subtitle: "Gente que compra e volta" },
 ];
 
 export default function TrustBar() {

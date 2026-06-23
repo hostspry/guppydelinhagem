@@ -8,10 +8,10 @@ export const timeline = [
   { ano: "2014", titulo: "Fase de experiências", texto: "Guppy e camarão dividindo as piscinas. O amor era mesmo o guppy." },
   { ano: "2015", titulo: "Chegam os asiáticos", texto: "Dumbo, Dragon e Mosaico. Nasce a paixão por criar pela beleza." },
   { ano: "2019", titulo: "Nasce a Marchezi Guppy Farm", texto: "Primeira estufa, na casa do Sr. Marchezi, com cerca de 5 mil litros." },
-  { ano: "2023", titulo: "Título mundial e mudança para Guarapari", texto: "Primeiro mundial e nova estufa, projetada para até 30 mil litros — ao lado do amigo Vinícius Pirovani. Ele me apresentou o aquário marinho, eu apresentei a ele o mundo dos guppys, e dessa troca nasceu a amizade." },
+  { ano: "2023", titulo: "Título mundial e mudança para Guarapari", texto: "Primeiro mundial e nova estufa, projetada para até 30 mil litros, ao lado do amigo Vinícius Pirovani. Ele me apresentou o aquário marinho, eu apresentei a ele o mundo dos guppys, e dessa troca nasceu a amizade." },
   { ano: "2024", titulo: "Campeões de novo", texto: "Mais um título mundial enquanto a estufa nova segue crescendo." },
   { ano: "2025", titulo: "Mais estrutura, mais títulos", texto: "Novos aquários, novas caixas, nova infraestrutura." },
-  { ano: "2026", titulo: "Nova fase", texto: "Lucas da Matta entra como sócio — apaixonado por guppy, somando conhecimento e a mesma paixão que move a estufa." },
+  { ano: "2026", titulo: "Nova fase", texto: "Lucas da Matta entra como sócio. Apaixonado por guppy, soma conhecimento e a mesma paixão que move a estufa." },
 ] as const;
 
 // Dados confirmados pelo dono. Fonte única dos cards de conquista E do award do JSON-LD.
@@ -22,7 +22,7 @@ export const conquistas = [
     anos: "2023, 2024 e 2025",
     evento:
       "World Guppy Contest (WGA), representando a Brazilian Guppy Association",
-    nota: "Linha desenvolvida na nossa estufa — três títulos mundiais consecutivos. Em 2023, além do título, foi vice no Best of Show: o segundo melhor peixe de todo o mundial (categoria Moscow Black / Delta ¾ Black).",
+    nota: "Linha desenvolvida na nossa estufa, com três títulos mundiais seguidos. Em 2023, além do título, foi vice no Best of Show: o segundo melhor peixe de todo o mundial (categoria Moscow Black / Delta ¾ Black).",
     video: "https://www.instagram.com/reel/DVgIqWJjeAV/",
     videoExtra: "https://www.instagram.com/reel/C3oE1mMLy0X/",
     destaque: true,
@@ -32,7 +32,7 @@ export const conquistas = [
     titulo: "Campeão Mundial",
     anos: "2024",
     evento: "World Guppy Contest Virtual (UNAQUA)",
-    nota: "Linha adquirida do criador Paulo Keijock — a quem somos gratos.",
+    nota: "Linha que veio do criador Paulo Keijock, a quem somos gratos.",
     video: "https://www.instagram.com/reel/DG8GVXDxmfl/",
     videoExtra: null,
     destaque: false,

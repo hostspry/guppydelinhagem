@@ -19,10 +19,10 @@ const blueDragonData = {
   order: 0,
   eyebrowText: "LINHAGENS PREMIADAS",
   eyebrowIcon: "Trophy",
-  titleLine1: "Guppies Premium",
+  titleLine1: "Guppies",
   titleLine2: "de Linhagem",
   subtitle:
-    "Criação especializada com seleção genética rigorosa. Qualidade, saúde e beleza em cada detalhe.",
+    "Guppys criados com cuidado, da escolha das matrizes ao dia do envio. Saúde e beleza em cada peixe.",
   fishImageUrl: "/images/hero/blue-dragon-hero.webp",
   fishImageAlt:
     "Blue Dragon Halfmoon Snakeskin — campeão World Guppy Contest 2024",

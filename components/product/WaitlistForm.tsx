@@ -47,8 +47,8 @@ export default function WaitlistForm({ productId }: { productId: string }) {
       <div className="rounded-xl border border-green-200 bg-green-50 p-4 flex items-start gap-2">
         <Check size={18} className="text-green-600 shrink-0 mt-0.5" aria-hidden="true" />
         <p className="text-sm text-green-800">
-          Tudo certo! Você está na lista de espera — avisaremos no WhatsApp assim
-          que houver nova ninhada deste peixe.
+          Tudo certo! Você está na lista de espera. Assim que sair uma nova
+          ninhada deste peixe, a gente te avisa no WhatsApp.
         </p>
       </div>
     );

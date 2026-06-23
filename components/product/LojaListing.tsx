@@ -107,7 +107,7 @@ export default function LojaListing({
           Nossa Loja
         </h2>
         <p className="text-muted-foreground">
-          Guppies de linhagem selecionados à mão — escolha o seu.
+          Guppies de linhagem, escolhidos um a um. Pega o seu.
         </p>
       </header>
 

@@ -6,7 +6,7 @@ import VideoFeed from "@/components/feed/VideoFeed";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Feed de vídeos — Guppy de Linhagem",
+  title: "Feed de vídeos · Guppy de Linhagem",
   robots: { index: false, follow: false }, // feed não indexa
 };
 

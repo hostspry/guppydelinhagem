@@ -15,7 +15,7 @@ import PurchaseTracker from "@/components/checkout/PurchaseTracker";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Pedido confirmado — Guppy de Linhagem",
+  title: "Pedido confirmado · Guppy de Linhagem",
   robots: { index: false, follow: false },
 };
 
@@ -146,9 +146,10 @@ export default async function SucessoPage({
       {/* Envio — prazo honesto (sem inventar data fixa) */}
       <div className="mt-4 text-sm text-muted-foreground bg-bg-alt rounded-xl p-4 leading-relaxed">
         <p>
-          Seu pedido será preparado com cuidado para o transporte de peixes vivos.
-          Assim que despacharmos, você recebe o código de rastreio pelo WhatsApp/
-          e-mail. Combinamos a melhor data de envio para a chegada segura.
+          A gente prepara seu pedido com cuidado para o transporte de peixes
+          vivos. Quando despacharmos, você recebe o código de rastreio no
+          WhatsApp ou e-mail. Antes disso, combinamos a melhor data de envio
+          para os peixes chegarem bem.
         </p>
       </div>
 

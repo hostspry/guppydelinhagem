@@ -51,7 +51,7 @@ export const HOME_BANNERS: { estufa: HomeBanner; aprenda: HomeBanner } = {
       { texto: " com cada guppy" },
     ],
     subtitulo:
-      "Ambiente controlado, seleção genética rigorosa e bem-estar — veja como cada peixe é criado até chegar até você.",
+      "A gente cuida de cada peixe de perto, da escolha das matrizes até a hora de embalar. Veja como nossos guppys são criados.",
     ctaLabel: "Conhecer a estufa",
     ctaHref: "/sobre-nos",
     imagem: "/images/estufa.jpg",
@@ -59,7 +59,7 @@ export const HOME_BANNERS: { estufa: HomeBanner; aprenda: HomeBanner } = {
   // Banner 2 — aprenda (mantido).
   aprenda: {
     eyebrow: "Sobre os Guppy",
-    tituloPartes: [{ texto: "Aprenda Sobre, Como Criar e Mais!" }],
+    tituloPartes: [{ texto: "Aprenda a criar e cuidar dos seus guppys" }],
     ctaLabel: "Conhecer",
     ctaHref: "/conheca-os-guppy",
   },

@@ -9,7 +9,7 @@ import CheckoutClient, {
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Finalizar pedido — Guppy de Linhagem",
+  title: "Finalizar pedido · Guppy de Linhagem",
   robots: { index: false, follow: false }, // checkout não indexa
 };
 

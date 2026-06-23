@@ -8,7 +8,7 @@ import { WHATSAPP_URL, WHATSAPP_DISPLAY } from "@/lib/constants";
 import { pageMeta } from "@/lib/seo";
 
 export const metadata: Metadata = pageMeta({
-  title: "Contato — Guppy de Linhagem | Fale com a Marchezi Guppy Farm",
+  title: "Contato | Fale com a Marchezi Guppy Farm",
   description:
     "Fale com a Marchezi Guppy Farm: tire dúvidas sobre guppies de linhagem, disponibilidade e envio. Atendimento por WhatsApp e e-mail.",
   path: "/contatos",
@@ -30,8 +30,8 @@ export default function ContatosPage() {
                 </div>
                 <h3 className="text-secondary text-2xl font-semibold">Dúvidas?</h3>
                 <p className="text-text font-light leading-relaxed max-w-sm">
-                  Precisa de ajuda ou está procurando seu primeiro Guppy para comprar?
-                  Entre em contato agora mesmo!
+                  Tem alguma dúvida ou quer escolher o seu primeiro guppy? Chama a
+                  gente, a gente responde.
                 </p>
               </div>
 
