@@ -204,10 +204,11 @@ export default function SobreNosPage() {
               <span className="text-secondary">O mundo reconheceu.</span>
             </h1>
             <p className="text-text font-light text-lg leading-relaxed">
-              Desde 2000, a família Marchezi cria guppies de linhagem no Espírito
-              Santo. Buscamos a beleza acima de tudo — e, no caminho, vieram os
-              títulos mundiais, incluindo o tricampeonato da nossa linha Full
-              Black.
+              Tudo começou em 2000, com o sonho de um filho que acabou
+              contagiando o pai. O que era brincadeira de menino virou paixão de
+              verdade, e segue viva até hoje no mesmo cuidado de sempre com cada
+              linhagem. Criamos pela beleza, e foi esse cuidado que trouxe os
+              títulos mundiais, como o tricampeonato da linha Full Black.
             </p>
             <div className="flex flex-wrap gap-3 pt-1">
               <Link href="/" className={btnPrimario}>
