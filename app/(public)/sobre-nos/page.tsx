@@ -220,14 +220,23 @@ export default function SobreNosPage() {
             </div>
           </div>
           <Figura
-            src={`${IMG}/stufa-sol01.webp`}
-            alt="Estufa da Marchezi Guppy Farm em Guarapari ao fim da tarde"
-            ratio="16 / 9"
+            src={`${IMG}/marchezi-lucas02.webp`}
+            alt="Manassés e Lucas avaliando um guppy na estufa da Marchezi Guppy Farm em Guarapari"
+            ratio="3 / 4"
             priority
             sizes="(max-width: 1024px) 100vw, 50vw"
             className="max-w-md mx-auto lg:max-w-none"
           />
         </div>
+        {/* Faixa de ambientação — a estufa em Guarapari ao fim da tarde. */}
+        <Figura
+          src={`${IMG}/stufa-sol01.webp`}
+          alt="Estufa da Marchezi Guppy Farm em Guarapari ao fim da tarde"
+          ratio="16 / 9"
+          priority
+          sizes="(max-width: 1200px) 100vw, 1200px"
+          className="mt-10"
+        />
       </Secao>
 
       {/* ═══ 2. QUEM SOMOS ═══ */}
@@ -292,16 +301,6 @@ export default function SobreNosPage() {
                 <span className="inline-block text-secondary font-bold">{t.ano}</span>
                 <h3 className="text-primary font-semibold text-lg mt-0.5">{t.titulo}</h3>
                 <p className="text-text/80 font-light mt-1 leading-relaxed">{t.texto}</p>
-                {t.foto && (
-                  <Figura
-                    src={`${IMG}/${t.foto}`}
-                    alt={t.legenda ?? t.titulo}
-                    ratio="16 / 9"
-                    caption={t.legenda}
-                    sizes="(max-width: 768px) 100vw, 600px"
-                    className="mt-4"
-                  />
-                )}
               </div>
             </li>
           ))}
@@ -438,17 +437,6 @@ export default function SobreNosPage() {
             </ul>
           </div>
           <div className="grid grid-cols-2 gap-4">
-            {/* Retrato vertical (Lucas avaliando exemplares): ocupa as duas linhas
-                à esquerda, ao lado dos dois quadrados empilhados. */}
-            <figure className="relative row-span-2 overflow-hidden rounded-[22px] shadow-sm bg-bg-alt/60">
-              <Image
-                src={`${IMG}/marchezi-lucas02.webp`}
-                alt="Avaliação de exemplares na estufa"
-                fill
-                sizes="(max-width: 768px) 50vw, 25vw"
-                className="object-cover"
-              />
-            </figure>
             <Figura
               src={`${IMG}/pai-construindo-estufa.webp`}
               alt="A construção da estufa nova da Marchezi Guppy Farm em Guarapari"
@@ -649,6 +637,14 @@ export default function SobreNosPage() {
           <p className="text-text font-light text-lg leading-relaxed">
             Mostramos a criação de verdade, todo dia.
           </p>
+          <Figura
+            src={`${IMG}/marchezi-lucas03.webp`}
+            alt="Manassés e Lucas na estufa da Marchezi Guppy Farm em Guarapari"
+            ratio="16 / 9"
+            caption="Manassés e Lucas na estufa em Guarapari"
+            sizes="(max-width: 768px) 100vw, 640px"
+            className="max-w-xl mx-auto"
+          />
           <div className="flex flex-wrap items-center justify-center gap-3">
             <a
               href={REDES.youtube}
