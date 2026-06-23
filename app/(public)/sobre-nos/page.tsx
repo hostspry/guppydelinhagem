@@ -37,9 +37,10 @@ export const metadata: Metadata = pageMeta({
     "Desde 2000, a família Marchezi cria guppies de linhagem no Espírito Santo. Criação familiar pela beleza, com títulos mundiais — incluindo o tricampeonato da linha Full Black.",
   path: "/sobre-nos",
   image: {
-    url: "/images/sobrenos/estufa-nova-prateleiras.png",
-    width: 895,
-    height: 504,
+    url: "/images/sobrenos/og-sobre-nos.jpg",
+    width: 1200,
+    height: 630,
+    type: "image/jpeg",
     alt: "Estufa da Marchezi Guppy Farm em Guarapari, ES",
   },
 });
@@ -219,9 +220,9 @@ export default function SobreNosPage() {
             </div>
           </div>
           <Figura
-            src={`${IMG}/tres-geracoes.jpg`}
-            alt="Três gerações da família Marchezi — avô Vanderli, Manassés e a neta Sarah — na criação de guppies em Guarapari"
-            ratio="4 / 5"
+            src={`${IMG}/stufa-sol01.webp`}
+            alt="Estufa da Marchezi Guppy Farm em Guarapari ao fim da tarde"
+            ratio="16 / 9"
             priority
             sizes="(max-width: 1024px) 100vw, 50vw"
             className="max-w-md mx-auto lg:max-w-none"
@@ -231,17 +232,26 @@ export default function SobreNosPage() {
 
       {/* ═══ 2. QUEM SOMOS ═══ */}
       <Secao bg="bege">
-        <div className="max-w-3xl space-y-5">
-          <h2 className="text-primary text-2xl sm:text-3xl font-bold">
-            Uma criação familiar que virou <span className="text-secondary">referência</span>
-          </h2>
-          <p className="text-text font-light text-lg leading-relaxed">
-            A Marchezi Guppy Farm nasceu da paixão por guppies de linhagem e
-            cresceu com estudo e seleção contínua. Sempre criamos pela beleza —
-            pelo prazer de ver um peixe de cor, cauda e padrão excepcionais — e não
-            para competir. O reconhecimento veio como consequência desse cuidado:
-            nossas linhagens passaram a se destacar no cenário mundial do guppy.
-          </p>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-center">
+          <div className="space-y-5">
+            <h2 className="text-primary text-2xl sm:text-3xl font-bold">
+              Uma criação familiar que virou <span className="text-secondary">referência</span>
+            </h2>
+            <p className="text-text font-light text-lg leading-relaxed">
+              A Marchezi Guppy Farm nasceu da paixão por guppies de linhagem e
+              cresceu com estudo e seleção contínua. Sempre criamos pela beleza —
+              pelo prazer de ver um peixe de cor, cauda e padrão excepcionais — e não
+              para competir. O reconhecimento veio como consequência desse cuidado:
+              nossas linhagens passaram a se destacar no cenário mundial do guppy.
+            </p>
+          </div>
+          <Figura
+            src={`${IMG}/tres-geracoes.jpg`}
+            alt="Três gerações da família Marchezi na estufa"
+            ratio="4 / 5"
+            sizes="(max-width: 1024px) 100vw, 50vw"
+            className="max-w-md mx-auto lg:max-w-none"
+          />
         </div>
       </Secao>
 
@@ -282,6 +292,16 @@ export default function SobreNosPage() {
                 <span className="inline-block text-secondary font-bold">{t.ano}</span>
                 <h3 className="text-primary font-semibold text-lg mt-0.5">{t.titulo}</h3>
                 <p className="text-text/80 font-light mt-1 leading-relaxed">{t.texto}</p>
+                {t.foto && (
+                  <Figura
+                    src={`${IMG}/${t.foto}`}
+                    alt={t.legenda ?? t.titulo}
+                    ratio="16 / 9"
+                    caption={t.legenda}
+                    sizes="(max-width: 768px) 100vw, 600px"
+                    className="mt-4"
+                  />
+                )}
               </div>
             </li>
           ))}
@@ -418,6 +438,17 @@ export default function SobreNosPage() {
             </ul>
           </div>
           <div className="grid grid-cols-2 gap-4">
+            {/* Retrato vertical (Lucas avaliando exemplares): ocupa as duas linhas
+                à esquerda, ao lado dos dois quadrados empilhados. */}
+            <figure className="relative row-span-2 overflow-hidden rounded-[22px] shadow-sm bg-bg-alt/60">
+              <Image
+                src={`${IMG}/marchezi-lucas02.webp`}
+                alt="Avaliação de exemplares na estufa"
+                fill
+                sizes="(max-width: 768px) 50vw, 25vw"
+                className="object-cover"
+              />
+            </figure>
             <Figura
               src={`${IMG}/pai-construindo-estufa.webp`}
               alt="A construção da estufa nova da Marchezi Guppy Farm em Guarapari"

@@ -13,7 +13,7 @@ export const OG_DEFAULT = {
   alt: "Guppy de Linhagem — Marchezi Guppy Farm",
 } as const;
 
-type OgImage = { url: string; width?: number; height?: number; alt?: string };
+type OgImage = { url: string; width?: number; height?: number; alt?: string; type?: string };
 
 /**
  * Monta metadata completa de uma página indexável: title, description,

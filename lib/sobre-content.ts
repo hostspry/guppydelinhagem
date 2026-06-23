@@ -2,7 +2,17 @@
 // alimentam a página E o JSON-LD (GEO). Dados confirmados pelo dono; nada de
 // número/afirmação não verificável (sem UV/ozônio/exportação/depoimentos falsos).
 
-export const timeline = [
+// Item da trajetória. Alguns marcos têm foto + legenda (ex.: a entrada do Lucas).
+type TimelineItem = {
+  ano: string;
+  titulo: string;
+  texto: string;
+  /** Arquivo em /images/sobrenos (só o nome, ex.: "marchezi-lucas03.webp"). */
+  foto?: string;
+  legenda?: string;
+};
+
+export const timeline: readonly TimelineItem[] = [
   { ano: "2000", titulo: "O começo", texto: "Primeira bateria, com 8 aquários e peixes ainda sem linhagem." },
   { ano: "2010", titulo: "As primeiras matrizes", texto: "Criação em bacias, em casa. Guppy Cobra e HB Pastel." },
   { ano: "2014", titulo: "Fase de experiências", texto: "Guppy e camarão dividindo as piscinas. O amor era mesmo o guppy." },
@@ -11,8 +21,8 @@ export const timeline = [
   { ano: "2023", titulo: "Título mundial e mudança para Guarapari", texto: "Primeiro mundial e nova estufa, projetada para até 30 mil litros — ao lado do amigo Vinícius Pirovani. Ele me apresentou o aquário marinho, eu apresentei a ele o mundo dos guppys, e dessa troca nasceu a amizade." },
   { ano: "2024", titulo: "Campeões de novo", texto: "Mais um título mundial enquanto a estufa nova segue crescendo." },
   { ano: "2025", titulo: "Mais estrutura, mais títulos", texto: "Novos aquários, novas caixas, nova infraestrutura." },
-  { ano: "2026", titulo: "Nova fase", texto: "Chega Lucas da Matta, apaixonado por guppy, somando conhecimento e a mesma paixão que move a estufa." },
-] as const;
+  { ano: "2026", titulo: "Nova fase", texto: "Lucas da Matta entra como sócio — apaixonado por guppy, somando conhecimento e a mesma paixão que move a estufa.", foto: "marchezi-lucas03.webp", legenda: "Manassés e Lucas na estufa em Guarapari" },
+];
 
 // Dados confirmados pelo dono. Fonte única dos cards de conquista E do award do JSON-LD.
 export const conquistas = [
