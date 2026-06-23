@@ -288,6 +288,7 @@ async function precificarItens(
 type CupomResolvido = {
   cupomId: string;
   codigo: string;
+  modoAplicacao: CupomCalculo["modoAplicacao"];
   descontoPix: number;
   descontoCartao: number;
 };
@@ -362,6 +363,7 @@ async function resolverCupom(
     data: {
       cupomId: cupom.id,
       codigo: cupom.codigo,
+      modoAplicacao: cupom.modoAplicacao,
       descontoPix: pix.desconto,
       descontoCartao: cartao.desconto,
     },
@@ -383,6 +385,7 @@ export type ValidarCupomResult =
   | {
       ok: true;
       codigo: string;
+      modo: CupomCalculo["modoAplicacao"];
       descontoPix: number;
       descontoCartao: number;
     }
@@ -414,6 +417,7 @@ export async function validarCupom(
   return {
     ok: true,
     codigo: r.data.codigo,
+    modo: r.data.modoAplicacao,
     descontoPix: r.data.descontoPix,
     descontoCartao: r.data.descontoCartao,
   };

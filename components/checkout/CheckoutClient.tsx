@@ -187,6 +187,7 @@ export default function CheckoutClient({
   // é recalculado de novo ao fechar o pedido (anti-fraude); aqui é só o resumo.
   const [cupomDesc, setCupomDesc] = useState<{
     codigo: string;
+    modo: "AMBOS_VENCE_MAIOR" | "AMBOS_ACUMULA" | "SO_PIX" | "SO_CARTAO";
     descontoPix: number;
     descontoCartao: number;
   } | null>(null);
@@ -291,6 +292,16 @@ export default function CheckoutClient({
       ? cupomDesc.descontoPix
       : cupomDesc.descontoCartao
     : 0;
+  // Cupom "vence o maior" no Pix: ele SUBSTITUI o desconto Pix (não soma). Aí não
+  // mostramos a linha "Desconto no Pix"; o cupom aparece com o desconto cheio
+  // (cheio → preço final), pra não parecer que os dois se somam.
+  const cupomAbsorvePix =
+    !!cupomDesc && aba === "pix" && cupomDesc.modo === "AMBOS_VENCE_MAIOR";
+  const exibeDescontoPixBase =
+    aba === "pix" && descontoPixBase > 0 && !cupomAbsorvePix;
+  const cupomLinhaValor = cupomAbsorvePix
+    ? descontoPixBase + (cupomDesc?.descontoPix ?? 0)
+    : descontoCupom;
   const subtotalView = aba === "pix" ? subtotalPixView : subtotalCheioView;
   const total = Math.max(0, subtotalView + (freteEfetivo ?? 0) - descontoCupom);
   const totalCartao = Math.max(
@@ -404,6 +415,7 @@ export default function CheckoutClient({
         setCupom(r.codigo);
         setCupomDesc({
           codigo: r.codigo,
+          modo: r.modo,
           descontoPix: r.descontoPix,
           descontoCartao: r.descontoCartao,
         });
@@ -452,6 +464,7 @@ export default function CheckoutClient({
         r.ok
           ? {
               codigo: r.codigo,
+              modo: r.modo,
               descontoPix: r.descontoPix,
               descontoCartao: r.descontoCartao,
             }
@@ -1104,7 +1117,7 @@ export default function CheckoutClient({
               <span>Subtotal</span>
               <span className="tabular-nums">{formatBRL(subtotalCheioView)}</span>
             </div>
-            {aba === "pix" && descontoPixBase > 0 && (
+            {exibeDescontoPixBase && (
               <div className="flex justify-between text-green-700">
                 <span>Desconto no Pix</span>
                 <span className="tabular-nums font-medium">
@@ -1124,11 +1137,11 @@ export default function CheckoutClient({
                 </span>
               )}
             </div>
-            {cupomDesc && descontoCupom > 0 && (
+            {cupomDesc && cupomLinhaValor > 0 && (
               <div className="flex justify-between text-green-700">
                 <span>Cupom {cupomDesc.codigo}</span>
                 <span className="tabular-nums font-medium">
-                  − {formatBRL(descontoCupom)}
+                  − {formatBRL(cupomLinhaValor)}
                 </span>
               </div>
             )}

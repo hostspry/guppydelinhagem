@@ -34,6 +34,7 @@ export default function CarrinhoPage() {
   const [codigoInput, setCodigoInput] = useState("");
   const [cupomDesc, setCupomDesc] = useState<{
     codigo: string;
+    modo: "AMBOS_VENCE_MAIOR" | "AMBOS_ACUMULA" | "SO_PIX" | "SO_CARTAO";
     descontoPix: number;
     descontoCartao: number;
   } | null>(null);
@@ -64,6 +65,7 @@ export default function CarrinhoPage() {
       if (r.ok) {
         setCupomDesc({
           codigo: r.codigo,
+          modo: r.modo,
           descontoPix: r.descontoPix,
           descontoCartao: r.descontoCartao,
         });
@@ -97,6 +99,7 @@ export default function CarrinhoPage() {
         setCupom(r.codigo);
         setCupomDesc({
           codigo: r.codigo,
+          modo: r.modo,
           descontoPix: r.descontoPix,
           descontoCartao: r.descontoCartao,
         });
@@ -158,6 +161,14 @@ export default function CarrinhoPage() {
   // é recalculado no checkout.
   const descontoCupomPix = cupomDesc?.descontoPix ?? 0;
   const totalPixFinal = Math.max(0, subtotalPix - descontoCupomPix);
+  // Cupom "vence o maior": substitui o desconto Pix (não soma). Some a linha
+  // "Economia no Pix" e mostra o cupom já com o desconto cheio (cheio → final).
+  const cupomAbsorvePix =
+    !!cupomDesc && cupomDesc.modo === "AMBOS_VENCE_MAIOR";
+  const economiaPixVisivel = temDescontoGlobal && !cupomAbsorvePix;
+  const cupomLinhaValorPix = cupomAbsorvePix
+    ? economiaPix + descontoCupomPix
+    : descontoCupomPix;
 
   function finalizarNoWhatsapp() {
     const linhas = items
@@ -303,7 +314,7 @@ export default function CarrinhoPage() {
             </span>
           </div>
 
-          {temDescontoGlobal && (
+          {economiaPixVisivel && (
             <div className="flex items-center justify-between text-sm">
               <span className="text-green-700">Economia no Pix</span>
               <span className="text-green-700 font-medium tabular-nums">
@@ -330,11 +341,11 @@ export default function CarrinhoPage() {
                     <X size={16} aria-hidden="true" />
                   </button>
                 </div>
-                {descontoCupomPix > 0 && (
+                {cupomLinhaValorPix > 0 && (
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-green-700">Desconto do cupom (Pix)</span>
                     <span className="text-green-700 font-medium tabular-nums">
-                      − {formatBRL(descontoCupomPix)}
+                      − {formatBRL(cupomLinhaValorPix)}
                     </span>
                   </div>
                 )}
