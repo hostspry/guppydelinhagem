@@ -1130,9 +1130,10 @@ export default function CheckoutClient({
                 {formatBRL(total)}
               </span>
             </div>
-            {/* Selo por forma: Pix com desconto × Cartão cheio/parcelas */}
+            {/* Selo por forma: Pix com desconto × Cartão cheio/parcelas. Com cupom
+                aplicado, some (o desconto do cupom já aparece na linha acima). */}
             {aba === "pix" ? (
-              descontoMax > 0 ? (
+              cupomDesc ? null : descontoMax > 0 ? (
                 <p className="text-[11px] text-green-700 text-right font-medium">
                   no Pix • {descontoMax}% OFF · cartão à vista{" "}
                   {formatBRL(totalCartao)}
