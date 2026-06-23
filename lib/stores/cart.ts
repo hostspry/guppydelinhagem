@@ -21,10 +21,15 @@ export type CartItem = {
 
 type CartState = {
   items: CartItem[];
+  /** Código de cupom aplicado (normalizado). Só o código persiste; o desconto é
+   * sempre recalculado no servidor (validarCupom no carrinho, checkout no fechamento). */
+  cupom: string | null;
   /** Adiciona (ou soma) respeitando o estoque da variante. Chave = variantId. */
   addItem: (item: Omit<CartItem, "quantidade">, qtd: number) => void;
   removeItem: (variantId: string) => void;
   updateQty: (variantId: string, qtd: number) => void;
+  setCupom: (codigo: string) => void;
+  clearCupom: () => void;
   clear: () => void;
 };
 
@@ -32,6 +37,7 @@ export const useCart = create<CartState>()(
   persist(
     (set) => ({
       items: [],
+      cupom: null,
       addItem: (item, qtd) =>
         set((s) => {
           const teto = Math.max(0, item.estoque);
@@ -64,7 +70,10 @@ export const useCart = create<CartState>()(
               : i,
           ),
         })),
-      clear: () => set({ items: [] }),
+      setCupom: (codigo) =>
+        set({ cupom: (codigo ?? "").trim().toUpperCase() || null }),
+      clearCupom: () => set({ cupom: null }),
+      clear: () => set({ items: [], cupom: null }),
     }),
     { name: "guppy-cart" },
   ),

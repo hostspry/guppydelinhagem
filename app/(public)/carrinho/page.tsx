@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useTransition } from "react";
 import Link from "next/link";
-import { Minus, Plus, Trash2, ShoppingCart, Truck } from "lucide-react";
+import { Minus, Plus, Trash2, ShoppingCart, Truck, Tag, X } from "lucide-react";
 import { WhatsAppIcon } from "@/components/icons/WhatsAppIcon";
 import { VideoThumb } from "@/components/admin/VideoThumb";
 import { formatBRL } from "@/lib/utils/format";
 import { whatsappLink, MAX_PEIXES_POR_CAIXA } from "@/lib/constants";
+import { validarCupom } from "@/actions/checkout";
 import {
   useCart,
   selectTotalPeixes,
@@ -25,6 +26,93 @@ export default function CarrinhoPage() {
   const totalPeixes = useCart(selectTotalPeixes);
   const subtotalPix = useCart(selectSubtotalPix);
   const subtotalCheio = useCart(selectSubtotalCheio);
+
+  // ── Cupom ──────────────────────────────────────────────────────────────────
+  const cupom = useCart((s) => s.cupom);
+  const setCupom = useCart((s) => s.setCupom);
+  const clearCupom = useCart((s) => s.clearCupom);
+  const [codigoInput, setCodigoInput] = useState("");
+  const [cupomDesc, setCupomDesc] = useState<{
+    codigo: string;
+    descontoPix: number;
+    descontoCartao: number;
+  } | null>(null);
+  const [cupomErro, setCupomErro] = useState<string | null>(null);
+  const [aplicando, startAplicar] = useTransition();
+
+  // Assinatura do carrinho + cupom — revalida o desconto no servidor sempre que
+  // itens/quantidades/cupom mudam (o desconto NUNCA vem do client).
+  const cartKey =
+    items.map((i) => `${i.variantId}:${i.quantidade}`).join(",") +
+    "|" +
+    (cupom ?? "");
+
+  useEffect(() => {
+    if (!mounted) return;
+    if (!cupom || items.length === 0) {
+      setCupomDesc(null);
+      return;
+    }
+    let cancelado = false;
+    const payload = items.map((i) => ({
+      produtoId: i.produtoId,
+      composicao: i.composicao,
+      quantidade: i.quantidade,
+    }));
+    validarCupom(cupom, payload).then((r) => {
+      if (cancelado) return;
+      if (r.ok) {
+        setCupomDesc({
+          codigo: r.codigo,
+          descontoPix: r.descontoPix,
+          descontoCartao: r.descontoCartao,
+        });
+        setCupomErro(null);
+      } else {
+        // Cupom salvo deixou de valer (expirou/esgotou/carrinho mudou): remove.
+        setCupomDesc(null);
+        clearCupom();
+      }
+    });
+    return () => {
+      cancelado = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cartKey, mounted]);
+
+  function aplicarCupom() {
+    const codigo = codigoInput.trim();
+    if (!codigo) {
+      setCupomErro("Informe um código.");
+      return;
+    }
+    const payload = items.map((i) => ({
+      produtoId: i.produtoId,
+      composicao: i.composicao,
+      quantidade: i.quantidade,
+    }));
+    startAplicar(async () => {
+      const r = await validarCupom(codigo, payload);
+      if (r.ok) {
+        setCupom(r.codigo);
+        setCupomDesc({
+          codigo: r.codigo,
+          descontoPix: r.descontoPix,
+          descontoCartao: r.descontoCartao,
+        });
+        setCupomErro(null);
+        setCodigoInput("");
+      } else {
+        setCupomErro(r.motivo);
+      }
+    });
+  }
+
+  function removerCupom() {
+    clearCupom();
+    setCupomDesc(null);
+    setCupomErro(null);
+  }
 
   if (!mounted) {
     return (
@@ -65,6 +153,11 @@ export default function CarrinhoPage() {
       ? Math.round((economiaPix / subtotalCheio) * 100)
       : 0;
   const excedeCaixa = totalPeixes > MAX_PEIXES_POR_CAIXA;
+
+  // Preview do cupom no melhor preço (Pix). O valor exato por forma de pagamento
+  // é recalculado no checkout.
+  const descontoCupomPix = cupomDesc?.descontoPix ?? 0;
+  const totalPixFinal = Math.max(0, subtotalPix - descontoCupomPix);
 
   function finalizarNoWhatsapp() {
     const linhas = items
@@ -219,15 +312,85 @@ export default function CarrinhoPage() {
             </div>
           )}
 
+          {/* Cupom de desconto (código digitado; não aparece na vitrine) */}
+          <div className="border-t border-border pt-3">
+            {cupomDesc ? (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-2 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+                  <span className="inline-flex items-center gap-1.5 text-sm text-green-700 font-medium">
+                    <Tag size={14} aria-hidden="true" />
+                    Cupom {cupomDesc.codigo}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={removerCupom}
+                    aria-label="Remover cupom"
+                    className="text-green-700 hover:text-secondary transition-colors"
+                  >
+                    <X size={16} aria-hidden="true" />
+                  </button>
+                </div>
+                {descontoCupomPix > 0 && (
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-green-700">Desconto do cupom (Pix)</span>
+                    <span className="text-green-700 font-medium tabular-nums">
+                      − {formatBRL(descontoCupomPix)}
+                    </span>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div>
+                <label
+                  htmlFor="cupom"
+                  className="block text-sm text-primary mb-1.5"
+                >
+                  Cupom de desconto
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    id="cupom"
+                    value={codigoInput}
+                    onChange={(e) => setCodigoInput(e.target.value.toUpperCase())}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        aplicarCupom();
+                      }
+                    }}
+                    placeholder="Digite o código"
+                    className="flex-1 min-w-0 border border-border rounded-lg px-3 py-2 text-sm uppercase placeholder:normal-case focus:outline-none focus:ring-2 focus:ring-secondary/40"
+                  />
+                  <button
+                    type="button"
+                    onClick={aplicarCupom}
+                    disabled={aplicando}
+                    className="shrink-0 bg-primary text-white text-sm font-semibold px-4 rounded-lg hover:brightness-110 disabled:opacity-50 transition-all"
+                  >
+                    {aplicando ? "…" : "Aplicar"}
+                  </button>
+                </div>
+                {cupomErro && (
+                  <p className="text-xs text-secondary mt-1.5">{cupomErro}</p>
+                )}
+              </div>
+            )}
+          </div>
+
           {/* À vista no Pix — destaque em verde (decisão do dono) */}
           <div className="flex items-end justify-between border-t border-border pt-3">
             <span className="text-sm font-medium text-primary">
               À vista no Pix{temDescontoGlobal ? ` (${pctPix}% OFF)` : ""}
             </span>
             <span className="text-green-600 text-2xl font-bold tabular-nums">
-              {formatBRL(subtotalPix)}
+              {formatBRL(totalPixFinal)}
             </span>
           </div>
+          {descontoCupomPix > 0 && (
+            <p className="text-[11px] text-muted-foreground -mt-2">
+              O desconto exato por forma de pagamento aparece no checkout.
+            </p>
+          )}
 
           {/* Frete — aviso VISÍVEL (calculado no checkout, não incluso ainda) */}
           <div className="flex items-start gap-2 text-sm bg-bg-alt rounded-lg p-2.5">
