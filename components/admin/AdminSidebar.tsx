@@ -10,6 +10,7 @@ import {
   ShoppingCart,
   Users,
   Settings,
+  Ticket,
   Fish,
 } from "lucide-react";
 
@@ -37,6 +38,7 @@ const NAV_SECTIONS: NavSection[] = [
     items: [
       { href: "/admin/produtos", label: "Produtos", icon: Package },
       { href: "/admin/categorias", label: "Categorias", icon: FolderTree },
+      { href: "/admin/cupons", label: "Cupons", icon: Ticket },
       {
         href: "/admin/hero-slides",
         label: "Hero da home",
