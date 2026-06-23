@@ -15,7 +15,9 @@ import {
   Plane,
   QrCode,
   ShoppingCart,
+  Tag,
   Truck,
+  X,
 } from "lucide-react";
 import { WhatsAppIcon } from "@/components/icons/WhatsAppIcon";
 import { formatBRL } from "@/lib/utils/format";
@@ -178,6 +180,8 @@ export default function CheckoutClient({
   const subtotalPixCart = useCart(selectSubtotalPix);
   const subtotalCheioCart = useCart(selectSubtotalCheio);
   const cupom = useCart((s) => s.cupom);
+  const setCupom = useCart((s) => s.setCupom);
+  const clearCupom = useCart((s) => s.clearCupom);
 
   // Desconto do cupom, revalidado no servidor (preview no checkout). O valor exato
   // é recalculado de novo ao fechar o pedido (anti-fraude); aqui é só o resumo.
@@ -186,6 +190,9 @@ export default function CheckoutClient({
     descontoPix: number;
     descontoCartao: number;
   } | null>(null);
+  const [codigoCupom, setCodigoCupom] = useState("");
+  const [cupomErro, setCupomErro] = useState<string | null>(null);
+  const [aplicandoCupom, startCupom] = useTransition();
 
   const router = useRouter();
   const {
@@ -383,6 +390,35 @@ export default function CheckoutClient({
       composicao: i.composicao,
       quantidade: i.quantidade,
     }));
+
+  function aplicarCupom() {
+    const codigo = codigoCupom.trim();
+    if (!codigo) {
+      setCupomErro("Informe um código.");
+      return;
+    }
+    startCupom(async () => {
+      const r = await validarCupom(codigo, itensPedido());
+      if (r.ok) {
+        setCupom(r.codigo);
+        setCupomDesc({
+          codigo: r.codigo,
+          descontoPix: r.descontoPix,
+          descontoCartao: r.descontoCartao,
+        });
+        setCupomErro(null);
+        setCodigoCupom("");
+      } else {
+        setCupomErro(r.motivo);
+      }
+    });
+  }
+
+  function removerCupom() {
+    clearCupom();
+    setCupomDesc(null);
+    setCupomErro(null);
+  }
 
   // Preços autoritativos (cheio + Pix) do servidor — refaz quando o carrinho muda.
   const itensKey = items
@@ -1008,6 +1044,58 @@ export default function CheckoutClient({
               );
             })}
           </ul>
+
+          {/* Cupom de desconto */}
+          <div className="border-t border-border pt-3">
+            {cupomDesc ? (
+              <div className="flex items-center justify-between gap-2 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+                <span className="inline-flex items-center gap-1.5 text-sm text-green-700 font-medium">
+                  <Tag size={14} aria-hidden="true" />
+                  Cupom {cupomDesc.codigo}
+                </span>
+                <button
+                  type="button"
+                  onClick={removerCupom}
+                  aria-label="Remover cupom"
+                  className="text-green-700 hover:text-secondary transition-colors"
+                >
+                  <X size={16} aria-hidden="true" />
+                </button>
+              </div>
+            ) : (
+              <div>
+                <label htmlFor="cupom" className="block text-xs font-medium text-primary mb-1">
+                  Cupom de desconto
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    id="cupom"
+                    value={codigoCupom}
+                    onChange={(e) => setCodigoCupom(e.target.value.toUpperCase())}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        aplicarCupom();
+                      }
+                    }}
+                    placeholder="Digite o código"
+                    className="flex-1 min-w-0 min-h-11 px-3 rounded-lg border border-border bg-white text-sm text-primary uppercase placeholder:normal-case placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:border-primary focus:ring-primary/30 transition-all"
+                  />
+                  <button
+                    type="button"
+                    onClick={aplicarCupom}
+                    disabled={aplicandoCupom}
+                    className="shrink-0 inline-flex items-center justify-center min-h-11 px-4 rounded-lg bg-primary text-white text-sm font-semibold hover:brightness-110 disabled:opacity-50 transition-all"
+                  >
+                    {aplicandoCupom ? "…" : "Aplicar"}
+                  </button>
+                </div>
+                {cupomErro && (
+                  <p className="text-xs text-red-600 mt-1">{cupomErro}</p>
+                )}
+              </div>
+            )}
+          </div>
 
           <div className="space-y-1 border-t border-border pt-3 text-sm">
             <div className="flex justify-between text-muted-foreground">
