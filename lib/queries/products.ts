@@ -3,6 +3,8 @@ import { prisma } from "../prisma";
 import { ordenarVitrine } from "../estoque";
 import { calcularPrecos, type ConfigPreco } from "../precos";
 import { getConfigPreco } from "./config";
+import { resolverCampanhas } from "../campanha";
+import type { CampanhaProduto } from "../campanha-core";
 import type { Prisma } from "../generated/prisma/client";
 import type { ProductType, TipoComposicao } from "../generated/prisma/enums";
 
@@ -22,6 +24,8 @@ export type PublicProductCard = {
   descontoPixPercent: number; // % efetivo aplicado no Pix (0 = sem desconto)
   parcelasMax: number;
   estoque: number;
+  // Campanha automática vigente (preço promo já calculado), ou null.
+  campanha: CampanhaProduto | null;
   video: {
     platform: "YOUTUBE" | "INSTAGRAM" | "TIKTOK";
     thumbnailUrl: string | null;
@@ -39,8 +43,9 @@ const cardSelect = {
   usarDescontoPixGlobal: true, // p/ aplicar o desconto Pix GLOBAL no card
   parcelasMax: true,
   estoque: true,
+  categoryId: true, // escopo de campanha (não vai pro card)
   // Para ordenar a vitrine (esgotados por último; destaque entre disponíveis).
-  // Não vão para o card — só alimentam ordenarVitrine.
+  // Não vão para o card — só alimentam ordenarVitrine / resolução de campanha.
   destaque: true,
   estoqueMachos: true,
   estoqueFemeas: true,
@@ -81,6 +86,7 @@ function toCard(p: CardRow, config: ConfigPreco): PublicProductCard {
     descontoPixPercent: precos.descontoPixPercent,
     parcelasMax: p.parcelasMax,
     estoque: p.estoque,
+    campanha: null, // preenchido por anexarCampanhasCards
     video: v
       ? {
           platform: v.platform,
@@ -90,6 +96,28 @@ function toCard(p: CardRow, config: ConfigPreco): PublicProductCard {
         }
       : null,
   };
+}
+
+// Anexa a campanha vigente a cada card (resolve 1× via React.cache em lib/campanha).
+async function anexarCampanhasCards(
+  rows: CardRow[],
+  config: ConfigPreco,
+): Promise<PublicProductCard[]> {
+  const cards = rows.map((r) => toCard(r, config));
+  const map = await resolverCampanhas(
+    rows.map((r, i) => ({
+      id: r.id,
+      categoryId: r.categoryId,
+      precoCheio: cards[i].precoCheio,
+      descontoPixPercent: cards[i].descontoPixPercent,
+      estoqueMachos: r.estoqueMachos,
+      estoqueFemeas: r.estoqueFemeas,
+    })),
+  );
+  return cards.map((c) => {
+    const camp = map.get(c.id);
+    return camp ? { ...c, campanha: camp } : c;
+  });
 }
 
 async function findCards(
@@ -105,7 +133,7 @@ async function findCards(
     }),
     getConfigPreco(),
   ]);
-  return rows.map((r) => toCard(r, config));
+  return anexarCampanhasCards(rows, config);
 }
 
 /** "Mais Procurados" = destaque manual (sem vendas registradas ainda). */
@@ -197,7 +225,7 @@ export async function listProductsLoja(
   const skip = filters.skip ?? 0;
   const take = filters.take ?? LOJA_PAGE_SIZE;
   return {
-    items: ordenados.slice(skip, skip + take).map((r) => toCard(r, config)),
+    items: await anexarCampanhasCards(ordenados.slice(skip, skip + take), config),
     total: ordenados.length,
   };
 }

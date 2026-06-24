@@ -100,6 +100,8 @@ export type CupomDetalhe = {
   valor: number;
   escopo: "TODOS" | "CATEGORIAS" | "PRODUTOS";
   modoAplicacao: "AMBOS_VENCE_MAIOR" | "AMBOS_ACUMULA" | "SO_PIX" | "SO_CARTAO";
+  tipoCupom: "SECRETO" | "CAMPANHA";
+  precoUnicoNaCampanha: boolean;
   ativo: boolean;
   validoDe: Date | null;
   validoAte: Date | null;
@@ -129,6 +131,8 @@ export async function getCupomById(id: string): Promise<CupomDetalhe | null> {
     valor: Number(c.valor),
     escopo: c.escopo,
     modoAplicacao: c.modoAplicacao,
+    tipoCupom: c.tipoCupom,
+    precoUnicoNaCampanha: c.precoUnicoNaCampanha,
     ativo: c.ativo,
     validoDe: c.validoDe,
     validoAte: c.validoAte,

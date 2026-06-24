@@ -7,6 +7,8 @@ import {
   getUltimosAdicionados,
 } from "@/lib/queries/products";
 import { getConfigPreco } from "@/lib/queries/config";
+import { calcularPrecos } from "@/lib/precos";
+import { resolverCampanhaInfo } from "@/lib/campanha";
 import { stripMarcheziSignature } from "@/lib/constants";
 import ProductDetail from "@/components/product/ProductDetail";
 import FeedAutoOpen from "@/components/feed/FeedAutoOpen";
@@ -87,6 +89,25 @@ export default async function ProdutoPage({ params }: Props) {
   // preço efetivo com isso, igual ao checkout).
   const { descontoPixGlobalPercent } = await getConfigPreco();
 
+  // Campanha automática vigente para este produto (preço base = produto, sem
+  // variante). O componente recalcula o promo por variante com a mesma fórmula.
+  const precosBase = calcularPrecos(
+    {
+      precoBase: prod.preco,
+      descontoPixProprio: prod.descontoPix,
+      usarDescontoPixGlobal: prod.usarDescontoPixGlobal,
+    },
+    { descontoPixGlobalPercent },
+  );
+  const campanha = await resolverCampanhaInfo({
+    id: prod.id,
+    categoryId: prod.categoryId,
+    precoCheio: precosBase.precoCartao,
+    descontoPixPercent: precosBase.descontoPixPercent,
+    estoqueMachos: prod.estoqueMachos,
+    estoqueFemeas: prod.estoqueFemeas,
+  });
+
   return (
     <>
       {/* Mobile: deep link abre o feed neste produto (desktop ignora). */}
@@ -101,6 +122,7 @@ export default async function ProdutoPage({ params }: Props) {
         product={prod}
         relacionados={relacionados}
         descontoPixGlobalPercent={descontoPixGlobalPercent}
+        campanha={campanha}
       />
     </>
   );
