@@ -6,7 +6,7 @@ import {
   getRelacionados,
   getUltimosAdicionados,
 } from "@/lib/queries/products";
-import { getConfigPreco } from "@/lib/queries/config";
+import { getConfigPreco, getFreteGratisConfig } from "@/lib/queries/config";
 import { calcularPrecos } from "@/lib/precos";
 import { resolverCampanhaInfo } from "@/lib/campanha";
 import { stripMarcheziSignature } from "@/lib/constants";
@@ -88,6 +88,7 @@ export default async function ProdutoPage({ params }: Props) {
   // Desconto Pix global (lib/precos é a fonte única; o ProductDetail calcula o
   // preço efetivo com isso, igual ao checkout).
   const { descontoPixGlobalPercent } = await getConfigPreco();
+  const freteGratis = await getFreteGratisConfig();
 
   // Campanha automática vigente para este produto (preço base = produto, sem
   // variante). O componente recalcula o promo por variante com a mesma fórmula.
@@ -123,6 +124,7 @@ export default async function ProdutoPage({ params }: Props) {
         relacionados={relacionados}
         descontoPixGlobalPercent={descontoPixGlobalPercent}
         campanha={campanha}
+        freteGratis={freteGratis}
       />
     </>
   );

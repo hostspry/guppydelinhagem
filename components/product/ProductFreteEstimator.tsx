@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { AlertTriangle, Clock, Loader2, MapPin } from "lucide-react";
 import { WhatsAppIcon } from "@/components/icons/WhatsAppIcon";
 import { formatBRL } from "@/lib/utils/format";
-import { whatsappLink, MAX_PEIXES_POR_CAIXA } from "@/lib/constants";
+import { whatsappLink } from "@/lib/constants";
 
 type JadlogOpt = {
   id: number;
@@ -39,7 +39,8 @@ export default function ProductFreteEstimator({ qtd }: { qtd: number }) {
 
   const cepDigits = cep.replace(/\D/g, "");
   const cepValido = /^\d{8}$/.test(cepDigits);
-  const excedeCaixa = qtd > MAX_PEIXES_POR_CAIXA;
+  // Limite vem da resposta da API (config da loja); antes da 1ª cotação, sem aviso.
+  const excedeCaixa = result != null && qtd > result.maxPeixesPorCaixa;
   // Evita recalcular o mesmo (cep, qtd) — o cálculo automático dispara só quando
   // o par muda. O botão força via "" no ref.
   const ultimaChave = useRef("");
@@ -171,7 +172,7 @@ export default function ProductFreteEstimator({ qtd }: { qtd: number }) {
 
             {excedeCaixa && (
               <p className="text-[11px] text-amber-700 leading-snug">
-                Mais de {MAX_PEIXES_POR_CAIXA} peixes: a gente recalcula o frete.{" "}
+                Mais de {result.maxPeixesPorCaixa} peixes: a gente recalcula o frete.{" "}
                 <a
                   href={whatsappLink(
                     `Olá! Tenho ${qtd} peixes e gostaria de recalcular o frete para fechar o pedido.`,

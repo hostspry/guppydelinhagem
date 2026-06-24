@@ -6,7 +6,7 @@ import { Minus, Plus, Trash2, ShoppingCart, Truck, Tag, X } from "lucide-react";
 import { WhatsAppIcon } from "@/components/icons/WhatsAppIcon";
 import { VideoThumb } from "@/components/admin/VideoThumb";
 import { formatBRL } from "@/lib/utils/format";
-import { whatsappLink, MAX_PEIXES_POR_CAIXA } from "@/lib/constants";
+import { whatsappLink } from "@/lib/constants";
 import {
   validarCupom,
   resolverItensCarrinho,
@@ -148,8 +148,22 @@ export default function CarrinhoPage() {
   const subtotalCheioEfetivo =
     resolvido?.subtotalCheioEfetivo ?? subtotalCheioBase;
 
-  const excedeCaixa = totalPeixes > MAX_PEIXES_POR_CAIXA;
+  // Limite de peixes (config, desce do servidor via resolverItensCarrinho).
+  const maxPeixes = resolvido?.maxPeixesFreteAuto ?? 10;
+  const excedeCaixa = totalPeixes > maxPeixes;
   const economiaPix = Math.max(0, subtotalCheioBase - subtotalPixEfetivo);
+
+  // Frete grátis: base = subtotal EFETIVO do cartão (com campanha). Não promete
+  // quando o pedido excede o limite de peixes (frete será combinado no WhatsApp).
+  const fg = resolvido?.freteGratis;
+  const freteGratisAtivo = !!fg?.ativo && fg.acimaDe != null && !excedeCaixa;
+  const freteGratisAcimaDe = fg?.acimaDe ?? 0;
+  const faltaFreteGratis = Math.max(0, freteGratisAcimaDe - subtotalCheioEfetivo);
+  const freteGratisAtingido = freteGratisAtivo && faltaFreteGratis <= 0;
+  const freteGratisPct =
+    freteGratisAtivo && freteGratisAcimaDe > 0
+      ? Math.min(100, Math.round((subtotalCheioEfetivo / freteGratisAcimaDe) * 100))
+      : 0;
   const pctPix =
     economiaPix > 0 && subtotalCheioBase > 0
       ? Math.round((economiaPix / subtotalCheioBase) * 100)
@@ -395,6 +409,24 @@ export default function CarrinhoPage() {
             </div>
           )}
 
+          {/* Frete grátis — progresso sobre o valor efetivo (cartão com campanha) */}
+          {freteGratisAtivo && (
+            <div className="rounded-lg bg-bg-alt p-2.5 space-y-1.5">
+              <p className="text-sm font-medium text-primary flex items-center gap-1.5">
+                <Truck size={15} className="shrink-0 text-green-600" aria-hidden="true" />
+                {freteGratisAtingido
+                  ? "Você ganhou frete grátis!"
+                  : `Faltam ${formatBRL(faltaFreteGratis)} para o frete grátis`}
+              </p>
+              <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-green-500 transition-[width] duration-500"
+                  style={{ width: `${freteGratisPct}%` }}
+                />
+              </div>
+            </div>
+          )}
+
           {/* Frete — aviso VISÍVEL (calculado no checkout, não incluso ainda) */}
           <div className="flex items-start gap-2 text-sm bg-bg-alt rounded-lg p-2.5">
             <Truck size={16} className="text-primary shrink-0 mt-0.5" aria-hidden="true" />
@@ -409,8 +441,8 @@ export default function CarrinhoPage() {
 
           {excedeCaixa && (
             <p className="text-[11px] text-amber-700 bg-amber-50 rounded-md p-2 leading-snug">
-              Para mais de {MAX_PEIXES_POR_CAIXA} peixes, o frete precisa ser
-              recalculado. Fale com o criador no WhatsApp ao finalizar.
+              Para mais de {maxPeixes} peixes, o frete precisa ser recalculado.
+              Fale com o criador no WhatsApp ao finalizar.
             </p>
           )}
 

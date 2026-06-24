@@ -110,11 +110,13 @@ export default function ProductDetail({
   relacionados,
   descontoPixGlobalPercent,
   campanha,
+  freteGratis,
 }: {
   product: ProductDetailData;
   relacionados: PublicProductCard[];
   descontoPixGlobalPercent: number;
   campanha: CampanhaInfo | null;
+  freteGratis: { ativo: boolean; acimaDe: number | null };
 }) {
   const router = useRouter();
   const [qtd, setQtd] = useState(1);
@@ -540,6 +542,14 @@ export default function ProductDetail({
               </>
             )}
           </div>
+
+          {/* Selo de frete grátis (config da loja) */}
+          {freteGratis.ativo && freteGratis.acimaDe != null && (
+            <p className="inline-flex items-center gap-1.5 text-sm font-medium text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-1.5">
+              <Truck size={15} className="shrink-0" aria-hidden="true" />
+              Frete grátis acima de {formatBRL(freteGratis.acimaDe)}
+            </p>
+          )}
 
           {/* Frete — logo abaixo do preço */}
           <div className="max-w-md">

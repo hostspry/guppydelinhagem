@@ -26,11 +26,7 @@ import {
   trackAddPaymentInfo,
   type AnalyticsItem,
 } from "@/lib/analytics";
-import {
-  whatsappLink,
-  MAX_PEIXES_POR_CAIXA,
-  freteGollog,
-} from "@/lib/constants";
+import { whatsappLink, freteGollog } from "@/lib/constants";
 import { checkoutSchema } from "@/lib/validations/checkout";
 import {
   useCart,
@@ -227,7 +223,8 @@ export default function CheckoutClient({
 
   const cepDigits = (watch("cep") ?? "").replace(/\D/g, "");
   const cepValido = /^\d{8}$/.test(cepDigits);
-  const excedeCaixa = totalPeixes > MAX_PEIXES_POR_CAIXA;
+  const maxPeixes = resolvido?.maxPeixesFreteAuto ?? 10;
+  const excedeCaixa = totalPeixes > maxPeixes;
 
   // Terrestre = Jadlog .Com (id 4, via Melhor Envio). Aéreo = Gollog fixo por UF.
   const jadlogSel = useMemo(
@@ -275,12 +272,20 @@ export default function CheckoutClient({
     return m;
   }, [resolvido]);
 
-  // Frete grátis: base = subtotal CHEIO base (igual ao servidor; não muda por aba).
+  // Frete grátis: base = subtotal EFETIVO do cartão (com campanha), igual ao
+  // servidor. Config vem do resolvido (fallback no prop). Não promete acima do
+  // limite de peixes (frete combinado no WhatsApp).
+  const fg = resolvido?.freteGratis ?? freteGratis;
   const freteGratisAplicado =
-    freteGratis.ativo &&
-    freteGratis.acimaDe != null &&
-    subtotalCheioBase >= freteGratis.acimaDe;
+    fg.ativo && !excedeCaixa && subtotalCheioEfetivo >= (fg.acimaDe ?? Infinity);
   const freteEfetivo = freteGratisAplicado ? 0 : freteValor;
+  // Barra de progresso (só quando ativo e dentro do limite de peixes).
+  const mostraBarraFreteGratis = fg.ativo && !excedeCaixa;
+  const faltaFreteGratis = Math.max(0, (fg.acimaDe ?? 0) - subtotalCheioEfetivo);
+  const freteGratisPct =
+    fg.acimaDe && fg.acimaDe > 0
+      ? Math.min(100, Math.round((subtotalCheioEfetivo / fg.acimaDe) * 100))
+      : 0;
 
   // Totais por aba a partir dos subtotais EFETIVOS (já com campanha/cupom). O
   // cartão (Brick) usa totalCartao — bate com o que o servidor cobra.
@@ -715,7 +720,7 @@ export default function CheckoutClient({
               {excedeCaixa && (
                 <div className="text-xs text-amber-800 bg-amber-50 rounded-lg p-3 leading-snug space-y-1">
                   <p className="font-medium">
-                    Mais de {MAX_PEIXES_POR_CAIXA} peixes neste pedido.
+                    Mais de {maxPeixes} peixes neste pedido.
                   </p>
                   <p>
                     O frete acima desse limite é calculado manualmente. Finalize
@@ -1089,9 +1094,26 @@ export default function CheckoutClient({
             )}
           </div>
 
+          {/* Frete grátis — progresso sobre o valor efetivo do cartão */}
+          {mostraBarraFreteGratis && (
+            <div className="rounded-lg bg-bg-alt p-2.5 space-y-1.5">
+              <p className="text-sm font-medium text-primary flex items-center gap-1.5">
+                <Truck size={15} className="shrink-0 text-green-600" aria-hidden="true" />
+                {freteGratisAplicado
+                  ? "Você ganhou frete grátis!"
+                  : `Faltam ${formatBRL(faltaFreteGratis)} para o frete grátis`}
+              </p>
+              <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-green-500 transition-[width] duration-500"
+                  style={{ width: `${freteGratisPct}%` }}
+                />
+              </div>
+            </div>
+          )}
+
           <div className="space-y-1 border-t border-border pt-3 text-sm">
-            {/* Subtotal sempre no preço CHEIO (cartão à vista) — os descontos vêm
-                listados abaixo, pra ficar claro de onde sai cada valor. */}
+            {/* Subtotal efetivo da aba (Pix ou cartão) — já com campanha/cupom. */}
             <div className="flex justify-between text-muted-foreground">
               <span>Subtotal {aba === "pix" ? "no Pix" : "no cartão"}</span>
               <span className="tabular-nums">{formatBRL(subtotalEfetivoAba)}</span>
@@ -1194,7 +1216,7 @@ export default function CheckoutClient({
                 </p>
               ) : excedeCaixa ? (
                 <p className="text-xs text-amber-700">
-                  Acima de {MAX_PEIXES_POR_CAIXA} peixes, finalize no WhatsApp.
+                  Acima de {maxPeixes} peixes, finalize no WhatsApp.
                 </p>
               ) : freteValor == null ? (
                 <p className="text-[11px] text-muted-foreground flex items-center gap-1 leading-snug">
