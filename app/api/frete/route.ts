@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { FRETE_CONFIG, calcularPesoECaixa, cotarFrete } from "@/lib/shipping";
+import { getMaxPeixesFreteAuto } from "@/lib/queries/config";
 import { rateLimit, clientIp } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
@@ -45,5 +46,7 @@ export async function POST(req: Request) {
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: result.status });
   }
-  return NextResponse.json(result.data);
+  // Limite de peixes p/ frete automático vem da config (acima → WhatsApp).
+  const maxPeixesPorCaixa = await getMaxPeixesFreteAuto();
+  return NextResponse.json({ ...result.data, maxPeixesPorCaixa });
 }

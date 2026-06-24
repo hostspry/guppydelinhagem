@@ -24,9 +24,14 @@ import {
 import { resolverCampanhaInfo } from "@/lib/campanha";
 import { precoComCampanha, type CampanhaInfo } from "@/lib/campanha-core";
 import { getCupomByCodigo } from "@/lib/queries/cupons";
-import { getConfigPreco, getFreteGratisConfig } from "@/lib/queries/config";
+import {
+  getConfigPreco,
+  getFreteGratisConfig,
+  getConfiguracaoLoja,
+  getMaxPeixesFreteAuto,
+} from "@/lib/queries/config";
 import { COMPOSICAO_LABEL } from "@/lib/composicoes";
-import { MAX_PEIXES_POR_CAIXA, freteGollog } from "@/lib/constants";
+import { freteGollog } from "@/lib/constants";
 import type { EnderecoEntrega } from "@/lib/validations/pedido";
 import {
   ProviderPagamento,
@@ -651,6 +656,9 @@ export type CarrinhoResolvido = {
   subtotalPixBase: number;
   subtotalCheioEfetivo: number;
   subtotalPixEfetivo: number;
+  // Config da loja que o carrinho/checkout precisam (descem do servidor).
+  maxPeixesFreteAuto: number;
+  freteGratis: { ativo: boolean; acimaDe: number | null };
 };
 
 /**
@@ -691,12 +699,18 @@ export async function resolverItensCarrinho(
   });
   const soma = (f: (l: LinhaCarrinhoResolvida) => number) =>
     round2(linhas.reduce((a, l) => a + f(l) * l.quantidade, 0));
+  const cfg = await getConfiguracaoLoja();
   return {
     linhas,
     subtotalCheioBase: soma((l) => l.precoCheioBase),
     subtotalPixBase: soma((l) => l.precoPixBase),
     subtotalCheioEfetivo: soma((l) => l.precoCheioEfetivo),
     subtotalPixEfetivo: soma((l) => l.precoPixEfetivo),
+    maxPeixesFreteAuto: cfg.maxPeixesFreteAuto,
+    freteGratis: {
+      ativo: cfg.freteGratisAtivo && cfg.freteGratisAcimaDe != null,
+      acimaDe: cfg.freteGratisAcimaDe,
+    },
   };
 }
 
@@ -753,11 +767,27 @@ export async function criarOrderDoCheckout(
     cupomCodigo: descItens[i].cupomCodigo,
   }));
 
-  // >10 peixes → não dá pra cobrar frete automático: fecha no WhatsApp.
-  if (totalPeixes > MAX_PEIXES_POR_CAIXA) {
+  // Desconto do pedido (por item, base cartão e Pix) — calculado já aqui pois o
+  // frete grátis incide sobre o subtotal EFETIVO do cartão.
+  const descontoCartao = round2(
+    prec.itens.reduce(
+      (a, it, i) => a + descItens[i].descontoCartaoUnit * it.quantidade,
+      0,
+    ),
+  );
+  const descontoPix = round2(
+    prec.itens.reduce(
+      (a, it, i) => a + descItens[i].descontoPixUnit * it.quantidade,
+      0,
+    ),
+  );
+
+  // Acima do limite de peixes (config) → frete combinado por WhatsApp.
+  const maxPeixes = await getMaxPeixesFreteAuto();
+  if (totalPeixes > maxPeixes) {
     return {
       ok: false,
-      error: `Pedidos acima de ${MAX_PEIXES_POR_CAIXA} peixes têm o frete calculado manualmente — finalize no WhatsApp.`,
+      error: `Pedidos acima de ${maxPeixes} peixes têm o frete calculado manualmente. Finalize no WhatsApp.`,
     };
   }
 
@@ -805,29 +835,19 @@ export async function criarOrderDoCheckout(
   }
 
   // ── 2b. Frete grátis (config da loja, anti-tamper) ─────────────────────────
-  // Base ÚNICA = subtotal no preço cheio (cartão). É a base canônica do pedido
-  // (Order.subtotal), não depende da forma de pagamento e mantém o Order.frete
-  // consistente (gerarNovoPix reusa esse frete salvo). Generosa: cheio ≥ Pix.
+  // Base = subtotal EFETIVO do cartão (preço cheio já com campanha/cupom) — o que
+  // o cliente realmente paga. Mesma base mostrada na vitrine/carrinho/checkout.
+  const subtotalCheioEfetivo = round2(subtotalCheio - descontoCartao);
   const freteGratis = await getFreteGratisConfig();
-  if (freteGratis.ativo && subtotalCheio >= (freteGratis.acimaDe ?? Infinity)) {
+  if (
+    freteGratis.ativo &&
+    subtotalCheioEfetivo >= (freteGratis.acimaDe ?? Infinity)
+  ) {
     frete = 0;
   }
 
-  // ── 2c. Desconto do pedido = soma dos descontos por item (base cartão e Pix).
-  // A fonte de verdade do desconto é por item (OrderItem). No Order guardamos a
-  // soma (cheio/cartão) e, informativo, o código secreto digitado (cupomId null).
-  const descontoCartao = round2(
-    prec.itens.reduce(
-      (a, it, i) => a + descItens[i].descontoCartaoUnit * it.quantidade,
-      0,
-    ),
-  );
-  const descontoPix = round2(
-    prec.itens.reduce(
-      (a, it, i) => a + descItens[i].descontoPixUnit * it.quantidade,
-      0,
-    ),
-  );
+  // No Order guardamos a soma do desconto (calculada acima) e, informativo, o
+  // código secreto digitado (cupomId null — a fonte de verdade é por item).
   const cupomId: string | null = null;
   const cupomCodigo: string | null = data.cupomCodigo?.trim()
     ? normalizarCodigo(data.cupomCodigo)
