@@ -15,12 +15,14 @@ import {
   Volume2,
   VolumeX,
   Share2,
+  Tag,
 } from "lucide-react";
 import { toast } from "sonner";
 import { trackAddToCart } from "@/lib/analytics";
 import { VideoThumb } from "@/components/admin/VideoThumb";
 import { formatBRL } from "@/lib/utils/format";
 import { calcularPrecos } from "@/lib/precos";
+import { precoComCampanha } from "@/lib/campanha-core";
 import { useCart } from "@/lib/stores/cart";
 import {
   COMPOSICAO_LABEL,
@@ -256,6 +258,10 @@ export default function VideoFeed({
     },
     { descontoPixGlobalPercent },
   );
+  // Campanha automática (mesma da vitrine), aplicada por variante.
+  const promo = p.campanha
+    ? precoComCampanha(precos.precoCartao, precos.descontoPixPercent, p.campanha)
+    : null;
   const estoqueAtual = variant ? unitsDoPool(p, variant) : p.estoque;
   const semEstoque = estoqueAtual <= 0;
   const pool = { machos: p.estoqueMachos, femeas: p.estoqueFemeas };
@@ -530,41 +536,24 @@ export default function VideoFeed({
         </button>
       </div>
 
-      {/* Alça central de minimizar/expandir a camada de compra. Fica SEMPRE
-          visível (não desliza junto com a gaveta): ChevronsDown esconde a compra
-          deixando o vídeo limpo; ChevronsUp traz de volta. z-40 acima da gaveta.
-          Expandido: ancorada no TOPO da gaveta. Minimizado: desce pra base. */}
-      <div
-        className={`absolute inset-x-0 z-40 flex justify-center pointer-events-none transition-all duration-300 ${
-          minimizado ? "bottom-0" : "bottom-[var(--gaveta-h)]"
-        }`}
-        style={
-          {
-            // Aproximação da altura da gaveta de compra (alça pousa logo acima).
-            "--gaveta-h": "11rem",
-            paddingBottom: minimizado
-              ? "calc(0.75rem + env(safe-area-inset-bottom))"
-              : "0",
-          } as React.CSSProperties
-        }
-      >
-        <button
-          type="button"
-          onClick={() => setMinimizado((v) => !v)}
-          aria-label={
-            minimizado
-              ? "Mostrar informações de compra"
-              : "Minimizar informações de compra"
-          }
-          className="pointer-events-auto flex items-center justify-center w-12 h-9 rounded-full bg-black/60 text-white hover:bg-black/80 transition-colors"
+      {/* Minimizado: alça flutuante na base pra TRAZER a compra de volta. (Quando
+          expandido, a alça vive no topo da própria gaveta — sem altura fixa, então
+          nunca cobre o nome, mesmo em 2 linhas.) */}
+      {minimizado && (
+        <div
+          className="absolute inset-x-0 z-40 flex justify-center pointer-events-none"
+          style={{ bottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}
         >
-          {minimizado ? (
+          <button
+            type="button"
+            onClick={() => setMinimizado(false)}
+            aria-label="Mostrar informações de compra"
+            className="pointer-events-auto flex items-center justify-center w-12 h-9 rounded-full bg-black/60 text-white hover:bg-black/80 transition-colors"
+          >
             <ChevronsUp className="w-5 h-5" aria-hidden="true" />
-          ) : (
-            <ChevronsDown className="w-5 h-5" aria-hidden="true" />
-          )}
-        </button>
-      </div>
+          </button>
+        </div>
+      )}
 
       {/* Gaveta de compra (parte de baixo, vídeo visível acima) — degradê escuro
           pra o texto ficar legível sobre qualquer vídeo (claro ou escuro). */}
@@ -580,28 +569,72 @@ export default function VideoFeed({
           paddingBottom: "calc(1rem + env(safe-area-inset-bottom))",
         }}
       >
+        {/* Alça no TOPO da gaveta (faixa própria): minimiza a compra. O pt-12 da
+            gaveta reserva espaço, então ela nunca cobre o nome (1 ou 2 linhas). */}
+        <button
+          type="button"
+          onClick={() => setMinimizado(true)}
+          aria-label="Minimizar informações de compra"
+          className="pointer-events-auto absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center w-12 h-9 rounded-full bg-black/60 text-white hover:bg-black/80 transition-colors"
+        >
+          <ChevronsDown className="w-5 h-5" aria-hidden="true" />
+        </button>
+
         {/* pointer-events-auto só no conteúdo: a área transparente do degradê não
             intercepta cliques dos controles atrás (ex.: botão compartilhar). */}
         <div className="max-w-[480px] mx-auto space-y-3 text-white pointer-events-auto">
           <div>
             <h2 className="text-base font-bold leading-tight">{p.nome}</h2>
-            {/* Preço: Pix com desconto + cheio do cartão legível (lib/precos) */}
-            <div className="flex items-end gap-2 flex-wrap mt-1">
-              <span className="text-green-400 text-2xl font-bold leading-none">
-                {formatBRL(precos.precoPix)}
-              </span>
-              <span className="text-green-300 text-xs font-semibold pb-0.5">
-                no Pix
-              </span>
-              {precos.descontoPixPercent > 0 && (
-                <span className="text-[10px] font-bold text-green-900 bg-green-300 px-1.5 py-0.5 rounded-full">
-                  {precos.descontoPixPercent}% OFF
-                </span>
-              )}
-            </div>
-            <p className="text-white/70 text-xs mt-0.5">
-              {formatBRL(precos.precoCartao)} no cartão · até {p.parcelasMax}x
-            </p>
+            {promo && p.campanha ? (
+              <>
+                {/* Campanha: de/por + "-X% OFF" + selo do código (igual à vitrine) */}
+                <div className="flex items-center gap-2 flex-wrap mt-1">
+                  <span className="text-white/60 text-sm line-through">
+                    {formatBRL(precos.precoCartao)}
+                  </span>
+                  <span className="text-[10px] font-bold text-[#07366A] bg-[#FAB82A] px-1.5 py-0.5 rounded-full">
+                    -{promo.descontoPercent}% OFF
+                  </span>
+                  <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-[#07366A] bg-[#FAB82A] px-1.5 py-0.5 rounded-full">
+                    <Tag size={10} aria-hidden="true" /> Cupom {p.campanha.codigo}
+                  </span>
+                </div>
+                <div className="flex items-end gap-2 flex-wrap mt-1">
+                  <span className="text-green-400 text-2xl font-bold leading-none">
+                    {formatBRL(promo.precoPromoPix)}
+                  </span>
+                  <span className="text-green-300 text-xs font-semibold pb-0.5">
+                    {p.campanha.precoUnico ? "no Pix ou cartão" : "no Pix"}
+                  </span>
+                </div>
+                {!p.campanha.precoUnico && (
+                  <p className="text-white/70 text-xs mt-0.5">
+                    {formatBRL(promo.precoPromoCheio)} no cartão · até{" "}
+                    {p.parcelasMax}x
+                  </p>
+                )}
+              </>
+            ) : (
+              <>
+                {/* Preço: Pix com desconto + cheio do cartão legível (lib/precos) */}
+                <div className="flex items-end gap-2 flex-wrap mt-1">
+                  <span className="text-green-400 text-2xl font-bold leading-none">
+                    {formatBRL(precos.precoPix)}
+                  </span>
+                  <span className="text-green-300 text-xs font-semibold pb-0.5">
+                    no Pix
+                  </span>
+                  {precos.descontoPixPercent > 0 && (
+                    <span className="text-[10px] font-bold text-green-900 bg-green-300 px-1.5 py-0.5 rounded-full">
+                      {precos.descontoPixPercent}% OFF
+                    </span>
+                  )}
+                </div>
+                <p className="text-white/70 text-xs mt-0.5">
+                  {formatBRL(precos.precoCartao)} no cartão · até {p.parcelasMax}x
+                </p>
+              </>
+            )}
           </div>
 
           {/* Composição (variantes do produto) */}
