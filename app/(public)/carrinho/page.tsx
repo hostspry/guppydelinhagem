@@ -151,7 +151,9 @@ export default function CarrinhoPage() {
   // Limite de peixes (config, desce do servidor via resolverItensCarrinho).
   const maxPeixes = resolvido?.maxPeixesFreteAuto ?? 10;
   const excedeCaixa = totalPeixes > maxPeixes;
-  const economiaPix = Math.max(0, subtotalCheioBase - subtotalPixEfetivo);
+  // Economia REAL do Pix = cartão efetivo − Pix efetivo (ambos já com campanha).
+  // No preço único (Pix = cartão) isso dá 0 e as linhas de Pix somem.
+  const economiaPix = Math.max(0, subtotalCheioEfetivo - subtotalPixEfetivo);
 
   // Frete grátis: base = subtotal EFETIVO do cartão (com campanha). Não promete
   // quando o pedido excede o limite de peixes (frete será combinado no WhatsApp).
@@ -165,8 +167,8 @@ export default function CarrinhoPage() {
       ? Math.min(100, Math.round((subtotalCheioEfetivo / freteGratisAcimaDe) * 100))
       : 0;
   const pctPix =
-    economiaPix > 0 && subtotalCheioBase > 0
-      ? Math.round((economiaPix / subtotalCheioBase) * 100)
+    economiaPix > 0 && subtotalCheioEfetivo > 0
+      ? Math.round((economiaPix / subtotalCheioEfetivo) * 100)
       : 0;
   // Cartão com desconto (campanha/cupom incide no cartão) — mostra preço no cartão.
   const temDescontoCartao = subtotalCheioEfetivo < subtotalCheioBase;
@@ -189,7 +191,15 @@ export default function CarrinhoPage() {
 
   return (
     <div className="container-site py-12">
-      <h1 className="text-primary text-2xl font-semibold mb-6">Seu carrinho</h1>
+      <div className="flex items-center justify-between gap-3 mb-6">
+        <h1 className="text-primary text-2xl font-semibold">Seu carrinho</h1>
+        <Link
+          href="/loja"
+          className="text-sm font-medium text-secondary hover:underline shrink-0"
+        >
+          Continuar comprando
+        </Link>
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
         {/* Lista de itens */}
@@ -289,7 +299,9 @@ export default function CarrinhoPage() {
                         removeItem(item.variantId);
                       }}
                       aria-label={`Remover ${item.nome}`}
-                      className="flex items-center justify-center w-11 h-11 -my-1 text-muted-foreground hover:text-secondary transition-colors"
+                      // touch-manipulation + alvo 44px: o toque no S23 acerta a
+                      // lixeira sem disparar nada por baixo.
+                      className="flex items-center justify-center w-11 h-11 -my-1 shrink-0 touch-manipulation text-muted-foreground hover:text-secondary transition-colors"
                     >
                       <Trash2 size={18} aria-hidden="true" />
                     </button>
@@ -467,7 +479,7 @@ export default function CarrinhoPage() {
           </button>
 
           <Link
-            href="/"
+            href="/loja"
             className="block text-center text-sm text-muted-foreground hover:text-primary transition-colors"
           >
             Continuar comprando
