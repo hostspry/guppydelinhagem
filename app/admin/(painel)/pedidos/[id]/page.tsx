@@ -149,6 +149,20 @@ export default async function PedidoDetalhePage({ params }: Props) {
               Envio &amp; pagamento
             </h2>
             <p className="text-gray-600">
+              Entrega:{" "}
+              <span
+                className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                  pedido.tipoEntrega === "RETIRADA"
+                    ? "bg-amber-50 text-amber-700"
+                    : "bg-blue-50 text-blue-700"
+                }`}
+              >
+                {pedido.tipoEntrega === "RETIRADA"
+                  ? "Retirada na loja"
+                  : "Envio"}
+              </span>
+            </p>
+            <p className="text-gray-600">
               Transportadora:{" "}
               <span className="text-[#07366A]">
                 {pedido.transportadora ?? "—"}

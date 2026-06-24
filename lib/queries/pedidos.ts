@@ -1,5 +1,9 @@
 import { prisma } from "../prisma";
-import type { Prisma, OrderStatus } from "../generated/prisma/client";
+import type {
+  Prisma,
+  OrderStatus,
+  TipoEntrega,
+} from "../generated/prisma/client";
 import type { EnderecoEntrega } from "../validations/pedido";
 
 const LIMITE_ORFAO_HORAS = 24;
@@ -28,12 +32,15 @@ export async function cancelarPedidosAguardandoExpirados(): Promise<number> {
 export async function listPedidos({
   status,
   q,
+  entrega,
 }: {
   status?: OrderStatus;
   q?: string;
+  entrega?: TipoEntrega;
 }) {
   const where: Prisma.OrderWhereInput = {};
   if (status) where.status = status;
+  if (entrega) where.tipoEntrega = entrega;
   const termo = q?.trim();
   if (termo) {
     where.OR = [
@@ -49,6 +56,7 @@ export async function listPedidos({
       id: true,
       numero: true,
       status: true,
+      tipoEntrega: true,
       total: true,
       criadoEm: true,
       cliente: { select: { nome: true } },
@@ -59,6 +67,7 @@ export async function listPedidos({
     id: r.id,
     numero: r.numero,
     status: r.status,
+    tipoEntrega: r.tipoEntrega,
     total: Number(r.total),
     criadoEm: r.criadoEm,
     clienteNome: r.cliente.nome,
@@ -85,6 +94,7 @@ export async function getPedidoById(id: string) {
     ano: p.ano,
     sequencia: p.sequencia,
     status: p.status,
+    tipoEntrega: p.tipoEntrega,
     formaPagamento: p.formaPagamento,
     transportadora: p.transportadora,
     codigoRastreio: p.codigoRastreio,
