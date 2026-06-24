@@ -453,6 +453,8 @@ model ConfiguracaoLoja {
   descontoPixGlobalPercent Int      @default(0) // 0–100, aplicado a produtos com usarDescontoPixGlobal
   freteGratisAtivo         Boolean  @default(false) // liga/desliga o frete grátis por valor
   freteGratisAcimaDe       Decimal? @db.Decimal(10, 2) // subtotal mínimo (preço cheio/cartão) p/ frete grátis
+  tarjaAtiva               Boolean  @default(false) // liga/desliga a tarja promocional no topo
+  tarjaTexto               String? // texto livre da tarja; vazio → usa o fallback do componente
   atualizadoEm             DateTime @updatedAt
 }
 

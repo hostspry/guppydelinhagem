@@ -13,6 +13,8 @@ export type ConfiguracaoLojaData = {
   descontoPixGlobalPercent: number;
   freteGratisAtivo: boolean;
   freteGratisAcimaDe: number | null;
+  tarjaAtiva: boolean;
+  tarjaTexto: string | null;
 };
 
 /**
@@ -31,6 +33,8 @@ export const getConfiguracaoLoja = cache(
         descontoPixGlobalPercent: true,
         freteGratisAtivo: true,
         freteGratisAcimaDe: true,
+        tarjaAtiva: true,
+        tarjaTexto: true,
       },
     });
     return {
@@ -38,6 +42,8 @@ export const getConfiguracaoLoja = cache(
       freteGratisAtivo: c?.freteGratisAtivo ?? false,
       freteGratisAcimaDe:
         c?.freteGratisAcimaDe == null ? null : Number(c.freteGratisAcimaDe),
+      tarjaAtiva: c?.tarjaAtiva ?? false,
+      tarjaTexto: c?.tarjaTexto ?? null,
     };
   },
 );

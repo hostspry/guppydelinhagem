@@ -1,6 +1,7 @@
 import { Toaster } from "sonner";
 import Navbar from "@/components/site/Navbar";
 import Footer from "@/components/site/Footer";
+import TarjaPromocional from "@/components/TarjaPromocional";
 
 export default function PublicLayout({
   children,
@@ -9,6 +10,7 @@ export default function PublicLayout({
 }) {
   return (
     <>
+      <TarjaPromocional />
       <Navbar />
       <main>{children}</main>
       <Footer />

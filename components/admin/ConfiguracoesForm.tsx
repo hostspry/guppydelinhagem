@@ -14,6 +14,8 @@ export function ConfiguracoesForm({
     descontoPixGlobalPercent: number;
     freteGratisAtivo: boolean;
     freteGratisAcimaDe: number | null;
+    tarjaAtiva: boolean;
+    tarjaTexto: string | null;
   };
 }) {
   const [pct, setPct] = useState(String(inicial.descontoPixGlobalPercent));
@@ -23,6 +25,8 @@ export function ConfiguracoesForm({
   const [freteGratisAcimaDe, setFreteGratisAcimaDe] = useState(
     inicial.freteGratisAcimaDe == null ? "" : String(inicial.freteGratisAcimaDe),
   );
+  const [tarjaAtiva, setTarjaAtiva] = useState(inicial.tarjaAtiva);
+  const [tarjaTexto, setTarjaTexto] = useState(inicial.tarjaTexto ?? "");
   const [isPending, startTransition] = useTransition();
 
   function onSubmit(e: React.FormEvent) {
@@ -31,6 +35,8 @@ export function ConfiguracoesForm({
     fd.set("descontoPixGlobalPercent", pct);
     if (freteGratisAtivo) fd.set("freteGratisAtivo", "on");
     fd.set("freteGratisAcimaDe", freteGratisAcimaDe);
+    if (tarjaAtiva) fd.set("tarjaAtiva", "on");
+    fd.set("tarjaTexto", tarjaTexto);
     startTransition(async () => {
       const r = await salvarConfiguracaoLoja(fd);
       if (r.success) toast.success(r.message ?? "Salvo.");
@@ -122,6 +128,49 @@ export function ConfiguracoesForm({
             Pedidos com subtotal de produtos (preço cheio) igual ou acima desse
             valor têm o frete zerado no checkout. Desligado, nenhum pedido ganha
             frete grátis e a faixa do topo do site some.
+          </p>
+        </div>
+      </div>
+
+      {/* ── Tarja promocional do topo ── */}
+      <div className="border-t border-gray-100 pt-6">
+        <h2 className="text-xs font-semibold text-[#07366A] uppercase tracking-wide mb-3">
+          Tarja promocional (topo do site)
+        </h2>
+        <label className="flex items-center gap-2.5 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={tarjaAtiva}
+            onChange={(e) => setTarjaAtiva(e.target.checked)}
+            className="h-4 w-4 accent-[#FF035C]"
+          />
+          <span className="text-sm text-gray-700">
+            Exibir tarja promocional no topo
+          </span>
+        </label>
+
+        <div className="mt-3">
+          <label
+            htmlFor="tarjaTexto"
+            className={`block text-sm text-gray-700 mb-1 ${
+              tarjaAtiva ? "" : "opacity-40"
+            }`}
+          >
+            Texto da tarja
+          </label>
+          <textarea
+            id="tarjaTexto"
+            rows={2}
+            placeholder="🇧🇷 Brasil em campo! Use o cupom HEXABRASIL e ganhe 50% OFF em todo o plantel."
+            value={tarjaTexto}
+            onChange={(e) => setTarjaTexto(e.target.value)}
+            disabled={!tarjaAtiva}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:border-[#FF035C] focus:ring-1 focus:ring-[#FF035C] disabled:opacity-40 disabled:cursor-not-allowed"
+          />
+          <p className="text-xs text-gray-500 mt-2 leading-snug max-w-md">
+            Faixa fina verde no topo de todas as páginas. Vazio usa o texto de
+            exemplo acima. A palavra <strong>HEXABRASIL</strong> aparece destacada
+            em amarelo automaticamente.
           </p>
         </div>
       </div>

@@ -31,6 +31,11 @@ export async function salvarConfiguracaoLoja(
       ? Math.round(valorRaw * 100) / 100
       : null;
 
+  // Tarja promocional do topo: toggle + texto livre (vazio → null, usa o fallback).
+  const tarjaAtiva = formData.get("tarjaAtiva") === "on";
+  const tarjaTextoRaw = String(formData.get("tarjaTexto") ?? "").trim();
+  const tarjaTexto = tarjaTextoRaw || null;
+
   try {
     await prisma.configuracaoLoja.upsert({
       where: { id: DEFAULT_ID },
@@ -39,8 +44,16 @@ export async function salvarConfiguracaoLoja(
         descontoPixGlobalPercent: pct,
         freteGratisAtivo,
         freteGratisAcimaDe,
+        tarjaAtiva,
+        tarjaTexto,
       },
-      update: { descontoPixGlobalPercent: pct, freteGratisAtivo, freteGratisAcimaDe },
+      update: {
+        descontoPixGlobalPercent: pct,
+        freteGratisAtivo,
+        freteGratisAcimaDe,
+        tarjaAtiva,
+        tarjaTexto,
+      },
     });
   } catch (e) {
     console.error(e);
