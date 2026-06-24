@@ -15,6 +15,13 @@ import {
 const inicioDoDia = (s?: string) => (s ? new Date(`${s}T00:00:00`) : null);
 const fimDoDia = (s?: string) => (s ? new Date(`${s}T23:59:59.999`) : null);
 
+// Cupons de CAMPANHA aparecem na vitrine: ao criar/editar/excluir/ligar, revalida
+// as rotas públicas. (A página de produto tem ISR de 60s; isto força o frescor.)
+function revalidarRotasPublicas() {
+  revalidatePath("/", "layout"); // home + /loja (vitrine) sob o layout público
+  revalidatePath("/loja/[slug]", "page"); // páginas de produto
+}
+
 /** Monta os dados comuns de create/update a partir do input validado. */
 function montarDados(d: ReturnType<typeof cupomSchema.parse>) {
   return {
@@ -24,6 +31,8 @@ function montarDados(d: ReturnType<typeof cupomSchema.parse>) {
     valor: d.valor,
     escopo: d.escopo,
     modoAplicacao: d.modoAplicacao,
+    tipoCupom: d.tipoCupom,
+    precoUnicoNaCampanha: d.precoUnicoNaCampanha,
     ativo: d.ativo,
     validoDe: inicioDoDia(d.validoDe),
     validoAte: fimDoDia(d.validoAte),
@@ -85,6 +94,7 @@ export async function createCupom(input: unknown): Promise<ActionResult> {
   }
 
   revalidatePath("/admin/cupons");
+  revalidarRotasPublicas();
   redirect("/admin/cupons");
 }
 
@@ -121,6 +131,7 @@ export async function updateCupom(
   }
 
   revalidatePath("/admin/cupons");
+  revalidarRotasPublicas();
   redirect("/admin/cupons");
 }
 
@@ -139,6 +150,7 @@ export async function deleteCupom(id: string): Promise<ActionResult> {
   }
 
   revalidatePath("/admin/cupons");
+  revalidarRotasPublicas();
   return { success: true, message: "Cupom excluído." };
 }
 
@@ -161,5 +173,6 @@ export async function toggleCupomAtivo(id: string): Promise<ActionResult> {
   }
 
   revalidatePath("/admin/cupons");
+  revalidarRotasPublicas();
   return { success: true };
 }

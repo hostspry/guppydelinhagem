@@ -15,6 +15,7 @@ import {
   TipoValorCupom,
   EscopoCupom,
   ModoAplicacaoCupom,
+  TipoCupom,
 } from "@/lib/generated/prisma/enums";
 import { createCupom, updateCupom } from "@/actions/cupons";
 import type { CupomDetalhe } from "@/lib/queries/cupons";
@@ -62,6 +63,8 @@ export function CupomForm({ initialData, categorias, produtos }: CupomFormProps)
           valor: initialData.valor,
           escopo: initialData.escopo,
           modoAplicacao: initialData.modoAplicacao,
+          tipoCupom: initialData.tipoCupom,
+          precoUnicoNaCampanha: initialData.precoUnicoNaCampanha,
           ativo: initialData.ativo,
           validoDe: dataParaInput(initialData.validoDe),
           validoAte: dataParaInput(initialData.validoAte),
@@ -78,6 +81,8 @@ export function CupomForm({ initialData, categorias, produtos }: CupomFormProps)
           valor: undefined,
           escopo: EscopoCupom.TODOS,
           modoAplicacao: ModoAplicacaoCupom.AMBOS_VENCE_MAIOR,
+          tipoCupom: TipoCupom.SECRETO,
+          precoUnicoNaCampanha: true,
           ativo: true,
           validoDe: "",
           validoAte: "",
@@ -92,6 +97,8 @@ export function CupomForm({ initialData, categorias, produtos }: CupomFormProps)
   const tipoValor = useWatch({ control, name: "tipoValor" });
   const escopo = useWatch({ control, name: "escopo" });
   const modoAplicacao = useWatch({ control, name: "modoAplicacao" });
+  const tipoCupom = useWatch({ control, name: "tipoCupom" });
+  const isCampanha = tipoCupom === "CAMPANHA";
   const categoriaIds = useWatch({ control, name: "categoriaIds" }) ?? [];
   const produtoIds = useWatch({ control, name: "produtoIds" }) ?? [];
 
@@ -143,6 +150,39 @@ export function CupomForm({ initialData, categorias, produtos }: CupomFormProps)
           className={inputClass}
           placeholder="Ex: cupom de boas-vindas"
         />
+      </FormField>
+
+      <FormField
+        label="Tipo do cupom"
+        name="tipoCupom"
+        required
+        error={errors.tipoCupom?.message}
+        hint={
+          isCampanha
+            ? "Campanha: aparece na vitrine e aplica sozinho, sem o cliente digitar."
+            : "Secreto: o cliente digita este código no carrinho."
+        }
+      >
+        <div className="flex gap-4 pt-1">
+          <label className="flex items-center gap-1.5 text-sm text-gray-700">
+            <input
+              type="radio"
+              value={TipoCupom.SECRETO}
+              {...register("tipoCupom")}
+              className="accent-[#FF035C]"
+            />
+            Secreto (digitado)
+          </label>
+          <label className="flex items-center gap-1.5 text-sm text-gray-700">
+            <input
+              type="radio"
+              value={TipoCupom.CAMPANHA}
+              {...register("tipoCupom")}
+              className="accent-[#FF035C]"
+            />
+            Campanha (vitrine)
+          </label>
+        </div>
       </FormField>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -250,28 +290,49 @@ export function CupomForm({ initialData, categorias, produtos }: CupomFormProps)
         />
       )}
 
-      <FormField
-        label="Modo de aplicação"
-        name="modoAplicacao"
-        required
-        error={errors.modoAplicacao?.message}
-        hint={MODO_DESCRICAO[modoAplicacao ?? "AMBOS_VENCE_MAIOR"]}
-      >
-        <select
-          id="modoAplicacao"
-          {...register("modoAplicacao")}
-          className={inputClass}
+      {/* SECRETO usa os 4 modos de aplicação; CAMPANHA usa o "preço único". */}
+      {!isCampanha && (
+        <FormField
+          label="Modo de aplicação"
+          name="modoAplicacao"
+          required
+          error={errors.modoAplicacao?.message}
+          hint={MODO_DESCRICAO[modoAplicacao ?? "AMBOS_VENCE_MAIOR"]}
         >
-          <option value={ModoAplicacaoCupom.AMBOS_VENCE_MAIOR}>
-            Vale nos dois, no Pix usa o maior desconto
-          </option>
-          <option value={ModoAplicacaoCupom.AMBOS_ACUMULA}>
-            Vale nos dois, no Pix soma os descontos
-          </option>
-          <option value={ModoAplicacaoCupom.SO_PIX}>Só no Pix</option>
-          <option value={ModoAplicacaoCupom.SO_CARTAO}>Só no cartão</option>
-        </select>
-      </FormField>
+          <select
+            id="modoAplicacao"
+            {...register("modoAplicacao")}
+            className={inputClass}
+          >
+            <option value={ModoAplicacaoCupom.AMBOS_VENCE_MAIOR}>
+              Vale nos dois, no Pix usa o maior desconto
+            </option>
+            <option value={ModoAplicacaoCupom.AMBOS_ACUMULA}>
+              Vale nos dois, no Pix soma os descontos
+            </option>
+            <option value={ModoAplicacaoCupom.SO_PIX}>Só no Pix</option>
+            <option value={ModoAplicacaoCupom.SO_CARTAO}>Só no cartão</option>
+          </select>
+        </FormField>
+      )}
+
+      {isCampanha && (
+        <FormField
+          label="Preço único na campanha"
+          name="precoUnicoNaCampanha"
+          error={errors.precoUnicoNaCampanha?.message}
+          hint="Ligado: o preço promocional vale igual no Pix e no cartão (o desconto Pix do produto some durante a campanha). Desligado: o Pix mantém a vantagem por cima do preço promocional."
+        >
+          <label className="flex items-center gap-2 text-sm text-gray-700">
+            <input
+              type="checkbox"
+              {...register("precoUnicoNaCampanha")}
+              className="accent-[#FF035C]"
+            />
+            Pix igual ao cartão durante a campanha
+          </label>
+        </FormField>
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <FormField
