@@ -315,11 +315,24 @@ async function resolverCupom(
 
   const cupom = await getCupomByCodigo(normalizarCodigo(codigo));
   if (!cupom) return { status: "invalido", motivo: "Cupom não encontrado." };
-  // Cupom de CAMPANHA não é digitável — ele já se aplica sozinho na vitrine.
+  // Cupom de CAMPANHA não é digitável — ele já se aplica sozinho na vitrine. Mas só
+  // afirmar "já aplicado" se a campanha realmente cobre algum item do carrinho;
+  // senão, não prometer um desconto que não está lá.
   if (cupom.tipoCupom !== "SECRETO") {
+    const catIds = cupom.categorias.map((c) => c.id);
+    const prodIds = cupom.produtos.map((p) => p.id);
+    const cobre =
+      cupom.escopo === "TODOS" ||
+      itens.some((i) =>
+        cupom.escopo === "CATEGORIAS"
+          ? catIds.includes(i.categoryId)
+          : prodIds.includes(i.productId),
+      );
     return {
       status: "invalido",
-      motivo: "Este cupom já é aplicado automaticamente nos produtos.",
+      motivo: cobre
+        ? "Este cupom já é aplicado automaticamente nos produtos."
+        : "Este código é de uma promoção automática e não vale para os itens do seu carrinho.",
     };
   }
 
@@ -450,6 +463,7 @@ export type DescontoItem = {
   descontoPixUnit: number;
   cupomId: string | null; // cupom vencedor (snapshot do OrderItem; base cartão)
   cupomCodigo: string | null;
+  tipoVencedor: "CAMPANHA" | "SECRETO" | null;
 };
 
 /**
@@ -594,21 +608,96 @@ async function resolverDescontosPorItem(
     // Cupom vencedor para o snapshot (base cartão; se cartão não desconta, usa Pix).
     let cupomId: string | null = null;
     let cupomCodigo: string | null = null;
+    let tipoVencedor: "CAMPANHA" | "SECRETO" | null = null;
     const escolher = (campVal: number, secVal: number) => {
       if (campVal <= 0 && secVal <= 0) return;
       if (campVal >= secVal && camp) {
         cupomId = camp.cupomId;
         cupomCodigo = camp.codigo;
+        tipoVencedor = "CAMPANHA";
       } else if (secreto) {
         cupomId = secreto.cupomId;
         cupomCodigo = secreto.codigo;
+        tipoVencedor = "SECRETO";
       }
     };
     if (descontoCartaoUnit > 0) escolher(campCartaoUnit, secCartaoUnit);
     else if (descontoPixUnit > 0) escolher(campPixUnit, secPixUnit);
 
-    return { descontoCartaoUnit, descontoPixUnit, cupomId, cupomCodigo };
+    return { descontoCartaoUnit, descontoPixUnit, cupomId, cupomCodigo, tipoVencedor };
   });
+}
+
+// ── Resolução ÚNICA do carrinho (preço efetivo no servidor) ───────────────────
+// Reusada pelo carrinho e pelo resumo do checkout. O preço NUNCA vem do client: a
+// campanha automática + o código secreto são recalculados do banco aqui.
+
+export type LinhaCarrinhoResolvida = {
+  produtoId: string;
+  composicao: CheckoutInput["itens"][number]["composicao"];
+  quantidade: number;
+  precoCheioBase: number; // sem campanha (para o "de/por")
+  precoPixBase: number;
+  precoCheioEfetivo: number; // com campanha/cupom (cartão)
+  precoPixEfetivo: number; // com campanha/cupom (Pix; = cheio no preço único)
+  descontoPercent: number; // p/ badge "-X% OFF"
+  cupomCodigo: string | null;
+  tipoCupomVencedor: "CAMPANHA" | "SECRETO" | null;
+};
+
+export type CarrinhoResolvido = {
+  linhas: LinhaCarrinhoResolvida[];
+  subtotalCheioBase: number;
+  subtotalPixBase: number;
+  subtotalCheioEfetivo: number;
+  subtotalPixEfetivo: number;
+};
+
+/**
+ * Resolve, no servidor, o preço efetivo de cada item (campanha automática + código
+ * secreto, vence o maior por item) + os subtotais. Linhas na MESMA ordem do input
+ * (o client casa por índice). Retorna null se algum item sumiu do catálogo.
+ */
+export async function resolverItensCarrinho(
+  itens: CheckoutFormInput["itens"],
+  codigoSecreto?: string | null,
+): Promise<CarrinhoResolvido | null> {
+  const parsed = checkoutSchema.shape.itens.safeParse(itens);
+  if (!parsed.success) return null;
+  const prec = await precificarItens(parsed.data);
+  if (!prec.ok) return null;
+
+  const desc = await resolverDescontosPorItem(prec.itens, codigoSecreto);
+  const linhas: LinhaCarrinhoResolvida[] = prec.itens.map((it, i) => {
+    const d = desc[i];
+    const precoCheioEfetivo = round2(Math.max(0, it.precoCheio - d.descontoCartaoUnit));
+    const precoPixEfetivo = round2(Math.max(0, it.precoPix - d.descontoPixUnit));
+    const descontoPercent =
+      it.precoCheio > 0
+        ? Math.round(((it.precoCheio - precoCheioEfetivo) / it.precoCheio) * 100)
+        : 0;
+    return {
+      produtoId: it.productId,
+      composicao: it.composicao,
+      quantidade: it.quantidade,
+      precoCheioBase: it.precoCheio,
+      precoPixBase: it.precoPix,
+      precoCheioEfetivo,
+      precoPixEfetivo,
+      descontoPercent,
+      cupomCodigo: d.cupomCodigo,
+      tipoCupomVencedor: d.tipoVencedor,
+    };
+  });
+  const soma = (f: (l: LinhaCarrinhoResolvida) => number) =>
+    round2(linhas.reduce((a, l) => a + f(l) * l.quantidade, 0));
+  return {
+    linhas,
+    subtotalCheioBase: soma((l) => l.precoCheioBase),
+    subtotalPixBase: soma((l) => l.precoPixBase),
+    subtotalCheioEfetivo: soma((l) => l.precoCheioEfetivo),
+    subtotalPixEfetivo: soma((l) => l.precoPixEfetivo),
+  };
 }
 
 type OrderResult =
