@@ -78,7 +78,10 @@ export interface CriarCartaoInput {
   // Device fingerprint do MP (window.MP_DEVICE_SESSION_ID) → header
   // X-meli-session-id. Sem ele o antifraude do MP recusa cartões legítimos.
   deviceId?: string | null;
-  endereco?: CartaoEndereco | null; // → additional_info.shipments
+  endereco?: CartaoEndereco | null; // → additional_info.shipments.receiver_address (onde recebe)
+  // Endereço do PAGADOR → additional_info.payer.address. Separado do shipments: na
+  // retirada o shipments é a loja, mas não há endereço do pagador (fica null/omitido).
+  payerAddress?: CartaoEndereco | null;
   itens?: CartaoItem[]; // → additional_info.items
   idempotencyKey?: string;
 }

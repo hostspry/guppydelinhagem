@@ -238,13 +238,15 @@ export const mercadoPagoProvider: PaymentProvider = {
       ? { type: cpfCnpj.length > 11 ? "CNPJ" : "CPF", number: cpfCnpj }
       : undefined;
     const phone = telefoneMp(input.pagador.telefone);
-    const cep = input.endereco?.cep?.replace(/\D/g, "") || null;
+    const cep = input.endereco?.cep?.replace(/\D/g, "") || null; // shipments
+    const payerCep = input.payerAddress?.cep?.replace(/\D/g, "") || null;
 
     // additional_info: sinais que o antifraude do MP usa pra aprovar pagamentos
     // legítimos (payer completo + items + endereço de entrega). Só inclui o que
-    // existe — campo vazio é pior que ausente pro scoring.
+    // existe — campo vazio é pior que ausente pro scoring. Na retirada o payer não
+    // tem endereço (payerAddress null) → address é omitido; o shipments usa a loja.
     const additionalInfo = {
-      ...(input.pagador.nome || input.pagador.sobrenome || phone || cep
+      ...(input.pagador.nome || input.pagador.sobrenome || phone || payerCep
         ? {
             payer: {
               ...(input.pagador.nome ? { first_name: input.pagador.nome } : {}),
@@ -252,15 +254,17 @@ export const mercadoPagoProvider: PaymentProvider = {
                 ? { last_name: input.pagador.sobrenome }
                 : {}),
               ...(phone ? { phone } : {}),
-              ...(cep || input.endereco?.logradouro || input.endereco?.numero
+              ...(payerCep ||
+              input.payerAddress?.logradouro ||
+              input.payerAddress?.numero
                 ? {
                     address: {
-                      ...(cep ? { zip_code: cep } : {}),
-                      ...(input.endereco?.logradouro
-                        ? { street_name: input.endereco.logradouro }
+                      ...(payerCep ? { zip_code: payerCep } : {}),
+                      ...(input.payerAddress?.logradouro
+                        ? { street_name: input.payerAddress.logradouro }
                         : {}),
-                      ...(input.endereco?.numero
-                        ? { street_number: input.endereco.numero }
+                      ...(input.payerAddress?.numero
+                        ? { street_number: input.payerAddress.numero }
                         : {}),
                     },
                   }
