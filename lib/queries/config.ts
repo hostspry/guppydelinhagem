@@ -14,6 +14,8 @@ export type ConfiguracaoLojaData = {
   freteGratisAtivo: boolean;
   freteGratisAcimaDe: number | null;
   maxPeixesFreteAuto: number;
+  retiradaLocalAtiva: boolean;
+  retiradaInstrucoes: string | null;
   tarjaAtiva: boolean;
   tarjaTexto: string | null;
 };
@@ -35,6 +37,8 @@ export const getConfiguracaoLoja = cache(
         freteGratisAtivo: true,
         freteGratisAcimaDe: true,
         maxPeixesFreteAuto: true,
+        retiradaLocalAtiva: true,
+        retiradaInstrucoes: true,
         tarjaAtiva: true,
         tarjaTexto: true,
       },
@@ -45,6 +49,8 @@ export const getConfiguracaoLoja = cache(
       freteGratisAcimaDe:
         c?.freteGratisAcimaDe == null ? null : Number(c.freteGratisAcimaDe),
       maxPeixesFreteAuto: c?.maxPeixesFreteAuto ?? 10,
+      retiradaLocalAtiva: c?.retiradaLocalAtiva ?? false,
+      retiradaInstrucoes: c?.retiradaInstrucoes ?? null,
       tarjaAtiva: c?.tarjaAtiva ?? false,
       tarjaTexto: c?.tarjaTexto ?? null,
     };

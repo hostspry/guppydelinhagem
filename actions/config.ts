@@ -36,6 +36,13 @@ export async function salvarConfiguracaoLoja(
   const maxPeixesFreteAuto =
     Number.isFinite(maxRaw) && maxRaw >= 1 ? Math.round(maxRaw) : 10;
 
+  // Retirada local: toggle + texto livre das instruções (vazio → null).
+  const retiradaLocalAtiva = formData.get("retiradaLocalAtiva") === "on";
+  const retiradaInstrucoesRaw = String(
+    formData.get("retiradaInstrucoes") ?? "",
+  ).trim();
+  const retiradaInstrucoes = retiradaInstrucoesRaw || null;
+
   // Tarja promocional do topo: toggle + texto livre (vazio → null, usa o fallback).
   const tarjaAtiva = formData.get("tarjaAtiva") === "on";
   const tarjaTextoRaw = String(formData.get("tarjaTexto") ?? "").trim();
@@ -50,6 +57,8 @@ export async function salvarConfiguracaoLoja(
         freteGratisAtivo,
         freteGratisAcimaDe,
         maxPeixesFreteAuto,
+        retiradaLocalAtiva,
+        retiradaInstrucoes,
         tarjaAtiva,
         tarjaTexto,
       },
@@ -58,6 +67,8 @@ export async function salvarConfiguracaoLoja(
         freteGratisAtivo,
         freteGratisAcimaDe,
         maxPeixesFreteAuto,
+        retiradaLocalAtiva,
+        retiradaInstrucoes,
         tarjaAtiva,
         tarjaTexto,
       },

@@ -7,6 +7,22 @@ export function whatsappLink(mensagem: string): string {
   return `${WHATSAPP_URL}?text=${encodeURIComponent(mensagem)}`;
 }
 
+// ── Retirada local (cliente busca presencialmente em Guarapari/ES) ───────────
+// Endereço da loja usado como receiver_address no additional_info do cartão
+// quando o pedido é RETIRADA (é factualmente onde o cliente recebe). Client-safe.
+// O CEP bate com FRETE_CONFIG.cepOrigem (origem do frete).
+export const LOJA_ENDERECO = {
+  cep: "29201010",
+  uf: "ES",
+  cidade: "Guarapari",
+  logradouro: "Marchezi Guppy Farm",
+  numero: "s/n",
+};
+
+// Texto padrão sugerido para as instruções de retirada (editável no admin).
+export const RETIRADA_INSTRUCOES_PADRAO =
+  "Após a confirmação do pagamento, combine o horário pelo WhatsApp. A retirada é presencial, na Marchezi Guppy Farm, em Guarapari/ES.";
+
 // Limite de peixes por caixa (frete único até esse número). Client-safe aqui —
 // lib/shipping.ts (server-only) reexporta no FRETE_CONFIG. Acima disso, o
 // carrinho avisa para falar no WhatsApp (sem bloquear).

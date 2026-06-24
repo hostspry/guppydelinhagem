@@ -44,6 +44,11 @@ enum Transportadora {
   OUTRO
 }
 
+enum TipoEntrega {
+  ENVIO // despacha pra casa do cliente (Jadlog/Gollog)
+  RETIRADA // cliente retira presencialmente (frete 0, sem endereço)
+}
+
 enum ProviderPagamento {
   MERCADO_PAGO
   PICPAY
@@ -332,6 +337,7 @@ model Order {
   total           Decimal         @default(0) @db.Decimal(10, 2)
 
   modalidadeFrete String? // 'TERRESTRE' (Jadlog) | 'AEREO' (Gollog) — como despachar
+  tipoEntrega     TipoEntrega @default(ENVIO) // ENVIO (despacha) | RETIRADA (cliente busca)
   codigoRastreio  String? // AWB (Gollog) ou código (Jadlog)
 
   // Cupom aplicado (opcional). cupomCodigo é snapshot (sobrevive à exclusão do cupom).
@@ -465,6 +471,8 @@ model ConfiguracaoLoja {
   freteGratisAtivo         Boolean  @default(false) // liga/desliga o frete grátis por valor
   freteGratisAcimaDe       Decimal? @db.Decimal(10, 2) // subtotal mínimo (preço cheio/cartão) p/ frete grátis
   maxPeixesFreteAuto       Int      @default(10) // até este nº cota frete automático; acima → WhatsApp
+  retiradaLocalAtiva       Boolean  @default(false) // oferece "retirar pessoalmente" no checkout (frete 0)
+  retiradaInstrucoes       String? // texto livre exibido ao cliente que escolhe retirada
   tarjaAtiva               Boolean  @default(false) // liga/desliga a tarja promocional no topo
   tarjaTexto               String? // texto livre da tarja; vazio → usa o fallback do componente
   atualizadoEm             DateTime @updatedAt

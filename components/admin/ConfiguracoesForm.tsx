@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { salvarConfiguracaoLoja } from "@/actions/config";
+import { RETIRADA_INSTRUCOES_PADRAO } from "@/lib/constants";
 
 const inputClass =
   "w-32 px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:border-[#FF035C] focus:ring-1 focus:ring-[#FF035C]";
@@ -15,6 +16,8 @@ export function ConfiguracoesForm({
     freteGratisAtivo: boolean;
     freteGratisAcimaDe: number | null;
     maxPeixesFreteAuto: number;
+    retiradaLocalAtiva: boolean;
+    retiradaInstrucoes: string | null;
     tarjaAtiva: boolean;
     tarjaTexto: string | null;
   };
@@ -29,6 +32,12 @@ export function ConfiguracoesForm({
   const [maxPeixes, setMaxPeixes] = useState(
     String(inicial.maxPeixesFreteAuto),
   );
+  const [retiradaAtiva, setRetiradaAtiva] = useState(
+    inicial.retiradaLocalAtiva,
+  );
+  const [retiradaInstrucoes, setRetiradaInstrucoes] = useState(
+    inicial.retiradaInstrucoes ?? "",
+  );
   const [tarjaAtiva, setTarjaAtiva] = useState(inicial.tarjaAtiva);
   const [tarjaTexto, setTarjaTexto] = useState(inicial.tarjaTexto ?? "");
   const [isPending, startTransition] = useTransition();
@@ -40,6 +49,8 @@ export function ConfiguracoesForm({
     if (freteGratisAtivo) fd.set("freteGratisAtivo", "on");
     fd.set("freteGratisAcimaDe", freteGratisAcimaDe);
     fd.set("maxPeixesFreteAuto", maxPeixes);
+    if (retiradaAtiva) fd.set("retiradaLocalAtiva", "on");
+    fd.set("retiradaInstrucoes", retiradaInstrucoes);
     if (tarjaAtiva) fd.set("tarjaAtiva", "on");
     fd.set("tarjaTexto", tarjaTexto);
     startTransition(async () => {
@@ -161,6 +172,59 @@ export function ConfiguracoesForm({
           Acima deste número de peixes no pedido, o frete é combinado por WhatsApp
           (a cotação automática só roda até este limite).
         </p>
+      </div>
+
+      {/* ── Retirada local ── */}
+      <div className="border-t border-gray-100 pt-6">
+        <h2 className="text-xs font-semibold text-[#07366A] uppercase tracking-wide mb-3">
+          Retirada local
+        </h2>
+        <label className="flex items-center gap-2.5 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={retiradaAtiva}
+            onChange={(e) => setRetiradaAtiva(e.target.checked)}
+            className="h-4 w-4 accent-[#FF035C]"
+          />
+          <span className="text-sm text-gray-700">
+            Permitir retirada local (cliente busca em Guarapari/ES)
+          </span>
+        </label>
+
+        <div className="mt-3">
+          <div className="flex items-center justify-between mb-1">
+            <label
+              htmlFor="retiradaInstrucoes"
+              className={`block text-sm text-gray-700 ${
+                retiradaAtiva ? "" : "opacity-40"
+              }`}
+            >
+              Instruções de retirada
+            </label>
+            <button
+              type="button"
+              onClick={() => setRetiradaInstrucoes(RETIRADA_INSTRUCOES_PADRAO)}
+              disabled={!retiradaAtiva}
+              className="text-xs text-[#FF035C] hover:underline disabled:opacity-40 disabled:no-underline disabled:cursor-not-allowed"
+            >
+              Usar texto padrão
+            </button>
+          </div>
+          <textarea
+            id="retiradaInstrucoes"
+            rows={3}
+            placeholder={RETIRADA_INSTRUCOES_PADRAO}
+            value={retiradaInstrucoes}
+            onChange={(e) => setRetiradaInstrucoes(e.target.value)}
+            disabled={!retiradaAtiva}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:border-[#FF035C] focus:ring-1 focus:ring-[#FF035C] disabled:opacity-40 disabled:cursor-not-allowed"
+          />
+          <p className="text-xs text-gray-500 mt-2 leading-snug max-w-md">
+            Mostrado ao cliente que escolhe retirar pessoalmente no checkout.
+            Vazio usa o texto de exemplo acima. A opção zera o frete e dispensa o
+            endereço de entrega.
+          </p>
+        </div>
       </div>
 
       {/* ── Tarja promocional do topo ── */}
