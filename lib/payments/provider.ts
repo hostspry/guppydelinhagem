@@ -43,6 +43,27 @@ export interface PixConsulta {
 export interface CartaoPagador {
   email: string;
   cpfCnpj?: string | null;
+  nome?: string | null; // first_name (antifraude MP)
+  sobrenome?: string | null; // last_name
+  telefone?: string | null; // só dígitos; provider separa area_code/number
+}
+
+// Endereço de entrega p/ additional_info.shipments.receiver_address (antifraude).
+export interface CartaoEndereco {
+  cep?: string | null; // só dígitos → zip_code
+  uf?: string | null; // → state_name
+  cidade?: string | null; // → city_name
+  logradouro?: string | null; // → street_name
+  numero?: string | null; // → street_number
+}
+
+// Item p/ additional_info.items (sinal de antifraude — o MP usa pra aprovar).
+export interface CartaoItem {
+  id: string;
+  title: string;
+  categoryId?: string | null;
+  quantity: number;
+  unitPrice: number;
 }
 
 export interface CriarCartaoInput {
@@ -54,6 +75,11 @@ export interface CriarCartaoInput {
   issuerId?: string | null; // emissor (do Brick)
   installments: number; // nº de parcelas escolhido
   pagador: CartaoPagador;
+  // Device fingerprint do MP (window.MP_DEVICE_SESSION_ID) → header
+  // X-meli-session-id. Sem ele o antifraude do MP recusa cartões legítimos.
+  deviceId?: string | null;
+  endereco?: CartaoEndereco | null; // → additional_info.shipments
+  itens?: CartaoItem[]; // → additional_info.items
   idempotencyKey?: string;
 }
 

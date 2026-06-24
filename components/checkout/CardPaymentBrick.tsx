@@ -34,6 +34,8 @@ type MpConstructor = new (
 declare global {
   interface Window {
     MercadoPago?: MpConstructor;
+    // Device fingerprint criado automaticamente pelo SDK v2 do MP ao carregar.
+    MP_DEVICE_SESSION_ID?: string;
   }
 }
 
@@ -127,6 +129,12 @@ export default function CardPaymentBrick({
                 issuerId:
                   formData.issuer_id != null ? String(formData.issuer_id) : null,
                 installments: Number(formData.installments),
+                // Device ID do MP (capturado pelo SDK v2) — vai ao backend e de lá
+                // pro header X-meli-session-id. Sem ele o antifraude recusa.
+                deviceId:
+                  typeof window !== "undefined"
+                    ? (window.MP_DEVICE_SESSION_ID ?? null)
+                    : null,
                 // payer fiel ao que o Brick devolveu (sem reordenar/substituir).
                 payer: formData.payer
                   ? {

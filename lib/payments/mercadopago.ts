@@ -115,6 +115,16 @@ function isoComOffsetBrasil(d: Date): string {
   );
 }
 
+// Telefone BR (só dígitos) → { area_code, number } que o MP espera no payer/phone.
+// DDD = 2 primeiros dígitos; o resto é o número. <10 dígitos → não envia (incompleto).
+function telefoneMp(
+  tel: string | null | undefined,
+): { area_code: string; number: string } | null {
+  const d = (tel ?? "").replace(/\D/g, "");
+  if (d.length < 10) return null;
+  return { area_code: d.slice(0, 2), number: d.slice(2) };
+}
+
 async function mpFetch(
   path: string,
   init: RequestInit & { idempotencyKey?: string },
@@ -224,6 +234,73 @@ export const mercadoPagoProvider: PaymentProvider = {
 
   async criarPagamentoCartao(input: CriarCartaoInput): Promise<CartaoCriado> {
     const cpfCnpj = input.pagador.cpfCnpj?.replace(/\D/g, "") || null;
+    const identification = cpfCnpj
+      ? { type: cpfCnpj.length > 11 ? "CNPJ" : "CPF", number: cpfCnpj }
+      : undefined;
+    const phone = telefoneMp(input.pagador.telefone);
+    const cep = input.endereco?.cep?.replace(/\D/g, "") || null;
+
+    // additional_info: sinais que o antifraude do MP usa pra aprovar pagamentos
+    // legítimos (payer completo + items + endereço de entrega). Só inclui o que
+    // existe — campo vazio é pior que ausente pro scoring.
+    const additionalInfo = {
+      ...(input.pagador.nome || input.pagador.sobrenome || phone || cep
+        ? {
+            payer: {
+              ...(input.pagador.nome ? { first_name: input.pagador.nome } : {}),
+              ...(input.pagador.sobrenome
+                ? { last_name: input.pagador.sobrenome }
+                : {}),
+              ...(phone ? { phone } : {}),
+              ...(cep || input.endereco?.logradouro || input.endereco?.numero
+                ? {
+                    address: {
+                      ...(cep ? { zip_code: cep } : {}),
+                      ...(input.endereco?.logradouro
+                        ? { street_name: input.endereco.logradouro }
+                        : {}),
+                      ...(input.endereco?.numero
+                        ? { street_number: input.endereco.numero }
+                        : {}),
+                    },
+                  }
+                : {}),
+            },
+          }
+        : {}),
+      ...(input.itens && input.itens.length
+        ? {
+            items: input.itens.map((it) => ({
+              id: it.id,
+              title: it.title,
+              description: it.title,
+              ...(it.categoryId ? { category_id: it.categoryId } : {}),
+              quantity: it.quantity,
+              unit_price: Math.round(it.unitPrice * 100) / 100,
+            })),
+          }
+        : {}),
+      ...(cep
+        ? {
+            shipments: {
+              receiver_address: {
+                zip_code: cep,
+                ...(input.endereco?.uf ? { state_name: input.endereco.uf } : {}),
+                ...(input.endereco?.cidade
+                  ? { city_name: input.endereco.cidade }
+                  : {}),
+                ...(input.endereco?.logradouro
+                  ? { street_name: input.endereco.logradouro }
+                  : {}),
+                ...(input.endereco?.numero
+                  ? { street_number: input.endereco.numero }
+                  : {}),
+              },
+            },
+          }
+        : {}),
+    };
+
     // O corpo carrega o TOKEN (uso único) — nunca PAN/CVV; nunca logamos o body.
     const body = {
       transaction_amount: Math.round(input.valor * 100) / 100,
@@ -236,20 +313,25 @@ export const mercadoPagoProvider: PaymentProvider = {
       notification_url: NOTIFICATION_URL,
       payer: {
         email: input.pagador.email,
-        ...(cpfCnpj
-          ? {
-              identification: {
-                type: cpfCnpj.length > 11 ? "CNPJ" : "CPF",
-                number: cpfCnpj,
-              },
-            }
-          : {}),
+        ...(input.pagador.nome ? { first_name: input.pagador.nome } : {}),
+        ...(input.pagador.sobrenome ? { last_name: input.pagador.sobrenome } : {}),
+        ...(identification ? { identification } : {}),
+        ...(phone ? { phone } : {}),
       },
+      ...(Object.keys(additionalInfo).length
+        ? { additional_info: additionalInfo }
+        : {}),
     };
+
+    // Device ID no header que o antifraude do MP espera. Sem ele, recusa por padrão.
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    if (input.deviceId) headers["X-meli-session-id"] = input.deviceId;
 
     const data = (await mpFetch("/v1/payments", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify(body),
       idempotencyKey: input.idempotencyKey ?? randomUUID(),
     })) as MpPaymentResponse;

@@ -130,6 +130,15 @@ export type PagadorCheckout = {
   cpfCnpj: string;
 };
 
+// Item já precificado p/ o additional_info.items do cartão (antifraude MP).
+export type ItemCartaoMp = {
+  id: string;
+  title: string;
+  categoryId: string;
+  quantity: number;
+  unitPrice: number; // preço efetivo no cartão (com campanha/cupom)
+};
+
 export type OrderCriado = {
   orderId: string;
   numero: string;
@@ -137,6 +146,16 @@ export type OrderCriado = {
   valorCartao: number; // total a cobrar no cartão (cheio) — recalculado no servidor
   pagador: PagadorCheckout;
   reused: boolean; // true = reaproveitou um AGUARDANDO existente (não deletar em erro)
+  // Dados (normalizados no servidor) p/ o additional_info do cartão — antifraude MP.
+  telefone: string; // só dígitos
+  endereco: {
+    cep: string; // só dígitos
+    uf: string;
+    cidade: string;
+    logradouro: string;
+    numero: string;
+  };
+  itens: ItemCartaoMp[];
 };
 
 // Item precificado no servidor (fonte da verdade). precoCheio = cartão à vista;
@@ -1021,6 +1040,15 @@ export async function criarOrderDoCheckout(
   }
 
   const partesNome = data.nome.trim().split(/\s+/);
+  // Itens com o preço EFETIVO do cartão (cheio − desconto por item) p/ o
+  // additional_info.items do MP. Mesma fonte do que o cartão realmente cobra.
+  const itensCartao: ItemCartaoMp[] = prec.itens.map((it, i) => ({
+    id: it.productId,
+    title: it.nomeProduto,
+    categoryId: it.categoryId,
+    quantity: it.quantidade,
+    unitPrice: round2(Math.max(0, it.precoCheio - descItens[i].descontoCartaoUnit)),
+  }));
   return {
     ok: true,
     data: {
@@ -1035,6 +1063,15 @@ export async function criarOrderDoCheckout(
         email: data.email,
         cpfCnpj: cpf,
       },
+      telefone: data.telefone,
+      endereco: {
+        cep: data.cep,
+        uf: data.uf.toUpperCase(),
+        cidade: data.cidade,
+        logradouro: data.logradouro,
+        numero: data.numero,
+      },
+      itens: itensCartao,
     },
   };
 }
@@ -1227,6 +1264,9 @@ export type CartaoInput = {
   paymentMethodId: string;
   issuerId: string | null;
   installments: number;
+  // Device fingerprint do MP (window.MP_DEVICE_SESSION_ID), capturado no Brick.
+  // Vai no header X-meli-session-id — sem ele o antifraude do MP recusa.
+  deviceId?: string | null;
   // payer exatamente como o Brick devolveu (não reordenar/substituir): o
   // identification (CPF) é o que o cliente digitou no formulário seguro do MP.
   payer?: {
@@ -1320,7 +1360,17 @@ export async function pagarComCartao(
       paymentMethodId: cartao.paymentMethodId,
       issuerId: cartao.issuerId,
       installments: parcelas,
-      pagador: { email: emailPagador, cpfCnpj: cpfPagador },
+      // Device ID + dados completos do pagador/entrega/itens p/ o antifraude do MP.
+      deviceId: cartao.deviceId ?? null,
+      pagador: {
+        email: emailPagador,
+        cpfCnpj: cpfPagador,
+        nome: pagador.nome,
+        sobrenome: pagador.sobrenome,
+        telefone: order.data.telefone,
+      },
+      endereco: order.data.endereco,
+      itens: order.data.itens,
     });
   } catch (e) {
     console.error("[checkout] cobrar cartão", e);
