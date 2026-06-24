@@ -17,9 +17,12 @@ import {
   normalizarCodigo,
   cupomVigente,
   calcularDescontoCupom,
+  itemElegivel,
   type CupomCalculo,
   type ItemPrecificadoCupom,
 } from "@/lib/cupom";
+import { resolverCampanhaInfo } from "@/lib/campanha";
+import { precoComCampanha, type CampanhaInfo } from "@/lib/campanha-core";
 import { getCupomByCodigo } from "@/lib/queries/cupons";
 import { getConfigPreco, getFreteGratisConfig } from "@/lib/queries/config";
 import { COMPOSICAO_LABEL } from "@/lib/composicoes";
@@ -312,6 +315,13 @@ async function resolverCupom(
 
   const cupom = await getCupomByCodigo(normalizarCodigo(codigo));
   if (!cupom) return { status: "invalido", motivo: "Cupom não encontrado." };
+  // Cupom de CAMPANHA não é digitável — ele já se aplica sozinho na vitrine.
+  if (cupom.tipoCupom !== "SECRETO") {
+    return {
+      status: "invalido",
+      motivo: "Este cupom já é aplicado automaticamente nos produtos.",
+    };
+  }
 
   const calc: CupomCalculo = {
     tipoValor: cupom.tipoValor,
@@ -433,6 +443,174 @@ export async function validarCupom(
   };
 }
 
+// ── Desconto POR ITEM: melhor entre a campanha automática e o código secreto ──
+
+export type DescontoItem = {
+  descontoCartaoUnit: number;
+  descontoPixUnit: number;
+  cupomId: string | null; // cupom vencedor (snapshot do OrderItem; base cartão)
+  cupomCodigo: string | null;
+};
+
+/**
+ * Para cada item, resolve o MAIOR desconto entre a campanha automática do produto
+ * e o código secreto digitado (não acumulam). Campanha é exata por item; o código
+ * secreto é calculado no carrinho inteiro (respeita pedido mínimo, modo e valor
+ * fixo "uma vez") e distribuído por item proporcionalmente. Tudo por método.
+ */
+async function resolverDescontosPorItem(
+  itens: ItemPrecificado[],
+  codigoSecreto: string | null | undefined,
+): Promise<DescontoItem[]> {
+  // 1) Campanha por produto (distinct; getCampanhasVigentes é cacheado no request).
+  const campanhaCache = new Map<string, CampanhaInfo | null>();
+  for (const it of itens) {
+    if (!campanhaCache.has(it.productId)) {
+      campanhaCache.set(
+        it.productId,
+        await resolverCampanhaInfo({
+          id: it.productId,
+          categoryId: it.categoryId,
+          precoCheio: it.precoCheio,
+          descontoPixPercent: it.descontoPixPercent,
+          estoqueMachos: 0,
+          estoqueFemeas: 0,
+        }),
+      );
+    }
+  }
+
+  // 2) Código secreto: total no carrinho + distribuição proporcional por item.
+  let secreto: {
+    cupomId: string;
+    codigo: string;
+    cobre: (i: ItemPrecificadoCupom) => boolean;
+    cartaoTotal: number;
+    pixTotal: number;
+    subCheio: number;
+    subPix: number;
+  } | null = null;
+
+  if (codigoSecreto && codigoSecreto.trim()) {
+    const cupom = await getCupomByCodigo(normalizarCodigo(codigoSecreto));
+    if (cupom && cupom.tipoCupom === "SECRETO") {
+      const calc: CupomCalculo = {
+        tipoValor: cupom.tipoValor,
+        valor: Number(cupom.valor),
+        escopo: cupom.escopo,
+        modoAplicacao: cupom.modoAplicacao,
+        pedidoMinimo:
+          cupom.pedidoMinimo == null ? null : Number(cupom.pedidoMinimo),
+        categoriaIds: cupom.categorias.map((c) => c.id),
+        produtoIds: cupom.produtos.map((p) => p.id),
+      };
+      const produtosEscopo =
+        cupom.escopo === "PRODUTOS"
+          ? cupom.produtos.map((p) => ({
+              estoqueMachos: p.estoqueMachos,
+              estoqueFemeas: p.estoqueFemeas,
+            }))
+          : cupom.escopo === "CATEGORIAS"
+            ? cupom.categorias.flatMap((c) => c.produtos)
+            : [];
+      const vig = cupomVigente(
+        {
+          ativo: cupom.ativo,
+          validoDe: cupom.validoDe,
+          validoAte: cupom.validoAte,
+          limiteUsos: cupom.limiteUsos,
+          usosRealizados: cupom.usosRealizados,
+          encerraAoEsgotarEstoque: cupom.encerraAoEsgotarEstoque,
+        },
+        produtosEscopo,
+      );
+      if (vig.ok) {
+        const itensCupom = itensParaCupom(itens);
+        const cartaoTotal = calcularDescontoCupom({
+          cupom: calc,
+          itens: itensCupom,
+          metodo: "CARTAO",
+        }).desconto;
+        const pixTotal = calcularDescontoCupom({
+          cupom: calc,
+          itens: itensCupom,
+          metodo: "PIX",
+        }).desconto;
+        const elegiveis = itensCupom.filter((i) => itemElegivel(calc, i));
+        secreto = {
+          cupomId: cupom.id,
+          codigo: cupom.codigo,
+          cobre: (i) => itemElegivel(calc, i),
+          cartaoTotal,
+          pixTotal,
+          subCheio: elegiveis.reduce(
+            (a, i) => a + i.precoCheio * i.quantidade,
+            0,
+          ),
+          subPix: elegiveis.reduce((a, i) => a + i.precoPix * i.quantidade, 0),
+        };
+      }
+    }
+  }
+
+  // 3) Por item: campanha (exata) vs cota do secreto. Vence o maior, por método.
+  return itens.map((it) => {
+    const camp = campanhaCache.get(it.productId) ?? null;
+    let campCartaoUnit = 0;
+    let campPixUnit = 0;
+    if (camp) {
+      const promo = precoComCampanha(it.precoCheio, it.descontoPixPercent, camp);
+      campCartaoUnit = Math.max(0, round2(it.precoCheio - promo.precoPromoCheio));
+      campPixUnit = Math.max(0, round2(it.precoPix - promo.precoPromoPix));
+    }
+
+    let secCartaoUnit = 0;
+    let secPixUnit = 0;
+    if (
+      secreto &&
+      secreto.cobre({
+        productId: it.productId,
+        categoryId: it.categoryId,
+        precoCheio: it.precoCheio,
+        precoPix: it.precoPix,
+        quantidade: it.quantidade,
+      })
+    ) {
+      const linhaCheio = it.precoCheio * it.quantidade;
+      const linhaPix = it.precoPix * it.quantidade;
+      const cotaCartao =
+        secreto.subCheio > 0
+          ? (secreto.cartaoTotal * linhaCheio) / secreto.subCheio
+          : 0;
+      const cotaPix =
+        secreto.subPix > 0 ? (secreto.pixTotal * linhaPix) / secreto.subPix : 0;
+      secCartaoUnit = it.quantidade > 0 ? round2(cotaCartao / it.quantidade) : 0;
+      secPixUnit = it.quantidade > 0 ? round2(cotaPix / it.quantidade) : 0;
+    }
+
+    const descontoCartaoUnit = Math.max(campCartaoUnit, secCartaoUnit);
+    const descontoPixUnit = Math.max(campPixUnit, secPixUnit);
+
+    // Cupom vencedor para o snapshot (base cartão; se cartão não desconta, usa Pix).
+    let cupomId: string | null = null;
+    let cupomCodigo: string | null = null;
+    const escolher = (campVal: number, secVal: number) => {
+      if (campVal <= 0 && secVal <= 0) return;
+      if (campVal >= secVal && camp) {
+        cupomId = camp.cupomId;
+        cupomCodigo = camp.codigo;
+      } else if (secreto) {
+        cupomId = secreto.cupomId;
+        cupomCodigo = secreto.codigo;
+      }
+    };
+    if (descontoCartaoUnit > 0) escolher(campCartaoUnit, secCartaoUnit);
+    else if (descontoPixUnit > 0) escolher(campPixUnit, secPixUnit);
+
+    return { descontoCartaoUnit, descontoPixUnit, cupomId, cupomCodigo };
+  });
+}
+
 type OrderResult =
   | { ok: true; data: OrderCriado }
   | { ok: false; error: string; fieldErrors?: Record<string, string[]> };
@@ -465,9 +643,13 @@ export async function criarOrderDoCheckout(
   if (!prec.ok) return { ok: false, error: prec.error };
   const { totalPeixes, subtotalCheio, subtotalPix } = prec;
 
+  // Desconto por item (campanha automática × código secreto, vence o maior) —
+  // recalculado no servidor. Base do snapshot/Order = cartão (cheio canônico).
+  const descItens = await resolverDescontosPorItem(prec.itens, data.cupomCodigo);
+
   // Snapshots a persistir: precoUnitario = CHEIO (canônico). O valor efetivamente
   // cobrado por forma (Pix com desconto vs cartão cheio) vai na linha Pagamento.
-  const itensData = prec.itens.map((it) => ({
+  const itensData = prec.itens.map((it, i) => ({
     productId: it.productId,
     nomeProduto: it.nomeProduto,
     precoUnitario: it.precoCheio,
@@ -476,6 +658,10 @@ export async function criarOrderDoCheckout(
     composicao: it.composicao,
     qtdMachos: it.qtdMachos,
     qtdFemeas: it.qtdFemeas,
+    descontoUnitario:
+      descItens[i].descontoCartaoUnit > 0 ? descItens[i].descontoCartaoUnit : null,
+    cupomId: descItens[i].cupomId,
+    cupomCodigo: descItens[i].cupomCodigo,
   }));
 
   // >10 peixes → não dá pra cobrar frete automático: fecha no WhatsApp.
@@ -538,23 +724,25 @@ export async function criarOrderDoCheckout(
     frete = 0;
   }
 
-  // ── 2c. Cupom: revalida e recalcula NO SERVIDOR (anti-fraude). Se ficou
-  // inválido entre o carrinho e o checkout (expirou/esgotou/limite), segue sem
-  // desconto. Order.desconto guarda a base CHEIA (cartão), igual a subtotal/total.
-  let descontoCartao = 0;
-  let descontoPix = 0;
-  let cupomId: string | null = null;
-  let cupomCodigo: string | null = null;
-  const cupomResolvido = await resolverCupom(
-    data.cupomCodigo,
-    itensParaCupom(prec.itens),
+  // ── 2c. Desconto do pedido = soma dos descontos por item (base cartão e Pix).
+  // A fonte de verdade do desconto é por item (OrderItem). No Order guardamos a
+  // soma (cheio/cartão) e, informativo, o código secreto digitado (cupomId null).
+  const descontoCartao = round2(
+    prec.itens.reduce(
+      (a, it, i) => a + descItens[i].descontoCartaoUnit * it.quantidade,
+      0,
+    ),
   );
-  if (cupomResolvido.status === "ok") {
-    descontoCartao = cupomResolvido.data.descontoCartao;
-    descontoPix = cupomResolvido.data.descontoPix;
-    cupomId = cupomResolvido.data.cupomId;
-    cupomCodigo = cupomResolvido.data.codigo;
-  }
+  const descontoPix = round2(
+    prec.itens.reduce(
+      (a, it, i) => a + descItens[i].descontoPixUnit * it.quantidade,
+      0,
+    ),
+  );
+  const cupomId: string | null = null;
+  const cupomCodigo: string | null = data.cupomCodigo?.trim()
+    ? normalizarCodigo(data.cupomCodigo)
+    : null;
 
   const totalCheio = round2(subtotalCheio + frete - descontoCartao);
   const totalPix = round2(subtotalPix + frete - descontoPix);
@@ -673,6 +861,8 @@ export async function criarOrderDoCheckout(
             cupomId,
             cupomCodigo,
             total: totalCheio,
+            // Recria os itens para refletir os descontos por item recalculados.
+            items: { deleteMany: {}, create: itensData },
           },
           select: { id: true, numero: true },
         });
@@ -837,12 +1027,17 @@ export async function gerarNovoPix(numero: string): Promise<CheckoutResult> {
   );
   let valorPix: number;
   if (prec.ok) {
-    let descontoPix = 0;
-    const cupomRes = await resolverCupom(
+    // Reaplica campanha (automática) + código secreto salvo, por item, no Pix.
+    const descItens = await resolverDescontosPorItem(
+      prec.itens,
       order.cupomCodigo,
-      itensParaCupom(prec.itens),
     );
-    if (cupomRes.status === "ok") descontoPix = cupomRes.data.descontoPix;
+    const descontoPix = round2(
+      prec.itens.reduce(
+        (a, it, i) => a + descItens[i].descontoPixUnit * it.quantidade,
+        0,
+      ),
+    );
     valorPix = round2(prec.subtotalPix + Number(order.frete) - descontoPix);
   } else {
     valorPix = Number(order.total);
