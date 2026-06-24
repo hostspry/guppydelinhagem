@@ -42,11 +42,11 @@ import {
   criarPedidoCheckout,
   pagarComCartao,
   calcularTetoParcelas,
-  precificarCheckout,
   validarCupom,
+  resolverItensCarrinho,
   type CheckoutPixData,
   type CartaoInput,
-  type CheckoutPreco,
+  type CarrinhoResolvido,
 } from "@/actions/checkout";
 import PixPanel from "@/components/checkout/PixPanel";
 import CardPaymentBrick from "@/components/checkout/CardPaymentBrick";
@@ -183,14 +183,6 @@ export default function CheckoutClient({
   const setCupom = useCart((s) => s.setCupom);
   const clearCupom = useCart((s) => s.clearCupom);
 
-  // Desconto do cupom, revalidado no servidor (preview no checkout). O valor exato
-  // é recalculado de novo ao fechar o pedido (anti-fraude); aqui é só o resumo.
-  const [cupomDesc, setCupomDesc] = useState<{
-    codigo: string;
-    modo: "AMBOS_VENCE_MAIOR" | "AMBOS_ACUMULA" | "SO_PIX" | "SO_CARTAO";
-    descontoPix: number;
-    descontoCartao: number;
-  } | null>(null);
   const [codigoCupom, setCodigoCupom] = useState("");
   const [cupomErro, setCupomErro] = useState<string | null>(null);
   const [aplicandoCupom, startCupom] = useTransition();
@@ -219,8 +211,9 @@ export default function CheckoutClient({
   );
   const [teto, setTeto] = useState(1);
   const [recusa, setRecusa] = useState<string | null>(null);
-  // Preços autoritativos do servidor (cheio + Pix). Fallback no cart até carregar.
-  const [preco, setPreco] = useState<CheckoutPreco | null>(null);
+  // Preço EFETIVO do servidor (campanha automática + código secreto). Fonte única
+  // do carrinho e do checkout. Fallback no cart até carregar.
+  const [resolvido, setResolvido] = useState<CarrinhoResolvido | null>(null);
 
   // Frete
   const [freteLoading, setFreteLoading] = useState(false);
@@ -257,57 +250,45 @@ export default function CheckoutClient({
   const enderecoBloqueado = !freteCalculado;
   const viacepSemResultado = freteCalculado && !frete?.endereco?.rua;
 
-  // Subtotais: servidor manda; cart é fallback até o servidor responder.
-  const subtotalPixView = preco?.subtotalPix ?? subtotalPixCart;
-  const subtotalCheioView = preco?.subtotalCheio ?? subtotalCheioCart;
-  // Desconto-base do Pix (sem cupom) = diferença entre o cheio e o Pix.
-  const descontoPixBase = Math.max(0, subtotalCheioView - subtotalPixView);
+  // Subtotais EFETIVOS (com campanha + código secreto). Base = "de/por". Cart é
+  // fallback até o servidor responder.
+  const subtotalCheioBase = resolvido?.subtotalCheioBase ?? subtotalCheioCart;
+  const subtotalPixEfetivo = resolvido?.subtotalPixEfetivo ?? subtotalPixCart;
+  const subtotalCheioEfetivo =
+    resolvido?.subtotalCheioEfetivo ?? subtotalCheioCart;
+  // Mapa por item → preços efetivos + base (para o resumo mostrar de/por + selo).
   const precoMap = useMemo(() => {
-    const m = new Map<string, { precoCheio: number; precoPix: number }>();
-    preco?.itens.forEach((it) =>
-      m.set(`${it.produtoId}|${it.composicao ?? ""}`, {
-        precoCheio: it.precoCheio,
-        precoPix: it.precoPix,
+    const m = new Map<
+      string,
+      { base: number; pix: number; cartao: number; campanha: boolean; codigo: string | null; pct: number }
+    >();
+    resolvido?.linhas.forEach((l) =>
+      m.set(`${l.produtoId}|${l.composicao ?? ""}`, {
+        base: l.precoCheioBase,
+        pix: l.precoPixEfetivo,
+        cartao: l.precoCheioEfetivo,
+        campanha: l.tipoCupomVencedor === "CAMPANHA",
+        codigo: l.cupomCodigo,
+        pct: l.descontoPercent,
       }),
     );
     return m;
-  }, [preco]);
+  }, [resolvido]);
 
-  // Frete grátis: base ÚNICA = subtotal no CHEIO (cartão), igual ao servidor —
-  // não muda entre abas Pix/Cartão. Aplica só quando ligado e atingido o valor.
+  // Frete grátis: base = subtotal CHEIO base (igual ao servidor; não muda por aba).
   const freteGratisAplicado =
     freteGratis.ativo &&
     freteGratis.acimaDe != null &&
-    subtotalCheioView >= freteGratis.acimaDe;
-  // Valor do frete que efetivamente entra no total (0 quando frete grátis).
+    subtotalCheioBase >= freteGratis.acimaDe;
   const freteEfetivo = freteGratisAplicado ? 0 : freteValor;
 
-  // Total exibido segue a ABA (Pix descontado × Cartão cheio). O cartão é cobrado
-  // pelo cheio (Brick usa totalCartao); juros do parcelado vêm do MP.
-  // Desconto do cupom conforme a aba (Pix × cartão). O cartão (Brick) precisa
-  // bater EXATAMENTE com o que o servidor cobra (valorCartao), então subtraímos
-  // o descontoCartao também no totalCartao.
-  const descontoCupom = cupomDesc
-    ? aba === "pix"
-      ? cupomDesc.descontoPix
-      : cupomDesc.descontoCartao
-    : 0;
-  // Cupom "vence o maior" no Pix: ele SUBSTITUI o desconto Pix (não soma). Aí não
-  // mostramos a linha "Desconto no Pix"; o cupom aparece com o desconto cheio
-  // (cheio → preço final), pra não parecer que os dois se somam.
-  const cupomAbsorvePix =
-    !!cupomDesc && aba === "pix" && cupomDesc.modo === "AMBOS_VENCE_MAIOR";
-  const exibeDescontoPixBase =
-    aba === "pix" && descontoPixBase > 0 && !cupomAbsorvePix;
-  const cupomLinhaValor = cupomAbsorvePix
-    ? descontoPixBase + (cupomDesc?.descontoPix ?? 0)
-    : descontoCupom;
-  const subtotalView = aba === "pix" ? subtotalPixView : subtotalCheioView;
-  const total = Math.max(0, subtotalView + (freteEfetivo ?? 0) - descontoCupom);
-  const totalCartao = Math.max(
-    0,
-    subtotalCheioView + (freteEfetivo ?? 0) - (cupomDesc?.descontoCartao ?? 0),
-  );
+  // Totais por aba a partir dos subtotais EFETIVOS (já com campanha/cupom). O
+  // cartão (Brick) usa totalCartao — bate com o que o servidor cobra.
+  const economiaPix = Math.max(0, subtotalCheioBase - subtotalPixEfetivo);
+  const subtotalEfetivoAba =
+    aba === "pix" ? subtotalPixEfetivo : subtotalCheioEfetivo;
+  const total = Math.max(0, subtotalEfetivoAba + (freteEfetivo ?? 0));
+  const totalCartao = Math.max(0, subtotalCheioEfetivo + (freteEfetivo ?? 0));
 
   // Frete obrigatório: depois de uma tentativa de envio, sem valor e ≤10 peixes.
   const freteFaltando = isSubmitted && !excedeCaixa && freteValor == null;
@@ -412,13 +393,7 @@ export default function CheckoutClient({
     startCupom(async () => {
       const r = await validarCupom(codigo, itensPedido());
       if (r.ok) {
-        setCupom(r.codigo);
-        setCupomDesc({
-          codigo: r.codigo,
-          modo: r.modo,
-          descontoPix: r.descontoPix,
-          descontoCartao: r.descontoCartao,
-        });
+        setCupom(r.codigo); // o desconto entra via resolverItensCarrinho
         setCupomErro(null);
         setCodigoCupom("");
       } else {
@@ -429,7 +404,6 @@ export default function CheckoutClient({
 
   function removerCupom() {
     clearCupom();
-    setCupomDesc(null);
     setCupomErro(null);
   }
 
@@ -440,36 +414,22 @@ export default function CheckoutClient({
   useEffect(() => {
     if (items.length === 0) return;
     let ativo = true;
-    precificarCheckout(itensPedido()).then((p) => {
-      if (ativo) setPreco(p);
+    resolverItensCarrinho(itensPedido(), cupom).then((r) => {
+      if (ativo) setResolvido(r);
     });
     return () => {
       ativo = false;
     };
-    // itensKey resume ids+composição+qtd do carrinho.
+    // itensKey resume ids+composição+qtd; cupom = código secreto aplicado.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [itensKey]);
+  }, [itensKey, cupom]);
 
-  // Revalida o cupom salvo (carrinho) contra os preços do servidor — preview do
-  // resumo. Some o desconto se o cupom deixou de valer ou não cobre os itens.
+  // Código secreto salvo deixou de valer (expirou/esgotou/não cobre) → remove.
   useEffect(() => {
-    if (!cupom || items.length === 0) {
-      setCupomDesc(null);
-      return;
-    }
+    if (!cupom || items.length === 0) return;
     let ativo = true;
     validarCupom(cupom, itensPedido()).then((r) => {
-      if (!ativo) return;
-      setCupomDesc(
-        r.ok
-          ? {
-              codigo: r.codigo,
-              modo: r.modo,
-              descontoPix: r.descontoPix,
-              descontoCartao: r.descontoCartao,
-            }
-          : null,
-      );
+      if (ativo && !r.ok) clearCupom();
     });
     return () => {
       ativo = false;
@@ -1035,9 +995,16 @@ export default function CheckoutClient({
           <ul className="divide-y divide-border text-sm">
             {items.map((i) => {
               const srv = precoMap.get(`${i.produtoId}|${i.composicao ?? ""}`);
-              // Mostra sempre o preço cheio (cartão à vista); os descontos (Pix e
-              // cupom) aparecem itemizados abaixo, no resumo.
-              const unit = srv?.precoCheio ?? i.precoCheio;
+              // Preço efetivo do servidor (campanha/cupom) conforme a aba.
+              const unit = srv
+                ? aba === "pix"
+                  ? srv.pix
+                  : srv.cartao
+                : aba === "pix"
+                  ? i.precoPix
+                  : i.precoCheio;
+              const base = srv?.base ?? i.precoCheio;
+              const temDesc = unit < base;
               return (
                 <li key={i.variantId} className="py-2 flex justify-between gap-3">
                   <span className="text-primary">
@@ -1049,22 +1016,34 @@ export default function CheckoutClient({
                       </span>
                     ) : null}
                     <span className="text-muted-foreground"> ×{i.quantidade}</span>
+                    {srv?.campanha && srv.codigo && (
+                      <span className="ml-1 inline-flex items-center gap-0.5 text-[10px] font-bold text-[#07366A] bg-[#FAB82A] px-1.5 py-0.5 rounded-full align-middle">
+                        <Tag size={10} aria-hidden="true" /> {srv.codigo}
+                      </span>
+                    )}
                   </span>
-                  <span className="text-primary font-medium shrink-0 tabular-nums">
-                    {formatBRL(unit * i.quantidade)}
+                  <span className="shrink-0 text-right tabular-nums">
+                    {temDesc && (
+                      <span className="block text-[11px] text-muted-foreground line-through">
+                        {formatBRL(base * i.quantidade)}
+                      </span>
+                    )}
+                    <span className="text-primary font-medium">
+                      {formatBRL(unit * i.quantidade)}
+                    </span>
                   </span>
                 </li>
               );
             })}
           </ul>
 
-          {/* Cupom de desconto */}
+          {/* Cupom secreto (código digitado) */}
           <div className="border-t border-border pt-3">
-            {cupomDesc ? (
+            {cupom ? (
               <div className="flex items-center justify-between gap-2 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
                 <span className="inline-flex items-center gap-1.5 text-sm text-green-700 font-medium">
                   <Tag size={14} aria-hidden="true" />
-                  Cupom {cupomDesc.codigo}
+                  Cupom {cupom}
                 </span>
                 <button
                   type="button"
@@ -1114,14 +1093,14 @@ export default function CheckoutClient({
             {/* Subtotal sempre no preço CHEIO (cartão à vista) — os descontos vêm
                 listados abaixo, pra ficar claro de onde sai cada valor. */}
             <div className="flex justify-between text-muted-foreground">
-              <span>Subtotal</span>
-              <span className="tabular-nums">{formatBRL(subtotalCheioView)}</span>
+              <span>Subtotal {aba === "pix" ? "no Pix" : "no cartão"}</span>
+              <span className="tabular-nums">{formatBRL(subtotalEfetivoAba)}</span>
             </div>
-            {exibeDescontoPixBase && (
+            {aba === "pix" && economiaPix > 0 && (
               <div className="flex justify-between text-green-700">
-                <span>Desconto no Pix</span>
+                <span>Você economiza no Pix</span>
                 <span className="tabular-nums font-medium">
-                  − {formatBRL(descontoPixBase)}
+                  − {formatBRL(economiaPix)}
                 </span>
               </div>
             )}
@@ -1137,14 +1116,6 @@ export default function CheckoutClient({
                 </span>
               )}
             </div>
-            {cupomDesc && cupomLinhaValor > 0 && (
-              <div className="flex justify-between text-green-700">
-                <span>Cupom {cupomDesc.codigo}</span>
-                <span className="tabular-nums font-medium">
-                  − {formatBRL(cupomLinhaValor)}
-                </span>
-              </div>
-            )}
             <div className="flex items-end justify-between pt-2">
               <span className="text-sm font-medium text-primary">
                 Total {aba === "pix" ? "no Pix" : "no cartão"}
