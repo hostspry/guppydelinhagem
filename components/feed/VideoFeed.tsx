@@ -6,6 +6,8 @@ import {
   X,
   ChevronUp,
   ChevronDown,
+  ChevronsUp,
+  ChevronsDown,
   Play,
   Minus,
   Plus,
@@ -156,6 +158,9 @@ export default function VideoFeed({
     () => slides[startIdx]?.p.variantes[0]?.composicao ?? null,
   );
   const [qtd, setQtd] = useState(1);
+  // Minimizar a camada de compra (gaveta + badges do topo) — estado global do
+  // feed, sem persistência. Resetado para expandido ao trocar de slide.
+  const [minimizado, setMinimizado] = useState(false);
 
   // Swipe vertical (ref do toque) — declarado antes de qualquer early return.
   const touchY = useRef<number | null>(null);
@@ -210,6 +215,7 @@ export default function VideoFeed({
     const alvo = slides[novo];
     setIdx(novo); // novo slide autoplaya (o iframe re-monta pela key=idx)
     setPausado(false); // novo vídeo começa tocando
+    setMinimizado(false); // ao trocar de slide a compra reaparece (expandido)
     // iOS: o vídeo novo entra mudo (não dá pra religar sem gesto) → reflete isso
     // no ícone de som. No Android a preferência de som persiste (auto-religa).
     if (isIOSRef.current) setSom(false);
@@ -456,7 +462,9 @@ export default function VideoFeed({
           superior DIREITO do embed; manter o nosso à esquerda evita parecer
           duplicado). Direita: contador + plataforma. */}
       <div
-        className="absolute top-0 inset-x-0 z-30 flex items-center justify-between p-3"
+        className={`absolute top-0 inset-x-0 z-30 flex items-center justify-between p-3 transition-all duration-300 ${
+          minimizado ? "-translate-y-full opacity-0 pointer-events-none" : ""
+        }`}
         style={{ paddingTop: "calc(0.75rem + env(safe-area-inset-top))" }}
       >
         <div className="flex items-center gap-2">
@@ -522,10 +530,48 @@ export default function VideoFeed({
         </button>
       </div>
 
+      {/* Alça central de minimizar/expandir a camada de compra. Fica SEMPRE
+          visível (não desliza junto com a gaveta): ChevronsDown esconde a compra
+          deixando o vídeo limpo; ChevronsUp traz de volta. z-40 acima da gaveta.
+          Expandido: ancorada no TOPO da gaveta. Minimizado: desce pra base. */}
+      <div
+        className={`absolute inset-x-0 z-40 flex justify-center pointer-events-none transition-all duration-300 ${
+          minimizado ? "bottom-0" : "bottom-[var(--gaveta-h)]"
+        }`}
+        style={
+          {
+            // Aproximação da altura da gaveta de compra (alça pousa logo acima).
+            "--gaveta-h": "11rem",
+            paddingBottom: minimizado
+              ? "calc(0.75rem + env(safe-area-inset-bottom))"
+              : "0",
+          } as React.CSSProperties
+        }
+      >
+        <button
+          type="button"
+          onClick={() => setMinimizado((v) => !v)}
+          aria-label={
+            minimizado
+              ? "Mostrar informações de compra"
+              : "Minimizar informações de compra"
+          }
+          className="pointer-events-auto flex items-center justify-center w-12 h-9 rounded-full bg-black/60 text-white hover:bg-black/80 transition-colors"
+        >
+          {minimizado ? (
+            <ChevronsUp className="w-5 h-5" aria-hidden="true" />
+          ) : (
+            <ChevronsDown className="w-5 h-5" aria-hidden="true" />
+          )}
+        </button>
+      </div>
+
       {/* Gaveta de compra (parte de baixo, vídeo visível acima) — degradê escuro
           pra o texto ficar legível sobre qualquer vídeo (claro ou escuro). */}
       <div
-        className="absolute bottom-0 inset-x-0 z-20 pt-12 px-4 pointer-events-none"
+        className={`absolute bottom-0 inset-x-0 z-20 pt-12 px-4 pointer-events-none transition-all duration-300 ${
+          minimizado ? "translate-y-full opacity-0" : ""
+        }`}
         style={{
           background:
             "linear-gradient(to top, rgba(0,0,0,0.9) 55%, rgba(0,0,0,0.5) 78%, transparent)",

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Check } from "lucide-react";
+import { Check, Tag } from "lucide-react";
 import { VideoThumb } from "@/components/admin/VideoThumb";
 import FeedPlayButton from "@/components/feed/FeedPlayButton";
 import { formatBRL } from "@/lib/utils/format";
@@ -31,6 +31,8 @@ export default function ProductCardSimple({
   // Preços já vêm calculados do servidor (lib/precos + desconto global) — o card
   // NÃO recalcula, batendo com a página do produto.
   const temDescontoPix = product.descontoPixPercent > 0;
+  // Campanha (cupom) tem PRIORIDADE sobre os ramos de preço normais.
+  const campanha = product.campanha;
 
   return (
     <Link
@@ -78,7 +80,47 @@ export default function ProductCardSimple({
         </p>
 
         <div className="mt-auto">
-          {temDescontoPix ? (
+          {campanha ? (
+            <>
+              {/* CAMPANHA (cupom) — prioridade: "De" riscado + "Por" em destaque */}
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span
+                  className="text-[11px] font-bold rounded-full px-2 py-0.5"
+                  style={{ backgroundColor: "#FAB82A", color: "#07366A" }}
+                >
+                  -{campanha.descontoPercent}% OFF
+                </span>
+                <span
+                  className="inline-flex items-center gap-1 text-[11px] font-semibold rounded-full px-2 py-0.5"
+                  style={{ backgroundColor: "#FAB82A", color: "#07366A" }}
+                >
+                  <Tag size={11} className="shrink-0" aria-hidden="true" />
+                  Cupom {campanha.codigo}
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                De{" "}
+                <span className="line-through">
+                  {formatBRL(product.precoCheio)}
+                </span>
+              </p>
+              <p className="text-green-600 text-xl font-bold leading-none mt-0.5">
+                Por {formatBRL(campanha.precoPromoPix)}
+              </p>
+              {campanha.precoUnico ? (
+                <p className="text-xs text-green-700 font-medium mt-1">
+                  no Pix ou cartão
+                </p>
+              ) : (
+                <p className="text-xs text-muted-foreground mt-1">
+                  <span className="line-through">
+                    {formatBRL(campanha.precoPromoCheio)}
+                  </span>{" "}
+                  no cartão
+                </p>
+              )}
+            </>
+          ) : temDescontoPix ? (
             <>
               {/* COM desconto: Pix em destaque + cartão riscado + % OFF */}
               <p className="text-green-600 text-xl font-bold leading-none">

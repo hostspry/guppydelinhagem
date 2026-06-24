@@ -20,6 +20,7 @@ import {
   Wind,
   Headset,
   Package,
+  Tag,
   type LucideIcon,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -31,6 +32,7 @@ import ProductShare from "./ProductShare";
 import WaitlistForm from "./WaitlistForm";
 import { formatBRL } from "@/lib/utils/format";
 import { calcularPrecos } from "@/lib/precos";
+import { precoComCampanha, type CampanhaInfo } from "@/lib/campanha-core";
 import {
   youtubeEmbedUrl,
   instagramEmbedUrl,
@@ -107,10 +109,12 @@ export default function ProductDetail({
   product,
   relacionados,
   descontoPixGlobalPercent,
+  campanha,
 }: {
   product: ProductDetailData;
   relacionados: PublicProductCard[];
   descontoPixGlobalPercent: number;
+  campanha: CampanhaInfo | null;
 }) {
   const router = useRouter();
   const [qtd, setQtd] = useState(1);
@@ -168,6 +172,15 @@ export default function ProductDetail({
   const descontoPercent = precos.descontoPixPercent;
   const temDescontoPix = descontoPercent > 0;
   const valorParcela = precoCheio / product.parcelasMax;
+  // Campanha (cupom) tem PRIORIDADE no bloco de preço. Recalcula o promo POR
+  // VARIANTE (preço cheio da composição atual) — só exibição; o preço cobrado é
+  // recalculado no servidor ao adicionar ao carrinho.
+  const promo = campanha
+    ? precoComCampanha(precoCheio, descontoPercent, campanha)
+    : null;
+  const valorParcelaPromo = promo
+    ? promo.precoPromoCheio / product.parcelasMax
+    : valorParcela;
   const capa = product.videos.find((v) => v.principal)?.thumbnailUrl ?? null;
 
   // GA4 view_item — uma vez por produto (preço Pix da composição inicial).
@@ -442,7 +455,52 @@ export default function ProductDetail({
 
           {/* Preço — cheio (cartão) bem legível; Pix em destaque como desconto */}
           <div className="space-y-1.5">
-            {temDescontoPix ? (
+            {campanha && promo ? (
+              <>
+                {/* CAMPANHA (cupom) — prioridade total no bloco de preço */}
+                <div className="flex flex-wrap items-center gap-2">
+                  <span
+                    className="text-[11px] font-bold rounded-full px-2 py-0.5"
+                    style={{ backgroundColor: "#FAB82A", color: "#07366A" }}
+                  >
+                    -{promo.descontoPercent}% OFF
+                  </span>
+                  <span
+                    className="inline-flex items-center gap-1 text-[11px] font-semibold rounded-full px-2 py-0.5"
+                    style={{ backgroundColor: "#FAB82A", color: "#07366A" }}
+                  >
+                    <Tag size={12} className="shrink-0" aria-hidden="true" />
+                    Cupom {campanha.codigo} aplicado
+                  </span>
+                </div>
+                {/* "De" cheio riscado */}
+                <p className="text-sm text-muted-foreground">
+                  De{" "}
+                  <span className="line-through">{formatBRL(precoCheio)}</span>
+                </p>
+                {/* "Por" promo Pix — grande, verde (destaque) */}
+                <div className="flex items-end gap-2 flex-wrap">
+                  <span className="text-green-600 text-3xl font-bold leading-none">
+                    {formatBRL(promo.precoPromoPix)}
+                  </span>
+                  <span className="text-green-700 text-sm font-semibold pb-0.5">
+                    {campanha.precoUnico ? "no Pix ou cartão" : "à vista no Pix"}
+                  </span>
+                </div>
+                {campanha.precoUnico ? (
+                  <p className="text-sm text-muted-foreground">
+                    em até {product.parcelasMax}x de{" "}
+                    {formatBRL(valorParcelaPromo)} sem juros
+                  </p>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    {formatBRL(promo.precoPromoCheio)} no cartão · em até{" "}
+                    {product.parcelasMax}x de {formatBRL(valorParcelaPromo)} sem
+                    juros
+                  </p>
+                )}
+              </>
+            ) : temDescontoPix ? (
               <>
                 {/* Preço normal (cartão) — claro e legível, não escondido */}
                 <p className="text-lg text-primary font-semibold leading-tight">
