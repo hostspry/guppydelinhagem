@@ -4,7 +4,7 @@ import { ordenarVitrine } from "../estoque";
 import { calcularPrecos, type ConfigPreco } from "../precos";
 import { getConfigPreco } from "./config";
 import { resolverCampanhas } from "../campanha";
-import type { CampanhaProduto } from "../campanha-core";
+import type { CampanhaProduto, CampanhaInfo } from "../campanha-core";
 import type { Prisma } from "../generated/prisma/client";
 import type { ProductType, TipoComposicao } from "../generated/prisma/enums";
 
@@ -534,76 +534,116 @@ export type FeedProduto = {
   estoque: number;
   estoqueMachos: number;
   estoqueFemeas: number;
+  campanha: CampanhaInfo | null;
   variantes: FeedVariante[];
   videos: FeedVideo[];
 };
 
 export async function getVideoFeed(): Promise<FeedProduto[]> {
-  const rows = await prisma.product.findMany({
-    where: { ativo: true, videos: { some: { ativo: true } } },
-    // Destaques primeiro; depois recentes. Tie-break por id (ordem estável).
-    // (A reordenação final que joga esgotados pro fim é em memória, abaixo.)
-    orderBy: [{ destaque: "desc" }, { criadoEm: "desc" }, { id: "asc" }],
-    select: {
-      id: true,
-      nome: true,
-      slug: true,
-      preco: true,
-      descontoPix: true,
-      usarDescontoPixGlobal: true,
-      parcelasMax: true,
-      estoque: true,
-      estoqueMachos: true,
-      estoqueFemeas: true,
-      destaque: true, // p/ ordenarVitrine (destaque entre disponíveis)
-      variantes: {
-        where: { ativo: true },
-        orderBy: [{ padrao: "desc" }, { ordem: "asc" }],
-        select: {
-          id: true,
-          composicao: true,
-          preco: true,
-          qtdMachos: true,
-          qtdFemeas: true,
-          rotulo: true,
-          padrao: true,
+  const [rows, config] = await Promise.all([
+    prisma.product.findMany({
+      where: { ativo: true, videos: { some: { ativo: true } } },
+      // Destaques primeiro; depois recentes. Tie-break por id (ordem estável).
+      // (A reordenação final que joga esgotados pro fim é em memória, abaixo.)
+      orderBy: [{ destaque: "desc" }, { criadoEm: "desc" }, { id: "asc" }],
+      select: {
+        id: true,
+        nome: true,
+        slug: true,
+        preco: true,
+        descontoPix: true,
+        usarDescontoPixGlobal: true,
+        parcelasMax: true,
+        estoque: true,
+        estoqueMachos: true,
+        estoqueFemeas: true,
+        categoryId: true, // escopo de campanha
+        destaque: true, // p/ ordenarVitrine (destaque entre disponíveis)
+        variantes: {
+          where: { ativo: true },
+          orderBy: [{ padrao: "desc" }, { ordem: "asc" }],
+          select: {
+            id: true,
+            composicao: true,
+            preco: true,
+            qtdMachos: true,
+            qtdFemeas: true,
+            rotulo: true,
+            padrao: true,
+          },
+        },
+        videos: {
+          where: { ativo: true },
+          orderBy: [{ principal: "desc" }, { ordem: "asc" }],
+          select: {
+            platform: true,
+            videoId: true,
+            originalUrl: true,
+            thumbnailUrl: true,
+            titulo: true,
+          },
         },
       },
-      videos: {
-        where: { ativo: true },
-        orderBy: [{ principal: "desc" }, { ordem: "asc" }],
-        select: {
-          platform: true,
-          videoId: true,
-          originalUrl: true,
-          thumbnailUrl: true,
-          titulo: true,
+    }),
+    getConfigPreco(),
+  ]);
+
+  // Campanha vigente por produto (mesma resolução da vitrine). O card aplica o
+  // preço promocional por variante com precoComCampanha.
+  const campMap = await resolverCampanhas(
+    rows.map((r) => {
+      const precos = calcularPrecos(
+        {
+          precoBase: Number(r.preco),
+          descontoPixProprio: r.descontoPix == null ? null : Number(r.descontoPix),
+          usarDescontoPixGlobal: r.usarDescontoPixGlobal,
         },
-      },
-    },
-  });
+        config,
+      );
+      return {
+        id: r.id,
+        categoryId: r.categoryId,
+        precoCheio: precos.precoCartao,
+        descontoPixPercent: precos.descontoPixPercent,
+        estoqueMachos: r.estoqueMachos,
+        estoqueFemeas: r.estoqueFemeas,
+      };
+    }),
+  );
 
   // Esgotados (pool 0/0) por último; destaque só conta entre disponíveis.
-  return ordenarVitrine(rows).map((p) => ({
-    id: p.id,
-    nome: p.nome,
-    slug: p.slug,
-    preco: Number(p.preco),
-    descontoPix: p.descontoPix == null ? null : Number(p.descontoPix),
-    usarDescontoPixGlobal: p.usarDescontoPixGlobal,
-    parcelasMax: p.parcelasMax,
-    estoque: p.estoque,
-    estoqueMachos: p.estoqueMachos,
-    estoqueFemeas: p.estoqueFemeas,
-    variantes: p.variantes.map((v) => ({
-      id: v.id,
-      composicao: v.composicao,
-      preco: Number(v.preco),
-      qtdMachos: v.qtdMachos,
-      qtdFemeas: v.qtdFemeas,
-      rotulo: v.rotulo,
-      padrao: v.padrao,
-    })),
-    videos: p.videos,
-  }));
+  return ordenarVitrine(rows).map((p) => {
+    const camp = campMap.get(p.id);
+    return {
+      id: p.id,
+      nome: p.nome,
+      slug: p.slug,
+      preco: Number(p.preco),
+      descontoPix: p.descontoPix == null ? null : Number(p.descontoPix),
+      usarDescontoPixGlobal: p.usarDescontoPixGlobal,
+      parcelasMax: p.parcelasMax,
+      estoque: p.estoque,
+      estoqueMachos: p.estoqueMachos,
+      estoqueFemeas: p.estoqueFemeas,
+      campanha: camp
+        ? {
+            cupomId: camp.cupomId,
+            codigo: camp.codigo,
+            tipoValor: camp.tipoValor,
+            valor: camp.valor,
+            precoUnico: camp.precoUnico,
+          }
+        : null,
+      variantes: p.variantes.map((v) => ({
+        id: v.id,
+        composicao: v.composicao,
+        preco: Number(v.preco),
+        qtdMachos: v.qtdMachos,
+        qtdFemeas: v.qtdFemeas,
+        rotulo: v.rotulo,
+        padrao: v.padrao,
+      })),
+      videos: p.videos,
+    };
+  });
 }
