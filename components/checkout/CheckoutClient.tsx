@@ -26,8 +26,12 @@ import {
   trackAddPaymentInfo,
   type AnalyticsItem,
 } from "@/lib/analytics";
-import { whatsappLink, freteGollog } from "@/lib/constants";
-import { checkoutSchema } from "@/lib/validations/checkout";
+import {
+  whatsappLink,
+  freteGollog,
+  RETIRADA_INSTRUCOES_PADRAO,
+} from "@/lib/constants";
+import { checkoutBaseSchema, refineEntrega } from "@/lib/validations/checkout";
 import {
   useCart,
   selectTotalPeixes,
@@ -62,12 +66,15 @@ export type CheckoutPrefill = {
 };
 
 // Só os campos visíveis do formulário (transportadora/itens vêm do carrinho e da
-// regra de frete, não do form). Reusa as mensagens PT do checkoutSchema.
-const camposSchema = checkoutSchema.omit({
-  transportadora: true,
-  modalidadeFrete: true,
-  itens: true,
-});
+// regra de frete, não do form). Reusa as mensagens PT + o refine condicional do
+// endereço (na retirada o endereço não é exigido; tipoEntrega fica no form).
+const camposSchema = checkoutBaseSchema
+  .omit({
+    transportadora: true,
+    modalidadeFrete: true,
+    itens: true,
+  })
+  .superRefine(refineEntrega);
 type CamposInput = z.input<typeof camposSchema>;
 type CamposOutput = z.output<typeof camposSchema>;
 
@@ -163,10 +170,12 @@ export default function CheckoutClient({
   prefill,
   mpPublicKey,
   freteGratis,
+  retirada,
 }: {
   prefill: CheckoutPrefill;
   mpPublicKey: string | null;
   freteGratis: { ativo: boolean; acimaDe: number | null };
+  retirada: { ativo: boolean; instrucoes: string | null };
 }) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
@@ -195,7 +204,7 @@ export default function CheckoutClient({
     formState: { errors, isSubmitted },
   } = useForm<CamposInput, unknown, CamposOutput>({
     resolver: zodResolver(camposSchema),
-    defaultValues: prefill,
+    defaultValues: { ...prefill, tipoEntrega: "ENVIO" },
     shouldFocusError: false, // foco/scroll manual e suave (abaixo)
   });
 
@@ -205,6 +214,14 @@ export default function CheckoutClient({
   const [modalidade, setModalidade] = useState<"TERRESTRE" | "AEREO">(
     "TERRESTRE",
   );
+  // Tipo de entrega: ENVIO (despacha) | RETIRADA (cliente busca, frete 0). Sincroniza
+  // no RHF para o refine do schema dispensar o endereço na retirada.
+  const [tipoEntrega, setTipoEntrega] = useState<"ENVIO" | "RETIRADA">("ENVIO");
+  const isRetirada = tipoEntrega === "RETIRADA";
+  function escolherEntrega(tipo: "ENVIO" | "RETIRADA") {
+    setTipoEntrega(tipo);
+    setValue("tipoEntrega", tipo, { shouldValidate: isSubmitted });
+  }
   const [teto, setTeto] = useState(1);
   const [recusa, setRecusa] = useState<string | null>(null);
   // Preço EFETIVO do servidor (campanha automática + código secreto). Fonte única
@@ -224,7 +241,8 @@ export default function CheckoutClient({
   const cepDigits = (watch("cep") ?? "").replace(/\D/g, "");
   const cepValido = /^\d{8}$/.test(cepDigits);
   const maxPeixes = resolvido?.maxPeixesFreteAuto ?? 10;
-  const excedeCaixa = totalPeixes > maxPeixes;
+  // Na retirada a quantidade não importa (não há frete) — o limite de caixa some.
+  const excedeCaixa = !isRetirada && totalPeixes > maxPeixes;
 
   // Terrestre = Jadlog .Com (id 4, via Melhor Envio). Aéreo = Gollog fixo por UF.
   const jadlogSel = useMemo(
@@ -233,9 +251,10 @@ export default function CheckoutClient({
   );
   const ufAtual = (watch("uf") ?? "").toUpperCase();
   const gollogInfo = freteGollog(ufAtual); // {preco, regiao} | null
-  // Valor do frete conforme a modalidade escolhida.
-  const freteValor =
-    modalidade === "AEREO"
+  // Valor do frete conforme a modalidade escolhida. Na retirada é sempre 0.
+  const freteValor = isRetirada
+    ? 0
+    : modalidade === "AEREO"
       ? (gollogInfo?.preco ?? null)
       : (jadlogSel?.price ?? null);
   // Há opções a mostrar quando o frete foi calculado (Jadlog) — aí a UF também já
@@ -275,11 +294,15 @@ export default function CheckoutClient({
   // servidor. Config vem do resolvido (fallback no prop). Não promete acima do
   // limite de peixes (frete combinado no WhatsApp).
   const fg = resolvido?.freteGratis ?? freteGratis;
+  // Frete grátis não se aplica na retirada (o frete já é 0 e não há barra/progresso).
   const freteGratisAplicado =
-    fg.ativo && !excedeCaixa && subtotalCheioEfetivo >= (fg.acimaDe ?? Infinity);
-  const freteEfetivo = freteGratisAplicado ? 0 : freteValor;
-  // Barra de progresso (só quando ativo e dentro do limite de peixes).
-  const mostraBarraFreteGratis = fg.ativo && !excedeCaixa;
+    !isRetirada &&
+    fg.ativo &&
+    !excedeCaixa &&
+    subtotalCheioEfetivo >= (fg.acimaDe ?? Infinity);
+  const freteEfetivo = isRetirada ? 0 : freteGratisAplicado ? 0 : freteValor;
+  // Barra de progresso (só no envio, ativo e dentro do limite de peixes).
+  const mostraBarraFreteGratis = !isRetirada && fg.ativo && !excedeCaixa;
   const faltaFreteGratis = Math.max(0, (fg.acimaDe ?? 0) - subtotalCheioEfetivo);
   const freteGratisPct =
     fg.acimaDe && fg.acimaDe > 0
@@ -446,14 +469,17 @@ export default function CheckoutClient({
   function onValid(data: CamposOutput) {
     // O submit do form é só do Pix; na aba Cartão o Brick tem botão próprio.
     if (aba === "cartao") return;
-    // Frete entra como “erro” do mesmo jeito: sem ele, não submete.
-    if (excedeCaixa) {
-      focarCampo("cep");
-      return;
-    }
-    if (freteValor == null) {
-      focarCampo("cep");
-      return;
+    // Frete entra como “erro” do mesmo jeito: sem ele, não submete (só no envio —
+    // a retirada não tem frete nem limite de caixa).
+    if (!isRetirada) {
+      if (excedeCaixa) {
+        focarCampo("cep");
+        return;
+      }
+      if (freteValor == null) {
+        focarCampo("cep");
+        return;
+      }
     }
     trackAddPaymentInfo(gaItens(), total, "pix");
     setErro(null);
@@ -461,6 +487,7 @@ export default function CheckoutClient({
       const res = await criarPedidoCheckout({
         ...data,
         complemento: data.complemento ?? "",
+        tipoEntrega,
         transportadora: modalidade === "AEREO" ? "GOLLOG" : "JADLOG",
         modalidadeFrete: modalidade,
         cupomCodigo: cupom ?? "",
@@ -495,7 +522,7 @@ export default function CheckoutClient({
       if (primeiro) focarCampo(primeiro);
       throw new Error("Revise os campos destacados.");
     }
-    if (excedeCaixa || freteValor == null) {
+    if (!isRetirada && (excedeCaixa || freteValor == null)) {
       focarCampo("cep");
       throw new Error("Calcule o frete pelo seu CEP para continuar.");
     }
@@ -507,6 +534,7 @@ export default function CheckoutClient({
       {
         ...dados,
         complemento: dados.complemento ?? "",
+        tipoEntrega,
         transportadora: modalidade === "AEREO" ? "GOLLOG" : "JADLOG",
         modalidadeFrete: modalidade,
         cupomCodigo: cupom ?? "",
@@ -649,10 +677,99 @@ export default function CheckoutClient({
             </div>
           </section>
 
-          {/* ── Seção 2 — Frete (o CEP e o cálculo moram aqui) ── */}
+          {/* ── Seção 2 — Entrega (escolha + CEP/frete ou retirada) ── */}
           <section className="bg-white border border-border rounded-xl p-5 space-y-4">
-            <h2 className="text-primary font-semibold">Frete</h2>
+            <h2 className="text-primary font-semibold">Entrega</h2>
 
+            {/* Escolha do tipo de entrega — só quando a retirada está ligada */}
+            {retirada.ativo && (
+              <fieldset className="space-y-2">
+                <legend className="text-xs font-medium text-primary mb-1">
+                  Como você quer receber?
+                </legend>
+                <label
+                  className={`flex items-center gap-3 rounded-lg border p-3 text-sm cursor-pointer transition-all ${
+                    !isRetirada
+                      ? "border-primary/60 bg-primary/5"
+                      : "border-border hover:border-primary/40"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="tipoEntrega"
+                    className="accent-secondary"
+                    checked={!isRetirada}
+                    onChange={() => escolherEntrega("ENVIO")}
+                  />
+                  <span className="flex-1">
+                    <span className="flex items-center gap-1.5 text-primary font-medium">
+                      <Truck size={14} aria-hidden="true" />
+                      Receber em casa
+                    </span>
+                    <span className="block text-xs text-muted-foreground">
+                      calcule o frete pelo seu CEP
+                    </span>
+                  </span>
+                </label>
+
+                <label
+                  className={`flex items-center gap-3 rounded-lg border p-3 text-sm cursor-pointer transition-all ${
+                    isRetirada
+                      ? "border-primary/60 bg-primary/5"
+                      : "border-border hover:border-primary/40"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="tipoEntrega"
+                    className="accent-secondary"
+                    checked={isRetirada}
+                    onChange={() => escolherEntrega("RETIRADA")}
+                  />
+                  <span className="flex-1">
+                    <span className="flex items-center gap-1.5 text-primary font-medium">
+                      <MapPin size={14} aria-hidden="true" />
+                      Vou retirar pessoalmente — Guarapari/ES
+                    </span>
+                    <span className="block text-xs text-muted-foreground">
+                      retirada presencial, sem frete
+                    </span>
+                  </span>
+                  <span className="font-bold shrink-0 text-green-600">Grátis</span>
+                </label>
+              </fieldset>
+            )}
+
+            {/* Instruções de retirada + WhatsApp */}
+            {isRetirada && (
+              <div className="rounded-lg bg-bg-alt p-3 space-y-2 text-sm">
+                <p className="flex items-start gap-2 text-primary">
+                  <MapPin
+                    size={15}
+                    className="shrink-0 mt-0.5 text-secondary"
+                    aria-hidden="true"
+                  />
+                  <span className="whitespace-pre-wrap">
+                    {retirada.instrucoes?.trim() || RETIRADA_INSTRUCOES_PADRAO}
+                  </span>
+                </p>
+                <a
+                  href={whatsappLink(
+                    "Olá! Quero retirar meu pedido pessoalmente em Guarapari/ES. Podemos combinar o horário?",
+                  )}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 font-semibold text-green-700 underline hover:text-green-800"
+                >
+                  <WhatsAppIcon className="w-3.5 h-3.5 text-[#25D366]" />
+                  Combinar o horário pelo WhatsApp
+                </a>
+              </div>
+            )}
+
+            {/* Envio (CEP + opções de frete) — só quando NÃO é retirada */}
+            {!isRetirada && (
+            <>
             {freteGratisAplicado && (
               <p className="flex items-center gap-2 text-sm font-medium text-green-700 bg-green-50 border border-green-200 rounded-lg p-3">
                 <Truck size={16} className="shrink-0" aria-hidden="true" />
@@ -875,9 +992,12 @@ export default function CheckoutClient({
                 </fieldset>
               )}
             </div>
+            </>
+            )}
           </section>
 
-          {/* ── Seção 3 — Endereço de entrega (bloqueada até calcular o CEP) ── */}
+          {/* ── Seção 3 — Endereço de entrega (envio; some na retirada) ── */}
+          {!isRetirada && (
           <section className="bg-white border border-border rounded-xl p-5 space-y-4">
             <h2 className="text-primary font-semibold">Endereço de entrega</h2>
 
@@ -982,6 +1102,7 @@ export default function CheckoutClient({
               </div>
             </fieldset>
           </section>
+          )}
         </div>
 
         {/* Resumo */}
@@ -1128,8 +1249,8 @@ export default function CheckoutClient({
               </div>
             )}
             <div className="flex justify-between text-muted-foreground">
-              <span>Frete</span>
-              {freteGratisAplicado ? (
+              <span>{isRetirada ? "Retirada" : "Frete"}</span>
+              {freteGratisAplicado || isRetirada ? (
                 <span className="tabular-nums font-semibold text-green-600">
                   Grátis
                 </span>
@@ -1202,7 +1323,7 @@ export default function CheckoutClient({
                 {pending ? "Gerando Pix…" : "Pagar com Pix"}
               </button>
 
-              {!freteValor && !excedeCaixa && !freteFaltando && (
+              {!isRetirada && !freteValor && !excedeCaixa && !freteFaltando && (
                 <p className="text-[11px] text-muted-foreground text-center leading-snug flex items-center justify-center gap-1">
                   <AlertTriangle size={12} aria-hidden="true" />
                   Calcule o frete pelo CEP para concluir.

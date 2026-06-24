@@ -14,8 +14,12 @@ export const checkoutItemSchema = z.object({
   quantidade: z.coerce.number().int().min(1).max(999),
 });
 
-export const checkoutSchema = z.object({
-  // Identificação (guest) — email + CPF são exigidos pelo pagador do Pix.
+// Base SEM o refine condicional — preserva `.shape`/`.omit` para o client e para
+// os pontos que só precisam dos `itens`. O endereço é OPCIONAL aqui: a exigência
+// (só no ENVIO) entra no superRefine de `checkoutSchema`/`camposSchema`.
+export const checkoutBaseSchema = z.object({
+  // Identificação (guest) — email + CPF são exigidos pelo pagador do Pix. SEMPRE
+  // obrigatórios (inclusive na retirada — cadastro + antifraude).
   nome: z.string().trim().min(2, "Informe seu nome completo"),
   telefone: z
     .string()
@@ -26,17 +30,16 @@ export const checkoutSchema = z.object({
     .string()
     .transform(digits)
     .pipe(z.string().min(11, "Informe um CPF/CNPJ válido").max(14)),
-  // Entrega
-  cep: z
-    .string()
-    .transform(digits)
-    .pipe(z.string().length(8, "CEP inválido")),
-  logradouro: z.string().trim().min(1, "Informe o endereço"),
-  numero: z.string().trim().min(1, "Informe o número"),
+  // Tipo de entrega: ENVIO (despacha) ou RETIRADA (cliente busca, frete 0).
+  tipoEntrega: z.enum(["ENVIO", "RETIRADA"]).default("ENVIO"),
+  // Entrega — opcional no base; exigido condicionalmente (ENVIO) no refine.
+  cep: z.string().transform(digits).optional().default(""),
+  logradouro: z.string().trim().optional().default(""),
+  numero: z.string().trim().optional().default(""),
   complemento: z.string().trim().optional().default(""),
-  bairro: z.string().trim().min(1, "Informe o bairro"),
-  cidade: z.string().trim().min(1, "Informe a cidade"),
-  uf: z.string().trim().length(2, "UF deve ter 2 letras"),
+  bairro: z.string().trim().optional().default(""),
+  cidade: z.string().trim().optional().default(""),
+  uf: z.string().trim().optional().default(""),
   // Frete escolhido (o VALOR é re-cotado no servidor; só a transportadora importa)
   transportadora: z.enum(Transportadora),
   // Modalidade escolhida pelo cliente: terrestre (Jadlog) ou aéreo (Gollog). O
@@ -47,6 +50,35 @@ export const checkoutSchema = z.object({
   cupomCodigo: z.string().trim().optional().default(""),
   itens: z.array(checkoutItemSchema).min(1, "Seu carrinho está vazio"),
 });
+
+// Endereço só é exigido no ENVIO. Na RETIRADA o cliente busca presencialmente —
+// dispensa CEP/endereço (mantém nome/email/telefone/CPF, validados no base).
+export function refineEntrega(
+  data: { tipoEntrega?: "ENVIO" | "RETIRADA" } & Record<string, unknown>,
+  ctx: z.RefinementCtx,
+) {
+  if ((data.tipoEntrega ?? "ENVIO") !== "ENVIO") return;
+  const str = (v: unknown) => (typeof v === "string" ? v : "");
+  if (str(data.cep).length !== 8) {
+    ctx.addIssue({ code: "custom", path: ["cep"], message: "CEP inválido" });
+  }
+  const obrig: [string, string][] = [
+    ["logradouro", "Informe o endereço"],
+    ["numero", "Informe o número"],
+    ["bairro", "Informe o bairro"],
+    ["cidade", "Informe a cidade"],
+  ];
+  for (const [campo, msg] of obrig) {
+    if (!str(data[campo]).trim()) {
+      ctx.addIssue({ code: "custom", path: [campo], message: msg });
+    }
+  }
+  if (str(data.uf).trim().length !== 2) {
+    ctx.addIssue({ code: "custom", path: ["uf"], message: "UF deve ter 2 letras" });
+  }
+}
+
+export const checkoutSchema = checkoutBaseSchema.superRefine(refineEntrega);
 
 // Output (pós-transform: telefone/cpf/cep só dígitos, complemento default "").
 export type CheckoutInput = z.infer<typeof checkoutSchema>;

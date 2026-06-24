@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getFreteGratisConfig } from "@/lib/queries/config";
+import {
+  getFreteGratisConfig,
+  getConfiguracaoLoja,
+} from "@/lib/queries/config";
 import CheckoutClient, {
   type CheckoutPrefill,
 } from "@/components/checkout/CheckoutClient";
@@ -68,13 +71,21 @@ export default async function CheckoutPage() {
 
   // Regra de frete grátis (toggle + valor) p/ o resumo zerar o frete na exibição.
   // O servidor (criarOrderDoCheckout) reaplica a mesma regra — fonte da verdade.
-  const freteGratis = await getFreteGratisConfig();
+  // getConfiguracaoLoja é cacheada no request (React.cache), então não dobra a query.
+  const [freteGratis, config] = await Promise.all([
+    getFreteGratisConfig(),
+    getConfiguracaoLoja(),
+  ]);
 
   return (
     <CheckoutClient
       prefill={prefill}
       mpPublicKey={mpPublicKey}
       freteGratis={freteGratis}
+      retirada={{
+        ativo: config.retiradaLocalAtiva,
+        instrucoes: config.retiradaInstrucoes,
+      }}
     />
   );
 }
