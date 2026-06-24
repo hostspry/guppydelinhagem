@@ -400,8 +400,18 @@ export async function validarCupom(
   codigo: string,
   itens: CheckoutFormInput["itens"],
 ): Promise<ValidarCupomResult> {
+  // "Vazio" é só quando NÃO há itens. Shape inválido (carrinho antigo) é outro
+  // caso — não dá pra mascarar de "carrinho vazio", senão o cupom fica travado.
+  if (!Array.isArray(itens) || itens.length === 0) {
+    return { ok: false, motivo: "Seu carrinho está vazio." };
+  }
   const parsed = checkoutSchema.shape.itens.safeParse(itens);
-  if (!parsed.success) return { ok: false, motivo: "Seu carrinho está vazio." };
+  if (!parsed.success) {
+    return {
+      ok: false,
+      motivo: "Não foi possível ler os itens do carrinho. Atualize a página e tente de novo.",
+    };
+  }
 
   const prec = await precificarItens(parsed.data);
   if (!prec.ok) {
