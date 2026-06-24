@@ -280,11 +280,11 @@ export default function ProductDetail({
     );
     toast.success("Adicionado ao carrinho ✓");
   }
-  // "Comprar agora" (opção B): adiciona ao carrinho (sem esvaziar o que já havia)
-  // e vai direto ao checkout — pula a revisão do /carrinho. O frete é no checkout.
+  // "Comprar agora": adiciona ao carrinho (sem esvaziar o que já havia) e leva ao
+  // /carrinho, onde o cliente revê os itens e pode continuar comprando.
   function handleComprar() {
     adicionar();
-    router.push("/checkout");
+    router.push("/carrinho");
   }
   const duvidasHref = whatsappLink(
     `Olá! Tenho dúvidas sobre: ${product.nome}.`,

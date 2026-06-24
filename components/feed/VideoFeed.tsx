@@ -343,7 +343,7 @@ export default function VideoFeed({
   }
   function comprarAgora() {
     adicionar();
-    router.push("/checkout");
+    router.push("/carrinho");
   }
   function adicionarECar() {
     adicionar();
