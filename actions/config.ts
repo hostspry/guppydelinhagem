@@ -31,6 +31,11 @@ export async function salvarConfiguracaoLoja(
       ? Math.round(valorRaw * 100) / 100
       : null;
 
+  // Limite de peixes para frete automático (≥ 1; acima → WhatsApp). Default 10.
+  const maxRaw = Number(formData.get("maxPeixesFreteAuto"));
+  const maxPeixesFreteAuto =
+    Number.isFinite(maxRaw) && maxRaw >= 1 ? Math.round(maxRaw) : 10;
+
   // Tarja promocional do topo: toggle + texto livre (vazio → null, usa o fallback).
   const tarjaAtiva = formData.get("tarjaAtiva") === "on";
   const tarjaTextoRaw = String(formData.get("tarjaTexto") ?? "").trim();
@@ -44,6 +49,7 @@ export async function salvarConfiguracaoLoja(
         descontoPixGlobalPercent: pct,
         freteGratisAtivo,
         freteGratisAcimaDe,
+        maxPeixesFreteAuto,
         tarjaAtiva,
         tarjaTexto,
       },
@@ -51,6 +57,7 @@ export async function salvarConfiguracaoLoja(
         descontoPixGlobalPercent: pct,
         freteGratisAtivo,
         freteGratisAcimaDe,
+        maxPeixesFreteAuto,
         tarjaAtiva,
         tarjaTexto,
       },
@@ -62,6 +69,8 @@ export async function salvarConfiguracaoLoja(
 
   revalidatePath("/admin/configuracoes");
   revalidatePath("/checkout");
+  revalidatePath("/carrinho");
+  revalidatePath("/loja/[slug]", "page"); // selo de frete grátis na página de produto
   revalidatePath("/", "layout"); // vitrine (desconto global) + faixa do topo (Navbar)
   return { success: true, message: "Configurações salvas." };
 }

@@ -14,6 +14,7 @@ export function ConfiguracoesForm({
     descontoPixGlobalPercent: number;
     freteGratisAtivo: boolean;
     freteGratisAcimaDe: number | null;
+    maxPeixesFreteAuto: number;
     tarjaAtiva: boolean;
     tarjaTexto: string | null;
   };
@@ -25,6 +26,9 @@ export function ConfiguracoesForm({
   const [freteGratisAcimaDe, setFreteGratisAcimaDe] = useState(
     inicial.freteGratisAcimaDe == null ? "" : String(inicial.freteGratisAcimaDe),
   );
+  const [maxPeixes, setMaxPeixes] = useState(
+    String(inicial.maxPeixesFreteAuto),
+  );
   const [tarjaAtiva, setTarjaAtiva] = useState(inicial.tarjaAtiva);
   const [tarjaTexto, setTarjaTexto] = useState(inicial.tarjaTexto ?? "");
   const [isPending, startTransition] = useTransition();
@@ -35,6 +39,7 @@ export function ConfiguracoesForm({
     fd.set("descontoPixGlobalPercent", pct);
     if (freteGratisAtivo) fd.set("freteGratisAtivo", "on");
     fd.set("freteGratisAcimaDe", freteGratisAcimaDe);
+    fd.set("maxPeixesFreteAuto", maxPeixes);
     if (tarjaAtiva) fd.set("tarjaAtiva", "on");
     fd.set("tarjaTexto", tarjaTexto);
     startTransition(async () => {
@@ -130,6 +135,32 @@ export function ConfiguracoesForm({
             frete grátis e a faixa do topo do site some.
           </p>
         </div>
+      </div>
+
+      {/* ── Limite de peixes para frete automático ── */}
+      <div className="border-t border-gray-100 pt-6">
+        <h2 className="text-xs font-semibold text-[#07366A] uppercase tracking-wide mb-3">
+          Frete automático
+        </h2>
+        <label
+          htmlFor="maxPeixesFreteAuto"
+          className="block text-sm text-gray-700 mb-1"
+        >
+          Limite de peixes para frete automático
+        </label>
+        <input
+          id="maxPeixesFreteAuto"
+          type="number"
+          min={1}
+          step={1}
+          value={maxPeixes}
+          onChange={(e) => setMaxPeixes(e.target.value)}
+          className={inputClass}
+        />
+        <p className="text-xs text-gray-500 mt-2 leading-snug max-w-md">
+          Acima deste número de peixes no pedido, o frete é combinado por WhatsApp
+          (a cotação automática só roda até este limite).
+        </p>
       </div>
 
       {/* ── Tarja promocional do topo ── */}

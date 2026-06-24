@@ -13,6 +13,7 @@ export type ConfiguracaoLojaData = {
   descontoPixGlobalPercent: number;
   freteGratisAtivo: boolean;
   freteGratisAcimaDe: number | null;
+  maxPeixesFreteAuto: number;
   tarjaAtiva: boolean;
   tarjaTexto: string | null;
 };
@@ -33,6 +34,7 @@ export const getConfiguracaoLoja = cache(
         descontoPixGlobalPercent: true,
         freteGratisAtivo: true,
         freteGratisAcimaDe: true,
+        maxPeixesFreteAuto: true,
         tarjaAtiva: true,
         tarjaTexto: true,
       },
@@ -42,6 +44,7 @@ export const getConfiguracaoLoja = cache(
       freteGratisAtivo: c?.freteGratisAtivo ?? false,
       freteGratisAcimaDe:
         c?.freteGratisAcimaDe == null ? null : Number(c.freteGratisAcimaDe),
+      maxPeixesFreteAuto: c?.maxPeixesFreteAuto ?? 10,
       tarjaAtiva: c?.tarjaAtiva ?? false,
       tarjaTexto: c?.tarjaTexto ?? null,
     };
@@ -60,6 +63,12 @@ export async function getFreteGratisConfig(): Promise<FreteGratisConfig> {
     ativo: c.freteGratisAtivo && c.freteGratisAcimaDe != null,
     acimaDe: c.freteGratisAcimaDe,
   };
+}
+
+/** Limite de peixes para cotação automática de frete (acima → WhatsApp). */
+export async function getMaxPeixesFreteAuto(): Promise<number> {
+  const c = await getConfiguracaoLoja();
+  return c.maxPeixesFreteAuto;
 }
 
 /** Atalho tipado p/ o helper de preço (lib/precos). */
