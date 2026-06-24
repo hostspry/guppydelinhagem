@@ -69,7 +69,7 @@ export async function transicionarParaPago(
 ): Promise<{ pago: boolean; baixou: boolean }> {
   const order = await tx.order.findUnique({
     where: { id: orderId },
-    select: { status: true, estoqueBaixado: true, cupomId: true },
+    select: { status: true, estoqueBaixado: true },
   });
   if (!order) throw new Error("Pedido não encontrado.");
 
@@ -85,11 +85,23 @@ export async function transicionarParaPago(
   let baixou = false;
   if (!order.estoqueBaixado) {
     await ajustarPoolEstoque(tx, orderId, -1);
-    // Contabiliza o uso do cupom UMA vez, na mesma trava do estoque (idempotente:
-    // um webhook reenviado não conta de novo). Pedido sem cupom → no-op.
-    if (order.cupomId) {
+    // Contabiliza o uso de CADA cupom distinto usado nos itens (campanhas + código
+    // secreto), uma vez cada, na mesma trava do estoque (idempotente: webhook
+    // reenviado não reconta). Pedido sem cupom → no-op.
+    const itensComCupom = await tx.orderItem.findMany({
+      where: { orderId, cupomId: { not: null } },
+      select: { cupomId: true },
+    });
+    const cupomIds = [
+      ...new Set(
+        itensComCupom
+          .map((i) => i.cupomId)
+          .filter((id): id is string => id != null),
+      ),
+    ];
+    for (const id of cupomIds) {
       await tx.cupomDesconto.update({
-        where: { id: order.cupomId },
+        where: { id },
         data: { usosRealizados: { increment: 1 } },
       });
     }
