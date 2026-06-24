@@ -249,7 +249,6 @@ export default function CheckoutClient({
 
   // Subtotais EFETIVOS (com campanha + código secreto). Base = "de/por". Cart é
   // fallback até o servidor responder.
-  const subtotalCheioBase = resolvido?.subtotalCheioBase ?? subtotalCheioCart;
   const subtotalPixEfetivo = resolvido?.subtotalPixEfetivo ?? subtotalPixCart;
   const subtotalCheioEfetivo =
     resolvido?.subtotalCheioEfetivo ?? subtotalCheioCart;
@@ -289,7 +288,9 @@ export default function CheckoutClient({
 
   // Totais por aba a partir dos subtotais EFETIVOS (já com campanha/cupom). O
   // cartão (Brick) usa totalCartao — bate com o que o servidor cobra.
-  const economiaPix = Math.max(0, subtotalCheioBase - subtotalPixEfetivo);
+  // Economia REAL do Pix = cartão efetivo − Pix efetivo (com campanha). No preço
+  // único (Pix = cartão) dá 0 → a linha "Você economiza no Pix" não aparece.
+  const economiaPix = Math.max(0, subtotalCheioEfetivo - subtotalPixEfetivo);
   const subtotalEfetivoAba =
     aba === "pix" ? subtotalPixEfetivo : subtotalCheioEfetivo;
   const total = Math.max(0, subtotalEfetivoAba + (freteEfetivo ?? 0));
