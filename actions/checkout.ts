@@ -5,6 +5,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import {
   checkoutSchema,
+  checkoutBaseSchema,
   type CheckoutInput,
   type CheckoutFormInput,
 } from "@/lib/validations/checkout";
@@ -31,7 +32,7 @@ import {
   getMaxPeixesFreteAuto,
 } from "@/lib/queries/config";
 import { COMPOSICAO_LABEL } from "@/lib/composicoes";
-import { freteGollog } from "@/lib/constants";
+import { freteGollog, LOJA_ENDERECO } from "@/lib/constants";
 import type { EnderecoEntrega } from "@/lib/validations/pedido";
 import {
   ProviderPagamento,
@@ -146,6 +147,7 @@ export type OrderCriado = {
   valorCartao: number; // total a cobrar no cartão (cheio) — recalculado no servidor
   pagador: PagadorCheckout;
   reused: boolean; // true = reaproveitou um AGUARDANDO existente (não deletar em erro)
+  tipoEntrega: "ENVIO" | "RETIRADA"; // RETIRADA → cartão usa endereço da loja no shipments
   // Dados (normalizados no servidor) p/ o additional_info do cartão — antifraude MP.
   telefone: string; // só dígitos
   endereco: {
@@ -452,7 +454,7 @@ export async function validarCupom(
   if (!Array.isArray(itens) || itens.length === 0) {
     return { ok: false, motivo: "Seu carrinho está vazio." };
   }
-  const parsed = checkoutSchema.shape.itens.safeParse(itens);
+  const parsed = checkoutBaseSchema.shape.itens.safeParse(itens);
   if (!parsed.success) {
     return {
       ok: false,
@@ -689,7 +691,7 @@ export async function resolverItensCarrinho(
   itens: CheckoutFormInput["itens"],
   codigoSecreto?: string | null,
 ): Promise<CarrinhoResolvido | null> {
-  const parsed = checkoutSchema.shape.itens.safeParse(itens);
+  const parsed = checkoutBaseSchema.shape.itens.safeParse(itens);
   if (!parsed.success) return null;
   const prec = await precificarItens(parsed.data);
   if (!prec.ok) return null;
@@ -801,68 +803,75 @@ export async function criarOrderDoCheckout(
     ),
   );
 
-  // Acima do limite de peixes (config) → frete combinado por WhatsApp.
-  const maxPeixes = await getMaxPeixesFreteAuto();
-  if (totalPeixes > maxPeixes) {
-    return {
-      ok: false,
-      error: `Pedidos acima de ${maxPeixes} peixes têm o frete calculado manualmente. Finalize no WhatsApp.`,
-    };
-  }
+  // ── 2. Entrega: RETIRADA (frete 0, sem transportadora) | ENVIO (cota frete) ──
+  // Anti-tamper: o tipo de entrega manda. Na RETIRADA o servidor FORÇA frete 0 e
+  // ignora CEP/modalidade/limite de peixes — o cliente busca presencialmente.
+  const isRetirada = data.tipoEntrega === "RETIRADA";
+  let frete = 0;
+  let transportadora: Transportadora | null = null;
+  let modalidade: "TERRESTRE" | "AEREO" | null = null;
 
-  // ── 2. Frete no servidor conforme a MODALIDADE escolhida (anti-tamper) ─────
-  const modalidade = data.modalidadeFrete ?? "TERRESTRE";
-  let frete: number;
-  let transportadora: Transportadora;
-
-  if (modalidade === "AEREO") {
-    // Gollog: tabela fixa por região (UF). Até 10 peixes (o >10 já barrou acima).
-    const g = freteGollog(data.uf);
-    if (!g) {
+  if (!isRetirada) {
+    // Acima do limite de peixes (config) → frete combinado por WhatsApp.
+    const maxPeixes = await getMaxPeixesFreteAuto();
+    if (totalPeixes > maxPeixes) {
       return {
         ok: false,
-        error:
-          "Frete aéreo indisponível para essa UF. Finalize no WhatsApp para combinarmos o envio.",
+        error: `Pedidos acima de ${maxPeixes} peixes têm o frete calculado manualmente. Finalize no WhatsApp.`,
       };
     }
-    frete = round2(g.preco);
-    transportadora = Transportadora.GOLLOG;
-  } else {
-    // Terrestre: re-cota Jadlog via Melhor Envio pra esse CEP + peso/caixa.
-    const { pesoGramas, caixa } = calcularPesoECaixa(Math.max(1, totalPeixes));
-    const cot = await cotarFrete({ cepDestino: data.cep, pesoGramas, caixa });
-    if (!cot.ok) {
-      return { ok: false, error: cot.error };
-    }
-    const jad = cot.data.jadlog.find((j) => j.id === 4) ?? cot.data.jadlog[0];
-    if (!jad) {
-      return {
-        ok: false,
-        error:
-          "Não há frete terrestre automático para esse CEP. Escolha o aéreo ou finalize no WhatsApp.",
-      };
-    }
-    if (jad.requerAvaliacao) {
-      return {
-        ok: false,
-        error:
-          "O prazo de entrega terrestre para esse CEP exige avaliação — escolha o aéreo ou finalize no WhatsApp.",
-      };
-    }
-    frete = round2(jad.price);
-    transportadora = Transportadora.JADLOG;
-  }
 
-  // ── 2b. Frete grátis (config da loja, anti-tamper) ─────────────────────────
-  // Base = subtotal EFETIVO do cartão (preço cheio já com campanha/cupom) — o que
-  // o cliente realmente paga. Mesma base mostrada na vitrine/carrinho/checkout.
-  const subtotalCheioEfetivo = round2(subtotalCheio - descontoCartao);
-  const freteGratis = await getFreteGratisConfig();
-  if (
-    freteGratis.ativo &&
-    subtotalCheioEfetivo >= (freteGratis.acimaDe ?? Infinity)
-  ) {
-    frete = 0;
+    // Frete no servidor conforme a MODALIDADE escolhida (anti-tamper).
+    modalidade = data.modalidadeFrete ?? "TERRESTRE";
+    if (modalidade === "AEREO") {
+      // Gollog: tabela fixa por região (UF). Até 10 peixes (o >10 já barrou acima).
+      const g = freteGollog(data.uf);
+      if (!g) {
+        return {
+          ok: false,
+          error:
+            "Frete aéreo indisponível para essa UF. Finalize no WhatsApp para combinarmos o envio.",
+        };
+      }
+      frete = round2(g.preco);
+      transportadora = Transportadora.GOLLOG;
+    } else {
+      // Terrestre: re-cota Jadlog via Melhor Envio pra esse CEP + peso/caixa.
+      const { pesoGramas, caixa } = calcularPesoECaixa(Math.max(1, totalPeixes));
+      const cot = await cotarFrete({ cepDestino: data.cep, pesoGramas, caixa });
+      if (!cot.ok) {
+        return { ok: false, error: cot.error };
+      }
+      const jad = cot.data.jadlog.find((j) => j.id === 4) ?? cot.data.jadlog[0];
+      if (!jad) {
+        return {
+          ok: false,
+          error:
+            "Não há frete terrestre automático para esse CEP. Escolha o aéreo ou finalize no WhatsApp.",
+        };
+      }
+      if (jad.requerAvaliacao) {
+        return {
+          ok: false,
+          error:
+            "O prazo de entrega terrestre para esse CEP exige avaliação — escolha o aéreo ou finalize no WhatsApp.",
+        };
+      }
+      frete = round2(jad.price);
+      transportadora = Transportadora.JADLOG;
+    }
+
+    // ── 2b. Frete grátis (config da loja, anti-tamper) ───────────────────────
+    // Base = subtotal EFETIVO do cartão (preço cheio já com campanha/cupom) — o
+    // que o cliente realmente paga. Mesma base da vitrine/carrinho/checkout.
+    const subtotalCheioEfetivo = round2(subtotalCheio - descontoCartao);
+    const freteGratis = await getFreteGratisConfig();
+    if (
+      freteGratis.ativo &&
+      subtotalCheioEfetivo >= (freteGratis.acimaDe ?? Infinity)
+    ) {
+      frete = 0;
+    }
   }
 
   // No Order guardamos a soma do desconto (calculada acima) e, informativo, o
@@ -881,19 +890,35 @@ export async function criarOrderDoCheckout(
   const cpf = data.cpfCnpj;
   const tel = data.telefone;
 
-  const endereco: EnderecoEntrega = {
-    nome: data.nome,
-    cpfCnpj: cpf,
-    telefone: tel,
-    email: data.email,
-    cep: data.cep,
-    logradouro: data.logradouro,
-    numero: data.numero,
-    complemento: data.complemento || null,
-    bairro: data.bairro,
-    cidade: data.cidade,
-    uf: data.uf.toUpperCase(),
-  };
+  // Snapshot do destinatário. Na RETIRADA não há endereço — só o cadastro mínimo
+  // (nome/CPF/telefone/email); os campos de endereço ficam null.
+  const endereco: EnderecoEntrega = isRetirada
+    ? {
+        nome: data.nome,
+        cpfCnpj: cpf,
+        telefone: tel,
+        email: data.email,
+        cep: null,
+        logradouro: null,
+        numero: null,
+        complemento: null,
+        bairro: null,
+        cidade: null,
+        uf: null,
+      }
+    : {
+        nome: data.nome,
+        cpfCnpj: cpf,
+        telefone: tel,
+        email: data.email,
+        cep: data.cep,
+        logradouro: data.logradouro,
+        numero: data.numero,
+        complemento: data.complemento || null,
+        bairro: data.bairro,
+        cidade: data.cidade,
+        uf: data.uf.toUpperCase(),
+      };
 
   let orderId = "";
   let numero = "";
@@ -906,18 +931,24 @@ export async function criarOrderDoCheckout(
         (await tx.cliente.findFirst({ where: { email: data.email } })) ||
         (tel ? await tx.cliente.findFirst({ where: { telefone: tel } }) : null);
 
+      // Na RETIRADA não atualiza o endereço do cliente (o form não o coleta —
+      // evita apagar um endereço já salvo de um cliente recorrente).
       const dadosCliente = {
         nome: data.nome,
         telefone: tel,
         email: data.email,
         cpfCnpj: cpf,
-        cep: data.cep,
-        logradouro: data.logradouro,
-        numero: data.numero,
-        complemento: data.complemento || null,
-        bairro: data.bairro,
-        cidade: data.cidade,
-        uf: data.uf.toUpperCase(),
+        ...(isRetirada
+          ? {}
+          : {
+              cep: data.cep,
+              logradouro: data.logradouro,
+              numero: data.numero,
+              complemento: data.complemento || null,
+              bairro: data.bairro,
+              cidade: data.cidade,
+              uf: data.uf.toUpperCase(),
+            }),
       };
 
       const cliente = existente
@@ -981,6 +1012,7 @@ export async function criarOrderDoCheckout(
           where: { id: reusar.id },
           data: {
             enderecoEntrega: endereco as unknown as Prisma.InputJsonValue,
+            tipoEntrega: data.tipoEntrega,
             transportadora,
             modalidadeFrete: modalidade,
             subtotal: subtotalCheio,
@@ -1016,6 +1048,7 @@ export async function criarOrderDoCheckout(
           userId: userId ?? undefined,
           status: "AGUARDANDO_PAGAMENTO", // sem baixar estoque (só no PAGO)
           formaPagamento: FormaPagamento.PIX,
+          tipoEntrega: data.tipoEntrega,
           transportadora,
           modalidadeFrete: modalidade,
           enderecoEntrega: endereco as unknown as Prisma.InputJsonValue,
@@ -1057,6 +1090,7 @@ export async function criarOrderDoCheckout(
       valorPix: totalPix,
       valorCartao: totalCheio,
       reused,
+      tipoEntrega: data.tipoEntrega,
       pagador: {
         nome: partesNome[0],
         sobrenome: partesNome.slice(1).join(" ") || null,
@@ -1237,7 +1271,7 @@ export type CheckoutPreco = {
 export async function precificarCheckout(
   itens: CheckoutFormInput["itens"],
 ): Promise<CheckoutPreco | null> {
-  const parsed = checkoutSchema.shape.itens.safeParse(itens);
+  const parsed = checkoutBaseSchema.shape.itens.safeParse(itens);
   if (!parsed.success) return null;
   const prec = await precificarItens(parsed.data);
   if (!prec.ok) return null;
@@ -1369,7 +1403,15 @@ export async function pagarComCartao(
         sobrenome: pagador.sobrenome,
         telefone: order.data.telefone,
       },
-      endereco: order.data.endereco,
+      // shipments.receiver_address = onde o cliente recebe. Na RETIRADA é a loja
+      // (não manda shipments vazio); no ENVIO é o endereço do cliente. O endereço
+      // do PAGADOR (payer.address) só existe no envio — na retirada fica omitido.
+      endereco:
+        order.data.tipoEntrega === "RETIRADA"
+          ? LOJA_ENDERECO
+          : order.data.endereco,
+      payerAddress:
+        order.data.tipoEntrega === "RETIRADA" ? null : order.data.endereco,
       itens: order.data.itens,
     });
   } catch (e) {
