@@ -5,6 +5,7 @@ import {
   TipoValorCupom,
   EscopoCupom,
   ModoAplicacaoCupom,
+  TipoCupom,
 } from "@/lib/generated/prisma/enums";
 
 // "" / null / undefined → undefined (campo opcional vazio). Demais valores seguem
@@ -39,7 +40,11 @@ export const cupomSchema = z
     tipoValor: z.enum(TipoValorCupom),
     valor: z.coerce.number().positive("Informe um valor maior que zero"),
     escopo: z.enum(EscopoCupom),
-    modoAplicacao: z.enum(ModoAplicacaoCupom),
+    // SECRETO usa modoAplicacao (4 modos); CAMPANHA usa precoUnicoNaCampanha. Os
+    // dois têm default, então o form só envia o relevante pro tipo escolhido.
+    tipoCupom: z.enum(TipoCupom).default("SECRETO"),
+    modoAplicacao: z.enum(ModoAplicacaoCupom).default("AMBOS_VENCE_MAIOR"),
+    precoUnicoNaCampanha: z.boolean().default(true),
     ativo: z.boolean().default(true),
     validoDe: dataOpcional,
     validoAte: dataOpcional,

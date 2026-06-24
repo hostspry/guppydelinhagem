@@ -108,6 +108,11 @@ enum ModoAplicacaoCupom {
   SO_CARTAO
 }
 
+enum TipoCupom {
+  SECRETO // código digitado no carrinho (comportamento original)
+  CAMPANHA // auto-aplica nos produtos do escopo e aparece na vitrine
+}
+
 // ─────────────────────────────────────────────
 // Usuários e Endereços
 // ─────────────────────────────────────────────
@@ -365,8 +370,14 @@ model OrderItem {
   qtdMachos      Int? // snapshot da receita (null em avulso/não-peixe)
   qtdFemeas      Int?
 
-  order   Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  // Desconto por item (campanha automática OU código secreto, o que vencer).
+  descontoUnitario Decimal? @db.Decimal(10, 2) // abatimento em R$ por unidade
+  cupomId          String?
+  cupomCodigo      String? // snapshot do código do cupom vencedor
+
+  order   Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product?       @relation(fields: [productId], references: [id], onDelete: SetNull)
+  cupom   CupomDesconto? @relation("ItemCupom", fields: [cupomId], references: [id], onDelete: SetNull)
 }
 
 model Pagamento {
@@ -470,6 +481,8 @@ model CupomDesconto {
   valor                   Decimal            @db.Decimal(10, 2) // % ou R$
   escopo                  EscopoCupom        @default(TODOS)
   modoAplicacao           ModoAplicacaoCupom @default(AMBOS_VENCE_MAIOR)
+  tipoCupom               TipoCupom          @default(SECRETO) // SECRETO (digitado) | CAMPANHA (vitrine)
+  precoUnicoNaCampanha    Boolean            @default(true) // só CAMPANHA: true = Pix igual ao cartão
   ativo                   Boolean            @default(true)
   validoDe                DateTime?
   validoAte               DateTime?
@@ -480,9 +493,11 @@ model CupomDesconto {
   criadoEm                DateTime           @default(now())
   atualizadoEm            DateTime           @updatedAt
 
-  categorias Category[] @relation("CupomCategorias")
-  produtos   Product[]  @relation("CupomProdutos")
+  categorias Category[]  @relation("CupomCategorias")
+  produtos   Product[]   @relation("CupomProdutos")
   pedidos    Order[]
+  itens      OrderItem[] @relation("ItemCupom")
 
   @@index([ativo])
+  @@index([tipoCupom, ativo])
 }
