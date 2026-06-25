@@ -1386,6 +1386,11 @@ export async function pagarComCartao(
   let pago;
   try {
     const provider = getPaymentProvider(ProviderPagamento.MERCADO_PAGO);
+    // TEMP (diagnóstico antifraude): registra se o Device ID chegou do Brick.
+    // Sem dado sensível — só "ok"/"VAZIO". Remover após validar a captura.
+    console.warn(
+      `[cartao] deviceId ${cartao.deviceId ? "ok" : "VAZIO"} pedido=${numero}`,
+    );
     pago = await provider.criarPagamentoCartao({
       orderId,
       valor,
