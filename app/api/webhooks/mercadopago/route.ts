@@ -8,6 +8,7 @@ import { aplicarEstornoPedido } from "@/lib/pagamento-estorno";
 import {
   ProviderPagamento,
   StatusPagamento,
+  MetodoPagamento,
 } from "@/lib/generated/prisma/enums";
 
 // Webhook do Mercado Pago (Pix + Cartão). Runtime Node (Prisma + crypto).
@@ -139,11 +140,39 @@ export async function POST(request: Request) {
   let mudouEstoque = false;
   try {
     const res = await prisma.$transaction(async (tx) => {
-      // Atualiza a linha Pagamento deste id (status vindo da API do MP).
-      await tx.pagamento.updateMany({
+      // Atualiza a linha Pagamento deste id — ou CRIA, se não existir. No Checkout
+      // Pro o pagamento nasce no MP e pode não ter registro local quando a
+      // notificação chega; método/parcelas/bandeira/valor vêm da consulta ao MP.
+      const existente = await tx.pagamento.findFirst({
         where: { externalId: consulta.externalId },
-        data: { status: consulta.status },
+        select: { id: true },
       });
+      if (existente) {
+        await tx.pagamento.update({
+          where: { id: existente.id },
+          data: { status: consulta.status },
+        });
+      } else {
+        await tx.pagamento.create({
+          data: {
+            orderId: orderId as string,
+            provider: ProviderPagamento.MERCADO_PAGO,
+            metodo: consulta.metodo ?? MetodoPagamento.CARTEIRA,
+            status: consulta.status,
+            valor: consulta.valor ?? 0,
+            externalId: consulta.externalId,
+            parcelas: consulta.parcelas ?? null,
+            bandeira: consulta.bandeira ?? null,
+          },
+        });
+        await tx.order.update({
+          where: { id: orderId as string },
+          data: {
+            mpPaymentId: consulta.externalId,
+            ...(consulta.parcelas ? { parcelas: consulta.parcelas } : {}),
+          },
+        });
+      }
 
       if (consulta.status === StatusPagamento.PAGO) {
         // Função COMPARTILHADA (admin/cartão/webhook): transição → PAGO + baixa
