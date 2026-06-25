@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { getPaymentProvider } from "@/lib/payments/registry";
 import { transicionarParaPago } from "@/lib/pedido-baixa";
+import { aplicarEstornoPedido } from "@/lib/pagamento-estorno";
 import {
   ProviderPagamento,
   StatusPagamento,
@@ -135,7 +136,7 @@ export async function POST(request: Request) {
   }
 
   // ── 3. Atualizar Pagamento + (se aprovado) confirmar pedido, idempotente ──
-  let baixou = false;
+  let mudouEstoque = false;
   try {
     const res = await prisma.$transaction(async (tx) => {
       // Atualiza a linha Pagamento deste id (status vindo da API do MP).
@@ -150,17 +151,37 @@ export async function POST(request: Request) {
         // que já confirmou na action, não baixam de novo.
         return transicionarParaPago(tx, orderId as string);
       }
+
+      if (consulta.status === StatusPagamento.ESTORNADO) {
+        // Estorno feito pelo PAINEL do MP converge aqui: marca estornado, cancela
+        // o pedido e devolve o estoque — MESMA rotina idempotente da action do
+        // admin (trava estornadoEm). Botão + painel levam ao mesmo estado.
+        const pag = await tx.pagamento.findFirst({
+          where: { externalId: consulta.externalId },
+          select: { id: true },
+        });
+        if (pag) {
+          const r = await aplicarEstornoPedido(tx, {
+            orderId: orderId as string,
+            pagamentoId: pag.id,
+            refundId: null, // o id do refund não vem nesta notificação
+          });
+          return { pago: false, baixou: r.aplicado };
+        }
+        return { pago: false, baixou: false };
+      }
+
       // EM_ANALISE (cartão in_process), rejeitado, expirado: só o Pagamento muda;
       // o pedido segue AGUARDANDO_PAGAMENTO, sem baixa.
       return { pago: false, baixou: false };
     });
-    baixou = res.baixou;
+    mudouEstoque = res.baixou;
   } catch (e) {
     console.error("[mp-webhook] processar", e);
     return NextResponse.json({ received: true });
   }
 
-  if (baixou) {
+  if (mudouEstoque) {
     revalidatePath("/admin/produtos");
     revalidatePath("/admin/pedidos");
   }
