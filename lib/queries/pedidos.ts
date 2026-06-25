@@ -123,6 +123,9 @@ export async function getPedidoById(id: string) {
       metodo: pg.metodo,
       status: pg.status,
       valor: Number(pg.valor),
+      externalId: pg.externalId,
+      estornadoEm: pg.estornadoEm,
+      refundId: pg.refundId,
       criadoEm: pg.criadoEm,
     })),
   };

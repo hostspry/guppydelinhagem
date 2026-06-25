@@ -4,6 +4,7 @@ import { Pencil } from "lucide-react";
 import { getPedidoById } from "@/lib/queries/pedidos";
 import { PageHeader } from "@/components/admin/PageHeader";
 import { StatusPedidoControl } from "@/components/admin/StatusPedidoControl";
+import { EstornarButton } from "@/components/admin/EstornarButton";
 import { podeEditarItens } from "@/lib/pedido-status";
 import {
   formatBRL,
@@ -24,6 +25,12 @@ export default async function PedidoDetalhePage({ params }: Props) {
     .filter(Boolean)
     .join(", ");
   const linhaCidade = [e.cidade, e.uf].filter(Boolean).join(" / ");
+
+  // Estorno: pagamento já estornado (estado final) e pagamento PAGO ainda
+  // reembolsável (mostra aviso + botão). O valor vem do banco, nunca do client.
+  const estornoInfo = pedido.pagamentos.find((p) => p.estornadoEm != null) ?? null;
+  const pagoReembolsavel =
+    pedido.pagamentos.find((p) => p.status === "PAGO" && p.externalId) ?? null;
 
   return (
     <div>
@@ -182,6 +189,65 @@ export default async function PedidoDetalhePage({ params }: Props) {
             </p>
             {/* "Gerar minuta" (Envio) e "Gerar cobrança" (Pagamentos) entram aqui. */}
           </div>
+
+          {/* ── Reembolso / estorno ── */}
+          {estornoInfo ? (
+            <div className="bg-white border border-gray-200 rounded-lg p-5 text-sm space-y-1">
+              <h2 className="text-xs font-semibold text-[#07366A] uppercase tracking-wide mb-2">
+                Reembolso
+              </h2>
+              <p className="font-medium text-emerald-700">
+                Reembolsado em{" "}
+                {estornoInfo.estornadoEm?.toLocaleString("pt-BR")}
+              </p>
+              {estornoInfo.refundId && (
+                <p className="text-gray-500">
+                  Refund:{" "}
+                  <span className="font-mono text-[#07366A]">
+                    {estornoInfo.refundId}
+                  </span>
+                </p>
+              )}
+              <p className="text-xs text-gray-400 pt-1">
+                O valor volta ao meio de pagamento do cliente; no cartão, aparece
+                na fatura.
+              </p>
+            </div>
+          ) : pagoReembolsavel ? (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-5 text-sm space-y-3">
+              <h2 className="text-xs font-semibold text-amber-900 uppercase tracking-wide">
+                Reembolso
+              </h2>
+              <p className="text-amber-800">
+                {pedido.status === "CANCELADO" ? (
+                  <>
+                    Este pedido foi pago (
+                    <strong>{formatBRL(pagoReembolsavel.valor)}</strong>) e está
+                    cancelado, mas o valor <strong>ainda não foi devolvido</strong>{" "}
+                    ao cliente. Para reembolsar, estorne no Mercado Pago.
+                  </>
+                ) : (
+                  <>
+                    Pedido pago (
+                    <strong>{formatBRL(pagoReembolsavel.valor)}</strong>). Para
+                    devolver o dinheiro ao cliente, estorne no Mercado Pago.
+                  </>
+                )}
+              </p>
+              {pagoReembolsavel.externalId && (
+                <p className="text-xs text-amber-700">
+                  Transação MP:{" "}
+                  <span className="font-mono">
+                    {pagoReembolsavel.externalId}
+                  </span>
+                </p>
+              )}
+              <EstornarButton
+                orderId={pedido.id}
+                valor={pagoReembolsavel.valor}
+              />
+            </div>
+          ) : null}
         </div>
       </div>
     </div>
