@@ -273,7 +273,7 @@ export default function CarrinhoPage() {
                         onClick={() => updateQty(item.variantId, item.quantidade - 1)}
                         disabled={item.quantidade <= 1}
                         aria-label="Diminuir quantidade"
-                        className="flex items-center justify-center w-11 h-11 text-primary disabled:opacity-30 hover:text-accent transition-colors"
+                        className="flex items-center justify-center w-11 h-11 text-primary disabled:opacity-30 hover:text-accent transition-colors [&>svg]:pointer-events-none"
                       >
                         <Minus size={14} aria-hidden="true" />
                       </button>
@@ -285,7 +285,7 @@ export default function CarrinhoPage() {
                         onClick={() => updateQty(item.variantId, item.quantidade + 1)}
                         disabled={item.quantidade >= item.estoque}
                         aria-label="Aumentar quantidade"
-                        className="flex items-center justify-center w-11 h-11 text-primary disabled:opacity-30 hover:text-accent transition-colors"
+                        className="flex items-center justify-center w-11 h-11 text-primary disabled:opacity-30 hover:text-accent transition-colors [&>svg]:pointer-events-none"
                       >
                         <Plus size={14} aria-hidden="true" />
                       </button>
@@ -299,9 +299,11 @@ export default function CarrinhoPage() {
                         removeItem(item.variantId);
                       }}
                       aria-label={`Remover ${item.nome}`}
-                      // touch-manipulation + alvo 44px: o toque no S23 acerta a
-                      // lixeira sem disparar nada por baixo.
-                      className="flex items-center justify-center w-11 h-11 -my-1 shrink-0 touch-manipulation text-muted-foreground hover:text-secondary transition-colors"
+                      // iOS Safari: o toque sobre o <svg> faz dele o event.target e o
+                      // click não chega ao <button> → [&>svg]:pointer-events-none força
+                      // o botão a ser sempre o alvo. touch-manipulation + alvo 44px
+                      // (do S23) mantidos; o botão é o mesmo elemento do onClick.
+                      className="flex items-center justify-center w-11 h-11 -my-1 shrink-0 touch-manipulation text-muted-foreground hover:text-secondary transition-colors [&>svg]:pointer-events-none"
                     >
                       <Trash2 size={18} aria-hidden="true" />
                     </button>
