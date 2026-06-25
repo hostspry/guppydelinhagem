@@ -17,6 +17,7 @@ import {
   ShoppingCart,
   Tag,
   Truck,
+  Wallet,
   X,
 } from "lucide-react";
 import { WhatsAppIcon } from "@/components/icons/WhatsAppIcon";
@@ -41,6 +42,7 @@ import {
 import {
   criarPedidoCheckout,
   pagarComCartao,
+  iniciarCheckoutPro,
   calcularTetoParcelas,
   validarCupom,
   resolverItensCarrinho,
@@ -209,7 +211,7 @@ export default function CheckoutClient({
   });
 
   // Forma de pagamento (Pix padrão) + teto de parcelas (do servidor) + recusa.
-  const [aba, setAba] = useState<"pix" | "cartao">("pix");
+  const [aba, setAba] = useState<"pix" | "cartao" | "mp">("pix");
   // Modalidade de frete escolhida (Jadlog terrestre padrão | Gollog aéreo).
   const [modalidade, setModalidade] = useState<"TERRESTRE" | "AEREO">(
     "TERRESTRE",
@@ -557,6 +559,41 @@ export default function CheckoutClient({
     }
     setErro(res.mensagem);
     throw new Error(res.mensagem);
+  }
+
+  // Checkout Pro (Wallet): valida igual ao Pix, cria a preference e redireciona
+  // ao ambiente do MP. A confirmação vem do webhook (volta pela /analise).
+  function onMercadoPago() {
+    setErro(null);
+    setRecusa(null);
+    startTransition(async () => {
+      const valido = await trigger();
+      if (!valido) {
+        const primeiro = FIELD_ORDER.find((f) => getFieldState(f).invalid);
+        if (primeiro) focarCampo(primeiro);
+        return;
+      }
+      if (!isRetirada && (excedeCaixa || freteValor == null)) {
+        focarCampo("cep");
+        return;
+      }
+      trackAddPaymentInfo(gaItens(), totalCartao, "mercadopago");
+      const dados = getValues();
+      const res = await iniciarCheckoutPro({
+        ...dados,
+        complemento: dados.complemento ?? "",
+        tipoEntrega,
+        transportadora: modalidade === "AEREO" ? "GOLLOG" : "JADLOG",
+        modalidadeFrete: modalidade,
+        cupomCodigo: cupom ?? "",
+        itens: itensPedido(),
+      });
+      if (res.ok) {
+        window.location.href = res.initPoint; // sai do site pro ambiente do MP
+      } else {
+        setErro(res.error);
+      }
+    });
   }
 
   // ── Hidratação / carrinho vazio ──
@@ -1275,8 +1312,8 @@ export default function CheckoutClient({
             )}
           </div>
 
-          {/* Forma de pagamento: Pix (padrão) | Cartão */}
-          <div className="grid grid-cols-2 gap-2 rounded-lg bg-bg-alt p-1">
+          {/* Forma de pagamento: Pix (padrão) | Cartão | Mercado Pago */}
+          <div className="grid grid-cols-3 gap-2 rounded-lg bg-bg-alt p-1">
             <button
               type="button"
               onClick={() => setAba("pix")}
@@ -1300,6 +1337,18 @@ export default function CheckoutClient({
             >
               <CreditCard size={15} aria-hidden="true" />
               Cartão
+            </button>
+            <button
+              type="button"
+              onClick={() => setAba("mp")}
+              className={`inline-flex items-center justify-center gap-1.5 py-2 rounded-md text-sm font-semibold transition-all ${
+                aba === "mp"
+                  ? "bg-white text-primary shadow-sm"
+                  : "text-muted-foreground hover:text-primary"
+              }`}
+            >
+              <Wallet size={15} aria-hidden="true" />
+              Mercado Pago
             </button>
           </div>
 
@@ -1329,7 +1378,7 @@ export default function CheckoutClient({
                 </p>
               )}
             </>
-          ) : (
+          ) : aba === "cartao" ? (
             <div className="space-y-2">
               {!mpPublicKey ? (
                 <p className="text-xs text-amber-700">
@@ -1367,6 +1416,43 @@ export default function CheckoutClient({
                 >
                   {recusa}
                 </p>
+              )}
+            </div>
+          ) : (
+            // Aba Mercado Pago (Checkout Pro / Wallet)
+            <div className="space-y-2">
+              {!mpPublicKey ? (
+                <p className="text-xs text-amber-700">
+                  Pagamento indisponível no momento. Use o Pix.
+                </p>
+              ) : excedeCaixa ? (
+                <p className="text-xs text-amber-700">
+                  Acima de {maxPeixes} peixes, finalize no WhatsApp.
+                </p>
+              ) : !isRetirada && freteValor == null ? (
+                <p className="text-[11px] text-muted-foreground flex items-center gap-1 leading-snug">
+                  <AlertTriangle size={12} aria-hidden="true" />
+                  Calcule o frete pelo seu CEP para continuar.
+                </p>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={onMercadoPago}
+                    disabled={pending}
+                    className="w-full inline-flex items-center justify-center gap-2 bg-secondary text-white text-sm font-semibold py-3 rounded-pill hover:brightness-110 disabled:opacity-60 disabled:cursor-not-allowed transition-all"
+                  >
+                    {pending ? (
+                      <Loader2 size={16} className="animate-spin" aria-hidden="true" />
+                    ) : (
+                      <Wallet size={16} aria-hidden="true" />
+                    )}
+                    {pending ? "Abrindo o Mercado Pago…" : "Pagar com Mercado Pago"}
+                  </button>
+                  <p className="text-[11px] text-muted-foreground text-center leading-snug">
+                    Você paga no ambiente do Mercado Pago e volta pra cá.
+                  </p>
+                </>
               )}
             </div>
           )}
