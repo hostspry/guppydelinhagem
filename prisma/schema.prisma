@@ -400,6 +400,10 @@ model Pagamento {
   parcelas      Int? // cartão: nº de parcelas da tentativa (1–12)
   bandeira      String? // cartão: "visa"/"master"/… (só exibição)
   payloadRaw    Json?
+  // Estorno (refund). estornadoEm é a TRAVA de idempotência (action + webhook);
+  // refundId é o id do refund no gateway (snapshot). Nulos = não estornado.
+  estornadoEm   DateTime?
+  refundId      String?
   criadoEm      DateTime          @default(now())
 
   @@index([orderId])

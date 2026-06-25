@@ -10,6 +10,9 @@ import {
 } from "@/lib/validations/pedido";
 import { TRANSICOES_PEDIDO, podeEditarItens } from "@/lib/pedido-status";
 import { transicionarParaPago, ajustarPoolEstoque } from "@/lib/pedido-baixa";
+import { aplicarEstornoPedido } from "@/lib/pagamento-estorno";
+import { getPaymentProvider } from "@/lib/payments/registry";
+import { ProviderPagamento } from "@/lib/generated/prisma/enums";
 import { COMPOSICAO_LABEL } from "@/lib/composicoes";
 import type { Prisma, OrderStatus } from "@/lib/generated/prisma/client";
 import {
@@ -318,4 +321,94 @@ export async function atualizarStatusPedido(
   revalidatePath("/admin/pedidos");
   revalidatePath(`/admin/pedidos/${id}`);
   return { success: true, message: "Status atualizado." };
+}
+
+/**
+ * Estorno TOTAL no Mercado Pago + convergência no sistema. Admin-only. É DINHEIRO:
+ * o valor vem do banco (nunca do client) e a idempotência é dupla — X-Idempotency-
+ * Key no MP + trava estornadoEm na rotina compartilhada (mesma do webhook). Se o MP
+ * falhar, NÃO marca como estornado (mensagem clara do MP). Clicar 2× é seguro.
+ */
+export async function estornarPedido(id: string): Promise<ActionResult> {
+  await assertAuthorized();
+
+  const order = await prisma.order.findUnique({
+    where: { id },
+    select: {
+      id: true,
+      pagamentos: {
+        where: { provider: "MERCADO_PAGO" },
+        select: {
+          id: true,
+          status: true,
+          externalId: true,
+          estornadoEm: true,
+        },
+      },
+    },
+  });
+  if (!order) return { success: false, error: "Pedido não encontrado." };
+
+  // Já estornado → sucesso idempotente (não chama o MP de novo).
+  if (order.pagamentos.some((p) => p.estornadoEm != null)) {
+    return { success: true, message: "Este pedido já foi estornado." };
+  }
+
+  // Pagamento que de fato moveu dinheiro (PAGO) com id no gateway.
+  const pago = order.pagamentos.find(
+    (p) => p.status === "PAGO" && p.externalId,
+  );
+  if (!pago?.externalId) {
+    return {
+      success: false,
+      error: "Não há pagamento aprovado neste pedido para estornar.",
+    };
+  }
+
+  // 1) Estorna no MP FORA da transação de DB. Idempotency-key estável dedup no MP.
+  //    Se falhar, retorna a mensagem do MP e NÃO marca como estornado.
+  let refundId: string | null = null;
+  try {
+    const provider = getPaymentProvider(ProviderPagamento.MERCADO_PAGO);
+    const r = await provider.estornarPagamento(pago.externalId, {
+      idempotencyKey: `refund-${pago.externalId}`,
+    });
+    refundId = r.refundId;
+  } catch (e) {
+    console.error("[estorno] MP", e);
+    return {
+      success: false,
+      error:
+        e instanceof Error
+          ? e.message
+          : "Não foi possível estornar no Mercado Pago.",
+    };
+  }
+
+  // 2) Converge no sistema (marca estornado + reverte estoque), idempotente.
+  try {
+    await prisma.$transaction((tx) =>
+      aplicarEstornoPedido(tx, {
+        orderId: id,
+        pagamentoId: pago.id,
+        refundId,
+      }),
+    );
+  } catch (e) {
+    console.error("[estorno] aplicar", e);
+    return {
+      success: false,
+      error:
+        "O estorno foi feito no Mercado Pago, mas houve um erro ao atualizar o pedido. Atualize a página.",
+    };
+  }
+
+  revalidatePath("/admin/produtos");
+  revalidatePath("/admin/pedidos");
+  revalidatePath(`/admin/pedidos/${id}`);
+  return {
+    success: true,
+    message:
+      "Pedido estornado. O valor volta ao meio de pagamento do cliente; no cartão, aparece na fatura.",
+  };
 }
