@@ -94,6 +94,12 @@ export interface CartaoCriado {
   bandeira: string | null; // payment_method_id (só exibição)
 }
 
+// Estorno (refund) — devolução do dinheiro ao cliente.
+export interface EstornoCriado {
+  refundId: string; // id do refund no gateway (snapshot)
+  status: string | null; // status do refund (ex.: "approved")
+}
+
 export interface PaymentProvider {
   readonly nome: ProviderPagamento;
   /** Cria a cobrança Pix no gateway e devolve QR + copia-e-cola + expiração. */
@@ -102,4 +108,13 @@ export interface PaymentProvider {
   criarPagamentoCartao(input: CriarCartaoInput): Promise<CartaoCriado>;
   /** Re-busca a cobrança no gateway (fonte da verdade p/ webhook e poll). */
   consultarPagamento(externalId: string): Promise<PixConsulta>;
+  /**
+   * Estorno TOTAL do pagamento no gateway. Idempotente via idempotencyKey estável
+   * (refund-{paymentId}) — o gateway deduplica. Lança em erro do gateway (já
+   * estornado, fora do prazo, sem saldo) — o chamador NÃO marca como estornado.
+   */
+  estornarPagamento(
+    paymentId: string,
+    opts?: { idempotencyKey?: string },
+  ): Promise<EstornoCriado>;
 }

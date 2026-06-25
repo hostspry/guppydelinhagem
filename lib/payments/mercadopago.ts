@@ -11,6 +11,7 @@ import type {
   PixConsulta,
   CriarCartaoInput,
   CartaoCriado,
+  EstornoCriado,
 } from "./provider";
 
 // Provider Mercado Pago — Pix via Checkout Transparente (API clássica de
@@ -358,5 +359,21 @@ export const mercadoPagoProvider: PaymentProvider = {
       status: mapStatus(data.status, data.status_detail),
       externalReference: data.external_reference ?? null,
     };
+  },
+
+  async estornarPagamento(
+    paymentId: string,
+    opts?: { idempotencyKey?: string },
+  ): Promise<EstornoCriado> {
+    // Corpo vazio = estorno TOTAL. X-Idempotency-Key estável (refund-{id}) → o MP
+    // deduplica: 2 cliques ou webhook+botão nunca geram 2 refunds. mpFetch lança
+    // (com a mensagem do MP) se falhar — o chamador não marca como estornado.
+    const data = (await mpFetch(`/v1/payments/${paymentId}/refunds`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+      idempotencyKey: opts?.idempotencyKey ?? `refund-${paymentId}`,
+    })) as { id?: number | string; status?: string };
+    return { refundId: String(data.id), status: data.status ?? null };
   },
 };
