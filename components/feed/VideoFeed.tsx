@@ -609,8 +609,7 @@ export default function VideoFeed({
                 </div>
                 {!p.campanha.precoUnico && (
                   <p className="text-white/70 text-xs mt-0.5">
-                    {formatBRL(promo.precoPromoCheio)} no cartão · até{" "}
-                    {p.parcelasMax}x
+                    {formatBRL(promo.precoPromoCheio)} no cartão
                   </p>
                 )}
               </>
@@ -631,7 +630,7 @@ export default function VideoFeed({
                   )}
                 </div>
                 <p className="text-white/70 text-xs mt-0.5">
-                  {formatBRL(precos.precoCartao)} no cartão · até {p.parcelasMax}x
+                  {formatBRL(precos.precoCartao)} no cartão
                 </p>
               </>
             )}

@@ -142,7 +142,7 @@ export default function ProductCardSimple({
                 {formatBRL(product.precoCheio)}
               </p>
               <p className="text-xs text-muted-foreground mt-1">
-                à vista · até {product.parcelasMax}x no cartão
+                à vista · parcele no cartão
               </p>
             </>
           )}

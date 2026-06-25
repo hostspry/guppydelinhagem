@@ -173,16 +173,12 @@ export default function ProductDetail({
   const precoPix = precos.precoPix;
   const descontoPercent = precos.descontoPixPercent;
   const temDescontoPix = descontoPercent > 0;
-  const valorParcela = precoCheio / product.parcelasMax;
   // Campanha (cupom) tem PRIORIDADE no bloco de preço. Recalcula o promo POR
   // VARIANTE (preço cheio da composição atual) — só exibição; o preço cobrado é
   // recalculado no servidor ao adicionar ao carrinho.
   const promo = campanha
     ? precoComCampanha(precoCheio, descontoPercent, campanha)
     : null;
-  const valorParcelaPromo = promo
-    ? promo.precoPromoCheio / product.parcelasMax
-    : valorParcela;
   const capa = product.videos.find((v) => v.principal)?.thumbnailUrl ?? null;
 
   // GA4 view_item — uma vez por produto (preço Pix da composição inicial).
@@ -491,14 +487,11 @@ export default function ProductDetail({
                 </div>
                 {campanha.precoUnico ? (
                   <p className="text-sm text-muted-foreground">
-                    em até {product.parcelasMax}x de{" "}
-                    {formatBRL(valorParcelaPromo)} sem juros
+                    parcele no cartão
                   </p>
                 ) : (
                   <p className="text-sm text-muted-foreground">
-                    {formatBRL(promo.precoPromoCheio)} no cartão · em até{" "}
-                    {product.parcelasMax}x de {formatBRL(valorParcelaPromo)} sem
-                    juros
+                    {formatBRL(promo.precoPromoCheio)} no cartão, em parcelas
                   </p>
                 )}
               </>
@@ -508,8 +501,7 @@ export default function ProductDetail({
                 <p className="text-lg text-primary font-semibold leading-tight">
                   {formatBRL(precoCheio)}{" "}
                   <span className="text-sm font-normal text-muted-foreground">
-                    no cartão · em até {product.parcelasMax}x de{" "}
-                    {formatBRL(valorParcela)} sem juros
+                    no cartão, em parcelas
                   </span>
                 </p>
                 {/* Desconto Pix à vista — grande, em verde (destaque) */}
@@ -536,8 +528,7 @@ export default function ProductDetail({
                   </span>
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  em até {product.parcelasMax}x de {formatBRL(valorParcela)} sem
-                  juros
+                  parcele no cartão
                 </p>
               </>
             )}

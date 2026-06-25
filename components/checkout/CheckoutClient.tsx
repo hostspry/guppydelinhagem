@@ -1270,8 +1270,7 @@ export default function CheckoutClient({
             </div>
             {aba === "cartao" && (
               <p className="text-[11px] text-muted-foreground text-right">
-                À vista no crédito
-                {teto > 1 ? ` ou em até ${teto}x com juros` : ""}.
+                À vista ou parcelado no cartão.
               </p>
             )}
           </div>
@@ -1348,7 +1347,7 @@ export default function CheckoutClient({
               ) : (
                 <>
                   <p className="text-[11px] text-muted-foreground text-center">
-                    Em até {teto}x com juros.
+                    Parcele no cartão — veja as opções abaixo.
                   </p>
                   <CardPaymentBrick
                     publicKey={mpPublicKey}
