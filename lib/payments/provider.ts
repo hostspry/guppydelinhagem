@@ -1,6 +1,7 @@
 import type {
   ProviderPagamento,
   StatusPagamento,
+  MetodoPagamento,
 } from "@/lib/generated/prisma/client";
 
 // Contrato de provider de pagamento — Pix (Checkout Transparente). O QR Code fica
@@ -36,6 +37,12 @@ export interface PixConsulta {
   externalId: string;
   status: StatusPagamento;
   externalReference: string | null; // = orderId (external_reference no gateway)
+  // Dados extras p/ o webhook CRIAR a linha Pagamento quando ela ainda não existe
+  // (Checkout Pro: o pagamento nasce no MP, sem registro local prévio).
+  valor?: number | null;
+  metodo?: MetodoPagamento | null;
+  parcelas?: number | null;
+  bandeira?: string | null;
 }
 
 // ── Cartão de crédito (token gerado no NAVEGADOR pelo Card Brick) ─────────────
@@ -100,6 +107,34 @@ export interface EstornoCriado {
   status: string | null; // status do refund (ex.: "approved")
 }
 
+// ── Checkout Pro (Wallet) — pagamento no ambiente do próprio Mercado Pago ──────
+// O cliente paga logado (saldo/cartões salvos); o MP aprova mais. Cria-se uma
+// "preference" e o cliente é levado ao init_point. A confirmação vem do webhook.
+export interface PreferenciaItem {
+  id: string;
+  title: string;
+  quantity: number;
+  unitPrice: number; // BRL — valor do banco
+}
+
+export interface CriarPreferenciaInput {
+  orderId: string; // vira external_reference
+  itens: PreferenciaItem[];
+  pagador: {
+    nome?: string | null;
+    sobrenome?: string | null;
+    email: string;
+    cpfCnpj?: string | null;
+  };
+  backUrls: { success: string; failure: string; pending: string };
+  idempotencyKey?: string;
+}
+
+export interface PreferenciaCriada {
+  preferenceId: string;
+  initPoint: string; // URL do ambiente do MP p/ redirecionar o cliente
+}
+
 export interface PaymentProvider {
   readonly nome: ProviderPagamento;
   /** Cria a cobrança Pix no gateway e devolve QR + copia-e-cola + expiração. */
@@ -117,4 +152,9 @@ export interface PaymentProvider {
     paymentId: string,
     opts?: { idempotencyKey?: string },
   ): Promise<EstornoCriado>;
+  /**
+   * Cria uma preference (Checkout Pro) e devolve o init_point p/ redirecionar o
+   * cliente ao ambiente do MP. Valor/itens vêm do banco; external_reference = orderId.
+   */
+  criarPreferencia(input: CriarPreferenciaInput): Promise<PreferenciaCriada>;
 }

@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import {
   ProviderPagamento,
   StatusPagamento,
+  MetodoPagamento,
 } from "@/lib/generated/prisma/enums";
 import type {
   PaymentProvider,
@@ -12,6 +13,8 @@ import type {
   CriarCartaoInput,
   CartaoCriado,
   EstornoCriado,
+  CriarPreferenciaInput,
+  PreferenciaCriada,
 } from "./provider";
 
 // Provider Mercado Pago — Pix via Checkout Transparente (API clássica de
@@ -126,6 +129,26 @@ function telefoneMp(
   return { area_code: d.slice(0, 2), number: d.slice(2) };
 }
 
+// payment_type_id do MP → nosso MetodoPagamento (p/ o webhook criar a linha
+// Pagamento do Checkout Pro, onde o método só é conhecido após o cliente pagar).
+function metodoDoTipoPagamento(tipo: string | undefined): MetodoPagamento {
+  switch (tipo) {
+    case "credit_card":
+    case "debit_card":
+    case "prepaid_card":
+      return MetodoPagamento.CARTAO;
+    case "bank_transfer":
+    case "pix":
+      return MetodoPagamento.PIX;
+    case "ticket":
+    case "atm":
+      return MetodoPagamento.BOLETO;
+    case "account_money":
+    default:
+      return MetodoPagamento.CARTEIRA;
+  }
+}
+
 async function mpFetch(
   path: string,
   init: RequestInit & { idempotencyKey?: string },
@@ -171,6 +194,8 @@ type MpPaymentResponse = {
   external_reference?: string;
   installments?: number;
   payment_method_id?: string;
+  payment_type_id?: string;
+  transaction_amount?: number;
   date_of_expiration?: string;
   point_of_interaction?: {
     transaction_data?: {
@@ -358,6 +383,10 @@ export const mercadoPagoProvider: PaymentProvider = {
       externalId: String(data.id),
       status: mapStatus(data.status, data.status_detail),
       externalReference: data.external_reference ?? null,
+      valor: data.transaction_amount ?? null,
+      metodo: metodoDoTipoPagamento(data.payment_type_id),
+      parcelas: data.installments ?? null,
+      bandeira: data.payment_method_id ?? null,
     };
   },
 
@@ -375,5 +404,49 @@ export const mercadoPagoProvider: PaymentProvider = {
       idempotencyKey: opts?.idempotencyKey ?? `refund-${paymentId}`,
     })) as { id?: number | string; status?: string };
     return { refundId: String(data.id), status: data.status ?? null };
+  },
+
+  async criarPreferencia(
+    input: CriarPreferenciaInput,
+  ): Promise<PreferenciaCriada> {
+    const cpfCnpj = input.pagador.cpfCnpj?.replace(/\D/g, "") || null;
+    const body = {
+      items: input.itens.map((it) => ({
+        id: it.id,
+        title: it.title,
+        quantity: it.quantity,
+        unit_price: Math.round(it.unitPrice * 100) / 100,
+        currency_id: "BRL",
+      })),
+      payer: {
+        email: input.pagador.email,
+        ...(input.pagador.nome ? { name: input.pagador.nome } : {}),
+        ...(input.pagador.sobrenome ? { surname: input.pagador.sobrenome } : {}),
+        ...(cpfCnpj
+          ? {
+              identification: {
+                type: cpfCnpj.length > 11 ? "CNPJ" : "CPF",
+                number: cpfCnpj,
+              },
+            }
+          : {}),
+      },
+      external_reference: input.orderId,
+      back_urls: input.backUrls,
+      auto_return: "approved",
+      notification_url: NOTIFICATION_URL,
+    };
+
+    const data = (await mpFetch("/checkout/preferences", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      idempotencyKey: input.idempotencyKey ?? randomUUID(),
+    })) as { id?: number | string; init_point?: string };
+
+    return {
+      preferenceId: String(data.id),
+      initPoint: data.init_point ?? "",
+    };
   },
 };
