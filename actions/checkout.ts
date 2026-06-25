@@ -45,6 +45,9 @@ import type { Prisma, OrderStatus } from "@/lib/generated/prisma/client";
 
 const TETO_PARCELAS = 12;
 
+// Base do site p/ as back_urls do Checkout Pro (retorno do ambiente do MP).
+const SITE_URL = "https://www.guppydelinhagem.com.br";
+
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
 export type CheckoutPixData = {
@@ -1141,6 +1144,83 @@ export async function criarPedidoCheckout(
       ok: false,
       error:
         e instanceof Error ? e.message : "Não foi possível gerar o Pix agora.",
+    };
+  }
+}
+
+export type CheckoutProResult =
+  | { ok: true; initPoint: string; numero: string }
+  | { ok: false; error: string; fieldErrors?: Record<string, string[]> };
+
+/**
+ * Checkout Pro (Wallet): cria/reusa o Order (helper compartilhado) e cria uma
+ * preference no MP com o valor DO BANCO (cartão cheio) + external_reference =
+ * orderId. Devolve o init_point pro client redirecionar ao ambiente do MP. A
+ * confirmação vem do WEBHOOK (nunca da back_url). Pedido fica AGUARDANDO até lá.
+ */
+export async function iniciarCheckoutPro(
+  input: CheckoutFormInput,
+): Promise<CheckoutProResult> {
+  const order = await criarOrderDoCheckout(input);
+  if (!order.ok) {
+    return { ok: false, error: order.error, fieldErrors: order.fieldErrors };
+  }
+
+  const { orderId, numero, valorCartao, pagador, itens } = order.data;
+  const numeroLimpo = numero.replace(/^#/, "");
+
+  // Itens da preference = itens do pedido (preço efetivo do cartão) + frete como
+  // linha separada, pra a soma bater exatamente com o total do banco (valorCartao).
+  const somaItens = round2(
+    itens.reduce((a, it) => a + it.unitPrice * it.quantity, 0),
+  );
+  const frete = round2(valorCartao - somaItens);
+  const itensPref = [
+    ...itens.map((it) => ({
+      id: it.id,
+      title: it.title,
+      quantity: it.quantity,
+      unitPrice: it.unitPrice,
+    })),
+    ...(frete > 0
+      ? [{ id: "frete", title: "Frete", quantity: 1, unitPrice: frete }]
+      : []),
+  ];
+
+  try {
+    const provider = getPaymentProvider(ProviderPagamento.MERCADO_PAGO);
+    const pref = await provider.criarPreferencia({
+      orderId,
+      itens: itensPref,
+      pagador,
+      backUrls: {
+        success: `${SITE_URL}/pedido/${numeroLimpo}/analise`,
+        pending: `${SITE_URL}/pedido/${numeroLimpo}/analise`,
+        failure: `${SITE_URL}/pedido/${numeroLimpo}/falha`,
+      },
+    });
+    if (!pref.initPoint) {
+      // Sem init_point não há pra onde mandar o cliente → remove o órfão recém-criado.
+      if (!order.data.reused) {
+        await prisma.order.delete({ where: { id: orderId } }).catch(() => {});
+      }
+      return {
+        ok: false,
+        error: "Não foi possível iniciar o pagamento no Mercado Pago.",
+      };
+    }
+    return { ok: true, initPoint: pref.initPoint, numero };
+  } catch (e) {
+    console.error("[checkout] checkout pro", e);
+    if (!order.data.reused) {
+      await prisma.order.delete({ where: { id: orderId } }).catch(() => {});
+    }
+    return {
+      ok: false,
+      error:
+        e instanceof Error
+          ? e.message
+          : "Não foi possível iniciar o pagamento no Mercado Pago.",
     };
   }
 }
