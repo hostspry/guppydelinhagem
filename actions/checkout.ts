@@ -1446,7 +1446,11 @@ export async function pagarComCartao(
         parcelas: pago.parcelas,
         bandeira: pago.bandeira,
         // Só motivo da recusa (não sensível). NUNCA token/PAN/CVV.
-        payloadRaw: { statusDetail: pago.statusDetail } as Prisma.InputJsonValue,
+        // TEMP (diagnóstico): deviceId só como "ok"/"vazio" — nunca o valor.
+        payloadRaw: {
+          statusDetail: pago.statusDetail,
+          deviceId: cartao.deviceId ? "ok" : "vazio",
+        } as Prisma.InputJsonValue,
       },
     });
     await prisma.order.update({
