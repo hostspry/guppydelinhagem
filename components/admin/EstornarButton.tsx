@@ -19,9 +19,11 @@ import { formatBRL } from "@/lib/utils/format";
 export function EstornarButton({
   orderId,
   valor,
+  gatewayLabel = "Mercado Pago",
 }: {
   orderId: string;
   valor: number;
+  gatewayLabel?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
@@ -46,7 +48,7 @@ export function EstornarButton({
         className="inline-flex items-center gap-1.5 rounded-md bg-[#FF035C] px-4 py-2 text-sm font-medium text-white hover:brightness-110 transition-all"
       >
         <RotateCcw className="w-4 h-4" aria-hidden="true" />
-        Estornar no Mercado Pago
+        Estornar no {gatewayLabel}
       </button>
 
       <AlertDialog open={open} onOpenChange={setOpen}>
@@ -57,7 +59,7 @@ export function EstornarButton({
             </AlertDialogTitle>
             <AlertDialogDescription>
               Isso devolve <strong>{formatBRL(valor)}</strong> ao meio de
-              pagamento do cliente pelo Mercado Pago (no cartão, aparece na
+              pagamento do cliente pelo {gatewayLabel} (no cartão, aparece na
               fatura). Os peixes voltam ao estoque. Esta ação não pode ser
               desfeita.
             </AlertDialogDescription>

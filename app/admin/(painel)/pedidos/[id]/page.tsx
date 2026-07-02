@@ -31,6 +31,9 @@ export default async function PedidoDetalhePage({ params }: Props) {
   const estornoInfo = pedido.pagamentos.find((p) => p.estornadoEm != null) ?? null;
   const pagoReembolsavel =
     pedido.pagamentos.find((p) => p.status === "PAGO" && p.externalId) ?? null;
+  // Rótulo do gateway p/ os textos de estorno (MP ou PagBank).
+  const gatewayLabel =
+    pagoReembolsavel?.provider === "PAGBANK" ? "PagBank" : "Mercado Pago";
 
   return (
     <div>
@@ -224,19 +227,19 @@ export default async function PedidoDetalhePage({ params }: Props) {
                     Este pedido foi pago (
                     <strong>{formatBRL(pagoReembolsavel.valor)}</strong>) e está
                     cancelado, mas o valor <strong>ainda não foi devolvido</strong>{" "}
-                    ao cliente. Para reembolsar, estorne no Mercado Pago.
+                    ao cliente. Para reembolsar, estorne no {gatewayLabel}.
                   </>
                 ) : (
                   <>
                     Pedido pago (
                     <strong>{formatBRL(pagoReembolsavel.valor)}</strong>). Para
-                    devolver o dinheiro ao cliente, estorne no Mercado Pago.
+                    devolver o dinheiro ao cliente, estorne no {gatewayLabel}.
                   </>
                 )}
               </p>
               {pagoReembolsavel.externalId && (
                 <p className="text-xs text-amber-700">
-                  Transação MP:{" "}
+                  Transação {gatewayLabel}:{" "}
                   <span className="font-mono">
                     {pagoReembolsavel.externalId}
                   </span>
@@ -245,6 +248,7 @@ export default async function PedidoDetalhePage({ params }: Props) {
               <EstornarButton
                 orderId={pedido.id}
                 valor={pagoReembolsavel.valor}
+                gatewayLabel={gatewayLabel}
               />
             </div>
           ) : null}

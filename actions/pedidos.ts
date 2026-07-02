@@ -12,7 +12,6 @@ import { TRANSICOES_PEDIDO, podeEditarItens } from "@/lib/pedido-status";
 import { transicionarParaPago, ajustarPoolEstoque } from "@/lib/pedido-baixa";
 import { aplicarEstornoPedido } from "@/lib/pagamento-estorno";
 import { getPaymentProvider } from "@/lib/payments/registry";
-import { ProviderPagamento } from "@/lib/generated/prisma/enums";
 import { COMPOSICAO_LABEL } from "@/lib/composicoes";
 import type { Prisma, OrderStatus } from "@/lib/generated/prisma/client";
 import {
@@ -324,10 +323,11 @@ export async function atualizarStatusPedido(
 }
 
 /**
- * Estorno TOTAL no Mercado Pago + convergência no sistema. Admin-only. É DINHEIRO:
- * o valor vem do banco (nunca do client) e a idempotência é dupla — X-Idempotency-
- * Key no MP + trava estornadoEm na rotina compartilhada (mesma do webhook). Se o MP
- * falhar, NÃO marca como estornado (mensagem clara do MP). Clicar 2× é seguro.
+ * Estorno TOTAL no gateway (Mercado Pago OU PagBank) + convergência no sistema.
+ * Admin-only. É DINHEIRO: o valor vem do banco (nunca do client) e a idempotência
+ * é dupla — chave de idempotência estável no gateway + trava estornadoEm na rotina
+ * compartilhada (mesma do webhook). Se o gateway falhar, NÃO marca como estornado
+ * (mensagem clara). Clicar 2× é seguro. O provider é resolvido pelo pagamento pago.
  */
 export async function estornarPedido(id: string): Promise<ActionResult> {
   await assertAuthorized();
@@ -337,9 +337,9 @@ export async function estornarPedido(id: string): Promise<ActionResult> {
     select: {
       id: true,
       pagamentos: {
-        where: { provider: "MERCADO_PAGO" },
         select: {
           id: true,
+          provider: true,
           status: true,
           externalId: true,
           estornadoEm: true,
@@ -349,7 +349,7 @@ export async function estornarPedido(id: string): Promise<ActionResult> {
   });
   if (!order) return { success: false, error: "Pedido não encontrado." };
 
-  // Já estornado → sucesso idempotente (não chama o MP de novo).
+  // Já estornado → sucesso idempotente (não chama o gateway de novo).
   if (order.pagamentos.some((p) => p.estornadoEm != null)) {
     return { success: true, message: "Este pedido já foi estornado." };
   }
@@ -365,23 +365,23 @@ export async function estornarPedido(id: string): Promise<ActionResult> {
     };
   }
 
-  // 1) Estorna no MP FORA da transação de DB. Idempotency-key estável dedup no MP.
-  //    Se falhar, retorna a mensagem do MP e NÃO marca como estornado.
+  // 1) Estorna no gateway FORA da transação de DB. Idempotency-key estável dedup no
+  //    gateway. Se falhar, retorna a mensagem e NÃO marca como estornado.
   let refundId: string | null = null;
   try {
-    const provider = getPaymentProvider(ProviderPagamento.MERCADO_PAGO);
+    const provider = getPaymentProvider(pago.provider);
     const r = await provider.estornarPagamento(pago.externalId, {
       idempotencyKey: `refund-${pago.externalId}`,
     });
     refundId = r.refundId;
   } catch (e) {
-    console.error("[estorno] MP", e);
+    console.error("[estorno] gateway", e);
     return {
       success: false,
       error:
         e instanceof Error
           ? e.message
-          : "Não foi possível estornar no Mercado Pago.",
+          : "Não foi possível estornar no gateway de pagamento.",
     };
   }
 
