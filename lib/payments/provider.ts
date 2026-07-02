@@ -77,9 +77,15 @@ export interface CriarCartaoInput {
   orderId: string; // vira external_reference
   valor: number; // BRL (recalculado no servidor)
   descricao: string;
-  token: string; // token de uso único do cartão (do Brick)
-  paymentMethodId: string; // bandeira: "visa"/"master"/… (do Brick)
+  // ── Mercado Pago (Card Brick): token de uso único tokenizado no navegador ──
+  token?: string; // token de uso único do cartão (do Brick)
+  paymentMethodId?: string; // bandeira: "visa"/"master"/… (do Brick)
   issuerId?: string | null; // emissor (do Brick)
+  // ── PagBank: cartão CRIPTOGRAFADO no navegador (nunca PAN/CVV no servidor) ──
+  cartaoCriptografado?: string | null; // charges[].payment_method.card.encrypted
+  holderNome?: string | null; // nome impresso no cartão (payment_method.card.holder.name)
+  // id da autenticação 3DS já concluída no navegador (§7). Vazio = sem 3DS.
+  threeDsId?: string | null;
   installments: number; // nº de parcelas escolhido
   pagador: CartaoPagador;
   // Device fingerprint do MP (window.MP_DEVICE_SESSION_ID) → header
@@ -105,6 +111,42 @@ export interface CartaoCriado {
 export interface EstornoCriado {
   refundId: string; // id do refund no gateway (snapshot)
   status: string | null; // status do refund (ex.: "approved")
+}
+
+// ── Boleto (PagBank) — compensa em 1–3 dias úteis; pedido fica AGUARDANDO ──────
+export interface CriarBoletoInput {
+  orderId: string; // vira reference_id
+  valor: number; // BRL (recalculado no servidor)
+  descricao: string;
+  pagador: {
+    nome: string;
+    email: string;
+    cpfCnpj: string; // só dígitos — obrigatório no boleto
+    endereco: {
+      cep: string; // só dígitos
+      uf: string;
+      cidade: string;
+      bairro?: string | null;
+      logradouro: string;
+      numero: string;
+    };
+  };
+  idempotencyKey?: string;
+}
+
+export interface BoletoCriado {
+  externalId: string; // charge.id do gateway
+  status: StatusPagamento; // normalmente PENDENTE (WAITING) até compensar
+  linhaDigitavel: string | null; // formatted_barcode (copia p/ o banco)
+  codigoBarras: string | null; // barcode (numérico)
+  linkPdf: string | null; // href do PDF do boleto
+  vencimento: Date | null;
+}
+
+// ── Sessão 3DS (PagBank) — criada no servidor, consumida pelo SDK no navegador ─
+export interface Sessao3ds {
+  session: string; // valor usado pelo SDK 3DS no navegador
+  expiresAt: number | null; // epoch ms (sessão vale ~30 min)
 }
 
 // ── Checkout Pro (Wallet) — pagamento no ambiente do próprio Mercado Pago ──────
@@ -155,6 +197,17 @@ export interface PaymentProvider {
   /**
    * Cria uma preference (Checkout Pro) e devolve o init_point p/ redirecionar o
    * cliente ao ambiente do MP. Valor/itens vêm do banco; external_reference = orderId.
+   * Só o Mercado Pago (Wallet) suporta de fato; os demais providers lançam.
    */
   criarPreferencia(input: CriarPreferenciaInput): Promise<PreferenciaCriada>;
+  /**
+   * Gera um boleto (charges[] type BOLETO). Devolve linha digitável + PDF. Opcional
+   * — só o PagBank implementa nesta fase.
+   */
+  gerarBoleto?(input: CriarBoletoInput): Promise<BoletoCriado>;
+  /**
+   * Cria uma sessão de autenticação 3DS (POST /checkout-sdk/sessions) p/ o SDK do
+   * navegador rodar o 3-D Secure. Opcional — só o PagBank implementa.
+   */
+  criar3dsSession?(): Promise<Sessao3ds>;
 }
