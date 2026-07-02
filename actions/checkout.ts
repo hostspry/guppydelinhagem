@@ -12,6 +12,7 @@ import {
 import { calcularPesoECaixa, cotarFrete } from "@/lib/shipping";
 import { getPaymentProvider } from "@/lib/payments/registry";
 import { mensagemRecusa } from "@/lib/payments/mercadopago";
+import { mensagemRecusaPagbank } from "@/lib/payments/pagbank";
 import { transicionarParaPago } from "@/lib/pedido-baixa";
 import { calcularPrecos } from "@/lib/precos";
 import {
@@ -53,7 +54,8 @@ const round2 = (n: number) => Math.round(n * 100) / 100;
 export type CheckoutPixData = {
   numero: string;
   valor: number;
-  qrCodeBase64: string | null;
+  qrCodeBase64: string | null; // MP: PNG embutido em base64
+  qrPngUrl: string | null; // PagBank: link do PNG do QR (renderiza direto)
   copiaECola: string | null;
   ticketUrl: string | null;
   expiraEm: string | null; // ISO
@@ -121,6 +123,7 @@ async function emitirPix(args: {
     numero: args.numero,
     valor: args.valor,
     qrCodeBase64: pix.qrCodeBase64,
+    qrPngUrl: null,
     copiaECola: pix.copiaECola ?? pix.qrCode,
     ticketUrl: pix.ticketUrl,
     expiraEm: pix.expiraEm ? pix.expiraEm.toISOString() : null,
@@ -1561,4 +1564,356 @@ export async function pagarComCartao(
 
   // RECUSADO (ou qualquer não-pago): pedido segue aguardando; tenta de novo.
   return { resultado: "recusado", mensagem: mensagemRecusa(pago.statusDetail) };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PagBank — segundo provider (cartão com 3DS, Pix e boleto). Reusa o MESMO
+// criarOrderDoCheckout (pedido/preço/frete recalculados no servidor); só troca o
+// provider na emissão da cobrança. Valores em BRL aqui — o provider converte p/
+// centavos internamente (gotcha nº 1 do PagBank).
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Emite a cobrança Pix no PagBank e grava a linha Pagamento (provider PAGBANK).
+ * Lança se o PagBank falhar (o chamador remove o pedido órfão). Falha ao gravar a
+ * linha só é logada (o Pix já existe — não dá pra perder o QR pro cliente).
+ */
+async function emitirPixPagbank(args: {
+  orderId: string;
+  numero: string;
+  valor: number;
+  pagador: PagadorCheckout;
+}): Promise<CheckoutPixData> {
+  const provider = getPaymentProvider(ProviderPagamento.PAGBANK);
+  const partes = args.pagador.nome.trim().split(/\s+/);
+  const pix = await provider.criarPagamentoPix({
+    orderId: args.orderId,
+    valor: args.valor,
+    descricao: `Pedido ${args.numero} — Guppy de Linhagem`,
+    pagador: {
+      nome: partes[0],
+      sobrenome: partes.slice(1).join(" ") || null,
+      email: args.pagador.email,
+      cpfCnpj: args.pagador.cpfCnpj,
+    },
+  });
+
+  try {
+    await prisma.pagamento.create({
+      data: {
+        orderId: args.orderId,
+        provider: ProviderPagamento.PAGBANK,
+        metodo: MetodoPagamento.PIX,
+        status: StatusPagamento.PENDENTE,
+        valor: args.valor,
+        externalId: pix.externalId,
+        qrCode: pix.qrCode, // copia-e-cola (EMV)
+        linkPagamento: pix.ticketUrl, // link do PNG do QR
+        payloadRaw: {
+          qrPngUrl: pix.ticketUrl,
+          expiraEm: pix.expiraEm ? pix.expiraEm.toISOString() : null,
+        } as Prisma.InputJsonValue,
+      },
+    });
+  } catch (e) {
+    console.error("[checkout] gravar Pagamento pix pagbank", e);
+  }
+
+  return {
+    numero: args.numero,
+    valor: args.valor,
+    qrCodeBase64: pix.qrCodeBase64,
+    qrPngUrl: pix.ticketUrl, // PagBank: link do PNG do QR
+    copiaECola: pix.copiaECola ?? pix.qrCode,
+    ticketUrl: null,
+    expiraEm: pix.expiraEm ? pix.expiraEm.toISOString() : null,
+  };
+}
+
+/**
+ * Pix PagBank: cria o Order (helper compartilhado) e gera a cobrança Pix. Se o
+ * PagBank falhar, remove o pedido órfão. Devolve o QR/copia-e-cola.
+ */
+export async function gerarPixPagbank(
+  input: CheckoutFormInput,
+): Promise<CheckoutResult> {
+  const order = await criarOrderDoCheckout(input);
+  if (!order.ok) return order;
+
+  try {
+    const pixData = await emitirPixPagbank({
+      orderId: order.data.orderId,
+      numero: order.data.numero,
+      valor: order.data.valorPix, // Pix cobra o total COM desconto
+      pagador: order.data.pagador,
+    });
+    return { ok: true, data: pixData };
+  } catch (e) {
+    console.error("[checkout] criar Pix pagbank", e);
+    if (!order.data.reused) {
+      await prisma.order
+        .delete({ where: { id: order.data.orderId } })
+        .catch(() => {});
+    }
+    return {
+      ok: false,
+      error:
+        e instanceof Error ? e.message : "Não foi possível gerar o Pix agora.",
+    };
+  }
+}
+
+/**
+ * Cria uma sessão de autenticação 3DS no PagBank p/ o SDK do navegador rodar o
+ * 3-D Secure antes de cobrar o cartão. Pública, leve. A sessão vale ~30 min.
+ */
+export async function criar3dsSessionPagbank(): Promise<
+  { ok: true; session: string } | { ok: false; error: string }
+> {
+  try {
+    const provider = getPaymentProvider(ProviderPagamento.PAGBANK);
+    if (!provider.criar3dsSession) {
+      return { ok: false, error: "Autenticação 3DS indisponível." };
+    }
+    const s = await provider.criar3dsSession();
+    return { ok: true, session: s.session };
+  } catch (e) {
+    console.error("[checkout] 3ds session pagbank", e);
+    return {
+      ok: false,
+      error:
+        e instanceof Error ? e.message : "Não foi possível iniciar a autenticação.",
+    };
+  }
+}
+
+// Dados do cartão PagBank vindos do navegador: cartão JÁ criptografado (nunca
+// PAN/CVV no backend) + id do 3DS concluído (§7). O 3DS pendente/desafio NÃO
+// chega aqui — o navegador só envia após AUTH_FLOW_COMPLETED (ou sem 3DS quando
+// o cartão não é elegível).
+export type CartaoPagbankInput = {
+  cartaoCriptografado: string;
+  holderNome: string;
+  installments: number;
+  threeDsId?: string | null;
+};
+
+/**
+ * Cartão PagBank: cria o Order (helper compartilhado) e cobra no cartão com o
+ * cartão criptografado no navegador (+ 3DS quando houver). Mesmos três desfechos
+ * do cartão do MP (status sempre da API do PagBank):
+ *  - PAID → Pagamento PAGO + transiciona o pedido (baixa com trava); "aprovado".
+ *  - IN_ANALYSIS → Pagamento EM_ANALISE, pedido segue AGUARDANDO; "analise".
+ *  - DECLINED → Pagamento RECUSADO; "recusado" + mensagem (deixa tentar de novo).
+ * NUNCA marca PAGO em 3DS pendente (o navegador não submete nesse estado).
+ */
+export async function pagarComCartaoPagbank(
+  input: CheckoutFormInput,
+  cartao: CartaoPagbankInput,
+): Promise<CartaoDesfecho> {
+  const parcelas = Number(cartao.installments);
+  const teto = await calcularTetoParcelas(
+    (input.itens ?? []).map((i) => i.produtoId),
+  );
+  if (!Number.isInteger(parcelas) || parcelas < 1 || parcelas > teto) {
+    return { resultado: "erro", mensagem: "Opção de parcelamento inválida." };
+  }
+  if (!cartao.cartaoCriptografado) {
+    return { resultado: "erro", mensagem: "Dados do cartão incompletos." };
+  }
+
+  const order = await criarOrderDoCheckout(input);
+  if (!order.ok) {
+    return {
+      resultado: "erro",
+      mensagem: order.error,
+      fieldErrors: order.fieldErrors,
+    };
+  }
+  const { orderId, numero, valorCartao: valor, pagador } = order.data;
+
+  let pago;
+  try {
+    const provider = getPaymentProvider(ProviderPagamento.PAGBANK);
+    pago = await provider.criarPagamentoCartao({
+      orderId,
+      valor, // cartão cobra o CHEIO
+      descricao: `Pedido ${numero} — Guppy de Linhagem`,
+      cartaoCriptografado: cartao.cartaoCriptografado,
+      holderNome: cartao.holderNome,
+      threeDsId: cartao.threeDsId ?? null,
+      installments: parcelas,
+      pagador: {
+        email: pagador.email,
+        cpfCnpj: pagador.cpfCnpj,
+        nome: pagador.nome,
+        sobrenome: pagador.sobrenome,
+        telefone: order.data.telefone,
+      },
+    });
+  } catch (e) {
+    console.error("[checkout] cobrar cartão pagbank", e);
+    if (!order.data.reused) {
+      await prisma.order.delete({ where: { id: orderId } }).catch(() => {});
+    }
+    return {
+      resultado: "erro",
+      mensagem:
+        e instanceof Error ? e.message : "Não foi possível processar o cartão.",
+    };
+  }
+
+  // Grava a linha Pagamento em TODOS os casos (PAGO/EM_ANALISE/RECUSADO). NUNCA
+  // guarda PAN/CVV/cartão criptografado — só o motivo (code) da resposta.
+  try {
+    await prisma.pagamento.create({
+      data: {
+        orderId,
+        provider: ProviderPagamento.PAGBANK,
+        metodo: MetodoPagamento.CARTAO,
+        status: pago.status,
+        valor,
+        externalId: pago.externalId,
+        parcelas: pago.parcelas,
+        bandeira: pago.bandeira,
+        payloadRaw: {
+          code: pago.statusDetail,
+          threeDs: cartao.threeDsId ? "sim" : "nao",
+        } as Prisma.InputJsonValue,
+      },
+    });
+  } catch (e) {
+    console.error("[checkout] gravar Pagamento cartão pagbank", e);
+  }
+
+  if (pago.status === StatusPagamento.PAGO) {
+    try {
+      await prisma.$transaction((tx) => transicionarParaPago(tx, orderId));
+      revalidatePath("/admin/produtos");
+      revalidatePath("/admin/pedidos");
+    } catch (e) {
+      console.error("[checkout] transicionar cartão pagbank aprovado", e);
+    }
+    return { resultado: "aprovado", numero };
+  }
+
+  if (pago.status === StatusPagamento.EM_ANALISE) {
+    return { resultado: "analise", numero };
+  }
+
+  return {
+    resultado: "recusado",
+    mensagem: mensagemRecusaPagbank(pago.statusDetail),
+  };
+}
+
+export type CheckoutBoletoData = {
+  numero: string;
+  valor: number;
+  linhaDigitavel: string | null;
+  codigoBarras: string | null;
+  linkPdf: string | null;
+  vencimento: string | null; // ISO
+};
+export type CheckoutBoletoResult =
+  | { ok: true; data: CheckoutBoletoData }
+  | { ok: false; error: string; fieldErrors?: Record<string, string[]> };
+
+/**
+ * Boleto PagBank: cria o Order (helper compartilhado) e gera o boleto. O pedido
+ * fica AGUARDANDO_PAGAMENTO até compensar (1–3 dias úteis) — a confirmação vem do
+ * webhook. Cobra o valor CHEIO (o desconto Pix não vale p/ boleto). CPF é
+ * obrigatório (o schema do checkout já exige).
+ */
+export async function gerarBoletoPagbank(
+  input: CheckoutFormInput,
+): Promise<CheckoutBoletoResult> {
+  const order = await criarOrderDoCheckout(input);
+  if (!order.ok) {
+    return { ok: false, error: order.error, fieldErrors: order.fieldErrors };
+  }
+  const { orderId, numero, valorCartao: valor, pagador, endereco } = order.data;
+
+  const cpf = (pagador.cpfCnpj ?? "").replace(/\D/g, "");
+  if (!cpf) {
+    if (!order.data.reused) {
+      await prisma.order.delete({ where: { id: orderId } }).catch(() => {});
+    }
+    return { ok: false, error: "CPF/CNPJ é obrigatório para gerar boleto." };
+  }
+
+  // Endereço do sacado: o do pedido (ENVIO) ou o da loja (RETIRADA, que não coleta
+  // endereço) — é só o cadastro do boleto; nome/CPF identificam o pagador.
+  const endBoleto =
+    order.data.tipoEntrega === "RETIRADA" ? LOJA_ENDERECO : endereco;
+
+  let boleto;
+  try {
+    const provider = getPaymentProvider(ProviderPagamento.PAGBANK);
+    if (!provider.gerarBoleto) {
+      throw new Error("Boleto indisponível no momento.");
+    }
+    boleto = await provider.gerarBoleto({
+      orderId,
+      valor,
+      descricao: `Pedido ${numero} — Guppy de Linhagem`,
+      pagador: {
+        nome: pagador.nome,
+        email: pagador.email,
+        cpfCnpj: cpf,
+        endereco: {
+          cep: endBoleto.cep,
+          uf: endBoleto.uf,
+          cidade: endBoleto.cidade,
+          bairro: null,
+          logradouro: endBoleto.logradouro,
+          numero: endBoleto.numero,
+        },
+      },
+    });
+  } catch (e) {
+    console.error("[checkout] gerar boleto pagbank", e);
+    if (!order.data.reused) {
+      await prisma.order.delete({ where: { id: orderId } }).catch(() => {});
+    }
+    return {
+      ok: false,
+      error:
+        e instanceof Error ? e.message : "Não foi possível gerar o boleto agora.",
+    };
+  }
+
+  try {
+    await prisma.pagamento.create({
+      data: {
+        orderId,
+        provider: ProviderPagamento.PAGBANK,
+        metodo: MetodoPagamento.BOLETO,
+        status: boleto.status,
+        valor,
+        externalId: boleto.externalId,
+        linkPagamento: boleto.linkPdf,
+        payloadRaw: {
+          linhaDigitavel: boleto.linhaDigitavel,
+          codigoBarras: boleto.codigoBarras,
+          linkPdf: boleto.linkPdf,
+          vencimento: boleto.vencimento ? boleto.vencimento.toISOString() : null,
+        } as Prisma.InputJsonValue,
+      },
+    });
+  } catch (e) {
+    console.error("[checkout] gravar Pagamento boleto pagbank", e);
+  }
+
+  return {
+    ok: true,
+    data: {
+      numero,
+      valor,
+      linhaDigitavel: boleto.linhaDigitavel,
+      codigoBarras: boleto.codigoBarras,
+      linkPdf: boleto.linkPdf,
+      vencimento: boleto.vencimento ? boleto.vencimento.toISOString() : null,
+    },
+  };
 }

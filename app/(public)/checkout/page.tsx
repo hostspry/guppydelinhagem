@@ -5,6 +5,7 @@ import {
   getFreteGratisConfig,
   getConfiguracaoLoja,
 } from "@/lib/queries/config";
+import { pagbankPublicKey, pagbankSdkEnv } from "@/lib/payments/pagbank/config";
 import CheckoutClient, {
   type CheckoutPrefill,
 } from "@/components/checkout/CheckoutClient";
@@ -77,10 +78,21 @@ export default async function CheckoutPage() {
     getConfiguracaoLoja(),
   ]);
 
+  // PagBank: mesma disciplina do MP — chave pública lida em runtime (sem
+  // NEXT_PUBLIC_) e injetada por prop. Só oferece PagBank se o toggle do admin
+  // estiver ligado E a chave configurada.
+  const pbPublicKey = pagbankPublicKey();
+  const pagbank = {
+    ativo: config.pagbankAtivo && !!pbPublicKey,
+    publicKey: pbPublicKey,
+    env: pagbankSdkEnv(),
+  };
+
   return (
     <CheckoutClient
       prefill={prefill}
       mpPublicKey={mpPublicKey}
+      pagbank={pagbank}
       freteGratis={freteGratis}
       retirada={{
         ativo: config.retiradaLocalAtiva,

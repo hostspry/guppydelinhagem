@@ -110,10 +110,14 @@ export default function PixPanel({ pix: pixInicial }: { pix: CheckoutPixData }) 
 
       {!expirado ? (
         <>
-          {pix.qrCodeBase64 ? (
+          {pix.qrCodeBase64 || pix.qrPngUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
-              src={`data:image/png;base64,${pix.qrCodeBase64}`}
+              src={
+                pix.qrCodeBase64
+                  ? `data:image/png;base64,${pix.qrCodeBase64}`
+                  : (pix.qrPngUrl as string)
+              }
               alt="QR Code do Pix"
               className="mx-auto w-60 h-60 rounded-lg border border-border bg-white"
               width={240}
