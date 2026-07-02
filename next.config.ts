@@ -17,6 +17,11 @@ const cspDirectives: Record<string, string[]> = {
     "https://*.mercadolibre.com",
     "https://sdk.mercadopago.com",
     "https://http2.mlstatic.com", // CDN de assets do Card Brick (cardPayment.js)
+    // PagBank: SDK Connect JS (criptografia de cartão + 3DS) e o desafio 3DS
+    // (Cardinal/ACS). Sem estes, o cartão/3DS do PagBank é bloqueado.
+    "https://assets.pagseguro.com.br",
+    "https://*.cardinalcommerce.com",
+    "https://*.cardinaltrusted.com",
     "https://www.googletagmanager.com",
     "https://www.google-analytics.com",
   ],
@@ -34,6 +39,7 @@ const cspDirectives: Record<string, string[]> = {
     "https://http2.mlstatic.com", // SVGs de bandeira do Brick
     "https://www.mercadopago.com.br", // pixels de fingerprint antifraude (TLD .com.br)
     "https://www.mercadolibre.com", // idem (apex, fora do *.mercadolibre.com)
+    "https://*.pagseguro.com", // PNG do QR do Pix PagBank (api.pagseguro.com)
     "https://www.google-analytics.com",
   ],
   "font-src": ["'self'", "data:"],
@@ -43,6 +49,11 @@ const cspDirectives: Record<string, string[]> = {
     "https://*.mercadopago.com",
     "https://*.mercadolibre.com",
     "https://http2.mlstatic.com", // configs/i18n/SVGs do Brick via fetch
+    // PagBank: sessão 3DS + API (sdk/api.pagseguro.com), SDK e desafio 3DS.
+    "https://*.pagseguro.com",
+    "https://assets.pagseguro.com.br",
+    "https://*.cardinalcommerce.com",
+    "https://*.cardinaltrusted.com",
     "https://www.guppydelinhagem.com.br",
     "https://media.guppydelinhagem.com.br",
     "https://utfs.io",
@@ -57,6 +68,10 @@ const cspDirectives: Record<string, string[]> = {
     "https://www.youtube-nocookie.com",
     "https://*.mercadopago.com",
     "https://*.mercadolibre.com",
+    // PagBank: desafio 3DS (iframe Cardinal/ACS). Domínios do emissor podem
+    // aparecer dinamicamente no desafio; os wildcards Cardinal cobrem o SDK.
+    "https://*.cardinalcommerce.com",
+    "https://*.cardinaltrusted.com",
   ],
   "object-src": ["'none'"],
   "base-uri": ["'self'"],
