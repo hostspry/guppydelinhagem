@@ -52,6 +52,7 @@ enum TipoEntrega {
 enum ProviderPagamento {
   MERCADO_PAGO
   PICPAY
+  PAGBANK
 }
 
 enum MetodoPagamento {
@@ -479,6 +480,7 @@ model ConfiguracaoLoja {
   retiradaInstrucoes       String? // texto livre exibido ao cliente que escolhe retirada
   tarjaAtiva               Boolean  @default(false) // liga/desliga a tarja promocional no topo
   tarjaTexto               String? // texto livre da tarja; vazio → usa o fallback do componente
+  pagbankAtivo             Boolean  @default(false) // oferece PagBank (cartão/Pix/boleto) no checkout
   atualizadoEm             DateTime @updatedAt
 }
 
