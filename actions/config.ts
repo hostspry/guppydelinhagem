@@ -48,6 +48,9 @@ export async function salvarConfiguracaoLoja(
   const tarjaTextoRaw = String(formData.get("tarjaTexto") ?? "").trim();
   const tarjaTexto = tarjaTextoRaw || null;
 
+  // PagBank: liga/desliga as opções PagBank no checkout (sem deploy).
+  const pagbankAtivo = formData.get("pagbankAtivo") === "on";
+
   try {
     await prisma.configuracaoLoja.upsert({
       where: { id: DEFAULT_ID },
@@ -61,6 +64,7 @@ export async function salvarConfiguracaoLoja(
         retiradaInstrucoes,
         tarjaAtiva,
         tarjaTexto,
+        pagbankAtivo,
       },
       update: {
         descontoPixGlobalPercent: pct,
@@ -71,6 +75,7 @@ export async function salvarConfiguracaoLoja(
         retiradaInstrucoes,
         tarjaAtiva,
         tarjaTexto,
+        pagbankAtivo,
       },
     });
   } catch (e) {

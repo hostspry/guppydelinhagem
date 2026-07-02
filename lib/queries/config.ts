@@ -18,6 +18,7 @@ export type ConfiguracaoLojaData = {
   retiradaInstrucoes: string | null;
   tarjaAtiva: boolean;
   tarjaTexto: string | null;
+  pagbankAtivo: boolean;
 };
 
 /**
@@ -41,6 +42,7 @@ export const getConfiguracaoLoja = cache(
         retiradaInstrucoes: true,
         tarjaAtiva: true,
         tarjaTexto: true,
+        pagbankAtivo: true,
       },
     });
     return {
@@ -53,6 +55,7 @@ export const getConfiguracaoLoja = cache(
       retiradaInstrucoes: c?.retiradaInstrucoes ?? null,
       tarjaAtiva: c?.tarjaAtiva ?? false,
       tarjaTexto: c?.tarjaTexto ?? null,
+      pagbankAtivo: c?.pagbankAtivo ?? false,
     };
   },
 );

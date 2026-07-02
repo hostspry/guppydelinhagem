@@ -20,6 +20,7 @@ export function ConfiguracoesForm({
     retiradaInstrucoes: string | null;
     tarjaAtiva: boolean;
     tarjaTexto: string | null;
+    pagbankAtivo: boolean;
   };
 }) {
   const [pct, setPct] = useState(String(inicial.descontoPixGlobalPercent));
@@ -40,6 +41,7 @@ export function ConfiguracoesForm({
   );
   const [tarjaAtiva, setTarjaAtiva] = useState(inicial.tarjaAtiva);
   const [tarjaTexto, setTarjaTexto] = useState(inicial.tarjaTexto ?? "");
+  const [pagbankAtivo, setPagbankAtivo] = useState(inicial.pagbankAtivo);
   const [isPending, startTransition] = useTransition();
 
   function onSubmit(e: React.FormEvent) {
@@ -53,6 +55,7 @@ export function ConfiguracoesForm({
     fd.set("retiradaInstrucoes", retiradaInstrucoes);
     if (tarjaAtiva) fd.set("tarjaAtiva", "on");
     fd.set("tarjaTexto", tarjaTexto);
+    if (pagbankAtivo) fd.set("pagbankAtivo", "on");
     startTransition(async () => {
       const r = await salvarConfiguracaoLoja(fd);
       if (r.success) toast.success(r.message ?? "Salvo.");
@@ -268,6 +271,29 @@ export function ConfiguracoesForm({
             em amarelo automaticamente.
           </p>
         </div>
+      </div>
+
+      {/* ── PagBank (segundo meio de pagamento) ── */}
+      <div className="border-t border-gray-100 pt-6">
+        <h2 className="text-xs font-semibold text-[#07366A] uppercase tracking-wide mb-3">
+          PagBank
+        </h2>
+        <label className="flex items-center gap-2.5 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={pagbankAtivo}
+            onChange={(e) => setPagbankAtivo(e.target.checked)}
+            className="h-4 w-4 accent-[#FF035C]"
+          />
+          <span className="text-sm text-gray-700">
+            Oferecer PagBank no checkout (cartão, Pix e boleto)
+          </span>
+        </label>
+        <p className="text-xs text-gray-500 mt-2 leading-snug max-w-md">
+          Liga as opções de pagamento pelo PagBank como alternativa ao Mercado
+          Pago. Desligado, as opções PagBank somem do checkout. Requer as chaves
+          do PagBank configuradas no servidor.
+        </p>
       </div>
 
       <div>
