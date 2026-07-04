@@ -8,7 +8,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import {
   AlertTriangle,
-  Barcode,
   Clock,
   CreditCard,
   Loader2,
@@ -44,20 +43,16 @@ import {
   criarPedidoCheckout,
   pagarComCartao,
   iniciarCheckoutPro,
-  gerarPixPagbank,
-  gerarBoletoPagbank,
   pagarComCartaoPagbank,
   calcularTetoParcelas,
   validarCupom,
   resolverItensCarrinho,
   type CheckoutPixData,
-  type CheckoutBoletoData,
   type CartaoInput,
   type CartaoPagbankInput,
   type CarrinhoResolvido,
 } from "@/actions/checkout";
 import PixPanel from "@/components/checkout/PixPanel";
-import BoletoPanel from "@/components/checkout/BoletoPanel";
 import CardPaymentBrick from "@/components/checkout/CardPaymentBrick";
 import PagBankCardForm, {
   type PagBankBilling,
@@ -228,10 +223,9 @@ export default function CheckoutClient({
   });
 
   // Forma de pagamento (Pix padrão) + teto de parcelas (do servidor) + recusa.
-  // Abas MP (pix/cartao/mp) + PagBank (pb_cartao/pb_pix/pb_boleto).
-  const [aba, setAba] = useState<
-    "pix" | "cartao" | "mp" | "pb_cartao" | "pb_pix" | "pb_boleto"
-  >("pix");
+  // Abas MP (pix/cartao/mp) + PagBank card-only (pb_cartao — 2º adquirente p/
+  // recuperar cartão recusado pela antifraude do MP).
+  const [aba, setAba] = useState<"pix" | "cartao" | "mp" | "pb_cartao">("pix");
   // Modalidade de frete escolhida (Jadlog terrestre padrão | Gollog aéreo).
   const [modalidade, setModalidade] = useState<"TERRESTRE" | "AEREO">(
     "TERRESTRE",
@@ -255,11 +249,10 @@ export default function CheckoutClient({
   const [freteErro, setFreteErro] = useState<string | null>(null);
   const [frete, setFrete] = useState<FreteResponse | null>(null);
 
-  // Submit / Pix / Boleto
+  // Submit / Pix
   const [pending, startTransition] = useTransition();
   const [erro, setErro] = useState<string | null>(null);
   const [pix, setPix] = useState<CheckoutPixData | null>(null);
-  const [boleto, setBoleto] = useState<CheckoutBoletoData | null>(null);
 
   const cepDigits = (watch("cep") ?? "").replace(/\D/g, "");
   const cepValido = /^\d{8}$/.test(cepDigits);
@@ -337,8 +330,8 @@ export default function CheckoutClient({
   // Economia REAL do Pix = cartão efetivo − Pix efetivo (com campanha). No preço
   // único (Pix = cartão) dá 0 → a linha "Você economiza no Pix" não aparece.
   const economiaPix = Math.max(0, subtotalCheioEfetivo - subtotalPixEfetivo);
-  // Pix (MP ou PagBank) usa o subtotal com desconto Pix; cartão/boleto o cheio.
-  const abaUsaPix = aba === "pix" || aba === "pb_pix";
+  // Só o Pix (MP) usa o subtotal com desconto Pix; cartão usa o cheio.
+  const abaUsaPix = aba === "pix";
   const subtotalEfetivoAba = abaUsaPix
     ? subtotalPixEfetivo
     : subtotalCheioEfetivo;
@@ -652,32 +645,6 @@ export default function CheckoutClient({
     };
   }
 
-  function onPixPagbank() {
-    setErro(null);
-    setRecusa(null);
-    startTransition(async () => {
-      const dados = await validarParaPagbank();
-      if (!dados) return;
-      trackAddPaymentInfo(gaItens(), total, "pix");
-      const res = await gerarPixPagbank(payloadPagbank(dados));
-      if (res.ok) setPix(res.data);
-      else setErro(res.error);
-    });
-  }
-
-  function onBoletoPagbank() {
-    setErro(null);
-    setRecusa(null);
-    startTransition(async () => {
-      const dados = await validarParaPagbank();
-      if (!dados) return;
-      trackAddPaymentInfo(gaItens(), totalCartao, "boleto");
-      const res = await gerarBoletoPagbank(payloadPagbank(dados));
-      if (res.ok) setBoleto(res.data);
-      else setErro(res.error);
-    });
-  }
-
   // Validação + dados do comprador/endereço p/ o 3DS. Roda ANTES de cobrar (o
   // PagBankCardForm chama isto, faz encrypt + 3DS e então onCartaoPagbank).
   async function antesDePagarPagbank(): Promise<{
@@ -736,7 +703,7 @@ export default function CheckoutClient({
     );
   }
 
-  if (!pix && !boleto && items.length === 0) {
+  if (!pix && items.length === 0) {
     return (
       <div className="container-site py-20 flex flex-col items-center text-center gap-4">
         <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center">
@@ -758,11 +725,6 @@ export default function CheckoutClient({
   // ── Pix gerado: tela do QR + copia-e-cola + contagem + poll de status ──
   if (pix) {
     return <PixPanel pix={pix} />;
-  }
-
-  // ── Boleto gerado: linha digitável + PDF + poll de status ──
-  if (boleto) {
-    return <BoletoPanel boleto={boleto} />;
   }
 
   // ── Formulário de checkout ──
@@ -1488,51 +1450,26 @@ export default function CheckoutClient({
             </button>
           </div>
 
-          {/* PagBank (segundo provider) — cartão, Pix e boleto. Só quando ligado
-              no admin E com chave pública configurada. */}
+          {/* PagBank (2º adquirente, card-only) — opção extra de cartão pra
+              recuperar cartão recusado pela antifraude do MP. Só quando ligado no
+              admin E com chave pública configurada. */}
           {pagbank.ativo && (
             <div className="space-y-1.5">
               <p className="text-[11px] font-medium text-muted-foreground text-center uppercase tracking-wide">
-                ou pague com PagBank
+                cartão recusado? tente por aqui
               </p>
-              <div className="grid grid-cols-3 gap-2 rounded-lg bg-bg-alt p-1">
-                <button
-                  type="button"
-                  onClick={() => setAba("pb_cartao")}
-                  className={`inline-flex items-center justify-center gap-1.5 py-2 rounded-md text-xs font-semibold transition-all ${
-                    aba === "pb_cartao"
-                      ? "bg-white text-primary shadow-sm"
-                      : "text-muted-foreground hover:text-primary"
-                  }`}
-                >
-                  <CreditCard size={14} aria-hidden="true" />
-                  Cartão
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setAba("pb_pix")}
-                  className={`inline-flex items-center justify-center gap-1.5 py-2 rounded-md text-xs font-semibold transition-all ${
-                    aba === "pb_pix"
-                      ? "bg-white text-primary shadow-sm"
-                      : "text-muted-foreground hover:text-primary"
-                  }`}
-                >
-                  <QrCode size={14} aria-hidden="true" />
-                  Pix
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setAba("pb_boleto")}
-                  className={`inline-flex items-center justify-center gap-1.5 py-2 rounded-md text-xs font-semibold transition-all ${
-                    aba === "pb_boleto"
-                      ? "bg-white text-primary shadow-sm"
-                      : "text-muted-foreground hover:text-primary"
-                  }`}
-                >
-                  <Barcode size={14} aria-hidden="true" />
-                  Boleto
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={() => setAba("pb_cartao")}
+                className={`w-full inline-flex items-center justify-center gap-1.5 py-2 rounded-md text-xs font-semibold transition-all ${
+                  aba === "pb_cartao"
+                    ? "bg-white text-primary shadow-sm ring-1 ring-border"
+                    : "bg-bg-alt text-muted-foreground hover:text-primary"
+                }`}
+              >
+                <CreditCard size={14} aria-hidden="true" />
+                Cartão de crédito (PagBank)
+              </button>
             </div>
           )}
 
@@ -1639,8 +1576,8 @@ export default function CheckoutClient({
                 </>
               )}
             </div>
-          ) : aba === "pb_cartao" ? (
-            // Cartão via PagBank (criptografado no browser + 3DS)
+          ) : (
+            // Cartão via PagBank (criptografado no browser + 3DS) — card-only
             <div className="space-y-2">
               {!pagbank.publicKey ? (
                 <p className="text-xs text-amber-700">
@@ -1673,63 +1610,6 @@ export default function CheckoutClient({
                 >
                   {recusa}
                 </p>
-              )}
-            </div>
-          ) : aba === "pb_pix" ? (
-            // Pix via PagBank
-            <>
-              <button
-                type="button"
-                onClick={onPixPagbank}
-                disabled={pending}
-                className="w-full inline-flex items-center justify-center gap-2 bg-secondary text-white text-sm font-semibold py-3 rounded-pill hover:brightness-110 disabled:opacity-60 disabled:cursor-not-allowed transition-all"
-              >
-                {pending ? (
-                  <Loader2 size={16} className="animate-spin" aria-hidden="true" />
-                ) : (
-                  <QrCode size={16} aria-hidden="true" />
-                )}
-                {pending ? "Gerando Pix…" : "Pagar com Pix (PagBank)"}
-              </button>
-              {!isRetirada && !freteValor && !excedeCaixa && !freteFaltando && (
-                <p className="text-[11px] text-muted-foreground text-center leading-snug flex items-center justify-center gap-1">
-                  <AlertTriangle size={12} aria-hidden="true" />
-                  Calcule o frete pelo CEP para concluir.
-                </p>
-              )}
-            </>
-          ) : (
-            // Boleto via PagBank
-            <div className="space-y-2">
-              {excedeCaixa ? (
-                <p className="text-xs text-amber-700">
-                  Acima de {maxPeixes} peixes, finalize no WhatsApp.
-                </p>
-              ) : !isRetirada && freteValor == null ? (
-                <p className="text-[11px] text-muted-foreground flex items-center gap-1 leading-snug">
-                  <AlertTriangle size={12} aria-hidden="true" />
-                  Calcule o frete pelo seu CEP para continuar.
-                </p>
-              ) : (
-                <>
-                  <button
-                    type="button"
-                    onClick={onBoletoPagbank}
-                    disabled={pending}
-                    className="w-full inline-flex items-center justify-center gap-2 bg-secondary text-white text-sm font-semibold py-3 rounded-pill hover:brightness-110 disabled:opacity-60 disabled:cursor-not-allowed transition-all"
-                  >
-                    {pending ? (
-                      <Loader2 size={16} className="animate-spin" aria-hidden="true" />
-                    ) : (
-                      <Barcode size={16} aria-hidden="true" />
-                    )}
-                    {pending ? "Gerando boleto…" : "Gerar boleto"}
-                  </button>
-                  <p className="text-[11px] text-muted-foreground text-center leading-snug">
-                    O pedido fica aguardando pagamento até o boleto compensar (1 a
-                    3 dias úteis).
-                  </p>
-                </>
               )}
             </div>
           )}

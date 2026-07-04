@@ -7,15 +7,12 @@ import {
 } from "@/lib/generated/prisma/enums";
 import type {
   PaymentProvider,
-  CriarPixInput,
   PixCriado,
   PixConsulta,
   CriarCartaoInput,
   CartaoCriado,
   EstornoCriado,
   PreferenciaCriada,
-  CriarBoletoInput,
-  BoletoCriado,
   Sessao3ds,
 } from "../provider";
 import {
@@ -25,8 +22,10 @@ import {
 } from "./config";
 
 // Provider PagBank — Order API (POST /orders): cria e paga em uma requisição.
-// Cartão (com 3DS), Pix (qr_codes) e Boleto. Token Bearer server-only (nunca vai
-// ao client — `server-only` quebra o build se importado de Client Component).
+// Escopo card-only: só CARTÃO (com 3DS). Existe como 2º adquirente pra recuperar
+// cartão recusado pela antifraude do Mercado Pago. Pix é exclusivo do MP e boleto
+// foi descontinuado neste provider. Token Bearer server-only (nunca vai ao client
+// — `server-only` quebra o build se importado de Client Component).
 //
 // Doc: developer.pagbank.com.br — Pedidos e pagamentos (Order). TODOS os valores
 // monetários vão em CENTAVOS (inteiro): R$ 342,00 → 34200 (gotcha nº 1 vs. o MP,
@@ -35,11 +34,6 @@ import {
 // URL do webhook registrada nos pedidos (a mesma valida a assinatura).
 const NOTIFICATION_URL =
   "https://www.guppydelinhagem.com.br/api/webhooks/pagbank";
-
-// Janela de validade do Pix (min). Spec do checkout: 30 min (igual ao MP).
-const PIX_EXPIRACAO_MIN = 30;
-// Dias até o vencimento do boleto.
-const BOLETO_DIAS_VENCIMENTO = 3;
 
 /** Reais (number, 2 casas) → centavos inteiro. Gotcha nº 1 do PagBank. */
 function centavos(valorReais: number): number {
@@ -75,22 +69,6 @@ function mapChargeStatus(
   }
 }
 
-// payment_method.type do PagBank → nosso MetodoPagamento (p/ o webhook criar a
-// linha Pagamento quando ela ainda não existe).
-function metodoDoTipo(tipo: string | undefined): MetodoPagamento {
-  switch (tipo) {
-    case "CREDIT_CARD":
-    case "DEBIT_CARD":
-      return MetodoPagamento.CARTAO;
-    case "BOLETO":
-      return MetodoPagamento.BOLETO;
-    case "PIX":
-      return MetodoPagamento.PIX;
-    default:
-      return MetodoPagamento.PIX;
-  }
-}
-
 // payment_response.code de recusa (§ Motivos de compra negada) → frase PT. Sem a
 // tabela completa oficial, mapeia os casos conhecidos e cai num fallback amigável.
 export function mensagemRecusaPagbank(
@@ -123,23 +101,6 @@ function telefonePagbank(
   return { country: "55", area: d.slice(0, 2), number: d.slice(2), type: "MOBILE" };
 }
 
-// ISO 8601 com offset -03:00 (Brasil sem horário de verão) p/ expiration_date.
-function isoOffsetBrasil(d: Date): string {
-  const local = new Date(d.getTime() - 3 * 60 * 60 * 1000);
-  const p = (n: number, len = 2) => String(n).padStart(len, "0");
-  return (
-    `${local.getUTCFullYear()}-${p(local.getUTCMonth() + 1)}-${p(local.getUTCDate())}` +
-    `T${p(local.getUTCHours())}:${p(local.getUTCMinutes())}:${p(local.getUTCSeconds())}-03:00`
-  );
-}
-
-// YYYY-MM-DD (data local BR) p/ o vencimento do boleto.
-function dataBrasil(d: Date): string {
-  const local = new Date(d.getTime() - 3 * 60 * 60 * 1000);
-  const p = (n: number) => String(n).padStart(2, "0");
-  return `${local.getUTCFullYear()}-${p(local.getUTCMonth() + 1)}-${p(local.getUTCDate())}`;
-}
-
 type ChargeResponse = {
   id?: string;
   reference_id?: string;
@@ -153,13 +114,7 @@ type ChargeResponse = {
     type?: string;
     installments?: number;
     card?: { brand?: string };
-    boleto?: {
-      barcode?: string;
-      formatted_barcode?: string;
-      due_date?: string;
-    };
   };
-  links?: { rel?: string; href?: string; media?: string }[];
 };
 
 type OrderResponse = {
@@ -229,53 +184,9 @@ async function pagbankFetch(
 export const pagBankProvider: PaymentProvider = {
   nome: ProviderPagamento.PAGBANK,
 
-  async criarPagamentoPix(input: CriarPixInput): Promise<PixCriado> {
-    const expiraEm = new Date(Date.now() + PIX_EXPIRACAO_MIN * 60 * 1000);
-    const cpf = input.pagador.cpfCnpj?.replace(/\D/g, "") || null;
-    const nome =
-      [input.pagador.nome, input.pagador.sobrenome].filter(Boolean).join(" ") ||
-      input.pagador.email;
-
-    const body = {
-      reference_id: input.orderId,
-      customer: {
-        name: nome,
-        email: input.pagador.email,
-        ...(cpf ? { tax_id: cpf } : {}),
-      },
-      items: [
-        { name: input.descricao, quantity: 1, unit_amount: centavos(input.valor) },
-      ],
-      qr_codes: [
-        {
-          amount: { value: centavos(input.valor) },
-          expiration_date: isoOffsetBrasil(expiraEm),
-        },
-      ],
-      notification_urls: [NOTIFICATION_URL],
-    };
-
-    const data = (await pagbankFetch("/orders", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-      idempotencyKey: input.idempotencyKey ?? randomUUID(),
-    })) as OrderResponse;
-
-    const qr = data.qr_codes?.[0];
-    const pngLink =
-      qr?.links?.find((l) => l.rel === "QRCODE.PNG")?.href ?? null;
-    return {
-      // Antes do pagamento não há charge; guardamos o id do QR (o webhook depois
-      // reconcilia pelo reference_id e grava o charge.id).
-      externalId: qr?.id ?? data.id ?? "",
-      status: StatusPagamento.PENDENTE,
-      qrCode: qr?.text ?? null,
-      qrCodeBase64: null, // PagBank entrega o PNG por link, não base64 embutido
-      copiaECola: qr?.text ?? null,
-      ticketUrl: pngLink, // link do PNG do QR (fallback visual)
-      expiraEm: qr?.expiration_date ? new Date(qr.expiration_date) : expiraEm,
-    };
+  // Pix é exclusivo do Mercado Pago — o PagBank (card-only) não emite Pix.
+  async criarPagamentoPix(): Promise<PixCriado> {
+    throw new Error("Pix não é suportado pelo PagBank.");
   },
 
   async criarPagamentoCartao(input: CriarCartaoInput): Promise<CartaoCriado> {
@@ -351,82 +262,6 @@ export const pagBankProvider: PaymentProvider = {
     };
   },
 
-  async gerarBoleto(input: CriarBoletoInput): Promise<BoletoCriado> {
-    const cpf = input.pagador.cpfCnpj.replace(/\D/g, "");
-    const vencimento = new Date(
-      Date.now() + BOLETO_DIAS_VENCIMENTO * 24 * 60 * 60 * 1000,
-    );
-    const end = input.pagador.endereco;
-
-    const body = {
-      reference_id: input.orderId,
-      customer: {
-        name: input.pagador.nome,
-        email: input.pagador.email,
-        tax_id: cpf,
-      },
-      items: [
-        { name: input.descricao, quantity: 1, unit_amount: centavos(input.valor) },
-      ],
-      charges: [
-        {
-          reference_id: input.orderId,
-          description: input.descricao,
-          amount: { value: centavos(input.valor), currency: "BRL" },
-          payment_method: {
-            type: "BOLETO",
-            boleto: {
-              due_date: dataBrasil(vencimento),
-              instruction_lines: {
-                line_1: "Pagamento processado para a Guppy de Linhagem",
-                line_2: "Não receber após o vencimento",
-              },
-              holder: {
-                name: input.pagador.nome,
-                tax_id: cpf,
-                email: input.pagador.email,
-                address: {
-                  street: end.logradouro,
-                  number: end.numero,
-                  locality: end.bairro || end.cidade,
-                  city: end.cidade,
-                  region_code: end.uf,
-                  country: "Brasil",
-                  postal_code: end.cep.replace(/\D/g, ""),
-                },
-              },
-            },
-          },
-        },
-      ],
-      notification_urls: [NOTIFICATION_URL],
-    };
-
-    const data = (await pagbankFetch("/orders", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-      idempotencyKey: input.idempotencyKey ?? randomUUID(),
-    })) as OrderResponse;
-
-    const charge = data.charges?.[0];
-    const boleto = charge?.payment_method?.boleto;
-    const pdf =
-      charge?.links?.find(
-        (l) => l.rel === "SELF" && l.media === "application/pdf",
-      )?.href ??
-      charge?.links?.find((l) => (l.href ?? "").includes(".pdf"))?.href ??
-      null;
-    return {
-      externalId: charge?.id ?? "",
-      status: mapChargeStatus(charge?.status),
-      linhaDigitavel: boleto?.formatted_barcode ?? null,
-      codigoBarras: boleto?.barcode ?? null,
-      linkPdf: pdf,
-      vencimento: boleto?.due_date ? new Date(boleto.due_date) : vencimento,
-    };
-  },
-
   async consultarPagamento(externalId: string): Promise<PixConsulta> {
     // Aceita id de ORDER (ORDE_) ou de CHARGE (CHAR_). O webhook manda o id do
     // pedido; estorno/poll usam o id da charge. Fonte da verdade sempre no PagBank.
@@ -455,7 +290,7 @@ export const pagBankProvider: PaymentProvider = {
             : order.qr_codes?.[0]?.amount?.value != null
               ? (order.qr_codes[0].amount!.value as number) / 100
               : null,
-        metodo: metodoDoTipo(charge?.payment_method?.type),
+        metodo: MetodoPagamento.CARTAO, // card-only
         parcelas: charge?.payment_method?.installments ?? null,
         bandeira: charge?.payment_method?.card?.brand ?? null,
       };
@@ -467,7 +302,7 @@ export const pagBankProvider: PaymentProvider = {
       status: mapChargeStatus(charge.status, charge.amount?.summary?.refunded),
       externalReference: charge.reference_id ?? null,
       valor: charge.amount?.value != null ? charge.amount.value / 100 : null,
-      metodo: metodoDoTipo(charge.payment_method?.type),
+      metodo: MetodoPagamento.CARTAO, // card-only
       parcelas: charge.payment_method?.installments ?? null,
       bandeira: charge.payment_method?.card?.brand ?? null,
     };

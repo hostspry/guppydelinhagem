@@ -113,36 +113,6 @@ export interface EstornoCriado {
   status: string | null; // status do refund (ex.: "approved")
 }
 
-// ── Boleto (PagBank) — compensa em 1–3 dias úteis; pedido fica AGUARDANDO ──────
-export interface CriarBoletoInput {
-  orderId: string; // vira reference_id
-  valor: number; // BRL (recalculado no servidor)
-  descricao: string;
-  pagador: {
-    nome: string;
-    email: string;
-    cpfCnpj: string; // só dígitos — obrigatório no boleto
-    endereco: {
-      cep: string; // só dígitos
-      uf: string;
-      cidade: string;
-      bairro?: string | null;
-      logradouro: string;
-      numero: string;
-    };
-  };
-  idempotencyKey?: string;
-}
-
-export interface BoletoCriado {
-  externalId: string; // charge.id do gateway
-  status: StatusPagamento; // normalmente PENDENTE (WAITING) até compensar
-  linhaDigitavel: string | null; // formatted_barcode (copia p/ o banco)
-  codigoBarras: string | null; // barcode (numérico)
-  linkPdf: string | null; // href do PDF do boleto
-  vencimento: Date | null;
-}
-
 // ── Sessão 3DS (PagBank) — criada no servidor, consumida pelo SDK no navegador ─
 export interface Sessao3ds {
   session: string; // valor usado pelo SDK 3DS no navegador
@@ -200,11 +170,6 @@ export interface PaymentProvider {
    * Só o Mercado Pago (Wallet) suporta de fato; os demais providers lançam.
    */
   criarPreferencia(input: CriarPreferenciaInput): Promise<PreferenciaCriada>;
-  /**
-   * Gera um boleto (charges[] type BOLETO). Devolve linha digitável + PDF. Opcional
-   * — só o PagBank implementa nesta fase.
-   */
-  gerarBoleto?(input: CriarBoletoInput): Promise<BoletoCriado>;
   /**
    * Cria uma sessão de autenticação 3DS (POST /checkout-sdk/sessions) p/ o SDK do
    * navegador rodar o 3-D Secure. Opcional — só o PagBank implementa.
