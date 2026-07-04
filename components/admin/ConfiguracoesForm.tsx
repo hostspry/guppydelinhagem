@@ -286,13 +286,13 @@ export function ConfiguracoesForm({
             className="h-4 w-4 accent-[#FF035C]"
           />
           <span className="text-sm text-gray-700">
-            Oferecer PagBank no checkout (cartão, Pix e boleto)
+            Oferecer cartão de crédito via PagBank no checkout
           </span>
         </label>
         <p className="text-xs text-gray-500 mt-2 leading-snug max-w-md">
-          Liga as opções de pagamento pelo PagBank como alternativa ao Mercado
-          Pago. Desligado, as opções PagBank somem do checkout. Requer as chaves
-          do PagBank configuradas no servidor.
+          Liga o cartão de crédito pelo PagBank como 2º adquirente (para
+          recuperar cartão recusado pelo Mercado Pago). Desligado, a opção some
+          do checkout. Requer a chave pública do PagBank configurada no servidor.
         </p>
       </div>
 
