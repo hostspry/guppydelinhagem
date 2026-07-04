@@ -9,23 +9,19 @@ import type {
   PaymentProvider,
   PixCriado,
   PixConsulta,
-  CriarCartaoInput,
   CartaoCriado,
   EstornoCriado,
+  CriarPreferenciaInput,
   PreferenciaCriada,
-  Sessao3ds,
 } from "../provider";
-import {
-  pagbankApiBase,
-  pagbankSdkBase,
-  pagbankToken,
-} from "./config";
+import { pagbankApiBase, pagbankToken } from "./config";
 
-// Provider PagBank — Order API (POST /orders): cria e paga em uma requisição.
-// Escopo card-only: só CARTÃO (com 3DS). Existe como 2º adquirente pra recuperar
-// cartão recusado pela antifraude do Mercado Pago. Pix é exclusivo do MP e boleto
-// foi descontinuado neste provider. Token Bearer server-only (nunca vai ao client
-// — `server-only` quebra o build se importado de Client Component).
+// Provider PagBank — Checkout hospedado (POST /checkouts): o cliente digita o
+// cartão na PÁGINA do PagBank (que cuida de criptografia, 3DS e antifraude) e
+// volta pro site. Escopo card-only: existe como 2º adquirente pra recuperar cartão
+// recusado pela antifraude do Mercado Pago. Pix é exclusivo do MP e boleto foi
+// descontinuado. Token Bearer server-only (nunca vai ao client — `server-only`
+// quebra o build se importado de Client Component).
 //
 // Doc: developer.pagbank.com.br — Pedidos e pagamentos (Order). TODOS os valores
 // monetários vão em CENTAVOS (inteiro): R$ 342,00 → 34200 (gotcha nº 1 vs. o MP,
@@ -67,38 +63,6 @@ function mapChargeStatus(
     default:
       return StatusPagamento.PENDENTE;
   }
-}
-
-// payment_response.code de recusa (§ Motivos de compra negada) → frase PT. Sem a
-// tabela completa oficial, mapeia os casos conhecidos e cai num fallback amigável.
-export function mensagemRecusaPagbank(
-  code: string | null | undefined,
-): string {
-  switch (code) {
-    case "10000":
-      return "Pagamento não autorizado pelo emissor. Tente outro cartão.";
-    case "10001":
-      return "Saldo ou limite insuficiente.";
-    case "10002":
-      return "Cartão vencido. Confira a validade ou use outro.";
-    case "10003":
-      return "Código de segurança (CVV) incorreto.";
-    case "10004":
-      return "Dados do cartão incorretos. Confira e tente de novo.";
-    case "10006":
-      return "Autorize o pagamento com o emissor do seu cartão e tente de novo.";
-    default:
-      return "Pagamento recusado. Tente outro cartão.";
-  }
-}
-
-// Telefone BR (só dígitos) → objeto phones[] do PagBank. <10 dígitos → null.
-function telefonePagbank(
-  tel: string | null | undefined,
-): { country: string; area: string; number: string; type: "MOBILE" } | null {
-  const d = (tel ?? "").replace(/\D/g, "");
-  if (d.length < 10) return null;
-  return { country: "55", area: d.slice(0, 2), number: d.slice(2), type: "MOBILE" };
 }
 
 type ChargeResponse = {
@@ -189,77 +153,13 @@ export const pagBankProvider: PaymentProvider = {
     throw new Error("Pix não é suportado pelo PagBank.");
   },
 
-  async criarPagamentoCartao(input: CriarCartaoInput): Promise<CartaoCriado> {
-    if (!input.cartaoCriptografado) {
-      throw new Error("Cartão não criptografado.");
-    }
-    const cpf = input.pagador.cpfCnpj?.replace(/\D/g, "") || null;
-    const nome =
-      [input.pagador.nome, input.pagador.sobrenome].filter(Boolean).join(" ") ||
-      input.pagador.email;
-    const phone = telefonePagbank(input.pagador.telefone);
-
-    const body = {
-      reference_id: input.orderId,
-      customer: {
-        name: nome,
-        email: input.pagador.email,
-        ...(cpf ? { tax_id: cpf } : {}),
-        ...(phone ? { phones: [phone] } : {}),
-      },
-      items: [
-        { name: input.descricao, quantity: 1, unit_amount: centavos(input.valor) },
-      ],
-      charges: [
-        {
-          reference_id: input.orderId,
-          description: input.descricao,
-          amount: { value: centavos(input.valor), currency: "BRL" },
-          payment_method: {
-            type: "CREDIT_CARD",
-            installments: input.installments,
-            capture: true,
-            card: {
-              encrypted: input.cartaoCriptografado,
-              store: false,
-            },
-            holder: {
-              name: input.holderNome || nome,
-              ...(cpf ? { tax_id: cpf } : {}),
-            },
-            // 3DS: só envia se a autenticação foi concluída no navegador (§7).
-            ...(input.threeDsId
-              ? {
-                  authentication_method: {
-                    type: "THREEDS",
-                    id: input.threeDsId,
-                  },
-                }
-              : {}),
-          },
-        },
-      ],
-      notification_urls: [NOTIFICATION_URL],
-    };
-
-    const data = (await pagbankFetch("/orders", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-      idempotencyKey: input.idempotencyKey ?? randomUUID(),
-    })) as OrderResponse;
-
-    const charge = data.charges?.[0];
-    return {
-      externalId: charge?.id ?? "",
-      status: mapChargeStatus(
-        charge?.status,
-        charge?.amount?.summary?.refunded,
-      ),
-      statusDetail: charge?.payment_response?.code ?? null,
-      parcelas: charge?.payment_method?.installments ?? input.installments,
-      bandeira: charge?.payment_method?.card?.brand ?? null,
-    };
+  // Cobrança direta de cartão não é suportada: o cartão é digitado na página
+  // hospedada do PagBank (ver criarPreferencia → POST /checkouts). Isso tira do
+  // nosso front a criptografia e o 3DS (que davam 400) e reduz o escopo PCI.
+  async criarPagamentoCartao(): Promise<CartaoCriado> {
+    throw new Error(
+      "Cartão direto não é suportado pelo PagBank; use o checkout hospedado.",
+    );
   },
 
   async consultarPagamento(externalId: string): Promise<PixConsulta> {
@@ -324,22 +224,64 @@ export const pagBankProvider: PaymentProvider = {
     return { refundId: data.id ?? chargeId, status: data.status ?? null };
   },
 
-  async criar3dsSession(): Promise<Sessao3ds> {
-    // POST /checkout-sdk/sessions no HOST do SDK (não na base da Order API). Sem
-    // corpo. A sessão vale ~30 min e é consumida pelo SDK 3DS no navegador.
-    const data = (await pagbankFetch("/checkout-sdk/sessions", {
-      method: "POST",
-      base: pagbankSdkBase(),
-      headers: { "Content-Type": "application/json" },
-    })) as { session?: string; expires_at?: number };
-    if (!data.session) {
-      throw new Error("Não foi possível iniciar a autenticação 3DS.");
-    }
-    return { session: data.session, expiresAt: data.expires_at ?? null };
-  },
+  // Checkout hospedado (POST /checkouts): cria a página de pagamento do PagBank
+  // restrita a CARTÃO e devolve o link (links[] rel PAY) pra redirecionar o
+  // cliente. O PagBank cuida da digitação do cartão + 3DS + antifraude; a
+  // confirmação volta pelo webhook (notification_urls). Valores em centavos.
+  async criarPreferencia(
+    input: CriarPreferenciaInput,
+  ): Promise<PreferenciaCriada> {
+    const cpf = input.pagador.cpfCnpj?.replace(/\D/g, "") || null;
+    const nome =
+      [input.pagador.nome, input.pagador.sobrenome].filter(Boolean).join(" ") ||
+      input.pagador.email;
 
-  // Checkout Pro (Wallet) é exclusivo do Mercado Pago — não faz parte do PagBank.
-  async criarPreferencia(): Promise<PreferenciaCriada> {
-    throw new Error("Checkout Pro não é suportado pelo PagBank.");
+    const body = {
+      reference_id: input.orderId,
+      customer: {
+        name: nome,
+        email: input.pagador.email,
+        ...(cpf ? { tax_id: cpf } : {}),
+      },
+      items: input.itens.map((it) => ({
+        name: it.title,
+        quantity: it.quantity,
+        unit_amount: centavos(it.unitPrice),
+      })),
+      // Card-only na página hospedada (Pix é do MP; boleto descontinuado).
+      payment_methods: [{ type: "CREDIT_CARD" }],
+      ...(input.installmentsLimit
+        ? {
+            payment_methods_configs: [
+              {
+                type: "CREDIT_CARD",
+                config_options: [
+                  {
+                    option: "INSTALLMENTS_LIMIT",
+                    value: String(input.installmentsLimit),
+                  },
+                ],
+              },
+            ],
+          }
+        : {}),
+      // Cliente volta pra cá após pagar; a confirmação real vem do webhook.
+      redirect_url: input.backUrls.success,
+      notification_urls: [NOTIFICATION_URL],
+      payment_notification_urls: [NOTIFICATION_URL],
+    };
+
+    const data = (await pagbankFetch("/checkouts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      idempotencyKey: input.idempotencyKey ?? randomUUID(),
+    })) as { id?: string; links?: { rel?: string; href?: string }[] };
+
+    const pay = data.links?.find((l) => l.rel === "PAY")?.href ?? null;
+    if (!pay) {
+      throw new Error("Não foi possível iniciar o checkout do PagBank.");
+    }
+    return { preferenceId: data.id ?? "", initPoint: pay };
   },
 };

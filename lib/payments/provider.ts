@@ -113,15 +113,10 @@ export interface EstornoCriado {
   status: string | null; // status do refund (ex.: "approved")
 }
 
-// ── Sessão 3DS (PagBank) — criada no servidor, consumida pelo SDK no navegador ─
-export interface Sessao3ds {
-  session: string; // valor usado pelo SDK 3DS no navegador
-  expiresAt: number | null; // epoch ms (sessão vale ~30 min)
-}
-
-// ── Checkout Pro (Wallet) — pagamento no ambiente do próprio Mercado Pago ──────
-// O cliente paga logado (saldo/cartões salvos); o MP aprova mais. Cria-se uma
-// "preference" e o cliente é levado ao init_point. A confirmação vem do webhook.
+// ── Checkout hospedado (redirect) — pagamento no ambiente do próprio gateway ────
+// O cliente é levado ao init_point/link de pagamento e paga fora do site. A
+// confirmação vem do webhook. Mercado Pago = Checkout Pro (Wallet); PagBank =
+// Checkout hospedado (POST /checkouts) restrito a cartão (card-only).
 export interface PreferenciaItem {
   id: string;
   title: string;
@@ -130,7 +125,7 @@ export interface PreferenciaItem {
 }
 
 export interface CriarPreferenciaInput {
-  orderId: string; // vira external_reference
+  orderId: string; // vira external_reference / reference_id
   itens: PreferenciaItem[];
   pagador: {
     nome?: string | null;
@@ -139,12 +134,15 @@ export interface CriarPreferenciaInput {
     cpfCnpj?: string | null;
   };
   backUrls: { success: string; failure: string; pending: string };
+  // Teto de parcelas do cartão (PagBank: payment_methods_configs). MP ignora
+  // (o Checkout Pro define o parcelamento pelas regras da conta).
+  installmentsLimit?: number;
   idempotencyKey?: string;
 }
 
 export interface PreferenciaCriada {
   preferenceId: string;
-  initPoint: string; // URL do ambiente do MP p/ redirecionar o cliente
+  initPoint: string; // URL do gateway p/ redirecionar o cliente
 }
 
 export interface PaymentProvider {
@@ -165,14 +163,10 @@ export interface PaymentProvider {
     opts?: { idempotencyKey?: string },
   ): Promise<EstornoCriado>;
   /**
-   * Cria uma preference (Checkout Pro) e devolve o init_point p/ redirecionar o
-   * cliente ao ambiente do MP. Valor/itens vêm do banco; external_reference = orderId.
-   * Só o Mercado Pago (Wallet) suporta de fato; os demais providers lançam.
+   * Cria um checkout hospedado e devolve o init_point p/ redirecionar o cliente ao
+   * ambiente do gateway. Valor/itens vêm do banco; reference_id = orderId. MP =
+   * Checkout Pro (Wallet); PagBank = POST /checkouts (card-only). A confirmação
+   * vem do webhook.
    */
   criarPreferencia(input: CriarPreferenciaInput): Promise<PreferenciaCriada>;
-  /**
-   * Cria uma sessão de autenticação 3DS (POST /checkout-sdk/sessions) p/ o SDK do
-   * navegador rodar o 3-D Secure. Opcional — só o PagBank implementa.
-   */
-  criar3dsSession?(): Promise<Sessao3ds>;
 }

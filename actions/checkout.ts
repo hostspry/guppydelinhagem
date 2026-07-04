@@ -12,7 +12,6 @@ import {
 import { calcularPesoECaixa, cotarFrete } from "@/lib/shipping";
 import { getPaymentProvider } from "@/lib/payments/registry";
 import { mensagemRecusa } from "@/lib/payments/mercadopago";
-import { mensagemRecusaPagbank } from "@/lib/payments/pagbank";
 import { transicionarParaPago } from "@/lib/pedido-baixa";
 import { calcularPrecos } from "@/lib/precos";
 import {
@@ -1567,153 +1566,88 @@ export async function pagarComCartao(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// PagBank — segundo adquirente, ESCOPO CARD-ONLY (cartão com 3DS). Existe pra
-// recuperar cartão recusado pela antifraude do MP. Pix é sempre do Mercado Pago e
-// boleto foi descontinuado aqui. Reusa o MESMO criarOrderDoCheckout (pedido/preço/
-// frete recalculados no servidor); só troca o provider na emissão. Valores em BRL
-// aqui — o provider converte p/ centavos (gotcha nº 1 do PagBank).
+// PagBank — 2º adquirente, ESCOPO CARD-ONLY via CHECKOUT HOSPEDADO. Existe pra
+// recuperar cartão recusado pela antifraude do MP. O cliente digita o cartão na
+// PÁGINA do PagBank (que cuida de criptografia, 3DS e antifraude) e volta pra cá;
+// a confirmação vem do WEBHOOK. Pix é sempre do MP e boleto foi descontinuado.
+// Reusa o MESMO criarOrderDoCheckout (pedido/preço/frete recalculados no servidor).
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Cria uma sessão de autenticação 3DS no PagBank p/ o SDK do navegador rodar o
- * 3-D Secure antes de cobrar o cartão. Pública, leve. A sessão vale ~30 min.
+ * Checkout hospedado do PagBank (cartão): cria/reusa o Order e cria um checkout no
+ * PagBank RESTRITO a cartão, com o valor DO BANCO (cartão cheio) + reference_id =
+ * orderId. Devolve o link (initPoint) pro client redirecionar à página do PagBank.
+ * A confirmação vem do WEBHOOK (nunca do retorno). Pedido fica AGUARDANDO até lá.
  */
-export async function criar3dsSessionPagbank(): Promise<
-  { ok: true; session: string } | { ok: false; error: string }
-> {
-  try {
-    const provider = getPaymentProvider(ProviderPagamento.PAGBANK);
-    if (!provider.criar3dsSession) {
-      return { ok: false, error: "Autenticação 3DS indisponível." };
-    }
-    const s = await provider.criar3dsSession();
-    return { ok: true, session: s.session };
-  } catch (e) {
-    console.error("[checkout] 3ds session pagbank", e);
-    return {
-      ok: false,
-      error:
-        e instanceof Error ? e.message : "Não foi possível iniciar a autenticação.",
-    };
-  }
-}
-
-// Dados do cartão PagBank vindos do navegador: cartão JÁ criptografado (nunca
-// PAN/CVV no backend) + id do 3DS concluído (§7). O 3DS pendente/desafio NÃO
-// chega aqui — o navegador só envia após AUTH_FLOW_COMPLETED (ou sem 3DS quando
-// o cartão não é elegível).
-export type CartaoPagbankInput = {
-  cartaoCriptografado: string;
-  holderNome: string;
-  installments: number;
-  threeDsId?: string | null;
-};
-
-/**
- * Cartão PagBank: cria o Order (helper compartilhado) e cobra no cartão com o
- * cartão criptografado no navegador (+ 3DS quando houver). Mesmos três desfechos
- * do cartão do MP (status sempre da API do PagBank):
- *  - PAID → Pagamento PAGO + transiciona o pedido (baixa com trava); "aprovado".
- *  - IN_ANALYSIS → Pagamento EM_ANALISE, pedido segue AGUARDANDO; "analise".
- *  - DECLINED → Pagamento RECUSADO; "recusado" + mensagem (deixa tentar de novo).
- * NUNCA marca PAGO em 3DS pendente (o navegador não submete nesse estado).
- */
-export async function pagarComCartaoPagbank(
+export async function iniciarCheckoutPagbank(
   input: CheckoutFormInput,
-  cartao: CartaoPagbankInput,
-): Promise<CartaoDesfecho> {
-  const parcelas = Number(cartao.installments);
+): Promise<CheckoutProResult> {
+  const order = await criarOrderDoCheckout(input);
+  if (!order.ok) {
+    return { ok: false, error: order.error, fieldErrors: order.fieldErrors };
+  }
+
+  const { orderId, numero, valorCartao, pagador, itens } = order.data;
+  const numeroLimpo = numero.replace(/^#/, "");
+
+  // Itens do checkout = itens do pedido (preço efetivo do cartão) + frete como
+  // linha separada, pra a soma bater exatamente com o total do banco (valorCartao).
+  const somaItens = round2(
+    itens.reduce((a, it) => a + it.unitPrice * it.quantity, 0),
+  );
+  const frete = round2(valorCartao - somaItens);
+  const itensPref = [
+    ...itens.map((it) => ({
+      id: it.id,
+      title: it.title,
+      quantity: it.quantity,
+      unitPrice: it.unitPrice,
+    })),
+    ...(frete > 0
+      ? [{ id: "frete", title: "Frete", quantity: 1, unitPrice: frete }]
+      : []),
+  ];
+
+  // Teto de parcelas (min 12 × menor parcelasMax do carrinho) → payment_methods_configs.
   const teto = await calcularTetoParcelas(
     (input.itens ?? []).map((i) => i.produtoId),
   );
-  if (!Number.isInteger(parcelas) || parcelas < 1 || parcelas > teto) {
-    return { resultado: "erro", mensagem: "Opção de parcelamento inválida." };
-  }
-  if (!cartao.cartaoCriptografado) {
-    return { resultado: "erro", mensagem: "Dados do cartão incompletos." };
-  }
 
-  const order = await criarOrderDoCheckout(input);
-  if (!order.ok) {
-    return {
-      resultado: "erro",
-      mensagem: order.error,
-      fieldErrors: order.fieldErrors,
-    };
-  }
-  const { orderId, numero, valorCartao: valor, pagador } = order.data;
-
-  let pago;
   try {
     const provider = getPaymentProvider(ProviderPagamento.PAGBANK);
-    pago = await provider.criarPagamentoCartao({
+    const pref = await provider.criarPreferencia({
       orderId,
-      valor, // cartão cobra o CHEIO
-      descricao: `Pedido ${numero} — Guppy de Linhagem`,
-      cartaoCriptografado: cartao.cartaoCriptografado,
-      holderNome: cartao.holderNome,
-      threeDsId: cartao.threeDsId ?? null,
-      installments: parcelas,
-      pagador: {
-        email: pagador.email,
-        cpfCnpj: pagador.cpfCnpj,
-        nome: pagador.nome,
-        sobrenome: pagador.sobrenome,
-        telefone: order.data.telefone,
+      itens: itensPref,
+      pagador,
+      backUrls: {
+        success: `${SITE_URL}/pedido/${numeroLimpo}/analise`,
+        pending: `${SITE_URL}/pedido/${numeroLimpo}/analise`,
+        failure: `${SITE_URL}/pedido/${numeroLimpo}/falha`,
       },
+      installmentsLimit: teto,
     });
+    if (!pref.initPoint) {
+      // Sem link não há pra onde mandar o cliente → remove o órfão recém-criado.
+      if (!order.data.reused) {
+        await prisma.order.delete({ where: { id: orderId } }).catch(() => {});
+      }
+      return {
+        ok: false,
+        error: "Não foi possível iniciar o pagamento no PagBank.",
+      };
+    }
+    return { ok: true, initPoint: pref.initPoint, numero };
   } catch (e) {
-    console.error("[checkout] cobrar cartão pagbank", e);
+    console.error("[checkout] checkout pagbank", e);
     if (!order.data.reused) {
       await prisma.order.delete({ where: { id: orderId } }).catch(() => {});
     }
     return {
-      resultado: "erro",
-      mensagem:
-        e instanceof Error ? e.message : "Não foi possível processar o cartão.",
+      ok: false,
+      error:
+        e instanceof Error
+          ? e.message
+          : "Não foi possível iniciar o pagamento no PagBank.",
     };
   }
-
-  // Grava a linha Pagamento em TODOS os casos (PAGO/EM_ANALISE/RECUSADO). NUNCA
-  // guarda PAN/CVV/cartão criptografado — só o motivo (code) da resposta.
-  try {
-    await prisma.pagamento.create({
-      data: {
-        orderId,
-        provider: ProviderPagamento.PAGBANK,
-        metodo: MetodoPagamento.CARTAO,
-        status: pago.status,
-        valor,
-        externalId: pago.externalId,
-        parcelas: pago.parcelas,
-        bandeira: pago.bandeira,
-        payloadRaw: {
-          code: pago.statusDetail,
-          threeDs: cartao.threeDsId ? "sim" : "nao",
-        } as Prisma.InputJsonValue,
-      },
-    });
-  } catch (e) {
-    console.error("[checkout] gravar Pagamento cartão pagbank", e);
-  }
-
-  if (pago.status === StatusPagamento.PAGO) {
-    try {
-      await prisma.$transaction((tx) => transicionarParaPago(tx, orderId));
-      revalidatePath("/admin/produtos");
-      revalidatePath("/admin/pedidos");
-    } catch (e) {
-      console.error("[checkout] transicionar cartão pagbank aprovado", e);
-    }
-    return { resultado: "aprovado", numero };
-  }
-
-  if (pago.status === StatusPagamento.EM_ANALISE) {
-    return { resultado: "analise", numero };
-  }
-
-  return {
-    resultado: "recusado",
-    mensagem: mensagemRecusaPagbank(pago.statusDetail),
-  };
 }

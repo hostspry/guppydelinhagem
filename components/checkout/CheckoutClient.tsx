@@ -43,21 +43,16 @@ import {
   criarPedidoCheckout,
   pagarComCartao,
   iniciarCheckoutPro,
-  pagarComCartaoPagbank,
+  iniciarCheckoutPagbank,
   calcularTetoParcelas,
   validarCupom,
   resolverItensCarrinho,
   type CheckoutPixData,
   type CartaoInput,
-  type CartaoPagbankInput,
   type CarrinhoResolvido,
 } from "@/actions/checkout";
 import PixPanel from "@/components/checkout/PixPanel";
 import CardPaymentBrick from "@/components/checkout/CardPaymentBrick";
-import PagBankCardForm, {
-  type PagBankBilling,
-  type PagBankCustomer,
-} from "@/components/checkout/PagBankCardForm";
 
 export type CheckoutPrefill = {
   nome: string;
@@ -183,11 +178,7 @@ export default function CheckoutClient({
 }: {
   prefill: CheckoutPrefill;
   mpPublicKey: string | null;
-  pagbank: {
-    ativo: boolean;
-    publicKey: string | null;
-    env: "PROD" | "SANDBOX";
-  };
+  pagbank: { ativo: boolean };
   freteGratis: { ativo: boolean; acimaDe: number | null };
   retirada: { ativo: boolean; instrucoes: string | null };
 }) {
@@ -613,85 +604,41 @@ export default function CheckoutClient({
     });
   }
 
-  // ── PagBank ────────────────────────────────────────────────────────────────
-  // Valida o checkout (campos + frete) e devolve os dados normalizados p/ cobrar,
-  // ou null (com foco no primeiro erro). Reusado por Pix/boleto/cartão PagBank.
-  async function validarParaPagbank(): Promise<CamposOutput | null> {
-    const valido = await trigger();
-    if (!valido) {
-      const primeiro = FIELD_ORDER.find((f) => getFieldState(f).invalid);
-      if (primeiro) focarCampo(primeiro);
-      return null;
-    }
-    if (!isRetirada && (excedeCaixa || freteValor == null)) {
-      focarCampo("cep");
-      return null;
-    }
-    return getValues() as CamposOutput;
-  }
-
-  // Payload comum das actions PagBank a partir dos dados do form + carrinho.
-  function payloadPagbank(dados: CamposOutput) {
-    return {
-      ...dados,
-      complemento: dados.complemento ?? "",
-      tipoEntrega,
-      transportadora: (modalidade === "AEREO" ? "GOLLOG" : "JADLOG") as
-        | "GOLLOG"
-        | "JADLOG",
-      modalidadeFrete: modalidade,
-      cupomCodigo: cupom ?? "",
-      itens: itensPedido(),
-    };
-  }
-
-  // Validação + dados do comprador/endereço p/ o 3DS. Roda ANTES de cobrar (o
-  // PagBankCardForm chama isto, faz encrypt + 3DS e então onCartaoPagbank).
-  async function antesDePagarPagbank(): Promise<{
-    customer: PagBankCustomer;
-    billing: PagBankBilling | null;
-  }> {
-    const dados = await validarParaPagbank();
-    if (!dados) throw new Error("Revise os campos destacados.");
-    const customer: PagBankCustomer = {
-      nome: dados.nome,
-      email: dados.email,
-      cpf: (dados.cpfCnpj ?? "").replace(/\D/g, ""),
-      telefone: (dados.telefone ?? "").replace(/\D/g, ""),
-    };
-    const billing: PagBankBilling | null = isRetirada
-      ? null
-      : {
-          street: dados.logradouro ?? "",
-          number: dados.numero ?? "",
-          complement: dados.complemento ?? "",
-          city: dados.cidade ?? "",
-          regionCode: (dados.uf ?? "").toUpperCase(),
-          postalCode: (dados.cep ?? "").replace(/\D/g, ""),
-        };
-    return { customer, billing };
-  }
-
-  async function onCartaoPagbank(cartao: CartaoPagbankInput) {
+  // ── PagBank (checkout hospedado, card-only) ──────────────────────────────────
+  // Valida igual ao Pix/MP, cria o checkout no PagBank e redireciona o cliente à
+  // página do PagBank (onde ele digita o cartão). A confirmação vem do webhook
+  // (volta pra /analise, que faz o poll do status no banco).
+  function onCartaoPagbank() {
     setErro(null);
     setRecusa(null);
-    const dados = getValues() as CamposOutput;
-    trackAddPaymentInfo(gaItens(), totalCartao, "cartao");
-    const res = await pagarComCartaoPagbank(payloadPagbank(dados), cartao);
-    if (res.resultado === "aprovado") {
-      router.push(`/pedido/${res.numero.replace(/^#/, "")}/sucesso`);
-      return;
-    }
-    if (res.resultado === "analise") {
-      router.push(`/pedido/${res.numero.replace(/^#/, "")}/analise`);
-      return;
-    }
-    if (res.resultado === "recusado") {
-      setRecusa(res.mensagem);
-      throw new Error(res.mensagem);
-    }
-    setErro(res.mensagem);
-    throw new Error(res.mensagem);
+    startTransition(async () => {
+      const valido = await trigger();
+      if (!valido) {
+        const primeiro = FIELD_ORDER.find((f) => getFieldState(f).invalid);
+        if (primeiro) focarCampo(primeiro);
+        return;
+      }
+      if (!isRetirada && (excedeCaixa || freteValor == null)) {
+        focarCampo("cep");
+        return;
+      }
+      trackAddPaymentInfo(gaItens(), totalCartao, "cartao");
+      const dados = getValues();
+      const res = await iniciarCheckoutPagbank({
+        ...dados,
+        complemento: dados.complemento ?? "",
+        tipoEntrega,
+        transportadora: modalidade === "AEREO" ? "GOLLOG" : "JADLOG",
+        modalidadeFrete: modalidade,
+        cupomCodigo: cupom ?? "",
+        itens: itensPedido(),
+      });
+      if (res.ok) {
+        window.location.href = res.initPoint; // sai do site pro ambiente do PagBank
+      } else {
+        setErro(res.error);
+      }
+    });
   }
 
   // ── Hidratação / carrinho vazio ──
@@ -1577,13 +1524,9 @@ export default function CheckoutClient({
               )}
             </div>
           ) : (
-            // Cartão via PagBank (criptografado no browser + 3DS) — card-only
+            // Cartão via PagBank — checkout hospedado (redireciona pro PagBank)
             <div className="space-y-2">
-              {!pagbank.publicKey ? (
-                <p className="text-xs text-amber-700">
-                  Cartão PagBank indisponível no momento. Use o Pix.
-                </p>
-              ) : excedeCaixa ? (
+              {excedeCaixa ? (
                 <p className="text-xs text-amber-700">
                   Acima de {maxPeixes} peixes, finalize no WhatsApp.
                 </p>
@@ -1593,23 +1536,24 @@ export default function CheckoutClient({
                   Calcule o frete pelo seu CEP para ver as parcelas do cartão.
                 </p>
               ) : (
-                <PagBankCardForm
-                  publicKey={pagbank.publicKey}
-                  sdkEnv={pagbank.env}
-                  amount={totalCartao}
-                  maxInstallments={teto}
-                  antesDePagar={antesDePagarPagbank}
-                  onPagar={onCartaoPagbank}
-                  onErro={(m) => setErro(m || null)}
-                />
-              )}
-              {recusa && (
-                <p
-                  role="alert"
-                  className="text-xs text-red-700 bg-red-50 border border-red-200 rounded-md p-2"
-                >
-                  {recusa}
-                </p>
+                <>
+                  <button
+                    type="button"
+                    onClick={onCartaoPagbank}
+                    disabled={pending}
+                    className="w-full inline-flex items-center justify-center gap-2 bg-secondary text-white text-sm font-semibold py-3 rounded-pill hover:brightness-110 disabled:opacity-60 disabled:cursor-not-allowed transition-all"
+                  >
+                    {pending ? (
+                      <Loader2 size={16} className="animate-spin" aria-hidden="true" />
+                    ) : (
+                      <CreditCard size={16} aria-hidden="true" />
+                    )}
+                    {pending ? "Abrindo o PagBank…" : "Pagar com cartão (PagBank)"}
+                  </button>
+                  <p className="text-[11px] text-muted-foreground text-center leading-snug">
+                    Você paga no ambiente seguro do PagBank e volta pra cá.
+                  </p>
+                </>
               )}
             </div>
           )}
