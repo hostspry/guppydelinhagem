@@ -13,7 +13,11 @@ import { transicionarParaPago, ajustarPoolEstoque } from "@/lib/pedido-baixa";
 import { aplicarEstornoPedido } from "@/lib/pagamento-estorno";
 import { getPaymentProvider } from "@/lib/payments/registry";
 import { COMPOSICAO_LABEL } from "@/lib/composicoes";
-import type { Prisma, OrderStatus } from "@/lib/generated/prisma/client";
+import type {
+  Prisma,
+  OrderStatus,
+  Transportadora,
+} from "@/lib/generated/prisma/client";
 import {
   type ActionResult,
   assertAuthorized,
@@ -320,6 +324,135 @@ export async function atualizarStatusPedido(
   revalidatePath("/admin/pedidos");
   revalidatePath(`/admin/pedidos/${id}`);
   return { success: true, message: "Status atualizado." };
+}
+
+const TRANSPORTADORAS_VALIDAS = ["JADLOG", "GOLLOG", "OUTRO"];
+
+/**
+ * Registra o envio MANUAL de um pedido PAGO (código digitado — Gollog, ou fallback
+ * quando a etiqueta foi comprada fora do site). ATÔMICO: grava transportadora +
+ * código + enviadoEm + status ENVIADO e cria o RastreioEvento + a Notificacao do
+ * cliente na MESMA transação (mesmo estado final do fluxo automático de etiqueta).
+ * Respeita a máquina de estados (só a partir de PAGO).
+ */
+export async function registrarEnvioManual(
+  id: string,
+  input: { transportadora: string; codigo: string },
+): Promise<ActionResult> {
+  await assertAuthorized();
+
+  if (!TRANSPORTADORAS_VALIDAS.includes(input.transportadora)) {
+    return { success: false, error: "Transportadora inválida." };
+  }
+  const transportadora = input.transportadora as Transportadora;
+  const codigo = (input.codigo ?? "").trim();
+  if (transportadora !== "OUTRO" && !codigo) {
+    return { success: false, error: "Informe o código de rastreio." };
+  }
+
+  const order = await prisma.order.findUnique({
+    where: { id },
+    select: { status: true, numero: true, clienteId: true, userId: true },
+  });
+  if (!order) return { success: false, error: "Pedido não encontrado." };
+  if (!TRANSICOES_PEDIDO[order.status].includes("ENVIADO")) {
+    return {
+      success: false,
+      error: `Só dá para registrar envio a partir de PAGO (status atual: ${order.status}).`,
+    };
+  }
+
+  const via =
+    transportadora === "JADLOG"
+      ? " pela Jadlog"
+      : transportadora === "GOLLOG"
+        ? " pela Gollog"
+        : "";
+  const agora = new Date();
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      await tx.order.update({
+        where: { id },
+        data: {
+          status: "ENVIADO",
+          transportadora,
+          codigoRastreio: codigo || null,
+          enviadoEm: agora,
+          rastreioStatus: "posted",
+        },
+      });
+      await tx.rastreioEvento.create({
+        data: {
+          orderId: id,
+          status: "posted",
+          descricao: "Envio registrado manualmente.",
+          ocorridoEm: agora,
+        },
+      });
+      await tx.notificacao.create({
+        data: {
+          orderId: id,
+          clienteId: order.clienteId,
+          userId: order.userId,
+          tipo: "ENVIADO",
+          titulo: "Pedido enviado",
+          corpo: `Seu pedido ${order.numero} foi despachado${via}.${
+            codigo ? ` Código de rastreio: ${codigo}.` : ""
+          }`,
+        },
+      });
+    });
+  } catch (e) {
+    console.error(e);
+    return { success: false, error: "Erro ao registrar o envio." };
+  }
+
+  revalidatePath("/admin/pedidos");
+  revalidatePath(`/admin/pedidos/${id}`);
+  return {
+    success: true,
+    message: "Envio registrado. Pedido marcado como enviado.",
+  };
+}
+
+/**
+ * Corrige o rastreio de um pedido JÁ enviado (erro de digitação). NÃO mexe no
+ * status nem cria evento/notificação — é só correção.
+ */
+export async function atualizarRastreio(
+  id: string,
+  input: { transportadora: string; codigo: string },
+): Promise<ActionResult> {
+  await assertAuthorized();
+
+  if (!TRANSPORTADORAS_VALIDAS.includes(input.transportadora)) {
+    return { success: false, error: "Transportadora inválida." };
+  }
+  const transportadora = input.transportadora as Transportadora;
+  const codigo = (input.codigo ?? "").trim();
+
+  const order = await prisma.order.findUnique({
+    where: { id },
+    select: { status: true },
+  });
+  if (!order) return { success: false, error: "Pedido não encontrado." };
+  if (order.status !== "ENVIADO" && order.status !== "ENTREGUE") {
+    return { success: false, error: "Este pedido ainda não foi enviado." };
+  }
+
+  try {
+    await prisma.order.update({
+      where: { id },
+      data: { transportadora, codigoRastreio: codigo || null },
+    });
+  } catch (e) {
+    console.error(e);
+    return { success: false, error: "Erro ao atualizar o rastreio." };
+  }
+
+  revalidatePath(`/admin/pedidos/${id}`);
+  return { success: true, message: "Rastreio atualizado." };
 }
 
 /**

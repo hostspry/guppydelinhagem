@@ -4,6 +4,7 @@ import { Pencil } from "lucide-react";
 import { getPedidoById } from "@/lib/queries/pedidos";
 import { PageHeader } from "@/components/admin/PageHeader";
 import { StatusPedidoControl } from "@/components/admin/StatusPedidoControl";
+import { EnvioCard } from "@/components/admin/EnvioCard";
 import { EstornarButton } from "@/components/admin/EstornarButton";
 import { podeEditarItens } from "@/lib/pedido-status";
 import {
@@ -154,9 +155,25 @@ export default async function PedidoDetalhePage({ params }: Props) {
             </div>
           </div>
 
+          {/* Envio & rastreio — registro manual + WhatsApp + link de rastreio.
+              Na retirada não há envio a rastrear. */}
+          {pedido.tipoEntrega !== "RETIRADA" && (
+            <EnvioCard
+              id={pedido.id}
+              numero={pedido.numero}
+              status={pedido.status}
+              transportadora={pedido.transportadora}
+              codigoRastreio={pedido.codigoRastreio}
+              selfTracking={pedido.selfTracking}
+              etiquetaUrl={pedido.etiquetaUrl}
+              clienteNome={e.nome}
+              clienteTelefone={e.telefone}
+            />
+          )}
+
           <div className="bg-white border border-gray-200 rounded-lg p-5 text-sm space-y-1">
             <h2 className="text-xs font-semibold text-[#07366A] uppercase tracking-wide mb-2">
-              Envio &amp; pagamento
+              Entrega &amp; pagamento
             </h2>
             <p className="text-gray-600">
               Entrega:{" "}
@@ -173,24 +190,11 @@ export default async function PedidoDetalhePage({ params }: Props) {
               </span>
             </p>
             <p className="text-gray-600">
-              Transportadora:{" "}
-              <span className="text-[#07366A]">
-                {pedido.transportadora ?? "—"}
-              </span>
-            </p>
-            <p className="text-gray-600">
-              Rastreio:{" "}
-              <span className="text-[#07366A]">
-                {pedido.codigoRastreio ?? "—"}
-              </span>
-            </p>
-            <p className="text-gray-600">
               Forma de pagamento:{" "}
               <span className="text-[#07366A]">
                 {pedido.formaPagamento ?? "—"}
               </span>
             </p>
-            {/* "Gerar minuta" (Envio) e "Gerar cobrança" (Pagamentos) entram aqui. */}
           </div>
 
           {/* ── Reembolso / estorno ── */}
