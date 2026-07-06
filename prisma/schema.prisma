@@ -134,10 +134,11 @@ model User {
   ultimoLogin       DateTime?
   criadoEm          DateTime  @default(now())
 
-  enderecos Address[]
-  pedidos   Order[]
-  waitlist  WaitlistEntry[]
-  cliente   Cliente?
+  enderecos    Address[]
+  pedidos      Order[]
+  waitlist     WaitlistEntry[]
+  cliente      Cliente?
+  notificacoes Notificacao[]
 }
 
 model Address {
@@ -176,8 +177,9 @@ model Cliente {
   userId String? @unique // futuro: conta do cliente
   user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
 
-  pedidos  Order[]
-  criadoEm DateTime @default(now())
+  pedidos      Order[]
+  notificacoes Notificacao[]
+  criadoEm     DateTime      @default(now())
 
   @@index([nome])
 }
@@ -339,7 +341,11 @@ model Order {
 
   modalidadeFrete String? // 'TERRESTRE' (Jadlog) | 'AEREO' (Gollog) — como despachar
   tipoEntrega     TipoEntrega @default(ENVIO) // ENVIO (despacha) | RETIRADA (cliente busca)
-  codigoRastreio  String? // AWB (Gollog) ou código (Jadlog)
+  codigoRastreio  String? // AWB (Gollog) ou código da transportadora (Jadlog)
+  selfTracking    String? // código ME…BR (Melhor Rastreio) — o link do cliente
+  etiquetaUrl     String? // PDF da etiqueta gerada no Melhor Envio (print público)
+  rastreioStatus  String? // último status conhecido no ME (posted/delivered/…)
+  enviadoEm       DateTime? // quando virou ENVIADO (etiqueta gerada ou registro manual)
 
   // Cupom aplicado (opcional). cupomCodigo é snapshot (sobrevive à exclusão do cupom).
   cupomId     String?
@@ -357,12 +363,52 @@ model Order {
   criadoEm        DateTime        @default(now())
   atualizadoEm    DateTime        @updatedAt
 
-  items      OrderItem[]
-  pagamentos Pagamento[]
+  items           OrderItem[]
+  pagamentos      Pagamento[]
+  rastreioEventos RastreioEvento[]
+  notificacoes    Notificacao[]
 
   @@unique([ano, sequencia])
   @@index([clienteId])
   @@index([status])
+}
+
+// Histórico de rastreio de um pedido (uma linha por ocorrência do Melhor Envio).
+// O poll é idempotente: a unique (orderId, status, ocorridoEm) impede duplicar a
+// mesma ocorrência a cada varredura. Uma ocorrência nova = notificar o cliente.
+model RastreioEvento {
+  id         String   @id @default(cuid())
+  orderId    String
+  order      Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  status     String // status/ocorrência do ME (ex.: posted, in_transit, delivered)
+  descricao  String? // texto da ocorrência, quando o ME fornece
+  ocorridoEm DateTime // data da ocorrência (fonte: Melhor Envio)
+  criadoEm   DateTime @default(now())
+
+  @@unique([orderId, status, ocorridoEm])
+  @@index([orderId])
+}
+
+// Notificação ao cliente — CANAL-AGNÓSTICA. Hoje alimenta o feed do painel; e-mail
+// e WhatsApp (futuro) lêem daqui. Vinculada ao pedido e ao destinatário (cliente
+// guest e/ou user logado). `tipo`: "ENVIADO" | "STATUS" | "ENTREGUE".
+model Notificacao {
+  id        String   @id @default(cuid())
+  orderId   String?
+  order     Order?   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  clienteId String?
+  cliente   Cliente? @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tipo      String
+  titulo    String
+  corpo     String
+  lida      Boolean  @default(false)
+  criadoEm  DateTime @default(now())
+
+  @@index([clienteId])
+  @@index([userId])
+  @@index([orderId])
 }
 
 model OrderItem {
