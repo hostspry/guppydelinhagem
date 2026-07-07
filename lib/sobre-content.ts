@@ -88,35 +88,6 @@ export const ORG = {
   pais: "BR",
 } as const;
 
-/**
- * Objeto schema.org Organization montado dos dados confirmados (ORG + REDES).
- * `siteUrl` e `whatsappE164` vêm de quem chama (sem importar constantes externas
- * aqui, mantendo este arquivo só de dados). Campos não verificáveis ficam de fora.
- */
-export function organizationJsonLd(siteUrl: string, whatsappE164: string) {
-  return {
-    "@type": "Organization",
-    name: ORG.nome,
-    url: siteUrl,
-    logo: `${siteUrl}/logo.png`,
-    founder: { "@type": "Person", name: ORG.fundador },
-    foundingDate: ORG.fundacao,
-    areaServed: ORG.pais,
-    location: {
-      "@type": "Place",
-      address: {
-        "@type": "PostalAddress",
-        addressLocality: ORG.cidade,
-        addressRegion: ORG.uf,
-        addressCountry: ORG.pais,
-      },
-    },
-    contactPoint: {
-      "@type": "ContactPoint",
-      telephone: whatsappE164,
-      contactType: "customer service",
-      availableLanguage: "Portuguese",
-    },
-    sameAs: [REDES.youtube, REDES.instagram],
-  };
-}
+// O JSON-LD da organização (home OnlineStore + /sobre-nos AboutPage) é montado em
+// lib/seo/jsonld.ts, a partir DESTES dados (ORG, REDES, conquistas) — fonte única
+// de entidade, com @id compartilhado. Este arquivo permanece só de dados.
