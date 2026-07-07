@@ -394,6 +394,45 @@ export const getProductBySlug = cache(
   },
 );
 
+// Card enxuto do grid "Principais linhagens" do guia (/conheca-os-guppy).
+export type LinhagemGuiaCard = {
+  slug: string;
+  nome: string;
+  descricaoCurta: string | null;
+  thumb: string | null;
+};
+
+/**
+ * Produtos ativos da categoria de linhagens para o grid do guia. Destaques
+ * primeiro. Só o necessário para o card (slug, nome, descrição curta, thumb).
+ * O slug da categoria é o real do banco; se mudar, o grid apenas fica vazio
+ * (nunca linka para algo que não existe).
+ */
+export async function getLinhagensParaGuia(take = 6): Promise<LinhagemGuiaCard[]> {
+  const rows = await prisma.product.findMany({
+    where: { ativo: true, category: { slug: "linhagens-exclusivas" } },
+    orderBy: [{ destaque: "desc" }, { criadoEm: "desc" }],
+    take,
+    select: {
+      slug: true,
+      nome: true,
+      descricaoCurta: true,
+      videos: {
+        where: { ativo: true },
+        orderBy: [{ principal: "desc" }, { ordem: "asc" }],
+        take: 1,
+        select: { thumbnailUrl: true },
+      },
+    },
+  });
+  return rows.map((r) => ({
+    slug: r.slug,
+    nome: r.nome,
+    descricaoCurta: r.descricaoCurta,
+    thumb: r.videos[0]?.thumbnailUrl ?? null,
+  }));
+}
+
 /**
  * Produtos ativos para o sitemap: só slug + atualizadoEm (lastModified). Ordena
  * por atualização recente. Query enxuta — não carrega vídeos/variantes.

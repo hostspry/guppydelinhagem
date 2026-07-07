@@ -118,7 +118,7 @@ export function breadcrumbJsonLd(items: CrumbItem[]): Record<string, unknown> {
 // ── FAQPage ───────────────────────────────────────────────────────────────────
 export type QaPair = { pergunta: string; resposta: string };
 
-export function faqPageJsonLd(pares: QaPair[]): Record<string, unknown> {
+export function faqPageJsonLd(pares: readonly QaPair[]): Record<string, unknown> {
   return {
     "@context": "https://schema.org",
     "@type": "FAQPage",
