@@ -257,6 +257,7 @@ export type ProductDetail = {
   estoqueMachos: number; // pool (PEIXE)
   estoqueFemeas: number;
   categoria: string;
+  categoriaSlug: string;
   categoryId: string;
   tipo: ProductType;
   peso: number | null; // frete de não-peixe
@@ -320,7 +321,7 @@ export const getProductBySlug = cache(
         ph: true,
         alimentacao: true,
         expectativaVida: true,
-        category: { select: { nome: true } },
+        category: { select: { nome: true, slug: true } },
         videos: {
           where: { ativo: true }, // loja mostra só vídeos ativos
           orderBy: [{ principal: "desc" }, { ordem: "asc" }],
@@ -367,6 +368,7 @@ export const getProductBySlug = cache(
       estoqueMachos: p.estoqueMachos,
       estoqueFemeas: p.estoqueFemeas,
       categoria: p.category.nome,
+      categoriaSlug: p.category.slug,
       categoryId: p.categoryId,
       tipo: p.tipo,
       peso: p.peso == null ? null : Number(p.peso),
@@ -391,6 +393,20 @@ export const getProductBySlug = cache(
     };
   },
 );
+
+/**
+ * Produtos ativos para o sitemap: só slug + atualizadoEm (lastModified). Ordena
+ * por atualização recente. Query enxuta — não carrega vídeos/variantes.
+ */
+export function getActiveProductsForSitemap(): Promise<
+  { slug: string; atualizadoEm: Date }[]
+> {
+  return prisma.product.findMany({
+    where: { ativo: true },
+    orderBy: { atualizadoEm: "desc" },
+    select: { slug: true, atualizadoEm: true },
+  });
+}
 
 // ── Lista do admin (/admin/produtos): busca + categoria + ordenação ──────────
 export type ProdutoOrdem =
