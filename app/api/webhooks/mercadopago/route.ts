@@ -6,6 +6,10 @@ import { getPaymentProvider } from "@/lib/payments/registry";
 import { transicionarParaPago } from "@/lib/pedido-baixa";
 import { aplicarEstornoPedido } from "@/lib/pagamento-estorno";
 import {
+  notificarPedidoPago,
+  notificarPagamentoRecusado,
+} from "@/lib/notificacoes";
+import {
   ProviderPagamento,
   StatusPagamento,
   MetodoPagamento,
@@ -138,6 +142,8 @@ export async function POST(request: Request) {
 
   // ── 3. Atualizar Pagamento + (se aprovado) confirmar pedido, idempotente ──
   let mudouEstoque = false;
+  let confirmouPago = false;
+  let recusouAgora = false;
   try {
     const res = await prisma.$transaction(async (tx) => {
       // Atualiza a linha Pagamento deste id — ou CRIA, se não existir. No Checkout
@@ -145,8 +151,17 @@ export async function POST(request: Request) {
       // notificação chega; método/parcelas/bandeira/valor vêm da consulta ao MP.
       const existente = await tx.pagamento.findFirst({
         where: { externalId: consulta.externalId },
-        select: { id: true },
+        select: { id: true, status: true },
       });
+      const statusAnterior = existente?.status ?? null;
+      // Transição → recusado (cliente tentou e o cartão negou): lead quente. Só na
+      // TRANSIÇÃO — reenvio do mesmo recusado não re-notifica.
+      if (
+        consulta.status === StatusPagamento.RECUSADO &&
+        statusAnterior !== StatusPagamento.RECUSADO
+      ) {
+        recusouAgora = true;
+      }
       if (existente) {
         await tx.pagamento.update({
           where: { id: existente.id },
@@ -205,6 +220,7 @@ export async function POST(request: Request) {
       return { pago: false, baixou: false };
     });
     mudouEstoque = res.baixou;
+    confirmouPago = res.pago && res.baixou; // 1ª confirmação real
   } catch (e) {
     console.error("[mp-webhook] processar", e);
     return NextResponse.json({ received: true });
@@ -213,6 +229,17 @@ export async function POST(request: Request) {
   if (mudouEstoque) {
     revalidatePath("/admin/produtos");
     revalidatePath("/admin/pedidos");
+  }
+
+  // Notificações (fora da transação; helpers nunca lançam).
+  if (confirmouPago) {
+    await notificarPedidoPago(orderId, {
+      provider: ProviderPagamento.MERCADO_PAGO,
+      metodo: consulta.metodo ?? null,
+    });
+  }
+  if (recusouAgora) {
+    await notificarPagamentoRecusado(orderId);
   }
 
   // ── 4. 200 rápido ──

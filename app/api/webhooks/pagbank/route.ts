@@ -6,6 +6,10 @@ import { getPaymentProvider } from "@/lib/payments/registry";
 import { transicionarParaPago } from "@/lib/pedido-baixa";
 import { aplicarEstornoPedido } from "@/lib/pagamento-estorno";
 import {
+  notificarPedidoPago,
+  notificarPagamentoRecusado,
+} from "@/lib/notificacoes";
+import {
   ProviderPagamento,
   StatusPagamento,
   MetodoPagamento,
@@ -105,6 +109,8 @@ export async function POST(request: Request) {
 
   // ── 3. Upsert Pagamento + (se aprovado/estornado) convergir, idempotente ──
   let mudouEstoque = false;
+  let confirmouPago = false;
+  let recusouAgora = false;
   try {
     const res = await prisma.$transaction(async (tx) => {
       // Acha a linha Pagamento PagBank deste pedido: por externalId (charge.id) e,
@@ -116,7 +122,7 @@ export async function POST(request: Request) {
             provider: "PAGBANK",
             externalId: consulta.externalId,
           },
-          select: { id: true },
+          select: { id: true, status: true },
         })) ??
         (await tx.pagamento.findFirst({
           where: {
@@ -127,8 +133,16 @@ export async function POST(request: Request) {
             },
           },
           orderBy: { criadoEm: "desc" },
-          select: { id: true },
+          select: { id: true, status: true },
         }));
+      const statusAnterior = existente?.status ?? null;
+      // Transição → recusado: lead quente. Só na TRANSIÇÃO (reenvio não re-notifica).
+      if (
+        consulta.status === StatusPagamento.RECUSADO &&
+        statusAnterior !== StatusPagamento.RECUSADO
+      ) {
+        recusouAgora = true;
+      }
 
       if (existente) {
         await tx.pagamento.update({
@@ -186,6 +200,7 @@ export async function POST(request: Request) {
       return { pago: false, baixou: false };
     });
     mudouEstoque = res.baixou;
+    confirmouPago = res.pago && res.baixou; // 1ª confirmação real
   } catch (e) {
     console.error("[pagbank-webhook] processar", e);
     return NextResponse.json({ received: true });
@@ -194,6 +209,17 @@ export async function POST(request: Request) {
   if (mudouEstoque) {
     revalidatePath("/admin/produtos");
     revalidatePath("/admin/pedidos");
+  }
+
+  // Notificações (fora da transação; helpers nunca lançam).
+  if (confirmouPago) {
+    await notificarPedidoPago(orderId as string, {
+      provider: ProviderPagamento.PAGBANK,
+      metodo: consulta.metodo ?? null,
+    });
+  }
+  if (recusouAgora) {
+    await notificarPagamentoRecusado(orderId as string);
   }
 
   // ── 5. 200 rápido ──

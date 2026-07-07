@@ -12,6 +12,12 @@ import { TRANSICOES_PEDIDO, podeEditarItens } from "@/lib/pedido-status";
 import { transicionarParaPago, ajustarPoolEstoque } from "@/lib/pedido-baixa";
 import { aplicarEstornoPedido } from "@/lib/pagamento-estorno";
 import { getPaymentProvider } from "@/lib/payments/registry";
+import {
+  notificarPedidoEnviado,
+  notificarPedidoEntregue,
+  notificarPedidoCancelado,
+  notificarEstorno,
+} from "@/lib/notificacoes";
 import { COMPOSICAO_LABEL } from "@/lib/composicoes";
 import type {
   Prisma,
@@ -320,6 +326,12 @@ export async function atualizarStatusPedido(
     return { success: false, error: "Erro ao atualizar o status." };
   }
 
+  // Notificações (após a transição persistir; helpers nunca lançam). PAGO não
+  // notifica aqui — é confirmação manual do dono / o gateway já avisa.
+  if (novoStatus === "ENVIADO") await notificarPedidoEnviado(id);
+  else if (novoStatus === "ENTREGUE") await notificarPedidoEntregue(id);
+  else if (novoStatus === "CANCELADO") await notificarPedidoCancelado(id);
+
   revalidatePath("/admin/produtos");
   revalidatePath("/admin/pedidos");
   revalidatePath(`/admin/pedidos/${id}`);
@@ -408,6 +420,8 @@ export async function registrarEnvioManual(
     return { success: false, error: "Erro ao registrar o envio." };
   }
 
+  await notificarPedidoEnviado(id); // 🚚 (com transportadora + rastreio)
+
   revalidatePath("/admin/pedidos");
   revalidatePath(`/admin/pedidos/${id}`);
   return {
@@ -476,6 +490,7 @@ export async function estornarPedido(id: string): Promise<ActionResult> {
           status: true,
           externalId: true,
           estornadoEm: true,
+          valor: true,
         },
       },
     },
@@ -535,6 +550,8 @@ export async function estornarPedido(id: string): Promise<ActionResult> {
         "O estorno foi feito no Mercado Pago, mas houve um erro ao atualizar o pedido. Atualize a página.",
     };
   }
+
+  await notificarEstorno(id, Number(pago.valor)); // ↩️ (valor do banco)
 
   revalidatePath("/admin/produtos");
   revalidatePath("/admin/pedidos");

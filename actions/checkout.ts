@@ -13,6 +13,10 @@ import { calcularPesoECaixa, cotarFrete } from "@/lib/shipping";
 import { getPaymentProvider } from "@/lib/payments/registry";
 import { mensagemRecusa } from "@/lib/payments/mercadopago";
 import { transicionarParaPago } from "@/lib/pedido-baixa";
+import {
+  notificarTentativaCompra,
+  notificarPedidoPago,
+} from "@/lib/notificacoes";
 import { calcularPrecos } from "@/lib/precos";
 import {
   normalizarCodigo,
@@ -1132,6 +1136,10 @@ export async function criarPedidoCheckout(
       valor: order.data.valorPix, // Pix cobra o total COM desconto
       pagador: order.data.pagador,
     });
+    // 🛒 recuperação de venda — só na criação (não em regeneração de Pix).
+    if (!order.data.reused) {
+      await notificarTentativaCompra(order.data.orderId, "Pix");
+    }
     return { ok: true, data: pixData };
   } catch (e) {
     console.error("[checkout] criar Pix", e);
@@ -1210,6 +1218,9 @@ export async function iniciarCheckoutPro(
         ok: false,
         error: "Não foi possível iniciar o pagamento no Mercado Pago.",
       };
+    }
+    if (!order.data.reused) {
+      await notificarTentativaCompra(orderId, "Cartão (Mercado Pago)");
     }
     return { ok: true, initPoint: pref.initPoint, numero };
   } catch (e) {
@@ -1547,17 +1558,33 @@ export async function pagarComCartao(
   if (pago.status === StatusPagamento.PAGO) {
     // approved já vem na hora → transiciona aqui (trava evita baixa dupla quando
     // o webhook chegar com a mesma aprovação).
+    let baixou = false;
     try {
-      await prisma.$transaction((tx) => transicionarParaPago(tx, orderId));
+      const res = await prisma.$transaction((tx) =>
+        transicionarParaPago(tx, orderId),
+      );
+      baixou = res.baixou;
       revalidatePath("/admin/produtos");
       revalidatePath("/admin/pedidos");
     } catch (e) {
       console.error("[checkout] transicionar cartão aprovado", e);
     }
+    // 💰 só na PRIMEIRA confirmação (trava estoqueBaixado) — evita duplicar com
+    // o webhook que chega depois com a mesma aprovação.
+    if (baixou) {
+      await notificarPedidoPago(orderId, {
+        provider: ProviderPagamento.MERCADO_PAGO,
+        metodo: MetodoPagamento.CARTAO,
+      });
+    }
     return { resultado: "aprovado", numero };
   }
 
   if (pago.status === StatusPagamento.EM_ANALISE) {
+    // Cartão em processamento → mesmo gatilho de acompanhamento da tentativa.
+    if (!order.data.reused) {
+      await notificarTentativaCompra(orderId, "Cartão (em análise)");
+    }
     return { resultado: "analise", numero };
   }
 
@@ -1635,6 +1662,9 @@ export async function iniciarCheckoutPagbank(
         ok: false,
         error: "Não foi possível iniciar o pagamento no PagBank.",
       };
+    }
+    if (!order.data.reused) {
+      await notificarTentativaCompra(orderId, "Cartão (PagBank)");
     }
     return { ok: true, initPoint: pref.initPoint, numero };
   } catch (e) {
