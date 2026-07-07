@@ -4,11 +4,13 @@ import { ChevronDown } from "lucide-react";
 import PageBanner from "@/components/site/PageBanner";
 import CtaWhatsapp from "@/components/site/CtaWhatsapp";
 import { pageMeta } from "@/lib/seo";
+import { faqPageJsonLd } from "@/lib/seo/jsonld";
+import { JsonLd } from "@/components/seo/JsonLd";
 
 export const metadata: Metadata = pageMeta({
-  title: "Conheça o Guppy: cuidados, água, alimentação e linhagens | Guppy de Linhagem",
+  title: "Guia do Guppy (Lebiste): cuidados e linhagens | Guppy de Linhagem",
   description:
-    "Guia do guppy (Poecilia reticulata): temperatura e pH ideais, tamanho de aquário, alimentação, convivência e dúvidas frequentes de quem cria guppies de linhagem.",
+    "Guia do guppy (lebiste, Poecilia reticulata): temperatura, pH, aquário, alimentação e linhagens como Full Black e Koi, direto do criador tricampeão mundial.",
   path: "/conheca-os-guppy",
 });
 
@@ -59,7 +61,9 @@ const FAQ = [
 export default function ConhecaOsGuppyPage() {
   return (
     <>
-      <PageBanner title="Sobre o Guppy" />
+      {/* FAQPage (AEO/GEO): as MESMAS 6 perguntas do acordeão visível abaixo. */}
+      <JsonLd data={faqPageJsonLd(FAQ)} />
+      <PageBanner as="h1" title="Conheça o Guppy (Lebiste)" />
 
       {/* ── Introdução ── */}
       <section className="bg-white py-16">

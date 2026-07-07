@@ -8,8 +8,13 @@ import {
 } from "@/lib/queries/products";
 import { getConfigPreco, getFreteGratisConfig } from "@/lib/queries/config";
 import { calcularPrecos } from "@/lib/precos";
+import { precoComCampanha } from "@/lib/campanha-core";
 import { resolverCampanhaInfo } from "@/lib/campanha";
+import { estaEsgotado } from "@/lib/estoque";
 import { stripMarcheziSignature } from "@/lib/constants";
+import { SITE_URL } from "@/lib/seo";
+import { productJsonLd, breadcrumbJsonLd } from "@/lib/seo/jsonld";
+import { JsonLd } from "@/components/seo/JsonLd";
 import ProductDetail from "@/components/product/ProductDetail";
 import FeedAutoOpen from "@/components/feed/FeedAutoOpen";
 
@@ -25,13 +30,22 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const produto = await getProductBySlug(slug); // cache() dedup com o render
   if (!produto) return { title: "Produto não encontrado" };
 
-  const titulo = produto.metaTitle || `${produto.nome} · Guppy de Linhagem`;
+  const titulo = produto.metaTitle || `${produto.nome} — Guppy de Linhagem`;
   // Descrição da prévia SEM preço (preço muda; link velho não pode mostrar errado).
+  // Sem meta/descrição curta própria, cai num fallback que sempre traz linhagem,
+  // casal/trio (quando há) e envio vivo — os elementos que o Google e o cliente
+  // que pesquisa querem ver. Único por produto (nome + padrão/cor).
+  const comps = new Set(produto.variantes.map((v) => v.composicao));
+  const temCasalTrio = comps.has("CASAL") || comps.has("TRIO");
+  const linhagem = produto.padraoCor?.trim();
+  const fallbackDesc =
+    `${produto.nome}: guppy (lebiste) de linhagem` +
+    (linhagem ? ` ${linhagem}` : "") +
+    ` da Marchezi Guppy Farm, criação tricampeã mundial.` +
+    (temCasalTrio ? " Casal e trio disponíveis." : "") +
+    " Envio de peixe vivo para todo o Brasil.";
   const descricao =
-    produto.metaDescription ||
-    produto.descricaoCurta ||
-    stripMarcheziSignature(produto.descricao).slice(0, 155).trim() ||
-    undefined;
+    produto.metaDescription || produto.descricaoCurta || fallbackDesc;
   // Imagem da prévia = thumb do vídeo principal (videos já vêm principal-primeiro,
   // só ativos). YouTube/upload já são URLs absolutas; fallback no selo da marca.
   const imagem = produto.videos[0]?.thumbnailUrl || "/images/selo.webp";
@@ -109,8 +123,60 @@ export default async function ProdutoPage({ params }: Props) {
     estoqueFemeas: prod.estoqueFemeas,
   });
 
+  // JSON-LD Product (rich result): o preço do schema DEVE bater com o número em
+  // destaque na página. O ProductDetail exibe, por variante, o preço Pix efetivo
+  // (ou o promocional da campanha). Reproduzimos a MESMA conta aqui, por variante
+  // (produto sem variantes usa o preço base), e viram Offer (preço único) ou
+  // AggregateOffer (faixa low/high).
+  const basesPreco =
+    prod.variantes.length > 0
+      ? prod.variantes.map((v) => v.preco)
+      : [prod.preco];
+  const precosEfetivos = basesPreco.map((base) => {
+    const pc = calcularPrecos(
+      {
+        precoBase: base,
+        descontoPixProprio: prod.descontoPix,
+        usarDescontoPixGlobal: prod.usarDescontoPixGlobal,
+      },
+      { descontoPixGlobalPercent },
+    );
+    return campanha
+      ? precoComCampanha(pc.precoCartao, pc.descontoPixPercent, campanha).precoPromoPix
+      : pc.precoPix;
+  });
+
+  const imagemRaw = prod.videos[0]?.thumbnailUrl || "/images/selo.webp";
+  const descricaoSchema =
+    stripMarcheziSignature(prod.descricao)
+      .replace(/<[^>]*>/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, 500) || undefined;
+
+  const produtoLd = productJsonLd({
+    name: prod.nome,
+    description: descricaoSchema,
+    image: imagemRaw.startsWith("http") ? imagemRaw : `${SITE_URL}${imagemRaw}`,
+    sku: prod.slug,
+    url: `${SITE_URL}/loja/${prod.slug}`,
+    inStock: !estaEsgotado({
+      estoqueMachos: prod.estoqueMachos,
+      estoqueFemeas: prod.estoqueFemeas,
+    }),
+    precos: precosEfetivos,
+  });
+
+  const breadcrumbLd = breadcrumbJsonLd([
+    { name: "Início", url: `${SITE_URL}/` },
+    { name: prod.categoria, url: `${SITE_URL}/?categoria=${prod.categoriaSlug}` },
+    { name: prod.nome },
+  ]);
+
   return (
     <>
+      <JsonLd data={produtoLd} />
+      <JsonLd data={breadcrumbLd} />
       {/* Mobile: deep link abre o feed neste produto (desktop ignora). */}
       <FeedAutoOpen slug={prod.slug} />
       {preview && (

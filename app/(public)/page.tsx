@@ -12,13 +12,14 @@ import {
 import { listCategories } from "@/lib/queries/categories";
 import { HOME_BANNERS } from "@/lib/home-content";
 import { pageMeta, SITE_URL } from "@/lib/seo";
-import { organizationJsonLd } from "@/lib/sobre-content";
+import { onlineStoreJsonLd } from "@/lib/seo/jsonld";
+import { JsonLd } from "@/components/seo/JsonLd";
 import { WHATSAPP_PHONE } from "@/lib/constants";
 
 export const metadata: Metadata = pageMeta({
-  title: "Guppy de Linhagem | Loja de guppies pedigree da Marchezi Guppy Farm",
+  title: "Guppy de Linhagem (Lebiste) — Criação Tricampeã Mundial",
   description:
-    "Compre guppies de linhagem direto do criador campeão no World Guppy Contest. Busque por nome ou linhagem (koi, full red, tuxedo…), filtre por categoria e receba em todo o Brasil com garantia de chegada viva.",
+    "Guppys (lebistes) de linhagem do tricampeão mundial Full Black. Full Red, Koi, Half Moon e mais — envio de peixe vivo para todo o Brasil, de Guarapari/ES.",
   path: "/",
   image: {
     url: "/images/hero/blue-dragon-hero.webp",
@@ -28,12 +29,12 @@ export const metadata: Metadata = pageMeta({
   },
 });
 
-// Organization JSON-LD (GEO) na home — fonte única em lib/sobre-content; WhatsApp
-// em E.164 a partir de lib/constants. Sem campos inventados.
-const orgJsonLd = {
-  "@context": "https://schema.org",
-  ...organizationJsonLd(SITE_URL, `+${WHATSAPP_PHONE}`),
-};
+// OnlineStore JSON-LD (GEO) na home — MESMA entidade de /sobre-nos (mesmo @id,
+// name, sameAs e award), apresentada como loja. Dados confirmados em
+// lib/sobre-content; WhatsApp em E.164 a partir de lib/constants. Sem inventar.
+const storeJsonLd = onlineStoreJsonLd(SITE_URL, {
+  whatsappE164: `+${WHATSAPP_PHONE}`,
+});
 
 // A home é a vitrine: lê o banco e os filtros da URL em request-time. Mantém o
 // frescor imediato do que o admin cadastra/edita (sem cache stale).
@@ -72,11 +73,8 @@ export default async function HomePage({ searchParams }: Props) {
 
   return (
     <>
-      {/* Organization JSON-LD (GEO) */}
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(orgJsonLd) }}
-      />
+      {/* OnlineStore JSON-LD (GEO) */}
+      <JsonLd data={storeJsonLd} />
 
       {/* ── Hero ── */}
       <HeroSection />
@@ -191,6 +189,54 @@ export default async function HomePage({ searchParams }: Props) {
               </div>
             </div>
           </div>
+        </div>
+      </section>
+
+      {/* ── Texto institucional (SEO/GEO): apresenta o site em texto real, com
+          os termos que as pessoas pesquisam (guppy e lebiste) e links internos
+          contextuais para as linhagens, o guia e a história. ── */}
+      <section className="bg-bg-alt py-16">
+        <div className="container-site max-w-3xl space-y-4">
+          <h2 className="text-primary text-2xl sm:text-3xl font-semibold">
+            Guppy de linhagem, também chamado de{" "}
+            <span className="text-secondary">lebiste</span>
+          </h2>
+          <p className="text-text font-light leading-relaxed">
+            Guppy e lebiste são o mesmo peixe (<em>Poecilia reticulata</em>). Aqui
+            na Marchezi Guppy Farm eu crio guppy de linhagem em Guarapari, no
+            Espírito Santo, numa estufa feita só para isso. São anos de seleção,
+            geração após geração, o mesmo trabalho que rendeu o tricampeonato
+            mundial na linha{" "}
+            <Link href="/?busca=full+black" className="text-secondary font-medium hover:underline">
+              Full Black
+            </Link>{" "}
+            no World Guppy Contest.
+          </p>
+          <p className="text-text font-light leading-relaxed">
+            Trabalho com casais e trios das linhagens que a gente desenvolve, como{" "}
+            <Link href="/?busca=full+red" className="text-secondary font-medium hover:underline">
+              Full Red
+            </Link>
+            ,{" "}
+            <Link href="/?busca=koi" className="text-secondary font-medium hover:underline">
+              Koi
+            </Link>{" "}
+            e{" "}
+            <Link href="/?busca=half+moon" className="text-secondary font-medium hover:underline">
+              Half Moon
+            </Link>
+            . Cada peixe é observado antes de viajar e embalado à mão para chegar
+            vivo e no padrão, com envio para todo o Brasil. Para entender melhor o
+            hobby, veja o{" "}
+            <Link href="/conheca-os-guppy" className="text-secondary font-medium hover:underline">
+              guia do guppy
+            </Link>{" "}
+            ou conheça a{" "}
+            <Link href="/sobre-nos" className="text-secondary font-medium hover:underline">
+              nossa história
+            </Link>
+            .
+          </p>
         </div>
       </section>
     </>

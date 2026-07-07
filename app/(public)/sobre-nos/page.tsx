@@ -21,7 +21,7 @@ import {
   Bug,
 } from "lucide-react";
 import { WhatsAppIcon } from "@/components/icons/WhatsAppIcon";
-import { WHATSAPP_URL } from "@/lib/constants";
+import { WHATSAPP_URL, WHATSAPP_PHONE } from "@/lib/constants";
 import {
   timeline,
   conquistas,
@@ -29,12 +29,14 @@ import {
   beneficios,
   REDES,
 } from "@/lib/sobre-content";
-import { pageMeta } from "@/lib/seo";
+import { pageMeta, SITE_URL } from "@/lib/seo";
+import { aboutPageJsonLd } from "@/lib/seo/jsonld";
+import { JsonLd } from "@/components/seo/JsonLd";
 
 export const metadata: Metadata = pageMeta({
-  title: "Sobre Nós | Marchezi Guppy Farm, guppies de linhagem tricampeões mundiais",
+  title: "Sobre Nós — Criador Tricampeão Mundial | Guppy de Linhagem",
   description:
-    "Desde 2000, a família Marchezi cria guppies de linhagem no Espírito Santo. Uma criação familiar pela beleza, com títulos mundiais, entre eles o tricampeonato da linha Full Black.",
+    "Desde 2000 a família Marchezi cria guppys (lebistes) de linhagem em Guarapari/ES. Criação pela beleza, tricampeã mundial Full Black no World Guppy Contest.",
   path: "/sobre-nos",
   image: {
     url: "/images/sobrenos/og-sobre-nos.jpg",
@@ -161,35 +163,15 @@ export default function SobreNosPage() {
   const heroi = conquistas.find((c) => c.destaque);
   const apoio = conquistas.filter((c) => !c.destaque);
 
-  const jsonLd = {
-    "@context": "https://schema.org",
-    "@type": "AboutPage",
-    name: "Sobre a Marchezi Guppy Farm",
-    mainEntity: {
-      "@type": "Organization",
-      name: "Marchezi Guppy Farm",
-      description:
-        "Criação familiar de guppies de linhagem em Guarapari, Espírito Santo, desde 2000. Criação pela beleza, com linhas premiadas em campeonatos mundiais.",
-      founder: { "@type": "Person", name: "Manassés Marchezi" },
-      foundingDate: "2000",
-      areaServed: "Brasil",
-      location: {
-        "@type": "Place",
-        address: {
-          "@type": "PostalAddress",
-          addressLocality: "Guarapari",
-          addressRegion: "ES",
-          addressCountry: "BR",
-        },
-      },
-      award: conquistas.map((c) => `${c.linha} — ${c.titulo} (${c.anos}), ${c.evento}`),
-      sameAs: [REDES.youtube, REDES.instagram],
-    },
-  };
+  // Mesma entidade da home (mesmo @id, name, sameAs e award), montada em
+  // lib/seo/jsonld a partir dos dados confirmados — aqui como AboutPage.
+  const jsonLd = aboutPageJsonLd(SITE_URL, {
+    whatsappE164: `+${WHATSAPP_PHONE}`,
+  });
 
   return (
     <>
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <JsonLd data={jsonLd} />
 
       {/* ═══ 1. HERO ═══ */}
       <Secao bg="white">

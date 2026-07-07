@@ -3,9 +3,9 @@ import FreteCalculator from "@/components/FreteCalculator";
 import { pageMeta } from "@/lib/seo";
 
 export const metadata: Metadata = pageMeta({
-  title: "Calcule seu frete | Guppy de Linhagem",
+  title: "Cálculo de Frete de Guppy Vivo | Guppy de Linhagem",
   description:
-    "Calcule o frete para receber guppies de linhagem em qualquer lugar do Brasil. Enviamos via Jadlog e Gollog, com cuidado no transporte dos peixes.",
+    "Calcule o frete e receba guppys (lebistes) de linhagem em todo o Brasil. Enviamos peixe vivo via Jadlog e frete aéreo Gollog, com embalagem cuidadosa.",
   path: "/frete",
 });
 

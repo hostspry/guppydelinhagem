@@ -50,9 +50,15 @@ export function HeroSlider({ slides, settings }: Props) {
     <div className="relative">
       <div className="overflow-hidden" ref={emblaRef}>
         <div className="flex">
-          {slides.map((slide) => (
+          {slides.map((slide, i) => (
             <div className="min-w-0 flex-[0_0_100%]" key={slide.id}>
-              <HeroStatic slide={slide} settings={settings} />
+              {/* Só o primeiro slide carrega o h1 da home; os demais usam "div"
+                  (mesmo visual) para não haver múltiplos h1 na página. */}
+              <HeroStatic
+                slide={slide}
+                settings={settings}
+                titleAs={i === 0 ? "h1" : "div"}
+              />
             </div>
           ))}
         </div>

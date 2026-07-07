@@ -14,6 +14,11 @@ import type {
 type Props = {
   slide: HeroSlide;
   settings: HeroSettings;
+  /**
+   * Tag do título do slide. Default "h1". No slider, só o primeiro slide é "h1";
+   * os demais viram "div" (visual idêntico) para a página ter exatamente um h1.
+   */
+  titleAs?: "h1" | "div";
 };
 
 // Resolve nome de ícone string ("Trophy", "Award") pro componente Lucide
@@ -25,7 +30,8 @@ function getIcon(name: string | null | undefined): LucideIcon | null {
 
 // Barra de features movida pra <TrustBar /> (faixa própria, fora do hero).
 
-export function HeroStatic({ slide, settings }: Props) {
+export function HeroStatic({ slide, settings, titleAs = "h1" }: Props) {
+  const TitleTag = titleAs;
   const EyebrowIcon = getIcon(slide.eyebrowIcon);
   const BadgeIcon = getIcon(slide.badgeIcon);
   const backgroundUrl = slide.backgroundUrl ?? settings.defaultBackgroundUrl;
@@ -91,7 +97,7 @@ export function HeroStatic({ slide, settings }: Props) {
               </span>
             )}
 
-            <h1 className="font-bold leading-[0.95] tracking-tight">
+            <TitleTag className="font-bold leading-[0.95] tracking-tight">
               <span className="block text-[40px] md:text-[60px] text-white">
                 {slide.titleLine1}
               </span>
@@ -100,7 +106,7 @@ export function HeroStatic({ slide, settings }: Props) {
                   {slide.titleLine2}
                 </span>
               )}
-            </h1>
+            </TitleTag>
 
             {slide.subtitle && (
               <p className="text-base md:text-lg text-white/95 md:text-[#cccccc] leading-relaxed max-w-[500px]">
