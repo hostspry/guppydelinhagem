@@ -11,11 +11,18 @@ import { formatBRL } from "@/lib/utils/format";
 import type { OrderStatus, TipoEntrega } from "@/lib/generated/prisma/client";
 
 type Props = {
-  searchParams: Promise<{ status?: string; q?: string; entrega?: string }>;
+  searchParams: Promise<{
+    status?: string;
+    q?: string;
+    entrega?: string;
+    transporte?: string;
+  }>;
 };
 
 const STATUS_VALIDOS = Object.keys(STATUS_PEDIDO) as OrderStatus[];
 const ENTREGA_VALIDAS: TipoEntrega[] = ["ENVIO", "RETIRADA"];
+type Transporte = "GOLLOG" | "JADLOG";
+const TRANSPORTE_VALIDOS: Transporte[] = ["GOLLOG", "JADLOG"];
 
 // Badge por tipo de entrega (envio = despacha; retirada = cliente busca).
 const ENTREGA_BADGE: Record<TipoEntrega, { label: string; badge: string }> = {
@@ -23,11 +30,18 @@ const ENTREGA_BADGE: Record<TipoEntrega, { label: string; badge: string }> = {
   RETIRADA: { label: "Retirada", badge: "bg-amber-50 text-amber-700" },
 };
 
-function buildHref(status: string, q: string, entrega: string) {
+// Badge por transportadora efetiva (Gollog = aéreo; Jadlog = terrestre).
+const TRANSPORTE_BADGE: Record<Transporte, { label: string; badge: string }> = {
+  GOLLOG: { label: "Gollog · aéreo", badge: "bg-sky-50 text-sky-700" },
+  JADLOG: { label: "Jadlog · terrestre", badge: "bg-violet-50 text-violet-700" },
+};
+
+function buildHref(status: string, q: string, entrega: string, transporte: string) {
   const p = new URLSearchParams();
   if (status) p.set("status", status);
   if (q) p.set("q", q);
   if (entrega) p.set("entrega", entrega);
+  if (transporte) p.set("transporte", transporte);
   const qs = p.toString();
   return qs ? `/admin/pedidos?${qs}` : "/admin/pedidos";
 }
@@ -44,12 +58,17 @@ export default async function PedidosPage({ searchParams }: Props) {
     ENTREGA_VALIDAS.includes(sp.entrega as TipoEntrega)
       ? (sp.entrega as TipoEntrega)
       : undefined;
+  const transporte =
+    typeof sp.transporte === "string" &&
+    TRANSPORTE_VALIDOS.includes(sp.transporte as Transporte)
+      ? (sp.transporte as Transporte)
+      : undefined;
 
   // Varredura oportunista: cancela AGUARDANDO órfãos > 24h sem pagamento
   // aprovado/em-análise. Resiliente — não quebra a lista se falhar.
   await cancelarPedidosAguardandoExpirados().catch(() => 0);
 
-  const pedidos = await listPedidos({ status, q, entrega });
+  const pedidos = await listPedidos({ status, q, entrega, transporte });
 
   return (
     <div>
@@ -71,7 +90,7 @@ export default async function PedidosPage({ searchParams }: Props) {
       {/* Filtro por status (preserva a busca e o tipo de entrega) */}
       <div className="flex flex-wrap gap-1.5 mb-3">
         <Link
-          href={buildHref("", q, entrega ?? "")}
+          href={buildHref("", q, entrega ?? "", transporte ?? "")}
           className={`px-3 py-1 rounded-full text-xs font-medium border ${
             !status
               ? "bg-[#07366A] text-white border-[#07366A]"
@@ -83,7 +102,7 @@ export default async function PedidosPage({ searchParams }: Props) {
         {STATUS_VALIDOS.map((s) => (
           <Link
             key={s}
-            href={buildHref(s, q, entrega ?? "")}
+            href={buildHref(s, q, entrega ?? "", transporte ?? "")}
             className={`px-3 py-1 rounded-full text-xs font-medium border ${
               status === s
                 ? "bg-[#07366A] text-white border-[#07366A]"
@@ -95,10 +114,10 @@ export default async function PedidosPage({ searchParams }: Props) {
         ))}
       </div>
 
-      {/* Filtro por tipo de entrega (preserva status e busca) */}
+      {/* Filtro por tipo de entrega (preserva status, busca e transportadora) */}
       <div className="flex flex-wrap gap-1.5 mb-3">
         <Link
-          href={buildHref(status ?? "", q, "")}
+          href={buildHref(status ?? "", q, "", transporte ?? "")}
           className={`px-3 py-1 rounded-full text-xs font-medium border ${
             !entrega
               ? "bg-[#07366A] text-white border-[#07366A]"
@@ -110,7 +129,7 @@ export default async function PedidosPage({ searchParams }: Props) {
         {ENTREGA_VALIDAS.map((t) => (
           <Link
             key={t}
-            href={buildHref(status ?? "", q, t)}
+            href={buildHref(status ?? "", q, t, transporte ?? "")}
             className={`px-3 py-1 rounded-full text-xs font-medium border ${
               entrega === t
                 ? "bg-[#07366A] text-white border-[#07366A]"
@@ -122,10 +141,38 @@ export default async function PedidosPage({ searchParams }: Props) {
         ))}
       </div>
 
+      {/* Filtro por transportadora (Gollog aéreo × Jadlog terrestre) */}
+      <div className="flex flex-wrap gap-1.5 mb-3">
+        <Link
+          href={buildHref(status ?? "", q, entrega ?? "", "")}
+          className={`px-3 py-1 rounded-full text-xs font-medium border ${
+            !transporte
+              ? "bg-[#07366A] text-white border-[#07366A]"
+              : "bg-white text-gray-600 border-gray-300 hover:border-[#07366A]"
+          }`}
+        >
+          Toda transportadora
+        </Link>
+        {TRANSPORTE_VALIDOS.map((t) => (
+          <Link
+            key={t}
+            href={buildHref(status ?? "", q, entrega ?? "", t)}
+            className={`px-3 py-1 rounded-full text-xs font-medium border ${
+              transporte === t
+                ? "bg-[#07366A] text-white border-[#07366A]"
+                : "bg-white text-gray-600 border-gray-300 hover:border-[#07366A]"
+            }`}
+          >
+            {TRANSPORTE_BADGE[t].label}
+          </Link>
+        ))}
+      </div>
+
       {/* Busca (preserva o status e o tipo de entrega) */}
       <form method="get" className="mb-4 relative max-w-sm">
         {status && <input type="hidden" name="status" value={status} />}
         {entrega && <input type="hidden" name="entrega" value={entrega} />}
+        {transporte && <input type="hidden" name="transporte" value={transporte} />}
         <Search
           className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
           aria-hidden="true"
@@ -172,6 +219,7 @@ export default async function PedidosPage({ searchParams }: Props) {
                 <th className="px-4 py-3">Cliente</th>
                 <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3">Entrega</th>
+                <th className="px-4 py-3">Transportadora</th>
                 <th className="px-4 py-3 text-right">Total</th>
                 <th className="px-4 py-3">Data</th>
                 <th className="px-4 py-3 text-right w-28">Ações</th>
@@ -202,6 +250,28 @@ export default async function PedidosPage({ searchParams }: Props) {
                     >
                       {ENTREGA_BADGE[p.tipoEntrega].label}
                     </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    {p.tipoEntrega === "RETIRADA" ? (
+                      <span className="text-xs text-gray-400">—</span>
+                    ) : p.transporte ? (
+                      <div className="flex flex-col gap-0.5">
+                        <span
+                          className={`inline-flex w-fit items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${TRANSPORTE_BADGE[p.transporte].badge}`}
+                        >
+                          {TRANSPORTE_BADGE[p.transporte].label}
+                        </span>
+                        {p.codigoRastreio && (
+                          <span className="font-mono text-[11px] text-gray-400">
+                            {p.codigoRastreio}
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-500">
+                        a definir
+                      </span>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-right font-medium text-[#07366A]">
                     {formatBRL(p.total)}

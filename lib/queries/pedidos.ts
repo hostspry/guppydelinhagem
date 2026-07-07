@@ -29,25 +29,45 @@ export async function cancelarPedidosAguardandoExpirados(): Promise<number> {
 }
 
 // ── Lista (/admin/pedidos) ────────────────────────────────────
+// Transportadora "efetiva" do pedido: GOLLOG quando é aéreo, JADLOG quando é
+// terrestre. Usa o enum transportadora e, como reforço, a modalidadeFrete
+// (AEREO=Gollog, TERRESTRE=Jadlog) — assim o filtro não perde pedido antigo em
+// que só um dos dois campos ficou preenchido.
+export type TransporteFiltro = "GOLLOG" | "JADLOG";
+
+function transporteWhere(t: TransporteFiltro): Prisma.OrderWhereInput {
+  return t === "GOLLOG"
+    ? { OR: [{ transportadora: "GOLLOG" }, { modalidadeFrete: "AEREO" }] }
+    : { OR: [{ transportadora: "JADLOG" }, { modalidadeFrete: "TERRESTRE" }] };
+}
+
 export async function listPedidos({
   status,
   q,
   entrega,
+  transporte,
 }: {
   status?: OrderStatus;
   q?: string;
   entrega?: TipoEntrega;
+  transporte?: TransporteFiltro;
 }) {
   const where: Prisma.OrderWhereInput = {};
   if (status) where.status = status;
   if (entrega) where.tipoEntrega = entrega;
+  // Vários grupos OR (busca + transportadora) convivem via AND.
+  const and: Prisma.OrderWhereInput[] = [];
   const termo = q?.trim();
   if (termo) {
-    where.OR = [
-      { numero: { contains: termo, mode: "insensitive" } },
-      { cliente: { nome: { contains: termo, mode: "insensitive" } } },
-    ];
+    and.push({
+      OR: [
+        { numero: { contains: termo, mode: "insensitive" } },
+        { cliente: { nome: { contains: termo, mode: "insensitive" } } },
+      ],
+    });
   }
+  if (transporte) and.push(transporteWhere(transporte));
+  if (and.length) where.AND = and;
 
   const rows = await prisma.order.findMany({
     where,
@@ -57,6 +77,9 @@ export async function listPedidos({
       numero: true,
       status: true,
       tipoEntrega: true,
+      transportadora: true,
+      modalidadeFrete: true,
+      codigoRastreio: true,
       total: true,
       criadoEm: true,
       cliente: { select: { nome: true } },
@@ -68,6 +91,14 @@ export async function listPedidos({
     numero: r.numero,
     status: r.status,
     tipoEntrega: r.tipoEntrega,
+    // Transportadora efetiva para exibir/filtrar na lista (null = ainda indefinida).
+    transporte:
+      r.transportadora === "GOLLOG" || r.modalidadeFrete === "AEREO"
+        ? ("GOLLOG" as const)
+        : r.transportadora === "JADLOG" || r.modalidadeFrete === "TERRESTRE"
+          ? ("JADLOG" as const)
+          : null,
+    codigoRastreio: r.codigoRastreio,
     total: Number(r.total),
     criadoEm: r.criadoEm,
     clienteNome: r.cliente.nome,
