@@ -58,6 +58,26 @@ export default async function CheckoutPage() {
       cidade: cliente?.cidade ?? "",
       uf: cliente?.uf ?? "",
     };
+
+    // Endereço PADRÃO do painel (Address.principal) tem precedência sobre o
+    // último endereço do Cliente — é prefill, o cliente ainda pode editar tudo.
+    if (session.user.id) {
+      const padrao = await prisma.address.findFirst({
+        where: { userId: session.user.id, principal: true },
+      });
+      if (padrao) {
+        prefill = {
+          ...prefill,
+          cep: padrao.cep,
+          logradouro: padrao.rua,
+          numero: padrao.numero,
+          complemento: padrao.complemento ?? "",
+          bairro: padrao.bairro,
+          cidade: padrao.cidade,
+          uf: padrao.estado,
+        };
+      }
+    }
   }
 
   // Public key do MP lida em RUNTIME no servidor e injetada por prop. Preferimos
