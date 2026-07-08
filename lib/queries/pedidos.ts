@@ -107,6 +107,18 @@ export async function listPedidos({
 
 export type PedidoListItem = Awaited<ReturnType<typeof listPedidos>>[number];
 
+// ── Pedidos do cliente logado (/minha-conta/pedidos), casados por e-mail ───────
+// Aceitável casar por e-mail nesta fase: Google verifica e-mail e o linking do
+// Facebook está restrito. Vínculo formal Cliente.userId fica para depois.
+export async function listPedidosDoCliente(email: string) {
+  const rows = await prisma.order.findMany({
+    where: { cliente: { email }, status: { not: "RASCUNHO" } },
+    orderBy: { criadoEm: "desc" },
+    select: { id: true, numero: true, status: true, total: true, criadoEm: true },
+  });
+  return rows.map((r) => ({ ...r, total: Number(r.total) }));
+}
+
 // ── Resumo operacional de envios (cron do Telegram) ───────────────────────────
 export type PedidoEnvio = {
   numero: string;
