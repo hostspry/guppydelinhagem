@@ -1,7 +1,7 @@
-export default function Page() {
-  return (
-    <main style={{ padding: "2rem" }}>
-      <p style={{ color: "#6b7280" }}>Em construção — Cadastro</p>
-    </main>
-  );
+import { permanentRedirect } from "next/navigation";
+
+// Cadastro de cliente é social-only por enquanto (sem fluxo de senha). Redireciona
+// permanente (308) para o /login, que oferece Google/Facebook.
+export default function CadastroPage() {
+  permanentRedirect("/login");
 }
