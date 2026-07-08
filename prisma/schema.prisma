@@ -134,11 +134,42 @@ model User {
   ultimoLogin       DateTime?
   criadoEm          DateTime  @default(now())
 
+  // Campos que o Auth.js/PrismaAdapter espera (OAuth). `nome` (obrigatório) segue
+  // sendo a fonte de verdade do app; o adapter preenche `name` e, no createUser
+  // customizado (lib/auth.ts), copiamos name→nome. `emailVerified`/`image` vêm do
+  // provider. Login por credenciais (admin) não usa nada disto.
+  name          String?
+  image         String?
+  emailVerified DateTime?
+
   enderecos    Address[]
   pedidos      Order[]
   waitlist     WaitlistEntry[]
   cliente      Cliente?
   notificacoes Notificacao[]
+  accounts     Account[]
+}
+
+// Vínculo de conta OAuth (Google/Facebook) ao User — model padrão do Auth.js.
+// Sessão continua JWT (sem Session/VerificationToken); o adapter usa Account só
+// para persistir o vínculo do provider.
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
 }
 
 model Address {
