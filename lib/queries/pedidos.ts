@@ -107,6 +107,71 @@ export async function listPedidos({
 
 export type PedidoListItem = Awaited<ReturnType<typeof listPedidos>>[number];
 
+// ── Resumo operacional de envios (cron do Telegram) ───────────────────────────
+export type PedidoEnvio = {
+  numero: string;
+  clienteNome: string;
+  tipoEntrega: TipoEntrega;
+  // Transportadora EFETIVA (mesma regra do admin): enum transportadora reforçado
+  // pela modalidadeFrete (AEREO=Gollog, TERRESTRE=Jadlog). null = a definir.
+  transporte: TransporteFiltro | null;
+  cidade: string | null;
+  uf: string | null;
+  itens: { nome: string; qtd: number }[];
+  // "Pago em": criadoEm do Pagamento PAGO (estável); fallback atualizadoEm do
+  // pedido. Base do alerta de pedido parado há > 7 dias.
+  pagoEm: Date;
+};
+
+/**
+ * Pedidos PAGO (pagos e ainda não enviados) para o resumo de envios. Traz itens,
+ * snapshot de cidade/UF, transportadora efetiva e o "pago em". Inclui ENVIO e
+ * RETIRADA (a quarentena vale para todos os pagos; as seções de despacho filtram
+ * só ENVIO). Ordena do mais antigo para o mais novo.
+ */
+export async function listPedidosAguardandoEnvio(): Promise<PedidoEnvio[]> {
+  const rows = await prisma.order.findMany({
+    where: { status: "PAGO" },
+    orderBy: { atualizadoEm: "asc" },
+    select: {
+      numero: true,
+      tipoEntrega: true,
+      transportadora: true,
+      modalidadeFrete: true,
+      enderecoEntrega: true,
+      atualizadoEm: true,
+      cliente: { select: { nome: true } },
+      items: { select: { nomeProduto: true, quantidade: true } },
+      pagamentos: {
+        where: { status: "PAGO" },
+        orderBy: { criadoEm: "asc" },
+        take: 1,
+        select: { criadoEm: true },
+      },
+    },
+  });
+
+  return rows.map((o) => {
+    const e = (o.enderecoEntrega ?? {}) as { cidade?: string | null; uf?: string | null };
+    const transporte: TransporteFiltro | null =
+      o.transportadora === "GOLLOG" || o.modalidadeFrete === "AEREO"
+        ? "GOLLOG"
+        : o.transportadora === "JADLOG" || o.modalidadeFrete === "TERRESTRE"
+          ? "JADLOG"
+          : null;
+    return {
+      numero: o.numero,
+      clienteNome: o.cliente.nome,
+      tipoEntrega: o.tipoEntrega,
+      transporte,
+      cidade: e.cidade ?? null,
+      uf: e.uf ?? null,
+      itens: o.items.map((i) => ({ nome: i.nomeProduto, qtd: i.quantidade })),
+      pagoEm: o.pagamentos[0]?.criadoEm ?? o.atualizadoEm,
+    };
+  });
+}
+
 // ── Detalhe (/admin/pedidos/[id]) ─────────────────────────────
 export async function getPedidoById(id: string) {
   const p = await prisma.order.findUnique({

@@ -2,6 +2,10 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { formatBRL } from "@/lib/utils/format";
 import { enviarTelegram, escapeHtml } from "@/lib/telegram";
+import {
+  listPedidosAguardandoEnvio,
+  type PedidoEnvio,
+} from "@/lib/queries/pedidos";
 import type { EnderecoEntrega } from "@/lib/validations/pedido";
 import type {
   MetodoPagamento,
@@ -214,4 +218,112 @@ export async function notificarPedidoCancelado(orderId: string): Promise<void> {
       `🚫 <b>Pedido cancelado</b>\n\n` +
       `<b>${escapeHtml(p.numero)}</b> — ${escapeHtml(p.clienteNome)} · Total: ${formatBRL(p.total)}`,
   );
+}
+
+// ── Resumo semanal de quarentena e envios (agendado via cron) ─────────────────
+const UMA_SEMANA_MS = 7 * 24 * 60 * 60 * 1000;
+
+function dataHojeBR(): string {
+  return new Date().toLocaleDateString("pt-BR", {
+    timeZone: "America/Sao_Paulo",
+    day: "2-digit",
+    month: "2-digit",
+  });
+}
+
+function peixesDoPedido(p: PedidoEnvio): number {
+  return p.itens.reduce((acc, i) => acc + i.qtd, 0);
+}
+
+function destinoDoPedido(p: PedidoEnvio): string {
+  const partes = [p.cidade, p.uf].filter(Boolean).map((s) => escapeHtml(String(s)));
+  return partes.length ? partes.join("/") : "destino não informado";
+}
+
+// Linha de pedido para as seções de despacho (com alerta de parado > 7 dias).
+function linhaEnvio(p: PedidoEnvio, agora: number): string {
+  const atrasado = agora - p.pagoEm.getTime() > UMA_SEMANA_MS ? " ⚠️" : "";
+  return (
+    `• <b>${escapeHtml(p.numero)}</b> — ${escapeHtml(p.clienteNome)} · ` +
+    `${destinoDoPedido(p)} · ${peixesDoPedido(p)} peixes${atrasado}`
+  );
+}
+
+/**
+ * Resumo operacional (quarentena + despacho Jadlog/Gollog) dos pedidos PAGO ainda
+ * não enviados. Chamado pela rota de cron. Retorna quantos pedidos entraram —
+ * nunca lança. Seções vazias são omitidas.
+ */
+export async function notificarResumoEnvios(): Promise<{ pedidos: number }> {
+  let pedidos: PedidoEnvio[] = [];
+  try {
+    pedidos = await listPedidosAguardandoEnvio();
+  } catch (e) {
+    console.error("[notificacoes] resumo: carregar pedidos", e);
+  }
+  const hoje = dataHojeBR();
+
+  if (pedidos.length === 0) {
+    await enviarSeguro(
+      () =>
+        `📋 <b>Planejamento de envios — ${hoje}</b>\n\n` +
+        `✅ Nenhum pedido aguardando envio. Semana limpa!`,
+    );
+    return { pedidos: 0 };
+  }
+
+  const agora = Date.now();
+
+  // Quarentena: soma de quantidade por produto em TODOS os pagos (ordem alfabética).
+  const porProduto = new Map<string, number>();
+  let totalPeixes = 0;
+  for (const p of pedidos) {
+    for (const it of p.itens) {
+      porProduto.set(it.nome, (porProduto.get(it.nome) ?? 0) + it.qtd);
+      totalPeixes += it.qtd;
+    }
+  }
+  const linhasQuarentena = [...porProduto.entries()]
+    .sort((a, b) => a[0].localeCompare(b[0], "pt-BR"))
+    .map(([nome, qtd]) => `• ${escapeHtml(nome)} — ${qtd} un`)
+    .join("\n");
+
+  // Seções de despacho: só ENVIO (retirada não despacha). Carrier efetivo.
+  const enviaveis = pedidos.filter((p) => p.tipoEntrega === "ENVIO");
+  const jadlog = enviaveis.filter((p) => p.transporte === "JADLOG");
+  const gollog = enviaveis.filter((p) => p.transporte === "GOLLOG");
+  const semTransp = enviaveis.filter((p) => p.transporte === null);
+
+  const secoes: string[] = [
+    `📋 <b>Planejamento de envios — ${hoje}</b>`,
+    `🐟 <b>Separar para quarentena:</b>\n${linhasQuarentena}\n` +
+      `Total: ${totalPeixes} peixes em ${pedidos.length} pedido${pedidos.length > 1 ? "s" : ""}`,
+  ];
+  if (jadlog.length) {
+    secoes.push(
+      `📦 <b>Jadlog — despacho SEGUNDA-FEIRA:</b>\n` +
+        jadlog.map((p) => linhaEnvio(p, agora)).join("\n"),
+    );
+  }
+  if (gollog.length) {
+    secoes.push(
+      `✈️ <b>Gollog — programar na semana:</b>\n` +
+        gollog.map((p) => linhaEnvio(p, agora)).join("\n"),
+    );
+  }
+  if (semTransp.length) {
+    secoes.push(
+      `❓ <b>Sem transportadora definida (resolver no admin):</b>\n` +
+        semTransp
+          .map(
+            (p) =>
+              `• <b>${escapeHtml(p.numero)}</b> — ${escapeHtml(p.clienteNome)} · ${destinoDoPedido(p)}`,
+          )
+          .join("\n"),
+    );
+  }
+  secoes.push(`Ver pedidos: ${LINK_ADMIN}`);
+
+  await enviarSeguro(() => secoes.join("\n\n"));
+  return { pedidos: pedidos.length };
 }
