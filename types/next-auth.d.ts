@@ -10,6 +10,7 @@ declare module "next-auth" {
       id: string;
       email: string;
       name: string | null;
+      image?: string | null; // foto do provider OAuth (Google/Facebook)
       role: string;
       senhaPrecisaTroca: boolean;
     };
