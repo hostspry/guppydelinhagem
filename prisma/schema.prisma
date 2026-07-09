@@ -593,3 +593,21 @@ model CupomDesconto {
   @@index([ativo])
   @@index([tipoCupom, ativo])
 }
+
+// Lead do checkout: contato capturado ANTES do pagamento (recuperação de carrinho
+// abandonado). O cron avisa no Telegram se o lead não virar pedido em ~15 min.
+// `convertido` = criou pedido; `notificadoEm` = já avisamos o abandono (não repete).
+model LeadCheckout {
+  id           String    @id @default(cuid())
+  nome         String?
+  telefone     String? // só dígitos
+  email        String?
+  capturadoEm  DateTime  @default(now())
+  atualizadoEm DateTime  @updatedAt
+  notificadoEm DateTime?
+  convertido   Boolean   @default(false)
+
+  @@index([convertido, notificadoEm])
+  @@index([email])
+  @@index([telefone])
+}

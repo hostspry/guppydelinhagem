@@ -41,6 +41,7 @@ import {
 } from "@/lib/stores/cart";
 import {
   criarPedidoCheckout,
+  registrarLeadCheckout,
   pagarComCartao,
   iniciarCheckoutPro,
   iniciarCheckoutPagbank,
@@ -212,6 +213,26 @@ export default function CheckoutClient({
     defaultValues: { ...prefill, tipoEntrega: "ENVIO" },
     shouldFocusError: false, // foco/scroll manual e suave (abaixo)
   });
+
+  // Captura o LEAD (contato) no blur de e-mail/telefone — uma vez por contato.
+  // Recuperação de carrinho abandonado: o contato é salvo já; o aviso de abandono
+  // sai do cron se não virar pedido. Silencioso (best-effort).
+  const leadRef = useRef("");
+  function capturarLead() {
+    const email = (getValues("email") ?? "").trim().toLowerCase();
+    const telefone = (getValues("telefone") ?? "").replace(/\D/g, "");
+    const emailOk = email.includes("@") && email.length > 4;
+    const telOk = telefone.length >= 10;
+    if (!emailOk && !telOk) return;
+    const chave = `${email}|${telefone}`;
+    if (chave === leadRef.current) return; // já capturado com esse contato
+    leadRef.current = chave;
+    void registrarLeadCheckout({
+      nome: (getValues("nome") ?? "").trim(),
+      email,
+      telefone,
+    });
+  }
 
   // Forma de pagamento (Pix padrão) + teto de parcelas (do servidor) + recusa.
   // Abas MP (pix/cartao/mp) + PagBank card-only (pb_cartao — 2º adquirente p/
@@ -715,7 +736,7 @@ export default function CheckoutClient({
                   className={cls(errors.email)}
                   autoComplete="email"
                   aria-invalid={!!errors.email}
-                  {...register("email")}
+                  {...register("email", { onBlur: capturarLead })}
                 />
                 <FieldError msg={errors.email?.message} />
               </div>
@@ -729,7 +750,7 @@ export default function CheckoutClient({
                   className={cls(errors.telefone)}
                   autoComplete="tel"
                   aria-invalid={!!errors.telefone}
-                  {...register("telefone")}
+                  {...register("telefone", { onBlur: capturarLead })}
                   onChange={(e) =>
                     setValue("telefone", formatTel(e.target.value), {
                       shouldValidate: isSubmitted,

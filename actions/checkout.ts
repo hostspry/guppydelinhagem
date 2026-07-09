@@ -1081,6 +1081,23 @@ export async function criarOrderDoCheckout(
     return { ok: false, error: "Não foi possível criar o pedido. Tente novamente." };
   }
 
+  // Lead que virou pedido não deve mais gerar aviso de abandono (fire-and-forget).
+  {
+    const emailLead = data.email.trim().toLowerCase();
+    prisma.leadCheckout
+      .updateMany({
+        where: {
+          convertido: false,
+          OR: [
+            ...(emailLead ? [{ email: emailLead }] : []),
+            ...(tel ? [{ telefone: tel }] : []),
+          ],
+        },
+        data: { convertido: true },
+      })
+      .catch(() => {});
+  }
+
   const partesNome = data.nome.trim().split(/\s+/);
   // Itens com o preço EFETIVO do cartão (cheio − desconto por item) p/ o
   // additional_info.items do MP. Mesma fonte do que o cartão realmente cobra.
@@ -1123,6 +1140,55 @@ export async function criarOrderDoCheckout(
  * Pix: cria o Order (helper compartilhado) e gera a cobrança Pix. Se o MP falhar,
  * remove o pedido órfão. Devolve o QR/copia-e-cola pra tela do Pix.
  */
+/**
+ * Captura o LEAD do checkout (contato preenchido ANTES de pagar) para recuperação
+ * de carrinho abandonado. Público (checkout é guest). Dedup por e-mail OU telefone
+ * entre leads ainda não convertidos. Não notifica aqui — o cron de abandono avisa
+ * se o lead não virar pedido em ~15 min. Nunca lança.
+ */
+export async function registrarLeadCheckout(input: {
+  nome?: string;
+  email?: string;
+  telefone?: string;
+}): Promise<{ ok: boolean }> {
+  try {
+    const nome = (input.nome ?? "").trim() || null;
+    const email = (input.email ?? "").trim().toLowerCase() || null;
+    const telefone = (input.telefone ?? "").replace(/\D/g, "") || null;
+    const emailOk = !!email && email.includes("@") && email.length > 4;
+    const telOk = !!telefone && telefone.length >= 10;
+    if (!emailOk && !telOk) return { ok: false };
+
+    const existente = await prisma.leadCheckout.findFirst({
+      where: {
+        convertido: false,
+        OR: [
+          ...(email ? [{ email }] : []),
+          ...(telefone ? [{ telefone }] : []),
+        ],
+      },
+      orderBy: { capturadoEm: "asc" },
+      select: { id: true },
+    });
+    if (existente) {
+      await prisma.leadCheckout.update({
+        where: { id: existente.id },
+        data: {
+          ...(nome ? { nome } : {}),
+          ...(email ? { email } : {}),
+          ...(telefone ? { telefone } : {}),
+        },
+      });
+    } else {
+      await prisma.leadCheckout.create({ data: { nome, email, telefone } });
+    }
+    return { ok: true };
+  } catch (e) {
+    console.error("[checkout] registrarLeadCheckout", e);
+    return { ok: false };
+  }
+}
+
 export async function criarPedidoCheckout(
   input: CheckoutFormInput,
 ): Promise<CheckoutResult> {
