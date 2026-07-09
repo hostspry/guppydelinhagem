@@ -206,6 +206,27 @@ export async function notificarLoteEnviado(
   );
 }
 
+// ── Rastreio atualizado (📦) — ocorrências novas do poll do Melhor Envio ───────
+export async function notificarRastreioAtualizado(
+  pedidos: {
+    numero: string;
+    cliente: string;
+    status: string;
+    url: string | null;
+  }[],
+): Promise<void> {
+  if (pedidos.length === 0) return;
+  const linhas = pedidos
+    .map((p) => {
+      const link = p.url ? ` — <a href="${p.url}">acompanhar</a>` : "";
+      return `• <b>${escapeHtml(p.numero)}</b> — ${escapeHtml(p.cliente)} · ${escapeHtml(p.status)}${link}`;
+    })
+    .join("\n");
+  await enviarSeguro(
+    () => `📦 <b>Rastreio atualizado (${pedidos.length})</b>\n\n${linhas}`,
+  );
+}
+
 // ── 3.5 Pedido entregue (✅) ──────────────────────────────────────────────────
 export async function notificarPedidoEntregue(orderId: string): Promise<void> {
   const p = await carregar(orderId);
