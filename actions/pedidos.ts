@@ -11,6 +11,7 @@ import {
 } from "@/lib/validations/pedido";
 import { TRANSICOES_PEDIDO, podeEditarItens } from "@/lib/pedido-status";
 import { transicionarParaPago, ajustarPoolEstoque } from "@/lib/pedido-baixa";
+import { gravarEnvioTx } from "@/lib/pedido-envio";
 import { aplicarEstornoPedido } from "@/lib/pagamento-estorno";
 import { getPaymentProvider } from "@/lib/payments/registry";
 import {
@@ -341,61 +342,6 @@ export async function atualizarStatusPedido(
 }
 
 const TRANSPORTADORAS_VALIDAS = ["JADLOG", "GOLLOG", "OUTRO"];
-
-function viaLabel(t: Transportadora | null): string {
-  return t === "JADLOG" ? " pela Jadlog" : t === "GOLLOG" ? " pela Gollog" : "";
-}
-
-/**
- * Grava o envio de UM pedido (status ENVIADO + rastreio + enviadoEm) e cria o
- * RastreioEvento + a Notificacao do cliente, tudo na MESMA transação. Fonte única
- * usada por registrarEnvioManual (detalhe) e marcarPedidosComoEnviados (lote).
- * A transportadora só é sobrescrita quando informada (o lote mantém a do pedido).
- * DEVE rodar dentro de prisma.$transaction (recebe o tx).
- */
-async function gravarEnvioTx(
-  tx: Prisma.TransactionClient,
-  o: {
-    id: string;
-    numero: string;
-    clienteId: string;
-    userId: string | null;
-    transportadora: Transportadora | null;
-    codigo: string | null;
-  },
-): Promise<void> {
-  const agora = new Date();
-  await tx.order.update({
-    where: { id: o.id },
-    data: {
-      status: "ENVIADO",
-      ...(o.transportadora ? { transportadora: o.transportadora } : {}),
-      codigoRastreio: o.codigo,
-      enviadoEm: agora,
-      rastreioStatus: "posted",
-    },
-  });
-  await tx.rastreioEvento.create({
-    data: {
-      orderId: o.id,
-      status: "posted",
-      descricao: "Envio registrado manualmente.",
-      ocorridoEm: agora,
-    },
-  });
-  await tx.notificacao.create({
-    data: {
-      orderId: o.id,
-      clienteId: o.clienteId,
-      userId: o.userId,
-      tipo: "ENVIADO",
-      titulo: "Pedido enviado",
-      corpo: `Seu pedido ${o.numero} foi despachado${viaLabel(o.transportadora)}.${
-        o.codigo ? ` Código de rastreio: ${o.codigo}.` : ""
-      }`,
-    },
-  });
-}
 
 /**
  * Registra o envio MANUAL de um pedido PAGO (código digitado — Gollog, ou fallback
