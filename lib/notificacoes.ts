@@ -227,6 +227,30 @@ export async function notificarRastreioAtualizado(
   );
 }
 
+// ── Checkout abandonado (🕐) — leads que preencheram contato e não pagaram ─────
+export async function notificarLeadsAbandonados(
+  leads: { nome: string | null; telefone: string | null; email: string | null }[],
+): Promise<void> {
+  if (leads.length === 0) return;
+  const linhas = leads
+    .map((l) => {
+      const nome = l.nome ? escapeHtml(l.nome) : "(sem nome)";
+      const d = (l.telefone ?? "").replace(/\D/g, "");
+      const tel = d
+        ? ` · <a href="https://wa.me/${d.startsWith("55") ? d : `55${d}`}">${escapeHtml(l.telefone as string)}</a>`
+        : "";
+      const email = l.email ? ` · ${escapeHtml(l.email)}` : "";
+      return `• <b>${nome}</b>${tel}${email}`;
+    })
+    .join("\n");
+  await enviarSeguro(
+    () =>
+      `🕐 <b>Checkout abandonado (${leads.length})</b>\n\n` +
+      `Preencheram o contato e não finalizaram:\n${linhas}\n\n` +
+      `💡 Um toque no WhatsApp pode fechar a venda.`,
+  );
+}
+
 // ── 3.5 Pedido entregue (✅) ──────────────────────────────────────────────────
 export async function notificarPedidoEntregue(orderId: string): Promise<void> {
   const p = await carregar(orderId);
