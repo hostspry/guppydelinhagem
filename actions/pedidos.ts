@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import {
   pedidoSchema,
@@ -17,6 +18,7 @@ import {
   notificarPedidoEntregue,
   notificarPedidoCancelado,
   notificarEstorno,
+  notificarLoteEnviado,
 } from "@/lib/notificacoes";
 import { COMPOSICAO_LABEL } from "@/lib/composicoes";
 import type {
@@ -340,6 +342,61 @@ export async function atualizarStatusPedido(
 
 const TRANSPORTADORAS_VALIDAS = ["JADLOG", "GOLLOG", "OUTRO"];
 
+function viaLabel(t: Transportadora | null): string {
+  return t === "JADLOG" ? " pela Jadlog" : t === "GOLLOG" ? " pela Gollog" : "";
+}
+
+/**
+ * Grava o envio de UM pedido (status ENVIADO + rastreio + enviadoEm) e cria o
+ * RastreioEvento + a Notificacao do cliente, tudo na MESMA transação. Fonte única
+ * usada por registrarEnvioManual (detalhe) e marcarPedidosComoEnviados (lote).
+ * A transportadora só é sobrescrita quando informada (o lote mantém a do pedido).
+ * DEVE rodar dentro de prisma.$transaction (recebe o tx).
+ */
+async function gravarEnvioTx(
+  tx: Prisma.TransactionClient,
+  o: {
+    id: string;
+    numero: string;
+    clienteId: string;
+    userId: string | null;
+    transportadora: Transportadora | null;
+    codigo: string | null;
+  },
+): Promise<void> {
+  const agora = new Date();
+  await tx.order.update({
+    where: { id: o.id },
+    data: {
+      status: "ENVIADO",
+      ...(o.transportadora ? { transportadora: o.transportadora } : {}),
+      codigoRastreio: o.codigo,
+      enviadoEm: agora,
+      rastreioStatus: "posted",
+    },
+  });
+  await tx.rastreioEvento.create({
+    data: {
+      orderId: o.id,
+      status: "posted",
+      descricao: "Envio registrado manualmente.",
+      ocorridoEm: agora,
+    },
+  });
+  await tx.notificacao.create({
+    data: {
+      orderId: o.id,
+      clienteId: o.clienteId,
+      userId: o.userId,
+      tipo: "ENVIADO",
+      titulo: "Pedido enviado",
+      corpo: `Seu pedido ${o.numero} foi despachado${viaLabel(o.transportadora)}.${
+        o.codigo ? ` Código de rastreio: ${o.codigo}.` : ""
+      }`,
+    },
+  });
+}
+
 /**
  * Registra o envio MANUAL de um pedido PAGO (código digitado — Gollog, ou fallback
  * quando a etiqueta foi comprada fora do site). ATÔMICO: grava transportadora +
@@ -374,47 +431,17 @@ export async function registrarEnvioManual(
     };
   }
 
-  const via =
-    transportadora === "JADLOG"
-      ? " pela Jadlog"
-      : transportadora === "GOLLOG"
-        ? " pela Gollog"
-        : "";
-  const agora = new Date();
-
   try {
-    await prisma.$transaction(async (tx) => {
-      await tx.order.update({
-        where: { id },
-        data: {
-          status: "ENVIADO",
-          transportadora,
-          codigoRastreio: codigo || null,
-          enviadoEm: agora,
-          rastreioStatus: "posted",
-        },
-      });
-      await tx.rastreioEvento.create({
-        data: {
-          orderId: id,
-          status: "posted",
-          descricao: "Envio registrado manualmente.",
-          ocorridoEm: agora,
-        },
-      });
-      await tx.notificacao.create({
-        data: {
-          orderId: id,
-          clienteId: order.clienteId,
-          userId: order.userId,
-          tipo: "ENVIADO",
-          titulo: "Pedido enviado",
-          corpo: `Seu pedido ${order.numero} foi despachado${via}.${
-            codigo ? ` Código de rastreio: ${codigo}.` : ""
-          }`,
-        },
-      });
-    });
+    await prisma.$transaction((tx) =>
+      gravarEnvioTx(tx, {
+        id,
+        numero: order.numero,
+        clienteId: order.clienteId,
+        userId: order.userId,
+        transportadora,
+        codigo: codigo || null,
+      }),
+    );
   } catch (e) {
     console.error(e);
     return { success: false, error: "Erro ao registrar o envio." };
@@ -467,6 +494,126 @@ export async function atualizarRastreio(
 
   revalidatePath(`/admin/pedidos/${id}`);
   return { success: true, message: "Rastreio atualizado." };
+}
+
+// ── Envio rápido em LOTE (listagem) ───────────────────────────────────────────
+const marcarEnviadosSchema = z.object({
+  envios: z
+    .array(
+      z.object({
+        pedidoId: z.string().min(1),
+        codigoRastreio: z.string().optional(),
+      }),
+    )
+    .min(1)
+    .max(50),
+});
+
+export type EnvioResultado = {
+  pedidoId: string;
+  numero: string;
+  sucesso: boolean;
+  erro?: string;
+};
+
+/**
+ * Marca vários pedidos como ENVIADO de uma vez (cada um com seu código opcional).
+ * Processa pedido a pedido em transações independentes — a falha de um NÃO derruba
+ * os outros. A transportadora de cada pedido é mantida (o lote não a altera).
+ * Telegram: 1 sucesso → 🚚 individual; 2+ → uma mensagem de lote agregada.
+ */
+export async function marcarPedidosComoEnviados(input: {
+  envios: { pedidoId: string; codigoRastreio?: string }[];
+}): Promise<{ ok: boolean; resultados: EnvioResultado[] }> {
+  await assertAuthorized();
+
+  const parsed = marcarEnviadosSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, resultados: [] };
+
+  const resultados: EnvioResultado[] = [];
+  const idsSucesso: string[] = [];
+  const sucessos: {
+    numero: string;
+    cliente: string;
+    cidade: string | null;
+    uf: string | null;
+    rastreio: string | null;
+  }[] = [];
+
+  for (const envio of parsed.data.envios) {
+    const codigo = (envio.codigoRastreio ?? "").trim() || null;
+    const order = await prisma.order.findUnique({
+      where: { id: envio.pedidoId },
+      select: {
+        id: true,
+        numero: true,
+        status: true,
+        clienteId: true,
+        userId: true,
+        transportadora: true,
+        enderecoEntrega: true,
+        cliente: { select: { nome: true } },
+      },
+    });
+    if (!order) {
+      resultados.push({
+        pedidoId: envio.pedidoId,
+        numero: "?",
+        sucesso: false,
+        erro: "Pedido não encontrado.",
+      });
+      continue;
+    }
+    if (!TRANSICOES_PEDIDO[order.status].includes("ENVIADO")) {
+      resultados.push({
+        pedidoId: order.id,
+        numero: order.numero,
+        sucesso: false,
+        erro: `Transição inválida (status ${order.status}).`,
+      });
+      continue;
+    }
+    try {
+      await prisma.$transaction((tx) =>
+        gravarEnvioTx(tx, {
+          id: order.id,
+          numero: order.numero,
+          clienteId: order.clienteId,
+          userId: order.userId,
+          transportadora: order.transportadora,
+          codigo,
+        }),
+      );
+      resultados.push({ pedidoId: order.id, numero: order.numero, sucesso: true });
+      idsSucesso.push(order.id);
+      const e = (order.enderecoEntrega ?? {}) as {
+        cidade?: string | null;
+        uf?: string | null;
+      };
+      sucessos.push({
+        numero: order.numero,
+        cliente: order.cliente.nome,
+        cidade: e.cidade ?? null,
+        uf: e.uf ?? null,
+        rastreio: codigo,
+      });
+    } catch (err) {
+      console.error("[pedidos] marcarPedidosComoEnviados", err);
+      resultados.push({
+        pedidoId: order.id,
+        numero: order.numero,
+        sucesso: false,
+        erro: "Erro ao registrar o envio.",
+      });
+    }
+  }
+
+  // Telegram: individual (1) ou lote agregado (2+). Sempre após persistir.
+  if (idsSucesso.length === 1) await notificarPedidoEnviado(idsSucesso[0]);
+  else if (idsSucesso.length >= 2) await notificarLoteEnviado(sucessos);
+
+  revalidatePath("/admin/pedidos");
+  return { ok: true, resultados };
 }
 
 /**

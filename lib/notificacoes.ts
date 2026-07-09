@@ -181,6 +181,31 @@ export async function notificarPedidoEnviado(orderId: string): Promise<void> {
   );
 }
 
+// ── Lote enviado (🚚) — UMA mensagem agregada (evita 10 notificações) ─────────
+export async function notificarLoteEnviado(
+  pedidos: {
+    numero: string;
+    cliente: string;
+    cidade: string | null;
+    uf: string | null;
+    rastreio: string | null;
+  }[],
+): Promise<void> {
+  if (pedidos.length === 0) return;
+  const linhas = pedidos
+    .map((p) => {
+      const dest =
+        [p.cidade, p.uf].filter(Boolean).map((s) => escapeHtml(String(s))).join("/") ||
+        "destino não informado";
+      const cod = p.rastreio ? escapeHtml(p.rastreio) : "sem rastreio";
+      return `• <b>${escapeHtml(p.numero)}</b> — ${escapeHtml(p.cliente)} · ${dest} · ${cod}`;
+    })
+    .join("\n");
+  await enviarSeguro(
+    () => `🚚 <b>Lote enviado (${pedidos.length} pedidos)</b>\n\n${linhas}`,
+  );
+}
+
 // ── 3.5 Pedido entregue (✅) ──────────────────────────────────────────────────
 export async function notificarPedidoEntregue(orderId: string): Promise<void> {
   const p = await carregar(orderId);
