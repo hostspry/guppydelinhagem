@@ -1,13 +1,12 @@
 import Link from "next/link";
-import { Plus, Pencil, Eye, Search } from "lucide-react";
+import { Plus, Search } from "lucide-react";
 import {
   listPedidos,
   cancelarPedidosAguardandoExpirados,
 } from "@/lib/queries/pedidos";
 import { PageHeader } from "@/components/admin/PageHeader";
-import { DeletePedidoButton } from "@/components/admin/DeletePedidoButton";
+import PedidosTabela from "@/components/admin/PedidosTabela";
 import { STATUS_PEDIDO } from "@/lib/pedido-status";
-import { formatBRL } from "@/lib/utils/format";
 import type { OrderStatus, TipoEntrega } from "@/lib/generated/prisma/client";
 
 type Props = {
@@ -211,98 +210,7 @@ export default async function PedidosPage({ searchParams }: Props) {
           )}
         </div>
       ) : (
-        <div className="bg-white border border-gray-200 rounded-lg overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr className="text-left text-xs font-medium text-gray-500 uppercase tracking-wide">
-                <th className="px-4 py-3">Número</th>
-                <th className="px-4 py-3">Cliente</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3">Entrega</th>
-                <th className="px-4 py-3">Transportadora</th>
-                <th className="px-4 py-3 text-right">Total</th>
-                <th className="px-4 py-3">Data</th>
-                <th className="px-4 py-3 text-right w-28">Ações</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {pedidos.map((p) => (
-                <tr key={p.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 font-mono font-medium text-[#07366A]">
-                    <Link
-                      href={`/admin/pedidos/${p.id}`}
-                      className="hover:text-[#FF035C]"
-                    >
-                      {p.numero}
-                    </Link>
-                  </td>
-                  <td className="px-4 py-3 text-gray-700">{p.clienteNome}</td>
-                  <td className="px-4 py-3">
-                    <span
-                      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_PEDIDO[p.status].badge}`}
-                    >
-                      {STATUS_PEDIDO[p.status].label}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span
-                      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${ENTREGA_BADGE[p.tipoEntrega].badge}`}
-                    >
-                      {ENTREGA_BADGE[p.tipoEntrega].label}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">
-                    {p.tipoEntrega === "RETIRADA" ? (
-                      <span className="text-xs text-gray-400">—</span>
-                    ) : p.transporte ? (
-                      <div className="flex flex-col gap-0.5">
-                        <span
-                          className={`inline-flex w-fit items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${TRANSPORTE_BADGE[p.transporte].badge}`}
-                        >
-                          {TRANSPORTE_BADGE[p.transporte].label}
-                        </span>
-                        {p.codigoRastreio && (
-                          <span className="font-mono text-[11px] text-gray-400">
-                            {p.codigoRastreio}
-                          </span>
-                        )}
-                      </div>
-                    ) : (
-                      <span className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-500">
-                        a definir
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-right font-medium text-[#07366A]">
-                    {formatBRL(p.total)}
-                  </td>
-                  <td className="px-4 py-3 text-gray-500">
-                    {p.criadoEm.toLocaleDateString("pt-BR")}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <div className="flex justify-end gap-1">
-                      <Link
-                        href={`/admin/pedidos/${p.id}`}
-                        className="text-gray-400 hover:text-[#07366A] p-1"
-                        aria-label={`Ver ${p.numero}`}
-                      >
-                        <Eye className="w-4 h-4" aria-hidden="true" />
-                      </Link>
-                      <Link
-                        href={`/admin/pedidos/${p.id}/editar`}
-                        className="text-gray-400 hover:text-[#07366A] p-1"
-                        aria-label={`Editar ${p.numero}`}
-                      >
-                        <Pencil className="w-4 h-4" aria-hidden="true" />
-                      </Link>
-                      <DeletePedidoButton id={p.id} numero={p.numero} />
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <PedidosTabela pedidos={pedidos} />
       )}
     </div>
   );
