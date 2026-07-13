@@ -30,7 +30,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const produto = await getProductBySlug(slug); // cache() dedup com o render
   if (!produto) return { title: "Produto não encontrado" };
 
-  const titulo = produto.metaTitle || `${produto.nome} — Guppy de Linhagem`;
+  // Title: respeita o metaTitle do admin quando existe. Sem ele, o fallback
+  // garante em todo produto os termos que trazem busca — a grafia "lebiste"
+  // (que quase ninguém otimiza) e "de linhagem" — via o sufixo da marca. A
+  // linhagem específica já vem no próprio nome do produto; não repetimos para
+  // não virar keyword stuffing.
+  const titulo = produto.metaTitle || `${produto.nome} | Guppy de Linhagem (Lebiste)`;
   // Descrição da prévia SEM preço (preço muda; link velho não pode mostrar errado).
   // Sem meta/descrição curta própria, cai num fallback que sempre traz linhagem,
   // casal/trio (quando há) e envio vivo — os elementos que o Google e o cliente
