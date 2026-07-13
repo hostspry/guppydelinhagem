@@ -12,12 +12,17 @@ import { ATACADO_INTRO, ATACADO_MOTIVOS, ATACADO_FAQ } from "@/lib/atacado-conte
 // Cluster: "criador de guppy" (10–100), "comprar guppy no atacado" (10–100),
 // fornecedor de peixes ornamentais para revenda. Página de CONVERSÃO B2B (não de
 // tráfego alto): objetivo é o lojista/criador falar no WhatsApp.
-export const metadata: Metadata = pageMeta({
-  title: "Guppy no Atacado: Fornecedor Direto do Criador | Marchezi Guppy Farm",
-  description:
-    "Comprar guppy de linhagem no atacado direto do criador tricampeão mundial. Fornecimento para lojas de aquarismo e revenda, com envio de peixe vivo para todo o Brasil.",
-  path: "/atacado",
-});
+export const metadata: Metadata = {
+  ...pageMeta({
+    title: "Guppy no Atacado: Fornecedor Direto do Criador | Marchezi Guppy Farm",
+    description:
+      "Comprar guppy de linhagem no atacado direto do criador tricampeão mundial. Fornecimento para lojas de aquarismo e revenda, com envio de peixe vivo para todo o Brasil.",
+    path: "/atacado",
+  }),
+  // Escondida por ora (decisão do negócio): acessível por link direto, mas fora
+  // dos buscadores. Remover este bloco para reativar a indexação.
+  robots: { index: false, follow: true },
+};
 
 const BTN_AMBAR =
   "inline-flex items-center justify-center gap-2 min-h-12 px-8 py-3.5 rounded-pill bg-accent text-[#302f2f] font-semibold hover:brightness-95 transition-all";

@@ -29,7 +29,7 @@ const INSTITUCIONAL = [
   { href: "/linhagens", label: "Linhagens" },
   { href: "/sobre-nos", label: "Sobre Nós" },
   { href: "/conheca-os-guppy", label: "Conheça o Guppy" },
-  { href: "/atacado", label: "Atacado" },
+  // /atacado escondido por ora (fora do menu/footer/sitemap, com noindex).
   { href: "/contatos", label: "Contatos" },
   // /blog e /politica-de-privacidade removidos por ora (rotas não existem → 404).
 ];

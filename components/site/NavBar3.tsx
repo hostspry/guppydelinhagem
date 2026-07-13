@@ -13,7 +13,8 @@ const NAV_LINKS = [
   { href: "/linhagens", label: "Linhagens" },
   { href: "/sobre-nos", label: "Sobre Nós" },
   { href: "/conheca-os-guppy", label: "Conheça o Guppy" },
-  { href: "/atacado", label: "Atacado" },
+  // /atacado escondido por ora (decisão do negócio) — a página existe, mas fora
+  // do menu, do footer e do sitemap, e com noindex.
   // /blog removido por ora (rota não existe → 404).
   { href: "/contatos", label: "Contatos" },
 ];
