@@ -61,6 +61,22 @@ export const IMG_HERO = {
   alt: "Macho de guppy Full Red, corpo e cauda inteiramente vermelhos",
 } as const;
 
+// ── Seção "Macho e fêmea": comparação escaneável (listas semânticas) ──────────
+export const MACHO_SINAIS = [
+  "Corpo menor e mais esguio",
+  "Cores mais intensas",
+  "Cauda geralmente maior",
+  "Nadadeira anal fina e pontuda",
+  "Possui gonopódio",
+];
+export const FEMEA_SINAIS = [
+  "Corpo maior e mais arredondado",
+  "Cores geralmente mais discretas",
+  "Nadadeira anal larga e arredondada",
+  "Pode apresentar mancha gravídica",
+  "Não possui gonopódio",
+];
+
 // ── FAQ (A.8) — perguntas com volume real; respostas VISÍVEIS na página ────────
 export const FAQ_PEIXE_GUPPY: QaPair[] = [
   {

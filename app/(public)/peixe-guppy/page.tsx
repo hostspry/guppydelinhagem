@@ -27,6 +27,8 @@ import {
   IMG_MACHO_FEMEA,
   IMG_FEMEA,
   IMG_HERO,
+  MACHO_SINAIS,
+  FEMEA_SINAIS,
 } from "@/lib/peixe-guppy-content";
 
 // ANEXO-A. Keyword-cabeça: "peixe guppy" (10K–100K, competição Baixa), intenção
@@ -174,52 +176,117 @@ export default function PeixeGuppyPage() {
 
       {/* ═══ 3. MACHO E FÊMEA ═══ */}
       <section className="bg-white py-12">
-        <div className="container-site max-w-4xl space-y-6">
+        <div className="container-site max-w-5xl space-y-6">
           <h2 className="text-primary text-2xl sm:text-3xl font-semibold">
             Macho e fêmea: como diferenciar
           </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
-            <div className="mx-auto w-full max-w-sm overflow-hidden rounded-2xl border border-border">
+
+          {/* Resposta direta (texto HTML, não dentro de imagem) */}
+          <p className="text-text font-light leading-relaxed max-w-3xl">
+            A forma mais segura de diferenciar o guppy macho da fêmea é observar a
+            nadadeira anal. No macho, ela é fina e pontuda, formando o gonopódio.
+            Na fêmea, é mais larga e arredondada.
+          </p>
+
+          {/* Duas colunas: infográfico (44%) | explicação + comparação (56%) */}
+          <div className="grid grid-cols-1 md:grid-cols-[44fr_56fr] gap-8 md:gap-12 lg:gap-14 items-start">
+            {/* Infográfico — inteiro, sem crop */}
+            <div className="overflow-hidden rounded-2xl border border-border">
               <Image
                 src={IMG_MACHO_FEMEA.src}
                 width={IMG_MACHO_FEMEA.width}
                 height={IMG_MACHO_FEMEA.height}
                 alt={IMG_MACHO_FEMEA.alt}
                 className="w-full h-auto"
-                sizes="(max-width: 768px) 100vw, 384px"
+                sizes="(max-width: 768px) 100vw, 44vw"
               />
             </div>
-            <div className="space-y-4">
-              <p className="text-text font-light leading-relaxed">
-                O jeito mais confiável é olhar a nadadeira anal. No macho ela é
-                fina e pontuda, o gonopódio, usado na reprodução. Na fêmea é larga,
-                em formato de leque. Some a isso que o macho é menor, esguio e bem
-                colorido, com cauda grande, enquanto a fêmea é maior, de corpo
-                arredondado e cores mais discretas.
+
+            {/* Coluna direita */}
+            <div className="space-y-5">
+              {/* Destaque "Sinal mais confiável" — azul muito claro, editorial */}
+              <div className="rounded-xl border border-primary/15 bg-primary/5 p-4">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-primary/70">
+                  Sinal mais confiável
+                </p>
+                <p className="mt-1 text-text font-light text-sm leading-relaxed">
+                  Observe a nadadeira anal: pontuda no macho e arredondada na
+                  fêmea.
+                </p>
+              </div>
+
+              {/* Comparação escaneável — listas semânticas (sem cor como único sinal) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="rounded-xl border border-border bg-white p-4">
+                  <h3 className="text-primary font-semibold text-sm flex items-center gap-1.5">
+                    <span aria-hidden="true">♂</span> Macho
+                  </h3>
+                  <ul className="mt-2 space-y-1.5">
+                    {MACHO_SINAIS.map((s) => (
+                      <li key={s} className="flex items-start gap-2 text-text font-light text-sm">
+                        <span className="text-accent mt-0.5 shrink-0" aria-hidden="true">●</span>
+                        {s}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                <div className="rounded-xl border border-border bg-white p-4">
+                  <h3 className="text-secondary font-semibold text-sm flex items-center gap-1.5">
+                    <span aria-hidden="true">♀</span> Fêmea
+                  </h3>
+                  <ul className="mt-2 space-y-1.5">
+                    {FEMEA_SINAIS.map((s) => (
+                      <li key={s} className="flex items-start gap-2 text-text font-light text-sm">
+                        <span className="text-accent mt-0.5 shrink-0" aria-hidden="true">●</span>
+                        {s}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+
+              {/* Explicação curta (complemento) */}
+              <p className="text-text font-light text-sm leading-relaxed">
+                Durante a gestação, a fêmea pode apresentar a mancha gravídica, uma
+                região escura próxima à nadadeira anal. Esse sinal deve ser usado
+                como complemento, e não como único critério de identificação.
               </p>
-              <p className="text-text font-light leading-relaxed">
-                A fêmea também mostra a mancha gravídica, uma área escura perto da
-                nadadeira anal, quando está gerando filhotes.
-              </p>
+
+              {/* CTA secundário — mesma URL, botão discreto (não compete com o principal) */}
               <Link
                 href="/guia/macho-e-femea"
-                className="inline-flex items-center gap-1.5 text-sm font-semibold text-secondary hover:underline"
+                className="inline-flex items-center gap-2 rounded-pill border-2 border-secondary text-secondary font-semibold text-sm px-5 py-2.5 hover:bg-secondary hover:text-white transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-secondary/40"
               >
-                Ver o guia completo de macho e fêmea
-                <ArrowRight size={15} aria-hidden="true" />
+                Ver guia completo sobre macho e fêmea
+                <ArrowRight size={16} aria-hidden="true" />
               </Link>
             </div>
           </div>
-          <figure className="mx-auto w-full max-w-md overflow-hidden rounded-2xl border border-border">
-            <Image
-              src={IMG_FEMEA.src}
-              width={IMG_FEMEA.width}
-              height={IMG_FEMEA.height}
-              alt={IMG_FEMEA.alt}
-              className="w-full h-auto"
-              sizes="(max-width: 768px) 100vw, 448px"
-            />
-            <figcaption className="text-xs text-muted-foreground px-4 py-2 bg-[#ECE7E8]/40">
+
+          {/* Exemplo real — foto da fêmea, contextualizada, abaixo das colunas */}
+          <figure className="mx-auto w-full max-w-[800px] space-y-3 mt-12 sm:mt-14">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-secondary">
+              Exemplo real
+            </p>
+            <h3 className="text-primary text-xl font-semibold">
+              Observe as características de uma fêmea
+            </h3>
+            <p className="text-text font-light text-sm leading-relaxed">
+              Corpo mais arredondado, coloração discreta e nadadeira anal em
+              formato de leque são características comuns nas fêmeas adultas.
+            </p>
+            <div className="overflow-hidden rounded-2xl border border-border">
+              <Image
+                src={IMG_FEMEA.src}
+                width={IMG_FEMEA.width}
+                height={IMG_FEMEA.height}
+                alt={IMG_FEMEA.alt}
+                loading="lazy"
+                className="w-full h-auto"
+                sizes="(max-width: 820px) 100vw, 800px"
+              />
+            </div>
+            <figcaption className="text-xs text-muted-foreground">
               Fêmea de guppy da linha Ivory: corpo robusto e arredondado, cauda com
               renda preta.
             </figcaption>
