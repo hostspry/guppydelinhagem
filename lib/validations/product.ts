@@ -68,6 +68,7 @@ export const productSchema = z
     categoryId: z.string().min(1, "Selecione uma categoria"),
     ativo: checkboxBool.default(true),
     destaque: checkboxBool.default(false),
+    linhagemCampea: checkboxBool.default(false),
     metaTitle: z.string().max(60, "Máx 60 caracteres").optional().or(z.literal("")),
     metaDescription: z
       .string()

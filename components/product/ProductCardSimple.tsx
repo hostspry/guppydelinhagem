@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Check, Tag } from "lucide-react";
 import { VideoThumb } from "@/components/admin/VideoThumb";
 import FeedPlayButton from "@/components/feed/FeedPlayButton";
+import { TricampeaoBadge } from "@/components/site/TricampeaoBadge";
 import { formatBRL } from "@/lib/utils/format";
 import type { PublicProductCard } from "@/lib/queries/products";
 
@@ -55,10 +56,16 @@ export default function ProductCardSimple({
 
         {product.video && (
           <span
-            className={`absolute top-2 left-2 z-10 text-white text-[10px] font-semibold px-2 py-0.5 rounded-full ${PLATFORM_COLOR[product.video.platform]}`}
+            className={`absolute top-2 right-2 z-10 text-white text-[10px] font-semibold px-2 py-0.5 rounded-full ${PLATFORM_COLOR[product.video.platform]}`}
           >
             {PLATFORM_LABEL[product.video.platform]}
           </span>
+        )}
+
+        {product.linhagemCampea && (
+          <div className="absolute top-2 left-2 z-20">
+            <TricampeaoBadge size="sm" short />
+          </div>
         )}
 
         {/* Mobile: tocar no vídeo abre o feed neste produto (desktop: card normal) */}

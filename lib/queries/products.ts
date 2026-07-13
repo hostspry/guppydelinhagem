@@ -24,6 +24,7 @@ export type PublicProductCard = {
   descontoPixPercent: number; // % efetivo aplicado no Pix (0 = sem desconto)
   parcelasMax: number;
   estoque: number;
+  linhagemCampea: boolean; // selo de tricampeão mundial (World Guppy Contest)
   // Campanha automática vigente (preço promo já calculado), ou null.
   campanha: CampanhaProduto | null;
   video: {
@@ -47,6 +48,7 @@ const cardSelect = {
   // Para ordenar a vitrine (esgotados por último; destaque entre disponíveis).
   // Não vão para o card — só alimentam ordenarVitrine / resolução de campanha.
   destaque: true,
+  linhagemCampea: true, // ESTE vai para o card (selo de tricampeão mundial)
   estoqueMachos: true,
   estoqueFemeas: true,
   // Vídeo de capa: principal primeiro, senão o de menor ordem. Só ativos (loja).
@@ -86,6 +88,7 @@ function toCard(p: CardRow, config: ConfigPreco): PublicProductCard {
     descontoPixPercent: precos.descontoPixPercent,
     parcelasMax: p.parcelasMax,
     estoque: p.estoque,
+    linhagemCampea: p.linhagemCampea,
     campanha: null, // preenchido por anexarCampanhasCards
     video: v
       ? {
@@ -256,6 +259,7 @@ export type ProductDetail = {
   estoque: number;
   estoqueMachos: number; // pool (PEIXE)
   estoqueFemeas: number;
+  linhagemCampea: boolean; // selo de tricampeão mundial
   categoria: string;
   categoriaSlug: string;
   categoryId: string;
@@ -308,6 +312,7 @@ export const getProductBySlug = cache(
         usarDescontoPixGlobal: true,
         parcelasMax: true,
         estoque: true,
+        linhagemCampea: true,
         estoqueMachos: true,
         estoqueFemeas: true,
         categoryId: true,
@@ -367,6 +372,7 @@ export const getProductBySlug = cache(
       estoque: p.estoque,
       estoqueMachos: p.estoqueMachos,
       estoqueFemeas: p.estoqueFemeas,
+      linhagemCampea: p.linhagemCampea,
       categoria: p.category.nome,
       categoriaSlug: p.category.slug,
       categoryId: p.categoryId,

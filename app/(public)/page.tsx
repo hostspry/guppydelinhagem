@@ -21,11 +21,14 @@ export const metadata: Metadata = pageMeta({
   description:
     "Guppys (lebistes) de linhagem do tricampeão mundial Full Black. Full Red, Koi, Half Moon e mais — envio de peixe vivo para todo o Brasil, de Guarapari/ES.",
   path: "/",
+  // OG/compartilhamento do site inteiro: foto comprovadamente própria (fêmea
+  // Ivory), sem afirmar prêmio sobre um peixe específico. blue-dragon-hero saiu
+  // por não ter procedência confirmada.
   image: {
-    url: "/images/hero/blue-dragon-hero.webp",
-    width: 1024,
-    height: 1024,
-    alt: "Guppy de linhagem premiado da Marchezi Guppy Farm",
+    url: "/images/guppy/femeaguppyivory.webp",
+    width: 750,
+    height: 752,
+    alt: "Fêmea de guppy Ivory da Marchezi Guppy Farm",
   },
 });
 

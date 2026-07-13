@@ -26,6 +26,7 @@ import {
 import { toast } from "sonner";
 import { VideoThumb } from "@/components/admin/VideoThumb";
 import { WhatsAppIcon } from "@/components/icons/WhatsAppIcon";
+import { TricampeaoBadge } from "@/components/site/TricampeaoBadge";
 import ProductFreteEstimator from "./ProductFreteEstimator";
 import ProductFaq from "./ProductFaq";
 import ProductShare from "./ProductShare";
@@ -388,9 +389,12 @@ export default function ProductDetail({
         {/* Info / compra */}
         <div className="space-y-5">
           <div className="space-y-2">
-            <span className="inline-block text-[11px] font-semibold uppercase tracking-wide text-secondary bg-secondary/10 px-2.5 py-0.5 rounded-full">
-              {product.categoria}
-            </span>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="inline-block text-[11px] font-semibold uppercase tracking-wide text-secondary bg-secondary/10 px-2.5 py-0.5 rounded-full">
+                {product.categoria}
+              </span>
+              {product.linhagemCampea && <TricampeaoBadge />}
+            </div>
             <h1 className="text-primary text-2xl sm:text-3xl font-bold leading-tight">
               {product.nome}
             </h1>

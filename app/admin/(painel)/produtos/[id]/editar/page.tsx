@@ -56,6 +56,7 @@ export default async function EditarProdutoPage({ params }: Props) {
           categoryId: produto.categoryId,
           ativo: produto.ativo,
           destaque: produto.destaque,
+          linhagemCampea: produto.linhagemCampea,
           metaTitle: produto.metaTitle,
           metaDescription: produto.metaDescription,
           keywords: produto.keywords,

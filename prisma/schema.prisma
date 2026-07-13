@@ -266,6 +266,9 @@ model Product {
   altura          Decimal?    @db.Decimal(8, 2)
   ativo           Boolean     @default(true)
   destaque        Boolean     @default(false)
+  // Linha campeã mundial (World Guppy Contest). Liga o selo de tricampeão no
+  // card/página do produto. Marcação manual no admin — nunca por nome.
+  linhagemCampea  Boolean     @default(false)
   categoryId      String
   criadoEm        DateTime    @default(now())
   atualizadoEm    DateTime    @updatedAt

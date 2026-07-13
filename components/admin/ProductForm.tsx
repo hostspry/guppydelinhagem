@@ -87,6 +87,7 @@ type ProductFormProps = {
     categoryId: string;
     ativo: boolean;
     destaque: boolean;
+    linhagemCampea: boolean;
     metaTitle: string | null;
     metaDescription: string | null;
     keywords: string[];
@@ -181,6 +182,7 @@ export function ProductForm({ categorias, initialData }: ProductFormProps) {
           categoryId: initialData.categoryId,
           ativo: initialData.ativo,
           destaque: initialData.destaque,
+          linhagemCampea: initialData.linhagemCampea,
           metaTitle: initialData.metaTitle ?? "",
           metaDescription: initialData.metaDescription ?? "",
           variantes: [],
@@ -209,6 +211,7 @@ export function ProductForm({ categorias, initialData }: ProductFormProps) {
           categoryId: "",
           ativo: true,
           destaque: false,
+          linhagemCampea: false,
           metaTitle: "",
           metaDescription: "",
           variantes: [],
@@ -409,6 +412,7 @@ export function ProductForm({ categorias, initialData }: ProductFormProps) {
     formData.append("categoryId", data.categoryId);
     formData.append("ativo", String(data.ativo));
     formData.append("destaque", String(data.destaque));
+    formData.append("linhagemCampea", String(data.linhagemCampea));
     if (data.metaTitle) formData.append("metaTitle", data.metaTitle);
     if (data.metaDescription)
       formData.append("metaDescription", data.metaDescription);
@@ -980,7 +984,7 @@ export function ProductForm({ categorias, initialData }: ProductFormProps) {
           </span>
         </label>
 
-        <label className="flex items-start gap-2.5 cursor-pointer">
+        <label className="flex items-start gap-2.5 mb-3 cursor-pointer">
           <input
             type="checkbox"
             {...register("destaque")}
@@ -989,6 +993,19 @@ export function ProductForm({ categorias, initialData }: ProductFormProps) {
           <span className="text-sm text-gray-700">
             <span className="font-medium text-[#07366A]">Destaque</span> — aparece na
             vitrine da home.
+          </span>
+        </label>
+
+        <label className="flex items-start gap-2.5 cursor-pointer">
+          <input
+            type="checkbox"
+            {...register("linhagemCampea")}
+            className="mt-0.5 w-4 h-4 accent-[#FF035C]"
+          />
+          <span className="text-sm text-gray-700">
+            <span className="font-medium text-[#07366A]">Linhagem campeã mundial</span>{" "}
+            — mostra o selo de tricampeão (World Guppy Contest) no card e na página.
+            Marque só linhas que realmente foram campeãs.
           </span>
         </label>
       </fieldset>
