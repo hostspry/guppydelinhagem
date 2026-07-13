@@ -61,6 +61,6 @@ export const HOME_BANNERS: { estufa: HomeBanner; aprenda: HomeBanner } = {
     eyebrow: "Sobre os Guppy",
     tituloPartes: [{ texto: "Aprenda a criar e cuidar dos seus guppys" }],
     ctaLabel: "Conhecer",
-    ctaHref: "/conheca-os-guppy",
+    ctaHref: "/peixe-guppy",
   },
 };

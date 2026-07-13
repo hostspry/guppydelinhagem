@@ -232,7 +232,7 @@ export default async function HomePage({ searchParams }: Props) {
             . Cada peixe é observado antes de viajar e embalado à mão para chegar
             vivo e no padrão, com envio para todo o Brasil. Para entender melhor o
             hobby, veja o{" "}
-            <Link href="/conheca-os-guppy" className="text-secondary font-medium hover:underline">
+            <Link href="/peixe-guppy" className="text-secondary font-medium hover:underline">
               guia do guppy
             </Link>{" "}
             ou conheça a{" "}

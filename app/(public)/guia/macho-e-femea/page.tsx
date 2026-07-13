@@ -18,7 +18,7 @@ import {
 } from "@/lib/guias-content";
 
 // Cluster: "guppy macho e fêmea", "guppy fêmea", "guppy macho", "lebiste macho e
-// fêmea". Tema de sexagem, distinto do pilar /conheca-os-guppy.
+// fêmea". Tema de sexagem, distinto do pilar /peixe-guppy.
 export const metadata: Metadata = pageMeta({
   title: "Guppy Macho e Fêmea: Como Diferenciar (Lebiste) | Guia do Criador",
   description:
@@ -36,7 +36,7 @@ const WA_GERAL = whatsappLink(
 export default function MachoFemeaPage() {
   const breadcrumbLd = breadcrumbJsonLd([
     { name: "Início", url: `${SITE_URL}/` },
-    { name: "Guia do Guppy", url: `${SITE_URL}/conheca-os-guppy` },
+    { name: "Peixe Guppy", url: `${SITE_URL}/peixe-guppy` },
     { name: "Macho e fêmea" },
   ]);
   const articleLd = articleJsonLd(SITE_URL, {

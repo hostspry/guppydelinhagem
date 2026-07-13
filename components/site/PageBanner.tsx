@@ -6,7 +6,7 @@ type Props = {
   /**
    * Tag do título. Default "h2" (não quebra usos onde a página já tem o seu h1).
    * Passe "h1" nas páginas em que o banner É o título principal (ex.: /contatos,
-   * /conheca-os-guppy), garantindo exatamente um h1 por página.
+   * /peixe-guppy), garantindo exatamente um h1 por página.
    */
   as?: "h1" | "h2";
 };

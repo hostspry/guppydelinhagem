@@ -394,7 +394,7 @@ export const getProductBySlug = cache(
   },
 );
 
-// Card enxuto do grid "Principais linhagens" do guia (/conheca-os-guppy).
+// Card enxuto do grid "Principais linhagens" do guia (/peixe-guppy).
 export type LinhagemGuiaCard = {
   slug: string;
   nome: string;

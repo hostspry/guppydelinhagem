@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import Image from "next/image";
 import { ArrowRight, Sparkles } from "lucide-react";
 import PageBanner from "@/components/site/PageBanner";
 import RespostaRapida from "@/components/site/RespostaRapida";
@@ -15,15 +16,15 @@ import {
 import { whatsappLink } from "@/lib/constants";
 import { listProductsLoja } from "@/lib/queries/products";
 import {
-  TIPOS_GUPPY,
   RESP_O_QUE_E_LINHAGEM,
   LINHAGENS_FAQ,
 } from "@/lib/linhagens-content";
+import { GALERIA_LINHAGENS } from "@/lib/peixe-guppy-content";
 
 // Keyword-cluster alvo: "guppy de linhagem" (100–1K), "tipos de guppy" (100–1K),
 // "comprar guppy de linhagem", "lebiste de linhagem". A home cobre "peixe guppy";
 // esta página cobre a intenção de catálogo/tipos, sem duplicar o guia
-// (/conheca-os-guppy), que trata cuidado e reprodução.
+// (/peixe-guppy), que trata cuidado e reprodução.
 export const metadata: Metadata = pageMeta({
   title: "Guppy de Linhagem (Lebiste): Tipos, Cores e Preços | Marchezi Guppy Farm",
   description:
@@ -86,7 +87,7 @@ export default async function LinhagensPage() {
             fixar cor, cauda e padrão. Se você quer entender o cuidado no dia a
             dia, veja o{" "}
             <Link
-              href="/conheca-os-guppy"
+              href="/peixe-guppy"
               className="text-secondary font-medium hover:underline"
             >
               guia do guppy
@@ -108,22 +109,36 @@ export default async function LinhagensPage() {
               para ver o que está disponível agora.
             </p>
           </div>
-          <div className="flex flex-wrap gap-3">
-            {TIPOS_GUPPY.map((t) => (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+            {GALERIA_LINHAGENS.map((l) => (
               <Link
-                key={t.busca}
-                href={`/?busca=${encodeURIComponent(t.busca)}#loja`}
-                className="inline-flex items-center px-5 py-2.5 rounded-pill bg-white border border-border text-primary font-medium text-sm hover:border-secondary hover:text-secondary transition-colors"
+                key={l.busca}
+                href={`/?busca=${encodeURIComponent(l.busca)}#loja`}
+                className="group flex flex-col bg-white rounded-xl border border-border overflow-hidden shadow-sm hover:shadow-md transition-shadow"
               >
-                {t.nome}
+                <div className="relative aspect-[4/3] bg-muted overflow-hidden">
+                  <Image
+                    src={l.img}
+                    alt={l.alt}
+                    fill
+                    className="object-cover group-hover:scale-105 transition-transform duration-300"
+                    sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 220px"
+                  />
+                </div>
+                <div className="px-3 py-2.5">
+                  <p className="font-semibold text-primary text-sm leading-tight group-hover:text-accent transition-colors">
+                    {l.nome}
+                  </p>
+                </div>
               </Link>
             ))}
             <Link
               href="/linhagens/endler"
-              className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-pill bg-secondary text-white font-medium text-sm hover:brightness-110 transition-all"
+              className="group flex flex-col items-center justify-center gap-2 bg-secondary text-white rounded-xl p-4 text-center hover:brightness-110 transition-all"
             >
-              <Sparkles size={15} aria-hidden="true" />
-              Guppy Endler
+              <Sparkles size={22} aria-hidden="true" />
+              <span className="font-semibold text-sm leading-tight">Guppy Endler</span>
+              <span className="text-white/85 text-xs">ver página</span>
             </Link>
           </div>
         </div>

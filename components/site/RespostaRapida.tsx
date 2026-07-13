@@ -1,6 +1,6 @@
 // Box "resposta rápida" (AEO/GEO): pergunta em negrito + resposta objetiva, num
 // bloco destacado com os tokens da marca (borda rosa + fundo tênue). Usado 3x na
-// página /conheca-os-guppy. Server component puro.
+// página /peixe-guppy. Server component puro.
 export default function RespostaRapida({
   titulo,
   texto,

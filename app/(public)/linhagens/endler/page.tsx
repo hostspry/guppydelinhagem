@@ -95,7 +95,7 @@ export default async function EndlerPage() {
           <p className="text-text font-light leading-relaxed">
             Se é a sua primeira vez com esse tipo de peixe, vale ler o{" "}
             <Link
-              href="/conheca-os-guppy"
+              href="/peixe-guppy"
               className="text-secondary font-medium hover:underline"
             >
               guia do guppy

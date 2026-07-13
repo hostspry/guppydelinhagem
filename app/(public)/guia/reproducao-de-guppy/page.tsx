@@ -20,7 +20,7 @@ import {
 
 // Cluster: "reprodução de guppy", "guppy grávida" (100–1K), "guppy prenha",
 // "guppy tendo filhote", "guppy come os filhotes", "reprodução de lebiste".
-// Aprofunda o tema que /conheca-os-guppy trata em uma seção; não o duplica.
+// Aprofunda o tema que /peixe-guppy trata em uma seção; não o duplica.
 export const metadata: Metadata = pageMeta({
   title: "Reprodução de Guppy (Lebiste): Guppy Grávida e Filhotes | Guia do Criador",
   description:
@@ -38,7 +38,7 @@ const WA_GERAL = whatsappLink(
 export default function ReproducaoGuppyPage() {
   const breadcrumbLd = breadcrumbJsonLd([
     { name: "Início", url: `${SITE_URL}/` },
-    { name: "Guia do Guppy", url: `${SITE_URL}/conheca-os-guppy` },
+    { name: "Peixe Guppy", url: `${SITE_URL}/peixe-guppy` },
     { name: "Reprodução de guppy" },
   ]);
   const articleLd = articleJsonLd(SITE_URL, {
@@ -115,7 +115,7 @@ export default function ReproducaoGuppyPage() {
               guia de filhotes de guppy
             </Link>
             , e para o cuidado geral do peixe, o{" "}
-            <Link href="/conheca-os-guppy" className="text-secondary font-medium hover:underline">
+            <Link href="/peixe-guppy" className="text-secondary font-medium hover:underline">
               guia completo do guppy
             </Link>
             .

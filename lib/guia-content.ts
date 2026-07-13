@@ -1,4 +1,4 @@
-// Conteúdo da página /conheca-os-guppy (guia pilar informacional). Fonte ÚNICA
+// Conteúdo da página /peixe-guppy (guia pilar informacional). Fonte ÚNICA
 // do texto para facilitar edição sem mexer no layout. Voz do criador (Manassés
 // Marchezi): frases de tamanho variado, fato no lugar de adjetivo, vocabulário
 // do aquarismo brasileiro. Nada de número/depoimento/prêmio inventado — os fatos

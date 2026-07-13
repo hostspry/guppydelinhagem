@@ -2,7 +2,7 @@
 // lib/guia-content.ts. Copy de criador, primeira pessoa, direta, sem termos
 // inflados e sem dose de medicamento.
 //
-// Anti-canibalização: /conheca-os-guppy é a página pilar ("o que é" + "como
+// Anti-canibalização: /peixe-guppy é a página pilar ("o que é" + "como
 // cuidar"). Estes guias tratam SUBTEMAS com volume próprio e pouca sobreposição
 // com o pilar (reprodução aprofundada, sexagem, filhotes). Cada um linka de volta
 // para o pilar e para os guias irmãos.

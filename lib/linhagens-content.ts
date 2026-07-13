@@ -4,7 +4,7 @@
 //
 // IMPORTANTE (regra da missão de SEO): nada aqui inventa linhagem. Os tipos
 // listados em TIPOS_GUPPY são apenas os que o próprio site já nomeia (home e
-// /conheca-os-guppy) e que aparecem no catálogo. Cada chip aponta para a busca
+// /peixe-guppy) e que aparecem no catálogo. Cada chip aponta para a busca
 // da loja, então se não houver peixe daquela linhagem o filtro só volta vazio,
 // nunca uma página falsa.
 

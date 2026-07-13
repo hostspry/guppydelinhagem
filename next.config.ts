@@ -113,6 +113,14 @@ const nextConfig: NextConfig = {
         destination: "/",
         permanent: true,
       },
+      // O guia de guppy foi consolidado na pilar /peixe-guppy (ANEXO-A): uma
+      // única URL de guppy/lebiste, as demais 301 para ela. Preserva o equity
+      // do antigo /conheca-os-guppy e evita autocanibalização.
+      {
+        source: "/conheca-os-guppy",
+        destination: "/peixe-guppy",
+        permanent: true,
+      },
     ];
   },
   async headers() {

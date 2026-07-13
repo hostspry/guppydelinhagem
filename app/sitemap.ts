@@ -15,8 +15,9 @@ const ESTATICAS: MetadataRoute.Sitemap = [
   { url: `${SITE_URL}/linhagens/endler`, changeFrequency: "weekly", priority: 0.8 },
   // /atacado escondido por ora (decisão do negócio) — fora do sitemap e noindex.
   { url: `${SITE_URL}/envio`, changeFrequency: "monthly", priority: 0.7 },
+  { url: `${SITE_URL}/peixe-guppy`, changeFrequency: "monthly", priority: 0.9 },
   { url: `${SITE_URL}/sobre-nos`, changeFrequency: "monthly", priority: 0.8 },
-  { url: `${SITE_URL}/conheca-os-guppy`, changeFrequency: "monthly", priority: 0.8 },
+  { url: `${SITE_URL}/guia/como-cuidar-de-guppy`, changeFrequency: "monthly", priority: 0.7 },
   { url: `${SITE_URL}/guia/reproducao-de-guppy`, changeFrequency: "monthly", priority: 0.7 },
   { url: `${SITE_URL}/guia/macho-e-femea`, changeFrequency: "monthly", priority: 0.6 },
   { url: `${SITE_URL}/guia/filhotes-de-guppy`, changeFrequency: "monthly", priority: 0.6 },

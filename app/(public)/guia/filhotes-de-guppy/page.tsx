@@ -38,7 +38,7 @@ const WA_GERAL = whatsappLink(
 export default function FilhotesGuppyPage() {
   const breadcrumbLd = breadcrumbJsonLd([
     { name: "Início", url: `${SITE_URL}/` },
-    { name: "Guia do Guppy", url: `${SITE_URL}/conheca-os-guppy` },
+    { name: "Peixe Guppy", url: `${SITE_URL}/peixe-guppy` },
     { name: "Filhotes de guppy" },
   ]);
   const articleLd = articleJsonLd(SITE_URL, {
