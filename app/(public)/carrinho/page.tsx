@@ -299,18 +299,20 @@ export default function CarrinhoPage() {
                         removeItem(item.variantId);
                       }}
                       aria-label={`Remover ${item.nome}`}
-                      // iOS Safari: o toque sobre o <svg> faz dele o event.target e o
-                      // click não chega ao <button> → [&>svg]:pointer-events-none força
-                      // o botão a ser sempre o alvo. touch-manipulation + alvo 44px
-                      // (do S23) mantidos; o botão é o mesmo elemento do onClick.
-                      className="flex items-center justify-center w-11 h-11 -my-1 shrink-0 touch-manipulation text-muted-foreground hover:text-secondary transition-colors [&>svg]:pointer-events-none"
+                      // O toque não chegava aqui no mobile porque a coluna de
+                      // "Subtotal" (irmã, à direita) estica por toda a altura da
+                      // linha (align-items:stretch) e sua caixa invisível cobria a
+                      // lixeira, roubando o toque. relative z-10 força a lixeira a
+                      // ficar por cima; o subtotal ganhou self-start (não estica).
+                      // [&>svg]:pointer-events-none + touch-manipulation mantidos.
+                      className="relative z-10 flex items-center justify-center w-11 h-11 -my-1 shrink-0 touch-manipulation text-muted-foreground hover:text-secondary transition-colors [&>svg]:pointer-events-none"
                     >
                       <Trash2 size={18} aria-hidden="true" />
                     </button>
                   </div>
                 </div>
 
-                <div className="text-right shrink-0">
+                <div className="text-right shrink-0 self-start">
                   <p className="text-xs text-muted-foreground">Subtotal</p>
                   <p className="text-green-600 font-bold">
                     {formatBRL(precoPix * item.quantidade)}
