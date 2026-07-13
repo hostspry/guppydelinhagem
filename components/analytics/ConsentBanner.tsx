@@ -103,10 +103,11 @@ export default function ConsentBanner() {
       aria-label="Aviso de privacidade"
       className="fixed inset-x-0 bottom-0 z-[200] bg-primary text-white shadow-lg pb-[env(safe-area-inset-bottom)]"
     >
-      <div className="container-site py-4 flex flex-col sm:flex-row sm:items-center gap-3">
-        <p className="text-sm font-light leading-snug flex-1">
-          Usamos cookies para entender como o site é usado e deixá-lo melhor.
-          Você pode aceitar ou recusar.{" "}
+      {/* Compacto no mobile: uma faixa baixa (texto curto + botões na mesma
+          linha) para cobrir o mínimo de tela enquanto não é dispensado. */}
+      <div className="container-site py-2.5 flex items-center gap-3">
+        <p className="text-xs sm:text-sm font-light leading-snug flex-1 line-clamp-2 sm:line-clamp-none">
+          Usamos cookies para melhorar o site.{" "}
           {/* TODO: trocar para a página de Política de Privacidade quando existir. */}
           <Link href="/contatos" className="underline hover:text-accent">
             Saiba mais
@@ -117,14 +118,14 @@ export default function ConsentBanner() {
           <button
             type="button"
             onClick={recusar}
-            className="min-h-11 px-5 py-2 rounded-pill border border-white/40 text-white text-sm font-medium hover:bg-white/10 transition-colors"
+            className="min-h-11 px-4 py-1.5 rounded-pill border border-white/40 text-white text-xs sm:text-sm font-medium hover:bg-white/10 transition-colors"
           >
             Recusar
           </button>
           <button
             type="button"
             onClick={aceitar}
-            className="min-h-11 px-5 py-2 rounded-pill bg-secondary text-white text-sm font-semibold hover:brightness-110 transition-all"
+            className="min-h-11 px-4 py-1.5 rounded-pill bg-secondary text-white text-xs sm:text-sm font-semibold hover:brightness-110 transition-all"
           >
             Aceitar
           </button>
