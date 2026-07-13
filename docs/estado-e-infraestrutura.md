@@ -354,3 +354,44 @@ Isso é certo que virá — só não agora.
 - Fórmula de preço: `(preço API × 1.5) + R$20`
 - Entrega ≥13 dias → dispara aviso de idade do peixe
 - ViaCEP para lookup de endereço (público, sem token)
+
+## 15. SEO + GEO (otimização — passo planejado, pós-vitrine)
+
+> **GEO é prioridade FORTE neste projeto** (mais que SEO tradicional). Nicho de guppy
+> pedigree + diferencial de criador campeão World Guppy Contest = potencial de ser
+> A REFERÊNCIA que as IAs (ChatGPT, Gemini, Perplexity, Claude) citam quando alguém
+> pergunta onde comprar/sobre guppy de linhagem no Brasil. Vale mais que disputar
+> keyword genérica no Google.
+
+### Já temos (base boa, sem ter planejado)
+- `generateMetadata` por produto (meta título/descrição únicos, gerados pela IA Fase 7)
+- SSR (Next) — conteúdo legível por buscadores e IAs
+- URLs limpas com slug (`/loja/guppy-koi-tuxedo`)
+- Conteúdo factual e estruturado (descrição IA, ficha técnica, FAQ) — formato que IA
+  generativa gosta de extrair/citar
+
+### Técnico — fase de código (fazer pós-vitrine)
+- [ ] **Schema.org / JSON-LD** (MAIOR impacto): Product (preço, disponibilidade,
+      imagem), Organization, FAQPage. Habilita rich results no Google E ajuda IA a
+      entender a página. **Vale já encaixar na página de produto (está fresca).**
+- [ ] sitemap.xml + robots.txt
+- [ ] `llms.txt` (arquivo experimental que "explica" o site às IAs)
+- [ ] Open Graph completo (preview ao compartilhar no WhatsApp/Instagram)
+- [ ] alt text nas imagens
+- [ ] Performance / Core Web Vitals (Google ranqueia por velocidade)
+- [ ] Deixar EXPLÍCITO em todo lugar (home, sobre, Schema): "criação de guppy pedigree
+      do campeão World Guppy Contest" — autoridade citável.
+
+### Estratégico — contínuo, NÃO é código (o que mais move o GEO)
+- **Autoridade/menções externas:** IAs citam quem aparece em vários lugares confiáveis
+  (fóruns de aquarismo, grupos, vídeos, artigos). O título de campeão mundial é o
+  maior ativo — explorar.
+- **Blog com conteúdo educativo:** responder dúvidas reais de aquarista (como cuidar de
+  guppy koi, diferença halfmoon × delta, como o peixe é enviado vivo). IA cita quem
+  responde a pergunta. (O menu já tem "Blog" — verificar se está vazio; se sim, é arma
+  subutilizada.)
+- **Presença:** YouTube (já é o vídeo primário dos produtos), comunidades, redes.
+
+### Decisão registrada
+GEO é foco forte. Fazer a fase técnica depois de fechar a vitrine (página de produto +
+/loja), mas adiantar o Schema.org na página de produto enquanto ela está fresca.
