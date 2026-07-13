@@ -58,7 +58,7 @@ export const IMG_HERO = {
   src: "/images/guppy/fullred.webp",
   width: 905,
   height: 592,
-  alt: "Macho de guppy Full Red, o lebiste de linhagem criado na Marchezi Guppy Farm",
+  alt: "Macho de guppy Full Red, corpo e cauda inteiramente vermelhos",
 } as const;
 
 // ── FAQ (A.8) — perguntas com volume real; respostas VISÍVEIS na página ────────

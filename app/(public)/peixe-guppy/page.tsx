@@ -3,6 +3,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { ArrowRight, Trophy, ChevronDown, Check, X } from "lucide-react";
 import PageBanner from "@/components/site/PageBanner";
+import { TricampeaoBadge } from "@/components/site/TricampeaoBadge";
 import { WhatsAppIcon } from "@/components/icons/WhatsAppIcon";
 import { JsonLd } from "@/components/seo/JsonLd";
 import { pageMeta, SITE_URL } from "@/lib/seo";
@@ -34,9 +35,11 @@ import {
 export const metadata: Metadata = pageMeta({
   title: "Peixe Guppy: guia completo do criador | Marchezi Guppy Farm",
   description:
-    "Tudo sobre o peixe guppy (lebiste): tipos, cuidados, reprodução, preço e como comprar de um criador real com 26 linhagens. Envio para todo o Brasil.",
+    "Peixe guppy (lebiste) por um criador tricampeão mundial (World Guppy Contest, linha Full Black): tipos, cuidados, preço e como comprar. Envio para todo o Brasil.",
   path: "/peixe-guppy",
-  image: { url: IMG_HERO.src, width: IMG_HERO.width, height: IMG_HERO.height, alt: IMG_HERO.alt },
+  // OG image = foto comprovadamente própria (fêmea Ivory), não uma das suspeitas
+  // de banco de imagem — é a imagem que aparece ao compartilhar.
+  image: { url: IMG_FEMEA.src, width: IMG_FEMEA.width, height: IMG_FEMEA.height, alt: IMG_FEMEA.alt },
 });
 
 const BTN_PRIMARIO =
@@ -60,7 +63,7 @@ export default function PeixeGuppyPage() {
     description:
       "Guia do peixe guppy (lebiste) por um criador real: o que é, preço, macho e fêmea, tipos e linhagens, cuidados, reprodução, alimentação e onde comprar.",
     path: "/peixe-guppy",
-    image: `${SITE_URL}${IMG_HERO.src}`,
+    image: `${SITE_URL}${IMG_FEMEA.src}`,
   });
 
   return (
@@ -74,6 +77,16 @@ export default function PeixeGuppyPage() {
         title="Peixe Guppy (Lebiste): o guia completo de quem cria"
         subtitle="O que é, quanto custa, como diferenciar macho e fêmea, tipos, cuidados e reprodução. Escrito por quem cria guppy de verdade, em Guarapari/ES."
       />
+
+      {/* Faixa de autoridade (E-E-A-T) logo abaixo do H1 — o maior ativo do site. */}
+      <section className="bg-primary text-white py-3">
+        <div className="container-site flex flex-col sm:flex-row items-center justify-center gap-2 text-center">
+          <TricampeaoBadge />
+          <span className="text-sm font-light text-white/90">
+            Criador tricampeão mundial na linha Full Black (2023, 2024 e 2025).
+          </span>
+        </div>
+      </section>
 
       {/* ═══ 1. O QUE É O PEIXE GUPPY (LEBISTE) ═══ */}
       <section className="bg-white py-12">
@@ -235,6 +248,11 @@ export default function PeixeGuppyPage() {
                 className="group flex flex-col bg-white rounded-xl border border-border overflow-hidden shadow-sm hover:shadow-md transition-shadow"
               >
                 <div className="relative aspect-[4/3] bg-muted overflow-hidden">
+                  {l.nome === "Full Black" && (
+                    <div className="absolute top-1.5 left-1.5 z-10">
+                      <TricampeaoBadge size="sm" short />
+                    </div>
+                  )}
                   <Image
                     src={l.img}
                     alt={l.alt}
@@ -289,9 +307,9 @@ export default function PeixeGuppyPage() {
             {FICHA.filter((f) =>
               ["Temperatura ideal", "pH ideal", "Tamanho adulto", "Nível de cuidado"].includes(f.label),
             ).map((item) => (
-              <div key={item.label} className="flex items-center justify-between bg-[#ECE7E8]/40 rounded-xl px-5 py-3 border border-border">
+              <div key={item.label} className="flex items-center justify-between gap-4 bg-[#ECE7E8]/40 rounded-xl px-5 py-3 border border-border">
                 <span className="text-sm font-medium text-primary">{item.label}</span>
-                <span className="text-sm font-light text-text text-right">{item.valor}</span>
+                <span className="text-sm font-light text-text text-right shrink-0">{item.valor}</span>
               </div>
             ))}
           </div>
@@ -347,8 +365,8 @@ export default function PeixeGuppyPage() {
             O que o peixe guppy come
           </h2>
           <p className="text-text font-light leading-relaxed">
-            Guppy é onívoro. Uma dieta variada deixa a cor mais forte e o peixe
-            mais resistente. A base:
+            Guppy é onívoro e aceita bem uma dieta variada. Veja o que compõe um
+            bom cardápio no dia a dia:
           </p>
           <ul className="space-y-2">
             {ALIMENTACAO.map((item) => (
@@ -423,10 +441,6 @@ export default function PeixeGuppyPage() {
             Eu envio guppy vivo para todos os estados, embalado à mão. Veja{" "}
             <Link href="/envio" className="text-secondary font-medium hover:underline">
               como o peixe chega vivo
-            </Link>
-            . Se você é lojista ou cria para revenda, dá para se abastecer no{" "}
-            <Link href="/atacado" className="text-secondary font-medium hover:underline">
-              atacado
             </Link>
             .
           </p>

@@ -6,6 +6,7 @@ import PageBanner from "@/components/site/PageBanner";
 import RespostaRapida from "@/components/site/RespostaRapida";
 import { WhatsAppIcon } from "@/components/icons/WhatsAppIcon";
 import ProductCardSimple from "@/components/product/ProductCardSimple";
+import { TricampeaoBadge } from "@/components/site/TricampeaoBadge";
 import { JsonLd } from "@/components/seo/JsonLd";
 import { pageMeta, SITE_URL } from "@/lib/seo";
 import {
@@ -117,6 +118,11 @@ export default async function LinhagensPage() {
                 className="group flex flex-col bg-white rounded-xl border border-border overflow-hidden shadow-sm hover:shadow-md transition-shadow"
               >
                 <div className="relative aspect-[4/3] bg-muted overflow-hidden">
+                  {l.nome === "Full Black" && (
+                    <div className="absolute top-1.5 left-1.5 z-10">
+                      <TricampeaoBadge size="sm" short />
+                    </div>
+                  )}
                   <Image
                     src={l.img}
                     alt={l.alt}
