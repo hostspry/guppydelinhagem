@@ -19,7 +19,8 @@ const ESTATICAS: MetadataRoute.Sitemap = [
   { url: `${SITE_URL}/sobre-nos`, changeFrequency: "monthly", priority: 0.8 },
   { url: `${SITE_URL}/guia/como-cuidar-de-guppy`, changeFrequency: "monthly", priority: 0.7 },
   { url: `${SITE_URL}/guia/reproducao-de-guppy`, changeFrequency: "monthly", priority: 0.7 },
-  { url: `${SITE_URL}/guia/macho-e-femea`, changeFrequency: "monthly", priority: 0.6 },
+  // /guia/macho-e-femea consolidado no pilar /peixe-guppy#macho-e-femea (308 em
+  // next.config). Fora do sitemap para não indexar uma rota que só redireciona.
   { url: `${SITE_URL}/guia/filhotes-de-guppy`, changeFrequency: "monthly", priority: 0.6 },
   { url: `${SITE_URL}/frete`, changeFrequency: "monthly", priority: 0.6 },
   { url: `${SITE_URL}/contatos`, changeFrequency: "monthly", priority: 0.5 },

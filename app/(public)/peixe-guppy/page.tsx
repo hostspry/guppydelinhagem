@@ -29,6 +29,8 @@ import {
   IMG_HERO,
   MACHO_SINAIS,
   FEMEA_SINAIS,
+  COMPARATIVO_SEXO,
+  ERROS_SEXAGEM,
 } from "@/lib/peixe-guppy-content";
 
 // ANEXO-A. Keyword-cabeça: "peixe guppy" (10K–100K, competição Baixa), intenção
@@ -175,9 +177,11 @@ export default function PeixeGuppyPage() {
       </section>
 
       {/* ═══ 3. MACHO E FÊMEA ═══ */}
+      {/* Seção-guia consolidada aqui (o antigo /guia/macho-e-femea agora 308 para
+          o pilar). Todo o aprofundamento é H3: o H2 do pilar não muda. */}
       <section className="bg-white py-12">
         <div className="container-site max-w-5xl space-y-6">
-          <h2 className="text-primary text-2xl sm:text-3xl font-semibold">
+          <h2 id="macho-e-femea" className="text-primary text-2xl sm:text-3xl font-semibold scroll-mt-24">
             Macho e fêmea: como diferenciar
           </h2>
 
@@ -185,10 +189,12 @@ export default function PeixeGuppyPage() {
           <p className="text-text font-light leading-relaxed max-w-3xl">
             A forma mais segura de diferenciar o guppy macho da fêmea é observar a
             nadadeira anal. No macho, ela é fina e pontuda, formando o gonopódio.
-            Na fêmea, é mais larga e arredondada.
+            Na fêmea, permanece curta, larga e em formato de leque. Tamanho,
+            formato do corpo, cores e cauda ajudam na identificação, mas são
+            sinais complementares.
           </p>
 
-          {/* Duas colunas: infográfico (44%) | explicação + comparação (56%) */}
+          {/* Duas colunas: infográfico (44%) | destaque + comparação (56%) */}
           <div className="grid grid-cols-1 md:grid-cols-[44fr_56fr] gap-8 md:gap-12 lg:gap-14 items-start">
             {/* Infográfico — inteiro, sem crop */}
             <div className="overflow-hidden rounded-2xl border border-border">
@@ -210,8 +216,8 @@ export default function PeixeGuppyPage() {
                   Sinal mais confiável
                 </p>
                 <p className="mt-1 text-text font-light text-sm leading-relaxed">
-                  Observe a nadadeira anal: pontuda no macho e arredondada na
-                  fêmea.
+                  Observe a nadadeira anal: gonopódio fino e pontiagudo no macho;
+                  nadadeira larga e em formato de leque na fêmea.
                 </p>
               </div>
 
@@ -244,31 +250,121 @@ export default function PeixeGuppyPage() {
                   </ul>
                 </div>
               </div>
-
-              {/* Explicação curta (complemento) */}
-              <p className="text-text font-light text-sm leading-relaxed">
-                Durante a gestação, a fêmea pode apresentar a mancha gravídica, uma
-                região escura próxima à nadadeira anal. Esse sinal deve ser usado
-                como complemento, e não como único critério de identificação.
-              </p>
-
-              {/* CTA secundário — mesma URL, botão discreto (não compete com o principal) */}
-              <Link
-                href="/guia/macho-e-femea"
-                className="inline-flex items-center gap-2 rounded-pill border-2 border-secondary text-secondary font-semibold text-sm px-5 py-2.5 hover:bg-secondary hover:text-white transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-secondary/40"
-              >
-                Ver guia completo sobre macho e fêmea
-                <ArrowRight size={16} aria-hidden="true" />
-              </Link>
             </div>
           </div>
 
-          {/* Exemplo real — foto da fêmea, contextualizada, abaixo das colunas */}
-          <figure className="mx-auto w-full max-w-[800px] space-y-3 mt-12 sm:mt-14">
+          {/* Aprofundamento em H3 — largura de leitura confortável */}
+          <div className="max-w-3xl space-y-7 pt-2">
+            <div className="space-y-2">
+              <h3 className="text-primary text-lg font-semibold">
+                O gonopódio: o sinal mais confiável
+              </h3>
+              <p className="text-text font-light text-sm leading-relaxed">
+                O gonopódio é a nadadeira anal do macho já modificada: fina,
+                alongada e pontiaguda, e é ela que participa da fecundação interna.
+                Na fêmea, essa mesma nadadeira continua curta, larga e aberta em
+                formato de leque. Quando você coloca dois guppys lado a lado, é
+                esse o primeiro ponto que eu olho.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <h3 className="text-primary text-lg font-semibold">
+                Tamanho e formato do corpo
+              </h3>
+              <p className="text-text font-light text-sm leading-relaxed">
+                A fêmea costuma ter o corpo maior, mais alto e robusto, com o
+                ventre arredondado. O macho tende a ser menor, mais estreito e
+                esguio. A diferença fica mais clara em adultos e durante a
+                gestação, mas o tamanho sozinho não decide, porque varia com a
+                genética, a alimentação e as condições de criação. Em muitos
+                adultos, o macho fica por volta de 3 a 4 cm e a fêmea bem
+                desenvolvida chega a 5 a 6 cm, sempre como faixa aproximada.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <h3 className="text-primary text-lg font-semibold">
+                Coloração, cauda e nadadeiras
+              </h3>
+              <p className="text-text font-light text-sm leading-relaxed">
+                O macho geralmente tem cores mais intensas, desenhos mais
+                contrastantes, cauda ampla e nadadeira dorsal mais desenvolvida.
+                Nos guppys comuns, a fêmea costuma ser mais discreta. Já nas
+                linhagens selecionadas, ela também pode exibir cor e padrão
+                marcantes. Por isso a coloração ajuda, mas não substitui a
+                observação da nadadeira anal.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <h3 className="text-primary text-lg font-semibold">Ponto gravídico</h3>
+              <p className="text-text font-light text-sm leading-relaxed">
+                A fêmea pode apresentar uma região escura na parte de trás do
+                ventre, perto da nadadeira anal, conhecida como ponto ou mancha
+                gravídica. Ela costuma ficar mais evidente durante a gestação, mas
+                varia com a linhagem, a coloração e a condição do peixe. O ponto
+                gravídico não deve ser usado sozinho para dizer o sexo nem como
+                relógio exato do nascimento. Se a sua fêmea está grávida, veja o
+                que esperar no{" "}
+                <Link href="/guia/reproducao-de-guppy" className="text-secondary font-medium hover:underline">
+                  guia de reprodução de guppy
+                </Link>
+                .
+              </p>
+            </div>
+          </div>
+
+          {/* Tabela comparativa (H3) — semântica, scroll horizontal só na tabela */}
+          <div className="max-w-4xl space-y-4 pt-2">
+            <h3 className="text-primary text-lg font-semibold">
+              Macho x fêmea: tabela comparativa
+            </h3>
+            <div className="overflow-x-auto rounded-2xl border border-border bg-white">
+              <table className="w-full text-sm border-collapse">
+                <thead>
+                  <tr className="bg-primary text-white text-left">
+                    <th className="px-4 py-3 font-semibold">Característica</th>
+                    <th className="px-4 py-3 font-semibold">Macho</th>
+                    <th className="px-4 py-3 font-semibold">Fêmea</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {COMPARATIVO_SEXO.map((row, i) => (
+                    <tr key={row.c} className={i % 2 ? "bg-[#ECE7E8]/40" : "bg-white"}>
+                      <th scope="row" className="px-4 py-3 font-medium text-primary text-left align-top">
+                        {row.c}
+                      </th>
+                      <td className="px-4 py-3 text-text font-light align-top">{row.macho}</td>
+                      <td className="px-4 py-3 text-text font-light align-top">{row.femea}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Juvenis (H3) */}
+          <div className="max-w-3xl space-y-2 pt-2">
+            <h3 className="text-primary text-lg font-semibold">
+              Como identificar guppys jovens
+            </h3>
+            <p className="text-text font-light text-sm leading-relaxed">
+              Em muitos juvenis, os primeiros sinais aparecem por volta de 30 a 40
+              dias, mas esse tempo muda com a linhagem, a temperatura, a
+              alimentação e o ritmo de crescimento. Olhe principalmente o começo do
+              alongamento da nadadeira anal nos machos. A cor não deve ser o único
+              critério, porque macho jovem ainda pode estar pouco colorido e fêmea
+              de linhagem pode já mostrar padrão forte.
+            </p>
+          </div>
+
+          {/* Exemplo real — foto da fêmea, contextualizada */}
+          <figure className="mx-auto w-full max-w-[800px] space-y-3 mt-8 sm:mt-10">
             <p className="text-[11px] font-semibold uppercase tracking-wide text-secondary">
               Exemplo real
             </p>
-            <h3 className="text-primary text-xl font-semibold">
+            <h3 className="text-primary text-lg font-semibold">
               Observe as características de uma fêmea
             </h3>
             <p className="text-text font-light text-sm leading-relaxed">
@@ -291,6 +387,21 @@ export default function PeixeGuppyPage() {
               renda preta.
             </figcaption>
           </figure>
+
+          {/* Erros comuns (H3) — bloco discreto */}
+          <div className="max-w-3xl rounded-2xl border border-border bg-[#ECE7E8]/40 p-5 space-y-3">
+            <h3 className="text-primary text-lg font-semibold">
+              Erros comuns na hora de sexar
+            </h3>
+            <ul className="space-y-1.5">
+              {ERROS_SEXAGEM.map((e) => (
+                <li key={e} className="flex items-start gap-2 text-text font-light text-sm">
+                  <X size={15} className="text-red-500 mt-0.5 shrink-0" aria-hidden="true" />
+                  {e}
+                </li>
+              ))}
+            </ul>
+          </div>
         </div>
       </section>
 

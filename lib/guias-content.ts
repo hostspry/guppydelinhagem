@@ -68,57 +68,10 @@ export const REPRODUCAO_FAQ: QaPair[] = [
   },
 ];
 
-// ── /guia/macho-e-femea ───────────────────────────────────────────────────────
-// Cluster: guppy macho e fêmea, guppy fêmea, guppy macho, lebiste macho e fêmea.
-
-export const MACHO_FEMEA_INTRO =
-  "Diferenciar macho de fêmea no guppy é simples depois que você aprende onde olhar. Isso importa para montar a proporção certa no aquário e, se você quer criar, para controlar os cruzamentos.";
-
-export const MACHO_FEMEA_COMPARATIVO: { c: string; macho: string; femea: string }[] = [
-  {
-    c: "Tamanho",
-    macho: "Menor e mais esguio.",
-    femea: "Maior e de corpo mais robusto.",
-  },
-  {
-    c: "Cor",
-    macho: "Muito colorido, caudas grandes e vistosas.",
-    femea: "Cores mais discretas, cauda menor.",
-  },
-  {
-    c: "Nadadeira anal",
-    macho: "Gonopódio: nadadeira fina e pontuda, usada na reprodução.",
-    femea: "Nadadeira anal larga, em formato de leque.",
-  },
-  {
-    c: "Mancha gravídica",
-    macho: "Não tem.",
-    femea: "Área escura perto da nadadeira anal, mais visível quando grávida.",
-  },
-];
-
-export const MACHO_FEMEA_FAQ: QaPair[] = [
-  {
-    pergunta: "Como diferenciar guppy macho de fêmea?",
-    resposta:
-      "O sinal mais confiável é a nadadeira anal: no macho ela é fina e pontuda, o gonopódio; na fêmea é larga, em leque. Some a isso que o macho é menor e mais colorido e a fêmea é maior e mais discreta.",
-  },
-  {
-    pergunta: "Com quantas semanas dá para saber o sexo do guppy?",
-    resposta:
-      "Por volta de 3 a 4 semanas de vida começam a aparecer os primeiros sinais, e por volta de 6 a 8 semanas fica claro. O gonopódio do macho é o primeiro a se formar.",
-  },
-  {
-    pergunta: "Qual a proporção ideal de macho e fêmea?",
-    resposta:
-      "Para o bem-estar das fêmeas, uma boa referência é de 1 macho para 2 ou 3 fêmeas. Isso evita que os machos fiquem perseguindo uma única fêmea o tempo todo.",
-  },
-  {
-    pergunta: "Posso ter só machos de guppy?",
-    resposta:
-      "Pode, e é comum para quem quer só a beleza sem lidar com filhotes. Um grupo só de machos costuma conviver bem, ainda mais em aquário com espaço e plantas.",
-  },
-];
+// ── /guia/macho-e-femea (REMOVIDO) ────────────────────────────────────────────
+// A sexagem foi consolidada na seção "Macho e fêmea" do pilar /peixe-guppy
+// (dados em lib/peixe-guppy-content). A rota antiga agora faz 308 para o pilar
+// (next.config), então os antigos exports MACHO_FEMEA_* saíram daqui.
 
 // ── /guia/filhotes-de-guppy ───────────────────────────────────────────────────
 // Cluster: filhote de guppy, alevino de guppy, como cuidar de alevinos, ração

@@ -121,6 +121,15 @@ const nextConfig: NextConfig = {
         destination: "/peixe-guppy",
         permanent: true,
       },
+      // O guia de sexagem foi consolidado na seção "Macho e fêmea" do pilar
+      // (/peixe-guppy#macho-e-femea). A rota antiga não renderiza mais: 308
+      // permanente para o pilar, preservando o equity e evitando conteúdo
+      // duplicado. Sem cadeia: aponta direto para o destino final.
+      {
+        source: "/guia/macho-e-femea",
+        destination: "/peixe-guppy",
+        permanent: true,
+      },
     ];
   },
   async headers() {

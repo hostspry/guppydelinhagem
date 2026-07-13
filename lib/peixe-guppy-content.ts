@@ -77,6 +77,29 @@ export const FEMEA_SINAIS = [
   "Não possui gonopódio",
 ];
 
+// Tabela comparativa da seção "Macho e fêmea" (H3 dentro do H2 do pilar).
+// Conteúdo migrado e ampliado do antigo /guia/macho-e-femea, consolidado aqui.
+// Faixas e generalizações propositalmente descritas como aproximadas.
+export const COMPARATIVO_SEXO: { c: string; macho: string; femea: string }[] = [
+  { c: "Nadadeira anal", macho: "Gonopódio fino e pontiagudo", femea: "Curta, larga e em formato de leque" },
+  { c: "Corpo", macho: "Menor, estreito e esguio", femea: "Maior, alto e arredondado" },
+  { c: "Coloração", macho: "Geralmente mais intensa", femea: "Variável, muitas vezes mais discreta" },
+  { c: "Cauda", macho: "Costuma ser maior e ornamentada", femea: "Normalmente menor" },
+  { c: "Nadadeira dorsal", macho: "Geralmente mais desenvolvida", femea: "Geralmente mais curta" },
+  { c: "Ventre", macho: "Mais afilado", femea: "Mais arredondado" },
+  { c: "Ponto gravídico", macho: "Ausente", femea: "Pode ficar visível" },
+];
+
+// Erros comuns na hora de sexar — bloco editorial discreto, sem cor como sinal.
+export const ERROS_SEXAGEM: string[] = [
+  "Usar só a cor para decidir o sexo.",
+  "Confiar apenas no tamanho do peixe.",
+  "Tratar o ponto gravídico como prova definitiva.",
+  "Tentar identificar filhotes cedo demais.",
+  "Confundir uma nadadeira fechada por um instante com o gonopódio.",
+  "Julgar por uma foto ruim, sem ver o peixe nadando.",
+];
+
 // ── FAQ (A.8) — perguntas com volume real; respostas VISÍVEIS na página ────────
 export const FAQ_PEIXE_GUPPY: QaPair[] = [
   {
@@ -88,6 +111,11 @@ export const FAQ_PEIXE_GUPPY: QaPair[] = [
     pergunta: "Como saber se o guppy é macho ou fêmea?",
     resposta:
       "O macho é menor e mais colorido, com cauda grande e o gonopódio (nadadeira anal fina e pontuda). A fêmea é maior, de corpo mais robusto e arredondado, com a nadadeira anal em leque e cores mais discretas.",
+  },
+  {
+    pergunta: "Com que idade dá para identificar o sexo do guppy?",
+    resposta:
+      "Em muitos juvenis, os primeiros sinais aparecem por volta de 30 a 40 dias, mas o desenvolvimento varia. Observe principalmente a formação do gonopódio no macho e o formato em leque da nadadeira anal na fêmea.",
   },
   {
     pergunta: "Como saber se a guppy está grávida?",
