@@ -130,6 +130,52 @@ export function faqPageJsonLd(pares: readonly QaPair[]): Record<string, unknown>
   };
 }
 
+// ── CollectionPage (páginas de catálogo: /linhagens, /linhagens/endler) ───────
+/**
+ * CollectionPage de uma página de catálogo/listagem. Amarra a página à MESMA
+ * entidade-organização (mesmo @id) via isPartOf/about, reforçando para o Google
+ * que a coleção é da Marchezi Guppy Farm. Sem inventar itens: descreve a coleção,
+ * não lista produtos (o grid já é HTML rastreável).
+ */
+export function collectionPageJsonLd(
+  siteUrl: string,
+  opts: { name: string; description: string; path: string },
+): Record<string, unknown> {
+  return {
+    "@context": "https://schema.org",
+    "@type": "CollectionPage",
+    name: opts.name,
+    description: opts.description,
+    url: `${siteUrl}${opts.path}`,
+    isPartOf: { "@id": orgId(siteUrl) },
+    about: { "@id": orgId(siteUrl) },
+  };
+}
+
+// ── Article (guias de conteúdo: /guia/*) ──────────────────────────────────────
+/**
+ * Article de uma página de guia. Autor e publisher apontam para a MESMA
+ * organização (mesmo @id da home/sobre) — reforça autoria/E-E-A-T para GEO.
+ */
+export function articleJsonLd(
+  siteUrl: string,
+  opts: { headline: string; description: string; path: string; image?: string },
+): Record<string, unknown> {
+  const url = `${siteUrl}${opts.path}`;
+  return {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    headline: opts.headline,
+    description: opts.description,
+    ...(opts.image ? { image: [opts.image] } : {}),
+    mainEntityOfPage: { "@type": "WebPage", "@id": url },
+    url,
+    author: { "@id": orgId(siteUrl) },
+    publisher: { "@id": orgId(siteUrl) },
+    inLanguage: "pt-BR",
+  };
+}
+
 // ── Product + Offer/AggregateOffer ────────────────────────────────────────────
 const IN_STOCK = "https://schema.org/InStock";
 const OUT_OF_STOCK = "https://schema.org/OutOfStock";

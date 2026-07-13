@@ -11,8 +11,15 @@ export const revalidate = 3600;
 // /login, /cadastro, /minha-conta, /admin (privadas ou noindex).
 const ESTATICAS: MetadataRoute.Sitemap = [
   { url: `${SITE_URL}/`, changeFrequency: "daily", priority: 1 },
+  { url: `${SITE_URL}/linhagens`, changeFrequency: "weekly", priority: 0.9 },
+  { url: `${SITE_URL}/linhagens/endler`, changeFrequency: "weekly", priority: 0.8 },
+  { url: `${SITE_URL}/atacado`, changeFrequency: "monthly", priority: 0.7 },
+  { url: `${SITE_URL}/envio`, changeFrequency: "monthly", priority: 0.7 },
   { url: `${SITE_URL}/sobre-nos`, changeFrequency: "monthly", priority: 0.8 },
   { url: `${SITE_URL}/conheca-os-guppy`, changeFrequency: "monthly", priority: 0.8 },
+  { url: `${SITE_URL}/guia/reproducao-de-guppy`, changeFrequency: "monthly", priority: 0.7 },
+  { url: `${SITE_URL}/guia/macho-e-femea`, changeFrequency: "monthly", priority: 0.6 },
+  { url: `${SITE_URL}/guia/filhotes-de-guppy`, changeFrequency: "monthly", priority: 0.6 },
   { url: `${SITE_URL}/frete`, changeFrequency: "monthly", priority: 0.6 },
   { url: `${SITE_URL}/contatos`, changeFrequency: "monthly", priority: 0.5 },
 ];

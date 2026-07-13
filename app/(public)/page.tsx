@@ -213,7 +213,11 @@ export default async function HomePage({ searchParams }: Props) {
             no World Guppy Contest.
           </p>
           <p className="text-text font-light leading-relaxed">
-            Trabalho com casais e trios das linhagens que a gente desenvolve, como{" "}
+            Trabalho com casais e trios das{" "}
+            <Link href="/linhagens" className="text-secondary font-medium hover:underline">
+              linhagens
+            </Link>{" "}
+            que a gente desenvolve, como{" "}
             <Link href="/?busca=full+red" className="text-secondary font-medium hover:underline">
               Full Red
             </Link>

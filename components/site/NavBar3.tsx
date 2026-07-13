@@ -10,8 +10,10 @@ import { cn } from "@/lib/utils";
 
 const NAV_LINKS = [
   { href: "/#loja", label: "Loja" },
+  { href: "/linhagens", label: "Linhagens" },
   { href: "/sobre-nos", label: "Sobre Nós" },
   { href: "/conheca-os-guppy", label: "Conheça o Guppy" },
+  { href: "/atacado", label: "Atacado" },
   // /blog removido por ora (rota não existe → 404).
   { href: "/contatos", label: "Contatos" },
 ];
@@ -55,7 +57,7 @@ export default function NavBar3() {
           {/* Desktop: destaques direita */}
           <div className="hidden md:flex items-center gap-5 text-sm">
             <Link
-              href="/loja?product_cat=peixes-de-linhagem"
+              href="/linhagens"
               className="flex items-center gap-1.5 text-accent font-semibold hover:text-secondary transition-colors"
             >
               <Star size={14} fill="currentColor" />
@@ -121,7 +123,7 @@ export default function NavBar3() {
 
           <div className="px-5 pt-5 space-y-3">
             <Link
-              href="/loja?product_cat=peixes-de-linhagem"
+              href="/linhagens"
               onClick={() => setMenuOpen(false)}
               className="flex items-center gap-2 text-accent font-semibold hover:text-secondary transition-colors"
             >

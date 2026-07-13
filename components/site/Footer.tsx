@@ -26,15 +26,18 @@ function IconYoutube({ size = 20 }: { size?: number }) {
 }
 
 const INSTITUCIONAL = [
+  { href: "/linhagens", label: "Linhagens" },
   { href: "/sobre-nos", label: "Sobre Nós" },
   { href: "/conheca-os-guppy", label: "Conheça o Guppy" },
+  { href: "/atacado", label: "Atacado" },
   { href: "/contatos", label: "Contatos" },
   // /blog e /politica-de-privacidade removidos por ora (rotas não existem → 404).
 ];
 
 const LINKS_UTEIS = [
   { href: "/loja", label: "Loja" },
-  { href: "/minha-conta", label: "Minha Conta" },
+  { href: "/envio", label: "Envio de Peixe Vivo" },
+  { href: "/frete", label: "Calcular Frete" },
   { href: "/carrinho", label: "Carrinho" },
   { href: WHATSAPP_URL, label: "Rastreamento de Pedido", external: true },
 ];

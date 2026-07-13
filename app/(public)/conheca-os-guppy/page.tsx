@@ -247,6 +247,21 @@ export default async function ConhecaOsGuppyPage() {
             que sai do padrão. É esse trabalho, geração após geração, que mantém
             uma linhagem campeã.
           </p>
+          <p className="text-text font-light leading-relaxed">
+            Quer se aprofundar? Veja os guias de{" "}
+            <Link href="/guia/reproducao-de-guppy" className="text-secondary font-medium hover:underline">
+              reprodução de guppy
+            </Link>
+            ,{" "}
+            <Link href="/guia/macho-e-femea" className="text-secondary font-medium hover:underline">
+              macho e fêmea
+            </Link>{" "}
+            e{" "}
+            <Link href="/guia/filhotes-de-guppy" className="text-secondary font-medium hover:underline">
+              filhotes de guppy
+            </Link>
+            .
+          </p>
         </div>
       </section>
 
