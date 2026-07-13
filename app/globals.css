@@ -74,6 +74,13 @@
     font-size: 1rem;
     line-height: 1.6;
     min-height: 100vh;
+    /* Reserva o espaço do banner de consentimento (fixo no rodapé). O banner
+       mede a própria altura e escreve --consent-h; assim TODO conteúdo pode ser
+       rolado acima dele. Sem banner, --consent-h = 0px (sem efeito). Corrige o
+       bug do iPhone em que botões (ex.: remover no carrinho) ficavam presos
+       embaixo do banner e o toque batia no banner, não no botão. */
+    padding-bottom: var(--consent-h, 0px);
+    scroll-padding-bottom: var(--consent-h, 0px);
     @apply bg-background text-foreground;
   }
 

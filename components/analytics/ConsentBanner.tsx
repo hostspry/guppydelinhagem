@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useSyncExternalStore } from "react";
+import { useEffect, useRef, useSyncExternalStore } from "react";
 import Link from "next/link";
 
 // Banner de consentimento (LGPD). Decisão persistida em localStorage. Enquanto não
@@ -58,8 +58,34 @@ export default function ConsentBanner() {
     if (decisao === "granted") aplicarConsent("granted");
   }, [decisao]);
 
+  const bannerRef = useRef<HTMLDivElement>(null);
+  const visivel = !!process.env.NEXT_PUBLIC_GA_ID && !decisao;
+
+  // Enquanto o banner (fixo no rodapé) está visível, publica a própria altura em
+  // --consent-h para o body reservar esse espaço (globals.css). Sem isso, o
+  // conteúdo do fim da página fica preso embaixo do banner e o toque nos botões
+  // (ex.: remover item no carrinho, no iPhone) bate no banner, não no botão.
+  // Re-mede em resize/rotação; zera ao sair (dismiss/unmount).
+  useEffect(() => {
+    const root = document.documentElement;
+    if (!visivel) {
+      root.style.setProperty("--consent-h", "0px");
+      return;
+    }
+    const medir = () => {
+      const h = bannerRef.current?.offsetHeight ?? 0;
+      root.style.setProperty("--consent-h", `${h}px`);
+    };
+    medir();
+    window.addEventListener("resize", medir);
+    return () => {
+      window.removeEventListener("resize", medir);
+      root.style.setProperty("--consent-h", "0px");
+    };
+  }, [visivel]);
+
   // Sem GA configurado não há o que consentir; já decidido → não mostra.
-  if (!process.env.NEXT_PUBLIC_GA_ID || decisao) return null;
+  if (!visivel) return null;
 
   function aceitar() {
     aplicarConsent("granted");
@@ -72,9 +98,10 @@ export default function ConsentBanner() {
 
   return (
     <div
+      ref={bannerRef}
       role="dialog"
       aria-label="Aviso de privacidade"
-      className="fixed inset-x-0 bottom-0 z-[200] bg-primary text-white shadow-lg"
+      className="fixed inset-x-0 bottom-0 z-[200] bg-primary text-white shadow-lg pb-[env(safe-area-inset-bottom)]"
     >
       <div className="container-site py-4 flex flex-col sm:flex-row sm:items-center gap-3">
         <p className="text-sm font-light leading-snug flex-1">
