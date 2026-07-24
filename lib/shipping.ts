@@ -30,7 +30,7 @@ export const FRETE_CONFIG = {
   pacotePadrao: { height: 30, width: 30, length: 30, weight: 2 }, // cm / kg
   insuranceValue: 100,
   // Regras de precificação — SERVIDOR APENAS
-  jadlogMarkup: 1.15, // multiplicador sobre o preço bruto da API (+15%)
+  jadlogMarkup: 1.1, // multiplicador sobre o preço bruto da API (+10%)
   caixaIsopor: 20, // R$ adicionados após o markup
   gollog: { min: 80, max: 110 }, // faixa exibida ao cliente, valor fixo
   jadlogLabel: "JADLOG entrega no seu CEP", // label exibido ao client
@@ -38,26 +38,19 @@ export const FRETE_CONFIG = {
   maxPeixesPorCaixa: MAX_PEIXES_POR_CAIXA, // limite por caixa — frete único até aqui
 };
 
-// ── Regra de peso/caixa por quantidade (tabela do brief) ──────────────────
+// ── Regra de peso/caixa por quantidade ────────────────────────────────────
 // CENTRALIZADA aqui — usada na página de produto, no carrinho e no checkout
-// futuro. NÃO duplicar a tabela em outro lugar.
+// futuro. NÃO duplicar em outro lugar.
 //
-// | peixes  | peso                     | caixa     |
-// | 1 a 10  | 4 kg                     | 30×30×30  |
-// | 11 a 30 | 4kg + 300g × (qtd − 10)  | 30×30×30  |
-// | > 30    | 4kg + 300g × (qtd − 10)  | 40×40×40  |
+// Caixa e peso FIXOS para todo pedido de peixe: 15×15×20 cm / 2 kg,
+// independentemente da quantidade (sem escalonamento por nº de peixes).
 
 export type Caixa = { comprimento: number; largura: number; altura: number };
 export type PesoCaixa = { pesoGramas: number; caixa: Caixa };
 
-export function calcularPesoECaixa(qtdPeixes: number): PesoCaixa {
-  const qtd = Math.max(1, Math.floor(qtdPeixes || 1));
-  const pesoBase = 4000; // g — cobre de 1 a 10 peixes
-  const pesoGramas = qtd <= 10 ? pesoBase : pesoBase + 300 * (qtd - 10);
-  const caixa: Caixa =
-    qtd > 30
-      ? { comprimento: 40, largura: 40, altura: 40 }
-      : { comprimento: 30, largura: 30, altura: 30 };
+export function calcularPesoECaixa(_qtdPeixes: number): PesoCaixa {
+  const pesoGramas = 2000; // g — fixo
+  const caixa: Caixa = { comprimento: 15, largura: 15, altura: 20 };
   return { pesoGramas, caixa };
 }
 
