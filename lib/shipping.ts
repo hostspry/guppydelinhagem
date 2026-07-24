@@ -30,7 +30,7 @@ export const FRETE_CONFIG = {
   pacotePadrao: { height: 30, width: 30, length: 30, weight: 2 }, // cm / kg
   insuranceValue: 100,
   // Regras de precificação — SERVIDOR APENAS
-  jadlogMarkup: 1.5, // multiplicador sobre o preço bruto da API
+  jadlogMarkup: 1.15, // multiplicador sobre o preço bruto da API (+15%)
   caixaIsopor: 20, // R$ adicionados após o markup
   gollog: { min: 80, max: 110 }, // faixa exibida ao cliente, valor fixo
   jadlogLabel: "JADLOG entrega no seu CEP", // label exibido ao client
