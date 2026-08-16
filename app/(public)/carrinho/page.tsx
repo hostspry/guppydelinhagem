@@ -13,6 +13,7 @@ import {
   type CarrinhoResolvido,
 } from "@/actions/checkout";
 import { useCart, selectTotalPeixes } from "@/lib/stores/cart";
+import { trackRemoveFromCart } from "@/lib/analytics";
 
 export default function CarrinhoPage() {
   // Store persistido (localStorage) só existe no client — guarda de hidratação.
@@ -296,6 +297,14 @@ export default function CarrinhoPage() {
                       onClick={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
+                        trackRemoveFromCart(
+                          {
+                            item_id: item.produtoId,
+                            item_name: item.nome,
+                            price: item.precoPix,
+                          },
+                          item.quantidade,
+                        );
                         removeItem(item.variantId);
                       }}
                       aria-label={`Remover ${item.nome}`}

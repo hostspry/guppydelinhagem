@@ -9,6 +9,10 @@ import { z } from "zod";
 import { authConfig } from "../auth.config";
 import { prisma } from "./prisma";
 import { rateLimit, clientIp } from "./rate-limit";
+import { rastrearNaConta } from "./rastreio/conta";
+import { auditar } from "./auditoria";
+import { ehPapelEquipe } from "./permissoes";
+import { EVENTOS } from "./rastreio/eventos";
 
 // Config COMPLETA (Node runtime): providers reais + Prisma + bcrypt + adapter.
 // Sessão continua JWT (auth.config.ts trava strategy). O adapter entra só para
@@ -126,6 +130,26 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
             token.role = dbUser.role;
             token.senhaPrecisaTroca = dbUser.senhaPrecisaTroca;
             token.name = dbUser.nome;
+          }
+        }
+
+        // Primeiro token da sessão = login que acabou de acontecer. Cliente vai
+        // para a jornada de visitante; equipe vai para a auditoria do painel —
+        // são registros com propósitos diferentes e não devem se misturar.
+        if (user.id) {
+          const papel = String(token.role ?? "CUSTOMER");
+          if (ehPapelEquipe(papel)) {
+            void auditar(
+              {
+                id: user.id,
+                nome: (token.name as string) ?? user.email ?? "—",
+                email: user.email ?? "—",
+                role: papel,
+              },
+              { acao: "conta.login", descricao: "Entrou no painel" },
+            );
+          } else {
+            void rastrearNaConta(EVENTOS.LOGIN, user.id);
           }
         }
       }

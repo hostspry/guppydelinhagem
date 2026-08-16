@@ -2,6 +2,8 @@
 
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
+import { rastrearNaConta } from "@/lib/rastreio/conta";
+import { EVENTOS } from "@/lib/rastreio/eventos";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { calcularPrecos } from "@/lib/precos";
@@ -188,6 +190,9 @@ export async function atualizarPerfil(input: unknown): Promise<ContaResult> {
       where: { userId: session.user.id },
       data: { nome, telefone: tel, cpfCnpj: cpf },
     });
+    await rastrearNaConta(EVENTOS.CONTA_ALTERADA, session.user.id, {
+      campos: ["nome", "telefone", "cpfCnpj"],
+    });
     revalidatePath("/minha-conta/perfil");
     revalidatePath("/minha-conta");
     return { ok: true };
@@ -241,6 +246,7 @@ export async function criarEndereco(input: unknown): Promise<ContaResult> {
       await tx.address.create({ data: { ...dados, principal, userId } });
     });
     revalidatePath("/minha-conta/enderecos");
+    await rastrearNaConta(EVENTOS.ENDERECO_ALTERADO, session.user.id, { acao: "criou" });
     return { ok: true };
   } catch (e) {
     console.error("[conta] criarEndereco", e);
@@ -270,6 +276,7 @@ export async function atualizarEndereco(
       await tx.address.update({ where: { id }, data: dados });
     });
     revalidatePath("/minha-conta/enderecos");
+    await rastrearNaConta(EVENTOS.ENDERECO_ALTERADO, session.user.id, { acao: "editou" });
     return { ok: true };
   } catch (e) {
     console.error("[conta] atualizarEndereco", e);
@@ -284,6 +291,7 @@ export async function excluirEndereco(id: string): Promise<ContaResult> {
     const res = await prisma.address.deleteMany({ where: { id, userId: session.user.id } });
     if (res.count === 0) return { ok: false, error: "Endereço não encontrado." };
     revalidatePath("/minha-conta/enderecos");
+    await rastrearNaConta(EVENTOS.ENDERECO_ALTERADO, session.user.id, { acao: "excluiu" });
     return { ok: true };
   } catch (e) {
     console.error("[conta] excluirEndereco", e);
@@ -303,6 +311,7 @@ export async function marcarEnderecoPadrao(id: string): Promise<ContaResult> {
       await tx.address.update({ where: { id }, data: { principal: true } });
     });
     revalidatePath("/minha-conta/enderecos");
+    await rastrearNaConta(EVENTOS.ENDERECO_ALTERADO, session.user.id, { acao: "definiu como padrão" });
     return { ok: true };
   } catch (e) {
     console.error("[conta] marcarEnderecoPadrao", e);

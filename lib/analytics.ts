@@ -4,6 +4,8 @@
 // valores e número de pedido. Os valores vêm da fonte única (lib/precos); aqui
 // não se recalcula nada.
 
+import { EVENTOS, rastrear } from "@/lib/rastreio/cliente";
+
 type GtagFn = (...args: unknown[]) => void;
 
 function gtag(...args: unknown[]): void {
@@ -29,6 +31,11 @@ function comQtd(i: AnalyticsItem): AnalyticsItem {
 
 /** Página de produto. */
 export function trackViewItem(item: AnalyticsItem): void {
+  rastrear(EVENTOS.PRODUTO, {
+    produtoId: item.item_id,
+    produtoNome: item.item_name,
+    valor: round2(item.price),
+  });
   gtag("event", "view_item", {
     currency: "BRL",
     value: round2(item.price),
@@ -38,7 +45,29 @@ export function trackViewItem(item: AnalyticsItem): void {
 
 /** Adição ao carrinho (produto ou feed). */
 export function trackAddToCart(item: AnalyticsItem, quantity: number): void {
+  rastrear(EVENTOS.CARRINHO_ADD, {
+    produtoId: item.item_id,
+    produtoNome: item.item_name,
+    quantidade: quantity,
+    valor: round2(item.price * quantity),
+  });
   gtag("event", "add_to_cart", {
+    currency: "BRL",
+    value: round2(item.price * quantity),
+    items: [{ ...item, quantity }],
+  });
+}
+
+/** Saída do carrinho — não existe no GA4 e-commerce padrão, mas é justamente o
+ * que o dono quer saber: de qual peixe as pessoas desistem. */
+export function trackRemoveFromCart(item: AnalyticsItem, quantity: number): void {
+  rastrear(EVENTOS.CARRINHO_REMOVE, {
+    produtoId: item.item_id,
+    produtoNome: item.item_name,
+    quantidade: quantity,
+    valor: round2(item.price * quantity),
+  });
+  gtag("event", "remove_from_cart", {
     currency: "BRL",
     value: round2(item.price * quantity),
     items: [{ ...item, quantity }],
@@ -47,6 +76,7 @@ export function trackAddToCart(item: AnalyticsItem, quantity: number): void {
 
 /** Entrada no checkout. */
 export function trackBeginCheckout(items: AnalyticsItem[], value: number): void {
+  rastrear(EVENTOS.CHECKOUT, { valor: round2(value), quantidade: items.length });
   gtag("event", "begin_checkout", {
     currency: "BRL",
     value: round2(value),

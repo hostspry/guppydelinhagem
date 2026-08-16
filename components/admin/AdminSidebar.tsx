@@ -12,6 +12,7 @@ import {
   UserCog,
   Wallet,
   History,
+  Radar,
   Settings,
   Ticket,
   Fish,
@@ -95,6 +96,12 @@ const NAV_SECTIONS: NavSection[] = [
   {
     title: "Sistema",
     items: [
+      {
+        href: "/admin/visitantes",
+        label: "Visitantes",
+        icon: Radar,
+        permissao: "auditoria.ver",
+      },
       {
         href: "/admin/auditoria",
         label: "Histórico",

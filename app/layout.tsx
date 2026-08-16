@@ -3,6 +3,7 @@ import { Nunito } from "next/font/google";
 import "./globals.css";
 import GoogleAnalytics from "@/components/analytics/GoogleAnalytics";
 import ConsentBanner from "@/components/analytics/ConsentBanner";
+import { Rastreador } from "@/components/analytics/Rastreador";
 
 const nunito = Nunito({
   subsets: ["latin"],
@@ -77,6 +78,7 @@ export default function RootLayout({
         <GoogleAnalytics />
         {children}
         <ConsentBanner />
+        <Rastreador />
       </body>
     </html>
   );
