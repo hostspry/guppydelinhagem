@@ -156,6 +156,7 @@ model User {
   cliente      Cliente?
   notificacoes Notificacao[]
   accounts     Account[]
+  lancamentos  Lancamento[]
 }
 
 // Vínculo de conta OAuth (Google/Facebook) ao User — model padrão do Auth.js.
@@ -409,6 +410,7 @@ model Order {
   pagamentos      Pagamento[]
   rastreioEventos RastreioEvento[]
   notificacoes    Notificacao[]
+  lancamentos     Lancamento[]
 
   @@unique([ano, sequencia])
   @@index([clienteId])
@@ -621,4 +623,115 @@ model LeadCheckout {
   @@index([convertido, notificadoEm])
   @@index([email])
   @@index([telefone])
+}
+
+// ─────────────────────────────────────────────
+// Financeiro — caixa de entradas e saídas
+//
+// Regime de CAIXA: o mês fecha pelo dinheiro que entrou e saiu de fato, então só
+// lançamento CONFIRMADO entra na conta. PENDENTE cobre duas coisas que ainda não
+// mexeram no caixa: a venda do site esperando conferência e a conta a pagar que
+// ainda não venceu. `valor` é sempre positivo — quem dá o sinal é o `tipo`.
+// ─────────────────────────────────────────────
+
+enum TipoLancamento {
+  ENTRADA
+  SAIDA
+}
+
+enum StatusLancamento {
+  PENDENTE // esperando confirmação (venda do site) ou vencimento (conta a pagar)
+  CONFIRMADO // dinheiro entrou/saiu — é o que forma o caixa
+  DESCARTADO // sugestão recusada; fica no histórico, fora das contas
+}
+
+enum OrigemLancamento {
+  MANUAL
+  PEDIDO // venda do site
+  TAXA_PAGAMENTO // taxa do gateway sobre uma venda
+  FRETE // custo de postagem de uma venda
+  RECORRENCIA
+  COMPROVANTE // criado a partir de PDF/imagem/texto lido
+}
+
+// Categorias são editáveis, mas as marcadas com `sistema` são procuradas por slug
+// pelo código (venda do site, taxa, frete) — dá para renomear, não para apagar.
+model CategoriaFinanceira {
+  id       String          @id @default(cuid())
+  nome     String
+  slug     String          @unique
+  tipo     TipoLancamento? // null = serve para entrada e saída
+  sistema  Boolean         @default(false)
+  ordem    Int             @default(0)
+  ativa    Boolean         @default(true)
+  criadoEm DateTime        @default(now())
+
+  lancamentos  Lancamento[]
+  recorrencias RecorrenciaFinanceira[]
+
+  @@index([tipo, ativa])
+}
+
+model Lancamento {
+  id        String           @id @default(cuid())
+  tipo      TipoLancamento
+  status    StatusLancamento @default(CONFIRMADO)
+  origem    OrigemLancamento @default(MANUAL)
+  descricao String
+  valor     Decimal          @db.Decimal(10, 2) // sempre positivo
+  data      DateTime // quando mexeu no caixa (ou previsão, se pendente)
+  vencimento DateTime? // contas a pagar/receber
+
+  categoriaId String?
+  categoria   CategoriaFinanceira? @relation(fields: [categoriaId], references: [id], onDelete: SetNull)
+
+  // Vínculo com a venda que originou o lançamento (entrada, taxa ou frete).
+  orderId String?
+  order   Order?  @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  // Trava de idempotência: o mesmo pagamento não gera duas vezes a mesma linha,
+  // mesmo com o webhook do gateway reenviando.
+  pagamentoId String?
+
+  comprovanteUrl String? // PDF/imagem no S3
+  observacoes    String?
+
+  recorrenciaId String?
+  recorrencia   RecorrenciaFinanceira? @relation(fields: [recorrenciaId], references: [id], onDelete: SetNull)
+
+  criadoPorId String?
+  criadoPor   User?   @relation(fields: [criadoPorId], references: [id], onDelete: SetNull)
+
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  @@unique([pagamentoId, origem])
+  @@index([status, data])
+  @@index([data])
+  @@index([categoriaId])
+  @@index([orderId])
+  @@index([status, vencimento])
+}
+
+// Despesa que se repete todo mês (energia, internet, ração). O cron gera a conta
+// do mês uma única vez — `ultimaCompetencia` ("2026-08") é a trava.
+model RecorrenciaFinanceira {
+  id            String         @id @default(cuid())
+  tipo          TipoLancamento @default(SAIDA)
+  descricao     String
+  valor         Decimal        @db.Decimal(10, 2)
+  diaVencimento Int // 1–28, para existir em todo mês
+  ativa         Boolean        @default(true)
+  observacoes   String?
+
+  categoriaId String?
+  categoria   CategoriaFinanceira? @relation(fields: [categoriaId], references: [id], onDelete: SetNull)
+
+  ultimaCompetencia String? // "AAAA-MM" já gerado
+  criadoEm          DateTime @default(now())
+  atualizadoEm      DateTime @updatedAt
+
+  lancamentos Lancamento[]
+
+  @@index([ativa])
 }

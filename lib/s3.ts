@@ -29,13 +29,14 @@ function client(): S3Client {
   return cached;
 }
 
-/** Envia um buffer de imagem ao Garage e retorna a URL pública de leitura. */
-export async function uploadImage(
+/** Envia um buffer ao Garage sob a pasta indicada e devolve a URL pública. */
+export async function uploadArquivo(
   buffer: Buffer,
   contentType: string,
   ext: string,
+  pasta: string,
 ): Promise<string> {
-  const key = `produtos/thumbs/${randomUUID()}.${ext}`;
+  const key = `${pasta}/${randomUUID()}.${ext}`;
   await client().send(
     new PutObjectCommand({
       Bucket: env("S3_BUCKET"),
@@ -45,6 +46,24 @@ export async function uploadImage(
     }),
   );
   return `${env("S3_PUBLIC_URL")}/${key}`;
+}
+
+/** Thumbnail de produto. */
+export async function uploadImage(
+  buffer: Buffer,
+  contentType: string,
+  ext: string,
+): Promise<string> {
+  return uploadArquivo(buffer, contentType, ext, "produtos/thumbs");
+}
+
+/** Comprovante do caixa (PDF ou print). Pasta própria para facilitar limpeza. */
+export async function uploadComprovante(
+  buffer: Buffer,
+  contentType: string,
+  ext: string,
+): Promise<string> {
+  return uploadArquivo(buffer, contentType, ext, "financeiro/comprovantes");
 }
 
 /**

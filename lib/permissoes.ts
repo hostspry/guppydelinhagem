@@ -27,6 +27,8 @@ export type Permissao =
   | "clientes.ver"
   | "clientes.editar"
   | "clientes.excluir"
+  // Dinheiro da loja (caixa, contas, relatórios)
+  | "financeiro.gerenciar"
   // Sistema
   | "config.editar"
   | "equipe.gerenciar";
@@ -44,6 +46,8 @@ const VENDAS: Permissao[] = [
   "clientes.ver",
   "clientes.editar",
   "clientes.excluir",
+  // O caixa fica com quem cuida das vendas: administrador e dono.
+  "financeiro.gerenciar",
 ];
 
 /**
@@ -71,7 +75,7 @@ export const PAPEL_LABEL: Record<PapelEquipe, string> = {
 
 export const PAPEL_DESCRICAO: Record<PapelEquipe, string> = {
   EDITOR: "Produtos, categorias, cupons e hero da home. Não vê pedidos nem clientes.",
-  ADMIN: "Tudo do editor, mais pedidos, clientes, status e envios.",
+  ADMIN: "Tudo do editor, mais pedidos, clientes, envios e o caixa da loja.",
   SUPER_ADMIN: "Acesso total, incluindo configurações da loja e gestão da equipe.",
 };
 

@@ -2,6 +2,7 @@ import "server-only";
 import type { Prisma } from "@/lib/generated/prisma/client";
 import { StatusPagamento } from "@/lib/generated/prisma/enums";
 import { ajustarPoolEstoque } from "@/lib/pedido-baixa";
+import { registrarDevolucaoDeVenda } from "@/lib/financeiro/venda-no-caixa";
 
 // Rotina ÚNICA de estorno compartilhada pela action do admin e pelo webhook do MP
 // (estorno feito pelo painel). É DINHEIRO: idempotência é o requisito nº 1 — nada
@@ -48,6 +49,10 @@ export async function aplicarEstornoPedido(
     where: { id: args.orderId },
     data: { status: "CANCELADO" },
   });
+
+  // O dinheiro voltou para o cliente: sai da fila do caixa se ainda não tinha
+  // sido conferido, ou vira uma devolução se já contava no mês.
+  await registrarDevolucaoDeVenda(tx, args.orderId);
 
   return { aplicado: true };
 }

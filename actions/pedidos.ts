@@ -13,6 +13,7 @@ import { TRANSICOES_PEDIDO, podeEditarItens } from "@/lib/pedido-status";
 import { transicionarParaPago, ajustarPoolEstoque } from "@/lib/pedido-baixa";
 import { gravarEnvioTx } from "@/lib/pedido-envio";
 import { aplicarEstornoPedido } from "@/lib/pagamento-estorno";
+import { registrarDevolucaoDeVenda } from "@/lib/financeiro/venda-no-caixa";
 import { getPaymentProvider } from "@/lib/payments/registry";
 import {
   notificarPedidoEnviado,
@@ -349,6 +350,12 @@ export async function atualizarStatusPedido(
           where: { id },
           data: { estoqueBaixado: false },
         });
+      }
+
+      // Cancelar tira a venda do caixa (ou lança a devolução, se já contava).
+      // Vale para qualquer cancelamento, com ou sem estorno no gateway.
+      if (novoStatus === "CANCELADO") {
+        await registrarDevolucaoDeVenda(tx, id);
       }
     });
   } catch (e) {

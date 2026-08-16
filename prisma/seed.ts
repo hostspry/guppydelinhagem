@@ -2,6 +2,7 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import bcrypt from "bcryptjs";
 import { PrismaClient } from "../lib/generated/prisma/client";
 import { WHATSAPP_URL } from "../lib/constants";
+import { semearCategoriasFinanceiras } from "../lib/financeiro/categorias-padrao";
 
 if (!process.env.DATABASE_URL) {
   throw new Error(
@@ -85,6 +86,8 @@ async function seedCategorias() {
 async function main() {
   await seedAdmin();
   await seedCategorias();
+  const n = await semearCategoriasFinanceiras(prisma);
+  console.log(`[seed] Categorias financeiras: ${n}`);
 
   const slide = await prisma.heroSlide.upsert({
     where: { id: BLUE_DRAGON_ID },
