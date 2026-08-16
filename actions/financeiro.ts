@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { assertPermissao } from "@/lib/permissoes-server";
+import { auditar } from "@/lib/auditoria";
 import { type ActionResult, isPrismaError } from "@/lib/utils/action-result";
 import {
   categoriaFinanceiraSchema,
@@ -72,6 +73,13 @@ export async function criarLancamento(input: unknown): Promise<ActionResult> {
     return { success: false, error: "Não foi possível salvar o lançamento." };
   }
 
+  await auditar(membro, {
+    acao: "financeiro.lancar",
+    entidade: "Lancamento",
+    descricao: `Lançou ${d.tipo === "ENTRADA" ? "entrada" : "saída"} de ${d.valor.toFixed(2)} — ${d.descricao}`,
+    depois: { tipo: d.tipo, valor: d.valor, data: d.data, aPagar: ehConta },
+  });
+
   revalidarFinanceiro();
   return { success: true, message: ehConta ? "Conta agendada." : "Lançamento salvo." };
 }
@@ -80,7 +88,7 @@ export async function atualizarLancamento(
   id: string,
   input: unknown,
 ): Promise<ActionResult> {
-  await assertPermissao("financeiro.gerenciar");
+  const membro = await assertPermissao("financeiro.gerenciar");
 
   const atual = await prisma.lancamento.findUnique({
     where: { id },
@@ -127,16 +135,25 @@ export async function atualizarLancamento(
     return { success: false, error: "Não foi possível salvar as alterações." };
   }
 
+  await auditar(membro, {
+    acao: "financeiro.editar",
+    entidade: "Lancamento",
+    entidadeId: id,
+    descricao: `Editou o lançamento "${d.descricao}" (${d.valor.toFixed(2)})`,
+    antes: { status: atual.status, origem: atual.origem },
+    depois: { tipo: d.tipo, valor: d.valor, data: d.data },
+  });
+
   revalidarFinanceiro();
   return { success: true, message: "Lançamento atualizado." };
 }
 
 export async function excluirLancamento(id: string): Promise<ActionResult> {
-  await assertPermissao("financeiro.gerenciar");
+  const membro = await assertPermissao("financeiro.gerenciar");
 
   const atual = await prisma.lancamento.findUnique({
     where: { id },
-    select: { origem: true, status: true },
+    select: { origem: true, status: true, descricao: true, valor: true, tipo: true },
   });
   if (!atual) return { success: false, error: "Lançamento não encontrado." };
 
@@ -158,6 +175,14 @@ export async function excluirLancamento(id: string): Promise<ActionResult> {
     return { success: false, error: "Não foi possível excluir." };
   }
 
+  await auditar(membro, {
+    acao: "financeiro.excluir",
+    entidade: "Lancamento",
+    entidadeId: id,
+    descricao: `Excluiu o lançamento "${atual.descricao}" (${Number(atual.valor).toFixed(2)})`,
+    antes: { tipo: atual.tipo, valor: atual.valor, descricao: atual.descricao },
+  });
+
   revalidarFinanceiro();
   return { success: true, message: "Lançamento excluído." };
 }
@@ -167,7 +192,7 @@ export async function marcarComoPago(
   id: string,
   dataPagamento?: string,
 ): Promise<ActionResult> {
-  await assertPermissao("financeiro.gerenciar");
+  const membro = await assertPermissao("financeiro.gerenciar");
 
   const quando = dataPagamento ? dataDoDia(dataPagamento) : new Date();
   if (!quando) return { success: false, error: "Data inválida." };
@@ -181,6 +206,14 @@ export async function marcarComoPago(
     console.error("[financeiro] marcar pago", e);
     return { success: false, error: "Não foi possível dar baixa." };
   }
+
+  await auditar(membro, {
+    acao: "financeiro.baixa",
+    entidade: "Lancamento",
+    entidadeId: id,
+    descricao: "Deu baixa numa conta",
+    depois: { data: quando },
+  });
 
   revalidarFinanceiro();
   return { success: true, message: "Baixa registrada." };
@@ -292,13 +325,21 @@ export async function confirmarVenda(
     return { success: false, error: "Não foi possível confirmar a venda." };
   }
 
+  await auditar(membro, {
+    acao: "financeiro.confirmar-venda",
+    entidade: "Lancamento",
+    entidadeId: id,
+    descricao: `Confirmou uma venda no caixa${taxaGateway ? ` (taxa ${taxaGateway})` : ""}${custoFrete ? ` (postagem ${custoFrete})` : ""}`,
+    depois: { data: dataStr, taxaGateway, custoFrete },
+  });
+
   revalidarFinanceiro();
   return { success: true, message: "Venda confirmada no caixa." };
 }
 
 /** Sugestão que não deve entrar no caixa (venda de teste, duplicada…). */
 export async function descartarSugestao(id: string): Promise<ActionResult> {
-  await assertPermissao("financeiro.gerenciar");
+  const membro = await assertPermissao("financeiro.gerenciar");
 
   try {
     await prisma.lancamento.update({
@@ -309,6 +350,13 @@ export async function descartarSugestao(id: string): Promise<ActionResult> {
     console.error("[financeiro] descartar", e);
     return { success: false, error: "Não foi possível descartar." };
   }
+
+  await auditar(membro, {
+    acao: "financeiro.descartar-venda",
+    entidade: "Lancamento",
+    entidadeId: id,
+    descricao: "Descartou uma venda do site do caixa",
+  });
 
   revalidarFinanceiro();
   return { success: true, message: "Sugestão descartada." };

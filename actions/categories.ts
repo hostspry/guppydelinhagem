@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { categorySchema } from "@/lib/validations/category";
 import { assertPermissao } from "@/lib/permissoes-server";
+import { auditar, diff } from "@/lib/auditoria";
 import {
   type ActionResult,
   isPrismaError,
@@ -13,7 +14,7 @@ import {
 export async function createCategory(
   formData: FormData,
 ): Promise<ActionResult> {
-  await assertPermissao("catalogo.editar");
+  const membro = await assertPermissao("catalogo.editar");
 
   const parsed = categorySchema.safeParse({
     nome: formData.get("nome"),
@@ -39,6 +40,13 @@ export async function createCategory(
     return { success: false, error: "Erro ao salvar. Tente novamente." };
   }
 
+  await auditar(membro, {
+    acao: "categoria.criar",
+    entidade: "Category",
+    descricao: `Criou a categoria ${parsed.data.nome}`,
+    depois: { nome: parsed.data.nome, slug: parsed.data.slug },
+  });
+
   revalidatePath("/admin/categorias");
   redirect("/admin/categorias");
 }
@@ -47,7 +55,11 @@ export async function updateCategory(
   id: string,
   formData: FormData,
 ): Promise<ActionResult> {
-  await assertPermissao("catalogo.editar");
+  const membro = await assertPermissao("catalogo.editar");
+  const anterior = await prisma.category.findUnique({
+    where: { id },
+    select: { nome: true, slug: true, ordem: true },
+  });
 
   const parsed = categorySchema.safeParse({
     nome: formData.get("nome"),
@@ -78,12 +90,30 @@ export async function updateCategory(
     return { success: false, error: "Erro ao salvar." };
   }
 
+  if (anterior) {
+    const mudancas = diff({ ...anterior }, { ...parsed.data });
+    if (mudancas.mudou) {
+      await auditar(membro, {
+        acao: "categoria.atualizar",
+        entidade: "Category",
+        entidadeId: id,
+        descricao: `Editou a categoria ${parsed.data.nome}`,
+        antes: mudancas.antes,
+        depois: mudancas.depois,
+      });
+    }
+  }
+
   revalidatePath("/admin/categorias");
   redirect("/admin/categorias");
 }
 
 export async function deleteCategory(id: string): Promise<ActionResult> {
-  await assertPermissao("catalogo.excluir");
+  const membro = await assertPermissao("catalogo.excluir");
+  const alvo = await prisma.category.findUnique({
+    where: { id },
+    select: { nome: true },
+  });
 
   const cat = await prisma.category.findUnique({
     where: { id },
@@ -107,5 +137,13 @@ export async function deleteCategory(id: string): Promise<ActionResult> {
   }
 
   revalidatePath("/admin/categorias");
+  await auditar(membro, {
+    acao: "categoria.excluir",
+    entidade: "Category",
+    entidadeId: id,
+    descricao: `Excluiu a categoria ${alvo?.nome ?? id}`,
+    antes: alvo ? { nome: alvo.nome } : undefined,
+  });
+
   return { success: true, message: "Categoria excluída." };
 }

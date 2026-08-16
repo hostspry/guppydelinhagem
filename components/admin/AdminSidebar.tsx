@@ -11,6 +11,7 @@ import {
   Users,
   UserCog,
   Wallet,
+  History,
   Settings,
   Ticket,
   Fish,
@@ -94,6 +95,12 @@ const NAV_SECTIONS: NavSection[] = [
   {
     title: "Sistema",
     items: [
+      {
+        href: "/admin/auditoria",
+        label: "Histórico",
+        icon: History,
+        permissao: "auditoria.ver",
+      },
       {
         href: "/admin/equipe",
         label: "Equipe",

@@ -6,6 +6,7 @@ import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { membroSchema, type MembroInput } from "@/lib/validations/membro";
 import { assertPermissao } from "@/lib/permissoes-server";
+import { auditar, diff } from "@/lib/auditoria";
 import { isPrismaError } from "@/lib/utils/action-result";
 
 export type MembroResult =
@@ -58,7 +59,7 @@ async function contarSuperAdmins(): Promise<number> {
 }
 
 export async function criarMembro(input: unknown): Promise<MembroResult> {
-  await assertPermissao("equipe.gerenciar");
+  const eu = await assertPermissao("equipe.gerenciar");
 
   const { erro, dados } = validar(input);
   if (erro) return erro;
@@ -106,6 +107,18 @@ export async function criarMembro(input: unknown): Promise<MembroResult> {
     console.error("[equipe] criar", e);
     return { success: false, error: "Não foi possível criar o acesso." };
   }
+
+  await auditar(eu, {
+    acao: "equipe.criar",
+    entidade: "User",
+    descricao: `Deu acesso ao painel para ${d.nome} (${d.email}) como ${d.role}`,
+    depois: {
+      nome: d.nome,
+      email: d.email,
+      role: d.role,
+      ...limitesDoPapel(d),
+    },
+  });
 
   revalidatePath("/admin/equipe");
   return { success: true, senhaTemporaria: senha, nome: d.nome };
@@ -167,13 +180,29 @@ export async function atualizarMembro(
     return { success: false, error: "Não foi possível salvar as alterações." };
   }
 
+  const mudancas = diff(
+    { nome: alvo.email, role: alvo.role },
+    { nome: d.nome, role: d.role },
+  );
+  await auditar(eu, {
+    acao: "equipe.atualizar",
+    entidade: "User",
+    entidadeId: id,
+    descricao: `Alterou o acesso de ${d.nome}${
+      alvo.role !== d.role ? ` (${alvo.role} → ${d.role})` : ""
+    }`,
+    antes: { role: alvo.role, email: alvo.email },
+    depois: { role: d.role, email: d.email, ...limitesDoPapel(d) },
+  });
+  void mudancas;
+
   revalidatePath("/admin/equipe");
   return { success: true, message: "Acesso atualizado." };
 }
 
 /** Nova senha temporária (esqueceu a senha, ou vazou). Mostrada uma vez na tela. */
 export async function resetarSenhaMembro(id: string): Promise<MembroResult> {
-  await assertPermissao("equipe.gerenciar");
+  const eu = await assertPermissao("equipe.gerenciar");
 
   const alvo = await prisma.user.findUnique({
     where: { id },
@@ -187,6 +216,13 @@ export async function resetarSenhaMembro(id: string): Promise<MembroResult> {
   await prisma.user.update({
     where: { id },
     data: { senhaHash: await bcrypt.hash(senha, 10), senhaPrecisaTroca: true },
+  });
+
+  await auditar(eu, {
+    acao: "equipe.resetar-senha",
+    entidade: "User",
+    entidadeId: id,
+    descricao: `Gerou uma senha nova para ${alvo.nome}`,
   });
 
   revalidatePath("/admin/equipe");
@@ -234,6 +270,15 @@ export async function removerAcesso(id: string): Promise<MembroResult> {
       podeEstornar: false,
       limiteValorFinanceiro: null,
     },
+  });
+
+  await auditar(eu, {
+    acao: "equipe.remover",
+    entidade: "User",
+    entidadeId: id,
+    descricao: `Removeu o acesso de ${alvo.nome}`,
+    antes: { role: alvo.role },
+    depois: { role: "CUSTOMER" },
   });
 
   revalidatePath("/admin/equipe");

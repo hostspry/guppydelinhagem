@@ -30,6 +30,7 @@ export type Permissao =
   // Dinheiro da loja (caixa, contas, relatórios)
   | "financeiro.gerenciar"
   // Sistema
+  | "auditoria.ver"
   | "config.editar"
   | "equipe.gerenciar";
 
@@ -62,6 +63,9 @@ export const PERMISSOES_POR_PAPEL: Record<PapelEquipe, readonly Permissao[]> = {
     ...CATALOGO,
     ...VENDAS,
     "pedidos.excluir",
+    // O histórico de quem fez o quê é do dono: é ele quem precisa auditar a
+    // equipe, e não faria sentido a pessoa auditada controlar o próprio registro.
+    "auditoria.ver",
     "config.editar",
     "equipe.gerenciar",
   ],

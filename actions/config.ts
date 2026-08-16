@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { assertPermissao } from "@/lib/permissoes-server";
+import { auditar, diff } from "@/lib/auditoria";
 import {
   type ActionResult,
 } from "@/lib/utils/action-result";
@@ -13,7 +14,10 @@ const DEFAULT_ID = "default";
 export async function salvarConfiguracaoLoja(
   formData: FormData,
 ): Promise<ActionResult> {
-  await assertPermissao("config.editar");
+  const membro = await assertPermissao("config.editar");
+  const anterior = await prisma.configuracaoLoja.findUnique({
+    where: { id: "default" },
+  });
 
   const raw = Number(formData.get("descontoPixGlobalPercent"));
   const pct = Number.isFinite(raw)
@@ -88,5 +92,25 @@ export async function salvarConfiguracaoLoja(
   revalidatePath("/carrinho");
   revalidatePath("/loja/[slug]", "page"); // selo de frete grátis na página de produto
   revalidatePath("/", "layout"); // vitrine (desconto global) + faixa do topo (Navbar)
+  const atual = await prisma.configuracaoLoja.findUnique({
+    where: { id: "default" },
+  });
+  if (anterior && atual) {
+    const mudancas = diff(
+      { ...anterior } as Record<string, unknown>,
+      { ...atual } as Record<string, unknown>,
+    );
+    if (mudancas.mudou) {
+      await auditar(membro, {
+        acao: "config.salvar",
+        entidade: "ConfiguracaoLoja",
+        entidadeId: "default",
+        descricao: "Alterou as configurações da loja",
+        antes: mudancas.antes,
+        depois: mudancas.depois,
+      });
+    }
+  }
+
   return { success: true, message: "Configurações salvas." };
 }

@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { clienteSchema, type ClienteInput } from "@/lib/validations/cliente";
 import { assertPermissao } from "@/lib/permissoes-server";
+import { auditar, diff } from "@/lib/auditoria";
 import {
   type ActionResult,
   isPrismaError,
@@ -58,7 +59,7 @@ function parseFromForm(formData: FormData) {
 export async function createCliente(
   formData: FormData,
 ): Promise<ActionResult> {
-  await assertPermissao("clientes.editar");
+  const membro = await assertPermissao("clientes.editar");
 
   const parsed = parseFromForm(formData);
   if (!parsed.success) {
@@ -76,6 +77,13 @@ export async function createCliente(
     return { success: false, error: "Erro ao salvar. Tente novamente." };
   }
 
+  await auditar(membro, {
+    acao: "cliente.criar",
+    entidade: "Cliente",
+    descricao: `Cadastrou o cliente ${parsed.data.nome}`,
+    depois: { nome: parsed.data.nome, telefone: parsed.data.telefone },
+  });
+
   revalidatePath("/admin/clientes");
   redirect("/admin/clientes");
 }
@@ -84,7 +92,11 @@ export async function updateCliente(
   id: string,
   formData: FormData,
 ): Promise<ActionResult> {
-  await assertPermissao("clientes.editar");
+  const membro = await assertPermissao("clientes.editar");
+  const anterior = await prisma.cliente.findUnique({
+    where: { id },
+    select: { nome: true, telefone: true, email: true, cidade: true, uf: true },
+  });
 
   const parsed = parseFromForm(formData);
   if (!parsed.success) {
@@ -108,12 +120,36 @@ export async function updateCliente(
     return { success: false, error: "Erro ao salvar." };
   }
 
+  if (anterior) {
+    const mudancas = diff({ ...anterior }, { ...parsed.data } as Record<string, unknown>, [
+      "nome",
+      "telefone",
+      "email",
+      "cidade",
+      "uf",
+    ]);
+    if (mudancas.mudou) {
+      await auditar(membro, {
+        acao: "cliente.atualizar",
+        entidade: "Cliente",
+        entidadeId: id,
+        descricao: `Editou o cliente ${parsed.data.nome}`,
+        antes: mudancas.antes,
+        depois: mudancas.depois,
+      });
+    }
+  }
+
   revalidatePath("/admin/clientes");
   redirect("/admin/clientes");
 }
 
 export async function deleteCliente(id: string): Promise<ActionResult> {
-  await assertPermissao("clientes.excluir");
+  const membro = await assertPermissao("clientes.excluir");
+  const alvo = await prisma.cliente.findUnique({
+    where: { id },
+    select: { nome: true, telefone: true },
+  });
 
   try {
     await prisma.cliente.delete({ where: { id } });
@@ -126,5 +162,13 @@ export async function deleteCliente(id: string): Promise<ActionResult> {
   }
 
   revalidatePath("/admin/clientes");
+  await auditar(membro, {
+    acao: "cliente.excluir",
+    entidade: "Cliente",
+    entidadeId: id,
+    descricao: `Excluiu o cliente ${alvo?.nome ?? id}`,
+    antes: alvo ? { nome: alvo.nome } : undefined,
+  });
+
   return { success: true, message: "Cliente excluído." };
 }

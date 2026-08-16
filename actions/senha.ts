@@ -5,6 +5,8 @@ import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import type { ActionResult } from "@/lib/utils/action-result";
+import { auditar } from "@/lib/auditoria";
+import { ehPapelEquipe } from "@/lib/permissoes";
 
 const trocaSchema = z
   .object({
@@ -62,6 +64,23 @@ export async function trocarMinhaSenha(input: unknown): Promise<ActionResult> {
       senhaPrecisaTroca: false,
     },
   });
+
+  if (ehPapelEquipe(user.role)) {
+    await auditar(
+      {
+        id: session.user.id,
+        nome: session.user.name ?? "—",
+        email: session.user.email ?? "—",
+        role: user.role,
+      },
+      {
+        acao: "conta.trocar-senha",
+        entidade: "User",
+        entidadeId: session.user.id,
+        descricao: "Trocou a própria senha do painel",
+      },
+    );
+  }
 
   return { success: true, message: "Senha alterada." };
 }

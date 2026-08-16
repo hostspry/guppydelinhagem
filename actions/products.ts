@@ -18,6 +18,7 @@ import {
 import { deleteImage } from "@/lib/s3";
 import { type ActionResult, isPrismaError } from "@/lib/utils/action-result";
 import { assertPermissao } from "@/lib/permissoes-server";
+import { auditar, diff } from "@/lib/auditoria";
 
 /** Campo JSON (array serializado pelo form). Falha → []. */
 function parseJsonArrayField(raw: FormDataEntryValue | null): unknown[] {
@@ -170,7 +171,7 @@ function buildVideoCreates(videos: VideoDraft[]) {
 }
 
 export async function createProduct(formData: FormData): Promise<ActionResult> {
-  await assertPermissao("catalogo.editar");
+  const membro = await assertPermissao("catalogo.editar");
 
   const parsed = parseForm(formData);
   if (!parsed.success) {
@@ -186,15 +187,18 @@ export async function createProduct(formData: FormData): Promise<ActionResult> {
     return { success: false, error: "Dados de vídeo inválidos." };
   }
 
+  let criadoId = "";
   try {
     // Nested create: produto + vídeos + variantes numa única transação implícita.
-    await prisma.product.create({
+    const criado = await prisma.product.create({
       data: {
         ...scalarData(parsed.data),
         videos: { create: buildVideoCreates(videos.videos) },
         variantes: { create: buildVariantCreates(parsed.data.variantes) },
       },
+      select: { id: true },
     });
+    criadoId = criado.id;
   } catch (e) {
     if (isPrismaError(e) && e.code === "P2002") {
       return { success: false, error: "Slug já existe. Escolha outro." };
@@ -202,6 +206,19 @@ export async function createProduct(formData: FormData): Promise<ActionResult> {
     console.error(e);
     return { success: false, error: "Erro ao salvar. Tente novamente." };
   }
+
+  await auditar(membro, {
+    acao: "produto.criar",
+    entidade: "Product",
+    entidadeId: criadoId,
+    descricao: `Criou o produto ${parsed.data.nome}`,
+    depois: {
+      nome: parsed.data.nome,
+      preco: scalarData(parsed.data).preco,
+      estoque: scalarData(parsed.data).estoque,
+      ativo: parsed.data.ativo,
+    },
+  });
 
   // 'layout' invalida a subárvore inteira de /admin/produtos (listagem +
   // detalhe + edição), não só a rota da listagem — assim a tela de edição não
@@ -216,7 +233,23 @@ export async function updateProduct(
   id: string,
   formData: FormData,
 ): Promise<ActionResult> {
-  await assertPermissao("catalogo.editar");
+  const membro = await assertPermissao("catalogo.editar");
+
+  // Foto do estado atual ANTES de salvar — é a única chance de saber de onde o
+  // preço e o estoque vieram.
+  const anterior = await prisma.product.findUnique({
+    where: { id },
+    select: {
+      nome: true,
+      preco: true,
+      estoque: true,
+      estoqueMachos: true,
+      estoqueFemeas: true,
+      ativo: true,
+      destaque: true,
+      categoryId: true,
+    },
+  });
 
   const parsed = parseForm(formData);
   if (!parsed.success) {
@@ -295,6 +328,33 @@ export async function updateProduct(
     return { success: false, error: "Erro ao salvar." };
   }
 
+  if (anterior) {
+    const d = parsed.data;
+    const mudancas = diff(
+      { ...anterior },
+      {
+        nome: d.nome,
+        preco: scalarData(d).preco,
+        estoque: scalarData(d).estoque,
+        estoqueMachos: scalarData(d).estoqueMachos,
+        estoqueFemeas: scalarData(d).estoqueFemeas,
+        ativo: d.ativo,
+        destaque: d.destaque,
+        categoryId: d.categoryId,
+      },
+    );
+    if (mudancas.mudou) {
+      await auditar(membro, {
+        acao: "produto.atualizar",
+        entidade: "Product",
+        entidadeId: id,
+        descricao: `Editou o produto ${d.nome}`,
+        antes: mudancas.antes,
+        depois: mudancas.depois,
+      });
+    }
+  }
+
   revalidatePath("/admin/produtos", "layout");
   revalidatePath("/loja/[slug]", "page"); // página de produto
   revalidatePath("/"); // home pública reflete a edição
@@ -302,7 +362,7 @@ export async function updateProduct(
 }
 
 export async function deleteProduct(id: string): Promise<ActionResult> {
-  await assertPermissao("catalogo.excluir");
+  const membro = await assertPermissao("catalogo.excluir");
 
   const prod = await prisma.product.findUnique({
     where: { id },
@@ -345,6 +405,14 @@ export async function deleteProduct(id: string): Promise<ActionResult> {
       .map((u) => deleteImage(u).catch(() => {})),
   );
 
+  await auditar(membro, {
+    acao: "produto.excluir",
+    entidade: "Product",
+    entidadeId: id,
+    descricao: `Excluiu o produto ${prod.nome}`,
+    antes: { nome: prod.nome, preco: prod.preco, estoque: prod.estoque },
+  });
+
   revalidatePath("/admin/produtos", "layout");
   revalidatePath("/"); // home pública deixa de mostrar o produto excluído
   return { success: true, message: "Produto excluído." };
@@ -355,9 +423,21 @@ export async function toggleProductAtivo(
   id: string,
   value: boolean,
 ): Promise<ActionResult> {
-  await assertPermissao("catalogo.editar");
+  const membro = await assertPermissao("catalogo.editar");
+  const alvo = await prisma.product.findUnique({
+    where: { id },
+    select: { nome: true, ativo: true },
+  });
   try {
     await prisma.product.update({ where: { id }, data: { ativo: value } });
+    await auditar(membro, {
+      acao: "produto.ativo",
+      entidade: "Product",
+      entidadeId: id,
+      descricao: `${value ? "Marcou" : "Desmarcou"} ${alvo?.nome ?? "produto"} como publicado`,
+      antes: { ativo: alvo?.ativo },
+      depois: { ativo: value },
+    });
   } catch (e) {
     if (isPrismaError(e) && e.code === "P2025") {
       return { success: false, error: "Produto não encontrado." };
@@ -375,9 +455,21 @@ export async function toggleProductDestaque(
   id: string,
   value: boolean,
 ): Promise<ActionResult> {
-  await assertPermissao("catalogo.editar");
+  const membro = await assertPermissao("catalogo.editar");
+  const alvo = await prisma.product.findUnique({
+    where: { id },
+    select: { nome: true, destaque: true },
+  });
   try {
     await prisma.product.update({ where: { id }, data: { destaque: value } });
+    await auditar(membro, {
+      acao: "produto.destaque",
+      entidade: "Product",
+      entidadeId: id,
+      descricao: `${value ? "Marcou" : "Desmarcou"} ${alvo?.nome ?? "produto"} como em destaque`,
+      antes: { destaque: alvo?.destaque },
+      depois: { destaque: value },
+    });
   } catch (e) {
     if (isPrismaError(e) && e.code === "P2025") {
       return { success: false, error: "Produto não encontrado." };

@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { cupomSchema } from "@/lib/validations/cupom";
 import { assertPermissao } from "@/lib/permissoes-server";
+import { auditar, diff } from "@/lib/auditoria";
 import {
   checarLimiteDesconto,
   type MembroAtual,
@@ -112,6 +113,13 @@ export async function createCupom(input: unknown): Promise<ActionResult> {
     return { success: false, error: "Não foi possível criar o cupom." };
   }
 
+  await auditar(membro, {
+    acao: "cupom.criar",
+    entidade: "CupomDesconto",
+    descricao: `Criou o cupom ${d.codigo}`,
+    depois: { codigo: d.codigo, tipoValor: d.tipoValor, valor: d.valor },
+  });
+
   revalidatePath("/admin/cupons");
   revalidarRotasPublicas();
   redirect("/admin/cupons");
@@ -152,13 +160,25 @@ export async function updateCupom(
     return { success: false, error: "Não foi possível salvar o cupom." };
   }
 
+  await auditar(membro, {
+    acao: "cupom.atualizar",
+    entidade: "CupomDesconto",
+    entidadeId: id,
+    descricao: `Editou o cupom ${d.codigo}`,
+    depois: { codigo: d.codigo, tipoValor: d.tipoValor, valor: d.valor, ativo: d.ativo },
+  });
+
   revalidatePath("/admin/cupons");
   revalidarRotasPublicas();
   redirect("/admin/cupons");
 }
 
 export async function deleteCupom(id: string): Promise<ActionResult> {
-  await assertPermissao("catalogo.excluir");
+  const membro = await assertPermissao("catalogo.excluir");
+  const alvo = await prisma.cupomDesconto.findUnique({
+    where: { id },
+    select: { codigo: true, valor: true, tipoValor: true },
+  });
 
   try {
     // Pedidos que usaram o cupom mantêm o snapshot cupomCodigo (FK = SetNull).
@@ -173,11 +193,19 @@ export async function deleteCupom(id: string): Promise<ActionResult> {
 
   revalidatePath("/admin/cupons");
   revalidarRotasPublicas();
+  await auditar(membro, {
+    acao: "cupom.excluir",
+    entidade: "CupomDesconto",
+    entidadeId: id,
+    descricao: `Excluiu o cupom ${alvo?.codigo ?? id}`,
+    antes: alvo ? { codigo: alvo.codigo, valor: alvo.valor } : undefined,
+  });
+
   return { success: true, message: "Cupom excluído." };
 }
 
 export async function toggleCupomAtivo(id: string): Promise<ActionResult> {
-  await assertPermissao("catalogo.editar");
+  const membro = await assertPermissao("catalogo.editar");
 
   try {
     const atual = await prisma.cupomDesconto.findUnique({
@@ -193,6 +221,13 @@ export async function toggleCupomAtivo(id: string): Promise<ActionResult> {
     console.error("[cupom] toggle ativo", e);
     return { success: false, error: "Não foi possível atualizar o cupom." };
   }
+
+  await auditar(membro, {
+    acao: "cupom.ativar",
+    entidade: "CupomDesconto",
+    entidadeId: id,
+    descricao: "Ligou/desligou um cupom",
+  });
 
   revalidatePath("/admin/cupons");
   revalidarRotasPublicas();

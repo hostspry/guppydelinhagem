@@ -157,6 +157,8 @@ model User {
   notificacoes Notificacao[]
   accounts     Account[]
   lancamentos  Lancamento[]
+  auditorias   AuditoriaAdmin[]
+  visitas      Visitante[]
 }
 
 // Vínculo de conta OAuth (Google/Facebook) ao User — model padrão do Auth.js.
@@ -734,4 +736,150 @@ model RecorrenciaFinanceira {
   lancamentos Lancamento[]
 
   @@index([ativa])
+}
+
+// ─────────────────────────────────────────────
+// Auditoria e rastreio
+//
+// Duas coisas diferentes no mesmo lugar do schema:
+//  1. AuditoriaAdmin — o que a EQUIPE fez no painel. Registro interno da loja,
+//     com o valor antes e depois de cada mudança.
+//  2. Visitante/SessaoVisita/EventoVisitante — o que o CLIENTE fez no site.
+//
+// Sobre dado pessoal: o IP só é guardado inteiro quando a pessoa aceitou os
+// cookies; sem consentimento, o último octeto vira "xxx" e a geolocalização
+// nem é consultada (ver lib/rastreio/ip.ts). Nada aqui é apagado sozinho — a
+// limpeza é manual, e o painel avisa quando há registro com mais de 90 dias.
+// ─────────────────────────────────────────────
+
+model AuditoriaAdmin {
+  id String @id @default(cuid())
+
+  // Quem fez. O nome é SNAPSHOT: se a pessoa sair da equipe e a conta for
+  // removida, o histórico continua dizendo quem foi.
+  userId    String?
+  user      User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+  userNome  String
+  userEmail String
+  userPapel String
+
+  acao       String // "produto.atualizar", "pedido.cancelar"…
+  entidade   String? // "Product", "Order"…
+  entidadeId String?
+  /** Frase pronta para leitura humana ("mudou o preço de X de R$ 80 para R$ 90"). */
+  descricao  String
+
+  /** Só os campos que mudaram, para o histórico não virar um dump do banco. */
+  antes Json?
+  depois Json?
+
+  ip        String?
+  userAgent String?
+
+  ocorridoEm DateTime @default(now())
+
+  @@index([ocorridoEm])
+  @@index([userId, ocorridoEm])
+  @@index([acao, ocorridoEm])
+  @@index([entidade, entidadeId])
+}
+
+// Identidade anônima persistente (cookie). Quando a pessoa loga, `userId` liga
+// as visitas anteriores à conta — é o que permite ver o que o cliente olhou
+// antes de comprar.
+model Visitante {
+  id String @id @default(cuid())
+
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  primeiroAcesso DateTime @default(now())
+  ultimoAcesso   DateTime @default(now())
+  totalSessoes   Int      @default(0)
+  totalEventos   Int      @default(0)
+
+  sessoes SessaoVisita[]
+  eventos EventoVisitante[]
+
+  @@index([ultimoAcesso])
+  @@index([userId])
+}
+
+model SessaoVisita {
+  id          String    @id @default(cuid())
+  visitanteId String
+  visitante   Visitante @relation(fields: [visitanteId], references: [id], onDelete: Cascade)
+
+  iniciadaEm      DateTime @default(now())
+  ultimaAtividade DateTime @default(now())
+
+  /** Mascarado quando `consentimento` é false. */
+  ip            String?
+  consentimento Boolean @default(false)
+
+  userAgent   String?
+  dispositivo String? // celular | computador | tablet
+  navegador   String?
+  sistema     String?
+
+  referrer     String?
+  utmSource    String?
+  utmMedium    String?
+  utmCampaign  String?
+  paginaEntrada String?
+
+  // Geolocalização (só com consentimento; vem do cache GeoIp).
+  cidade   String?
+  regiao   String?
+  pais     String?
+  provedor String?
+
+  eventos EventoVisitante[]
+
+  @@index([visitanteId, iniciadaEm])
+  @@index([iniciadaEm])
+}
+
+model EventoVisitante {
+  id          String    @id @default(cuid())
+  visitanteId String
+  visitante   Visitante @relation(fields: [visitanteId], references: [id], onDelete: Cascade)
+  sessaoId    String
+  sessao      SessaoVisita @relation(fields: [sessaoId], references: [id], onDelete: Cascade)
+
+  tipo       String // ver lib/rastreio/eventos.ts
+  ocorridoEm DateTime @default(now())
+
+  url      String?
+  titulo   String?
+
+  // Produto envolvido, com nome em snapshot (o produto pode ser renomeado ou
+  // excluído; o histórico não pode mentir sobre o que a pessoa viu).
+  produtoId    String?
+  produtoNome  String?
+  variantId    String?
+  composicao   String?
+  quantidade   Int?
+  valor        Decimal? @db.Decimal(10, 2)
+
+  busca String?
+  meta  Json?
+
+  @@index([visitanteId, ocorridoEm])
+  @@index([sessaoId, ocorridoEm])
+  @@index([tipo, ocorridoEm])
+  @@index([produtoId, ocorridoEm])
+  @@index([ocorridoEm])
+}
+
+// Cache de IP → cidade/provedor. Existe para NÃO consultar o serviço externo a
+// cada evento: um IP é resolvido uma vez e reaproveitado.
+model GeoIp {
+  ip          String   @id
+  cidade      String?
+  regiao      String?
+  pais        String?
+  provedor    String?
+  falhou      Boolean  @default(false)
+  consultadoEm DateTime @default(now())
 }

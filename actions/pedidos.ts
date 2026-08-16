@@ -29,6 +29,7 @@ import type {
   Transportadora,
 } from "@/lib/generated/prisma/client";
 import { assertPermissao } from "@/lib/permissoes-server";
+import { auditar } from "@/lib/auditoria";
 import {
   checarDescontoDoPedido,
   checarLimiteValor,
@@ -203,6 +204,14 @@ export async function createPedido(formData: FormData): Promise<ActionResult> {
     return { success: false, error: "Erro ao salvar o pedido." };
   }
 
+  await auditar(membro, {
+    acao: "pedido.criar",
+    entidade: "Order",
+    entidadeId: novoId,
+    descricao: `Criou um pedido de ${total.toFixed(2)}`,
+    depois: { subtotal, frete: data.frete, desconto: data.desconto, total },
+  });
+
   revalidatePath("/admin/pedidos");
   redirect(`/admin/pedidos/${novoId}`);
 }
@@ -272,12 +281,24 @@ export async function updatePedido(
     return { success: false, error: "Erro ao salvar o pedido." };
   }
 
+  await auditar(membro, {
+    acao: "pedido.atualizar",
+    entidade: "Order",
+    entidadeId: id,
+    descricao: "Editou os itens/valores de um pedido",
+    depois: { subtotal, frete: data.frete, desconto: data.desconto, total },
+  });
+
   revalidatePath("/admin/pedidos");
   redirect(`/admin/pedidos/${id}`);
 }
 
 export async function deletePedido(id: string): Promise<ActionResult> {
-  await assertPermissao("pedidos.excluir");
+  const membro = await assertPermissao("pedidos.excluir");
+  const alvo = await prisma.order.findUnique({
+    where: { id },
+    select: { numero: true, total: true, status: true },
+  });
 
   try {
     await prisma.order.delete({ where: { id } }); // cascata: itens + pagamentos
@@ -288,6 +309,26 @@ export async function deletePedido(id: string): Promise<ActionResult> {
     console.error(e);
     return { success: false, error: "Erro ao excluir o pedido." };
   }
+
+  await auditar(membro, {
+    acao: "pedido.excluir",
+    entidade: "Order",
+    entidadeId: id,
+    descricao: `Excluiu o pedido ${alvo?.numero ?? id}`,
+    antes: alvo
+      ? { numero: alvo.numero, total: alvo.total, status: alvo.status }
+      : undefined,
+  });
+
+  await auditar(membro, {
+    acao: "pedido.excluir",
+    entidade: "Order",
+    entidadeId: id,
+    descricao: `Excluiu o pedido ${alvo?.numero ?? id}`,
+    antes: alvo
+      ? { numero: alvo.numero, total: alvo.total, status: alvo.status }
+      : undefined,
+  });
 
   revalidatePath("/admin/pedidos");
   return { success: true, message: "Pedido excluído." };
@@ -369,6 +410,15 @@ export async function atualizarStatusPedido(
   else if (novoStatus === "ENTREGUE") await notificarPedidoEntregue(id);
   else if (novoStatus === "CANCELADO") await notificarPedidoCancelado(id);
 
+  await auditar(membro, {
+    acao: `pedido.status.${novoStatus.toLowerCase()}`,
+    entidade: "Order",
+    entidadeId: id,
+    descricao: `Mudou o pedido de ${atual.status} para ${novoStatus}`,
+    antes: { status: atual.status },
+    depois: { status: novoStatus },
+  });
+
   revalidatePath("/admin/produtos");
   revalidatePath("/admin/pedidos");
   revalidatePath(`/admin/pedidos/${id}`);
@@ -388,7 +438,7 @@ export async function registrarEnvioManual(
   id: string,
   input: { transportadora: string; codigo: string },
 ): Promise<ActionResult> {
-  await assertPermissao("pedidos.envio");
+  const membro = await assertPermissao("pedidos.envio");
 
   if (!TRANSPORTADORAS_VALIDAS.includes(input.transportadora)) {
     return { success: false, error: "Transportadora inválida." };
@@ -427,6 +477,14 @@ export async function registrarEnvioManual(
     return { success: false, error: "Erro ao registrar o envio." };
   }
 
+  await auditar(membro, {
+    acao: "pedido.enviar",
+    entidade: "Order",
+    entidadeId: id,
+    descricao: `Registrou envio por ${transportadora}${codigo ? ` (${codigo})` : ""}`,
+    depois: { transportadora, codigo },
+  });
+
   await notificarPedidoEnviado(id); // 🚚 (com transportadora + rastreio)
 
   revalidatePath("/admin/pedidos");
@@ -445,7 +503,7 @@ export async function atualizarRastreio(
   id: string,
   input: { transportadora: string; codigo: string },
 ): Promise<ActionResult> {
-  await assertPermissao("pedidos.envio");
+  const membro = await assertPermissao("pedidos.envio");
 
   if (!TRANSPORTADORAS_VALIDAS.includes(input.transportadora)) {
     return { success: false, error: "Transportadora inválida." };
@@ -471,6 +529,14 @@ export async function atualizarRastreio(
     console.error(e);
     return { success: false, error: "Erro ao atualizar o rastreio." };
   }
+
+  await auditar(membro, {
+    acao: "pedido.rastreio",
+    entidade: "Order",
+    entidadeId: id,
+    descricao: `Alterou o rastreio para ${input.codigo}`,
+    depois: { transportadora: input.transportadora, codigo: input.codigo },
+  });
 
   revalidatePath(`/admin/pedidos/${id}`);
   return { success: true, message: "Rastreio atualizado." };
@@ -505,7 +571,7 @@ export type EnvioResultado = {
 export async function marcarPedidosComoEnviados(input: {
   envios: { pedidoId: string; codigoRastreio?: string }[];
 }): Promise<{ ok: boolean; resultados: EnvioResultado[] }> {
-  await assertPermissao("pedidos.envio");
+  const membro = await assertPermissao("pedidos.envio");
 
   const parsed = marcarEnviadosSchema.safeParse(input);
   if (!parsed.success) return { ok: false, resultados: [] };
