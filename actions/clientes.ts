@@ -4,9 +4,9 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { clienteSchema, type ClienteInput } from "@/lib/validations/cliente";
+import { assertPermissao } from "@/lib/permissoes-server";
 import {
   type ActionResult,
-  assertAuthorized,
   isPrismaError,
 } from "@/lib/utils/action-result";
 
@@ -58,7 +58,7 @@ function parseFromForm(formData: FormData) {
 export async function createCliente(
   formData: FormData,
 ): Promise<ActionResult> {
-  await assertAuthorized();
+  await assertPermissao("clientes.editar");
 
   const parsed = parseFromForm(formData);
   if (!parsed.success) {
@@ -84,7 +84,7 @@ export async function updateCliente(
   id: string,
   formData: FormData,
 ): Promise<ActionResult> {
-  await assertAuthorized();
+  await assertPermissao("clientes.editar");
 
   const parsed = parseFromForm(formData);
   if (!parsed.success) {
@@ -113,7 +113,7 @@ export async function updateCliente(
 }
 
 export async function deleteCliente(id: string): Promise<ActionResult> {
-  await assertAuthorized();
+  await assertPermissao("clientes.excluir");
 
   try {
     await prisma.cliente.delete({ where: { id } });

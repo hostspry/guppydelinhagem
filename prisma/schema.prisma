@@ -1,5 +1,5 @@
 // Guppy de Linhagem — schema do banco de dados
-// Single-store e-commerce: roles CUSTOMER e ADMIN apenas
+// Single-store e-commerce: cliente (CUSTOMER) + equipe (EDITOR/ADMIN/SUPER_ADMIN)
 
 generator client {
   provider = "prisma-client"
@@ -133,6 +133,14 @@ model User {
   senhaPrecisaTroca Boolean   @default(false)
   ultimoLogin       DateTime?
   criadoEm          DateTime  @default(now())
+
+  // Limites operacionais do membro da equipe. O papel (role) diz em QUE áreas ele
+  // mexe; estes campos limitam QUANTO ele pode mexer em dinheiro. SUPER_ADMIN
+  // ignora todos — quem manda no time não se auto-limita. Ver lib/permissoes.ts.
+  limiteDescontoPercent Int? // teto de desconto em % (null = sem teto)
+  podeCancelarPedido    Boolean  @default(false)
+  podeEstornar          Boolean  @default(false)
+  limiteValorFinanceiro Decimal? @db.Decimal(10, 2) // teto R$ p/ cancelar pedido pago ou estornar
 
   // Campos que o Auth.js/PrismaAdapter espera (OAuth). `nome` (obrigatório) segue
   // sendo a fonte de verdade do app; o adapter preenche `name` e, no createUser

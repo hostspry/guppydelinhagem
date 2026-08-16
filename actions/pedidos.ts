@@ -27,11 +27,12 @@ import type {
   OrderStatus,
   Transportadora,
 } from "@/lib/generated/prisma/client";
+import { assertPermissao } from "@/lib/permissoes-server";
 import {
-  type ActionResult,
-  assertAuthorized,
-  isPrismaError,
-} from "@/lib/utils/action-result";
+  checarDescontoDoPedido,
+  checarLimiteValor,
+} from "@/lib/permissoes";
+import { type ActionResult, isPrismaError } from "@/lib/utils/action-result";
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 const nullify = (s: FormDataEntryValue | null) => {
@@ -143,7 +144,7 @@ function calcTotais(
 }
 
 export async function createPedido(formData: FormData): Promise<ActionResult> {
-  await assertAuthorized();
+  const membro = await assertPermissao("pedidos.editar");
 
   const parsed = parsePedidoForm(formData);
   if (!parsed.success) {
@@ -160,6 +161,9 @@ export async function createPedido(formData: FormData): Promise<ActionResult> {
 
   const itensData = await buildItens(data.itens);
   const { subtotal, total } = calcTotais(itensData, data.frete, data.desconto);
+
+  const foraDoLimite = checarDescontoDoPedido(membro, subtotal, data.desconto);
+  if (foraDoLimite) return { success: false, error: foraDoLimite };
 
   let novoId = "";
   try {
@@ -206,7 +210,7 @@ export async function updatePedido(
   id: string,
   formData: FormData,
 ): Promise<ActionResult> {
-  await assertAuthorized();
+  const membro = await assertPermissao("pedidos.editar");
 
   const atual = await prisma.order.findUnique({
     where: { id },
@@ -235,6 +239,9 @@ export async function updatePedido(
 
   const itensData = await buildItens(data.itens);
   const { subtotal, total } = calcTotais(itensData, data.frete, data.desconto);
+
+  const foraDoLimite = checarDescontoDoPedido(membro, subtotal, data.desconto);
+  if (foraDoLimite) return { success: false, error: foraDoLimite };
 
   try {
     // Reconcilia itens por substituição total (não há referência externa a item).
@@ -269,7 +276,7 @@ export async function updatePedido(
 }
 
 export async function deletePedido(id: string): Promise<ActionResult> {
-  await assertAuthorized();
+  await assertPermissao("pedidos.excluir");
 
   try {
     await prisma.order.delete({ where: { id } }); // cascata: itens + pagamentos
@@ -289,11 +296,11 @@ export async function atualizarStatusPedido(
   id: string,
   novoStatus: OrderStatus,
 ): Promise<ActionResult> {
-  await assertAuthorized();
+  const membro = await assertPermissao("pedidos.status");
 
   const atual = await prisma.order.findUnique({
     where: { id },
-    select: { status: true, estoqueBaixado: true },
+    select: { status: true, estoqueBaixado: true, total: true },
   });
   if (!atual) return { success: false, error: "Pedido não encontrado." };
 
@@ -302,6 +309,26 @@ export async function atualizarStatusPedido(
       success: false,
       error: `Transição inválida: ${atual.status} → ${novoStatus}.`,
     };
+  }
+
+  // Cancelar é a operação que desfaz venda: exige a permissão explícita do membro.
+  // Se o pedido já foi PAGO, o teto em R$ também vale — aí tem dinheiro do cliente
+  // no meio, não só um rascunho abandonado.
+  if (novoStatus === "CANCELADO") {
+    if (!membro.semLimites && !membro.podeCancelarPedido) {
+      return {
+        success: false,
+        error: "Seu perfil não pode cancelar pedidos. Peça a um administrador.",
+      };
+    }
+    if (atual.status === "PAGO") {
+      const foraDoLimite = checarLimiteValor(
+        membro,
+        Number(atual.total),
+        "cancelar pedido pago",
+      );
+      if (foraDoLimite) return { success: false, error: foraDoLimite };
+    }
   }
 
   // PAGO → transição + baixa do pool (uma vez, trava estoqueBaixado), via função
@@ -354,7 +381,7 @@ export async function registrarEnvioManual(
   id: string,
   input: { transportadora: string; codigo: string },
 ): Promise<ActionResult> {
-  await assertAuthorized();
+  await assertPermissao("pedidos.envio");
 
   if (!TRANSPORTADORAS_VALIDAS.includes(input.transportadora)) {
     return { success: false, error: "Transportadora inválida." };
@@ -411,7 +438,7 @@ export async function atualizarRastreio(
   id: string,
   input: { transportadora: string; codigo: string },
 ): Promise<ActionResult> {
-  await assertAuthorized();
+  await assertPermissao("pedidos.envio");
 
   if (!TRANSPORTADORAS_VALIDAS.includes(input.transportadora)) {
     return { success: false, error: "Transportadora inválida." };
@@ -471,7 +498,7 @@ export type EnvioResultado = {
 export async function marcarPedidosComoEnviados(input: {
   envios: { pedidoId: string; codigoRastreio?: string }[];
 }): Promise<{ ok: boolean; resultados: EnvioResultado[] }> {
-  await assertAuthorized();
+  await assertPermissao("pedidos.envio");
 
   const parsed = marcarEnviadosSchema.safeParse(input);
   if (!parsed.success) return { ok: false, resultados: [] };
@@ -570,7 +597,13 @@ export async function marcarPedidosComoEnviados(input: {
  * (mensagem clara). Clicar 2× é seguro. O provider é resolvido pelo pagamento pago.
  */
 export async function estornarPedido(id: string): Promise<ActionResult> {
-  await assertAuthorized();
+  const membro = await assertPermissao("pedidos.status");
+  if (!membro.semLimites && !membro.podeEstornar) {
+    return {
+      success: false,
+      error: "Seu perfil não pode estornar pagamentos. Peça a um administrador.",
+    };
+  }
 
   const order = await prisma.order.findUnique({
     where: { id },
@@ -605,6 +638,10 @@ export async function estornarPedido(id: string): Promise<ActionResult> {
       error: "Não há pagamento aprovado neste pedido para estornar.",
     };
   }
+
+  // Teto em R$ sobre o valor que realmente saiu da mão do cliente (vem do banco).
+  const foraDoLimite = checarLimiteValor(membro, Number(pago.valor), "estorno");
+  if (foraDoLimite) return { success: false, error: foraDoLimite };
 
   // 1) Estorna no gateway FORA da transação de DB. Idempotency-key estável dedup no
   //    gateway. Se falhar, retorna a mensagem e NÃO marca como estornado.

@@ -4,11 +4,12 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { cupomSchema } from "@/lib/validations/cupom";
+import { assertPermissao } from "@/lib/permissoes-server";
 import {
-  type ActionResult,
-  assertAuthorized,
-  isPrismaError,
-} from "@/lib/utils/action-result";
+  checarLimiteDesconto,
+  type MembroAtual,
+} from "@/lib/permissoes";
+import { type ActionResult, isPrismaError } from "@/lib/utils/action-result";
 
 // <input type="date"> → Date. Início do dia para validoDe; fim do dia para
 // validoAte (o cupom vale o dia inteiro da data final).
@@ -68,8 +69,23 @@ function relacoesSet(d: ReturnType<typeof cupomSchema.parse>) {
   };
 }
 
+/**
+ * Teto de desconto do membro aplicado ao cupom. O limite é em %, então cupom
+ * percentual compara direto. Cupom de VALOR fixo não tem base de comparação (R$
+ * não vira % sem saber o carrinho) — quem tem teto não cria cupom fixo, e a
+ * mensagem diz o que fazer.
+ */
+function checarCupomNoLimite(
+  membro: MembroAtual,
+  d: ReturnType<typeof cupomSchema.parse>,
+): string | null {
+  if (membro.semLimites || membro.limiteDescontoPercent == null) return null;
+  if (d.tipoValor === "PERCENTUAL") return checarLimiteDesconto(membro, d.valor);
+  return `Seu limite de desconto é ${membro.limiteDescontoPercent}%, então você só pode criar cupons percentuais. Peça a um administrador para criar cupons de valor fixo.`;
+}
+
 export async function createCupom(input: unknown): Promise<ActionResult> {
-  await assertAuthorized();
+  const membro = await assertPermissao("catalogo.editar");
 
   const parsed = cupomSchema.safeParse(input);
   if (!parsed.success) {
@@ -80,6 +96,9 @@ export async function createCupom(input: unknown): Promise<ActionResult> {
     };
   }
   const d = parsed.data;
+
+  const foraDoLimite = checarCupomNoLimite(membro, d);
+  if (foraDoLimite) return { success: false, error: foraDoLimite };
 
   try {
     await prisma.cupomDesconto.create({
@@ -102,7 +121,7 @@ export async function updateCupom(
   id: string,
   input: unknown,
 ): Promise<ActionResult> {
-  await assertAuthorized();
+  const membro = await assertPermissao("catalogo.editar");
 
   const parsed = cupomSchema.safeParse(input);
   if (!parsed.success) {
@@ -113,6 +132,9 @@ export async function updateCupom(
     };
   }
   const d = parsed.data;
+
+  const foraDoLimite = checarCupomNoLimite(membro, d);
+  if (foraDoLimite) return { success: false, error: foraDoLimite };
 
   try {
     await prisma.cupomDesconto.update({
@@ -136,7 +158,7 @@ export async function updateCupom(
 }
 
 export async function deleteCupom(id: string): Promise<ActionResult> {
-  await assertAuthorized();
+  await assertPermissao("catalogo.excluir");
 
   try {
     // Pedidos que usaram o cupom mantêm o snapshot cupomCodigo (FK = SetNull).
@@ -155,7 +177,7 @@ export async function deleteCupom(id: string): Promise<ActionResult> {
 }
 
 export async function toggleCupomAtivo(id: string): Promise<ActionResult> {
-  await assertAuthorized();
+  await assertPermissao("catalogo.editar");
 
   try {
     const atual = await prisma.cupomDesconto.findUnique({

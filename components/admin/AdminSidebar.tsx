@@ -9,10 +9,12 @@ import {
   Image as ImageIcon,
   ShoppingCart,
   Users,
+  UserCog,
   Settings,
   Ticket,
   Fish,
 } from "lucide-react";
+import type { Permissao } from "@/lib/permissoes";
 
 type NavItem = {
   href: string;
@@ -21,6 +23,8 @@ type NavItem = {
   // Rota ainda não construída: link visível (navegação futura), mas sem
   // prefetch — evita o 404 logado no console pelo prefetch do Next.
   prefetch?: boolean;
+  // Sem isto, o item aparece para toda a equipe (ex.: Dashboard).
+  permissao?: Permissao;
 };
 
 type NavSection = {
@@ -36,39 +40,85 @@ const NAV_SECTIONS: NavSection[] = [
   {
     title: "Catálogo",
     items: [
-      { href: "/admin/produtos", label: "Produtos", icon: Package },
-      { href: "/admin/categorias", label: "Categorias", icon: FolderTree },
-      { href: "/admin/cupons", label: "Cupons", icon: Ticket },
+      {
+        href: "/admin/produtos",
+        label: "Produtos",
+        icon: Package,
+        permissao: "catalogo.ver",
+      },
+      {
+        href: "/admin/categorias",
+        label: "Categorias",
+        icon: FolderTree,
+        permissao: "catalogo.ver",
+      },
+      {
+        href: "/admin/cupons",
+        label: "Cupons",
+        icon: Ticket,
+        permissao: "catalogo.ver",
+      },
       {
         href: "/admin/hero-slides",
         label: "Hero da home",
         icon: ImageIcon,
         prefetch: false,
+        permissao: "catalogo.ver",
       },
     ],
   },
   {
     title: "Vendas",
     items: [
-      { href: "/admin/pedidos", label: "Pedidos", icon: ShoppingCart },
-      { href: "/admin/clientes", label: "Clientes", icon: Users },
+      {
+        href: "/admin/pedidos",
+        label: "Pedidos",
+        icon: ShoppingCart,
+        permissao: "pedidos.ver",
+      },
+      {
+        href: "/admin/clientes",
+        label: "Clientes",
+        icon: Users,
+        permissao: "clientes.ver",
+      },
     ],
   },
   {
     title: "Sistema",
     items: [
       {
+        href: "/admin/equipe",
+        label: "Equipe",
+        icon: UserCog,
+        permissao: "equipe.gerenciar",
+      },
+      {
         href: "/admin/configuracoes",
         label: "Configurações",
         icon: Settings,
         prefetch: false,
+        permissao: "config.editar",
       },
     ],
   },
 ];
 
-export function AdminSidebar({ onNavigate }: { onNavigate?: () => void }) {
+export function AdminSidebar({
+  permissoes,
+  onNavigate,
+}: {
+  permissoes: readonly Permissao[];
+  onNavigate?: () => void;
+}) {
   const pathname = usePathname();
+
+  // Esconder o que a pessoa não pode abrir evita o clique que só levaria a um
+  // "sem permissão". Quem guarda de verdade são os layouts das seções.
+  const secoes = NAV_SECTIONS.map((s) => ({
+    ...s,
+    items: s.items.filter((i) => !i.permissao || permissoes.includes(i.permissao)),
+  })).filter((s) => s.items.length > 0);
 
   const isActive = (href: string) => {
     if (href === "/admin") return pathname === "/admin";
@@ -90,7 +140,7 @@ export function AdminSidebar({ onNavigate }: { onNavigate?: () => void }) {
       </div>
 
       <nav className="flex-1 px-2 py-3 overflow-y-auto">
-        {NAV_SECTIONS.map((section) => (
+        {secoes.map((section) => (
           <div key={section.title} className="mb-2">
             <div className="px-3 pt-2 pb-1 text-[10px] font-medium text-white/40 uppercase tracking-wider">
               {section.title}

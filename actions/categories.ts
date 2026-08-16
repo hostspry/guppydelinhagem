@@ -4,16 +4,16 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { categorySchema } from "@/lib/validations/category";
+import { assertPermissao } from "@/lib/permissoes-server";
 import {
   type ActionResult,
-  assertAuthorized,
   isPrismaError,
 } from "@/lib/utils/action-result";
 
 export async function createCategory(
   formData: FormData,
 ): Promise<ActionResult> {
-  await assertAuthorized();
+  await assertPermissao("catalogo.editar");
 
   const parsed = categorySchema.safeParse({
     nome: formData.get("nome"),
@@ -47,7 +47,7 @@ export async function updateCategory(
   id: string,
   formData: FormData,
 ): Promise<ActionResult> {
-  await assertAuthorized();
+  await assertPermissao("catalogo.editar");
 
   const parsed = categorySchema.safeParse({
     nome: formData.get("nome"),
@@ -83,7 +83,7 @@ export async function updateCategory(
 }
 
 export async function deleteCategory(id: string): Promise<ActionResult> {
-  await assertAuthorized();
+  await assertPermissao("catalogo.excluir");
 
   const cat = await prisma.category.findUnique({
     where: { id },

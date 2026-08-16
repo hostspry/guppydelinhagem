@@ -1,20 +1,24 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { Menu, X } from "lucide-react";
 import { signOut } from "next-auth/react";
 import { AdminSidebar } from "./AdminSidebar";
+import type { Permissao } from "@/lib/permissoes";
 
 type AdminHeaderProps = {
   userName: string;
   userRole: string;
   breadcrumb: string;
+  permissoes: readonly Permissao[];
 };
 
 export function AdminHeader({
   userName,
   userRole,
   breadcrumb,
+  permissoes,
 }: AdminHeaderProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -54,6 +58,12 @@ export function AdminHeader({
               </div>
             </div>
           </div>
+          <Link
+            href="/admin/trocar-senha"
+            className="text-gray-500 text-xs hover:text-[#07366A] hidden sm:inline"
+          >
+            Trocar senha
+          </Link>
           <button
             type="button"
             onClick={() => signOut({ callbackUrl: "/admin/login" })}
@@ -81,7 +91,10 @@ export function AdminHeader({
             >
               <X className="w-5 h-5" aria-hidden="true" />
             </button>
-            <AdminSidebar onNavigate={() => setMobileOpen(false)} />
+            <AdminSidebar
+              permissoes={permissoes}
+              onNavigate={() => setMobileOpen(false)}
+            />
           </div>
         </div>
       )}

@@ -2,9 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
+import { assertPermissao } from "@/lib/permissoes-server";
 import {
   type ActionResult,
-  assertAuthorized,
 } from "@/lib/utils/action-result";
 
 const DEFAULT_ID = "default";
@@ -13,7 +13,7 @@ const DEFAULT_ID = "default";
 export async function salvarConfiguracaoLoja(
   formData: FormData,
 ): Promise<ActionResult> {
-  await assertAuthorized();
+  await assertPermissao("config.editar");
 
   const raw = Number(formData.get("descontoPixGlobalPercent"));
   const pct = Number.isFinite(raw)

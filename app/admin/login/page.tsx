@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import Image from "next/image";
 import { Loader2 } from "lucide-react";
 import { signIn } from "next-auth/react";
+import { useSearchParams } from "next/navigation";
 
 // Logo oficial do Google (4 cores).
 function GoogleLogo({ size = 18 }: { size?: number }) {
@@ -17,12 +18,19 @@ function GoogleLogo({ size = 18 }: { size?: number }) {
   );
 }
 
-export default function AdminLoginPage() {
+function LoginConteudo() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+
+  // Quem teve o acesso removido chega aqui vindo de /api/sessao-encerrada; sem
+  // explicação, a volta ao login pareceria um bug.
+  const aviso =
+    useSearchParams().get("motivo") === "sem-acesso"
+      ? "Seu acesso ao painel foi encerrado. Fale com o dono da loja."
+      : null;
 
   function entrarGoogle() {
     if (loading || googleLoading) return;
@@ -115,6 +123,15 @@ export default function AdminLoginPage() {
               />
             </div>
 
+            {aviso && !error && (
+              <div
+                role="status"
+                className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800"
+              >
+                {aviso}
+              </div>
+            )}
+
             {error && (
               <div
                 role="alert"
@@ -170,5 +187,15 @@ export default function AdminLoginPage() {
         </p>
       </div>
     </main>
+  );
+}
+
+// useSearchParams precisa de um limite de Suspense para a rota não travar o
+// prerender do Next.
+export default function AdminLoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginConteudo />
+    </Suspense>
   );
 }

@@ -1,7 +1,7 @@
 "use server";
 
-import { assertAuthorized } from "@/lib/utils/action-result";
 import { uploadImage, deleteImage } from "@/lib/s3";
+import { assertPermissao } from "@/lib/permissoes-server";
 
 const ALLOWED: Record<string, string> = {
   "image/jpeg": "jpg",
@@ -19,7 +19,7 @@ type UploadResult = { ok: true; url: string } | { ok: false; error: string };
 export async function uploadProductImage(
   formData: FormData,
 ): Promise<UploadResult> {
-  await assertAuthorized();
+  await assertPermissao("catalogo.editar");
 
   const file = formData.get("file");
   if (!(file instanceof File) || file.size === 0) {

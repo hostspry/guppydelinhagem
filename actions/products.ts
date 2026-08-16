@@ -16,11 +16,8 @@ import {
   type DetectedPlatform,
 } from "@/lib/utils/video";
 import { deleteImage } from "@/lib/s3";
-import {
-  type ActionResult,
-  assertAuthorized,
-  isPrismaError,
-} from "@/lib/utils/action-result";
+import { type ActionResult, isPrismaError } from "@/lib/utils/action-result";
+import { assertPermissao } from "@/lib/permissoes-server";
 
 /** Campo JSON (array serializado pelo form). Falha → []. */
 function parseJsonArrayField(raw: FormDataEntryValue | null): unknown[] {
@@ -173,7 +170,7 @@ function buildVideoCreates(videos: VideoDraft[]) {
 }
 
 export async function createProduct(formData: FormData): Promise<ActionResult> {
-  await assertAuthorized();
+  await assertPermissao("catalogo.editar");
 
   const parsed = parseForm(formData);
   if (!parsed.success) {
@@ -219,7 +216,7 @@ export async function updateProduct(
   id: string,
   formData: FormData,
 ): Promise<ActionResult> {
-  await assertAuthorized();
+  await assertPermissao("catalogo.editar");
 
   const parsed = parseForm(formData);
   if (!parsed.success) {
@@ -305,7 +302,7 @@ export async function updateProduct(
 }
 
 export async function deleteProduct(id: string): Promise<ActionResult> {
-  await assertAuthorized();
+  await assertPermissao("catalogo.excluir");
 
   const prod = await prisma.product.findUnique({
     where: { id },
@@ -358,7 +355,7 @@ export async function toggleProductAtivo(
   id: string,
   value: boolean,
 ): Promise<ActionResult> {
-  await assertAuthorized();
+  await assertPermissao("catalogo.editar");
   try {
     await prisma.product.update({ where: { id }, data: { ativo: value } });
   } catch (e) {
@@ -378,7 +375,7 @@ export async function toggleProductDestaque(
   id: string,
   value: boolean,
 ): Promise<ActionResult> {
-  await assertAuthorized();
+  await assertPermissao("catalogo.editar");
   try {
     await prisma.product.update({ where: { id }, data: { destaque: value } });
   } catch (e) {
@@ -409,7 +406,7 @@ export type VideoMetadata = {
 export async function fetchVideoMetadata(
   url: string,
 ): Promise<{ ok: true; data: VideoMetadata } | { ok: false; error: string }> {
-  await assertAuthorized();
+  await assertPermissao("catalogo.editar");
 
   const parsed = parseVideoUrl(url);
   if (!parsed) {

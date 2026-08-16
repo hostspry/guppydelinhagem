@@ -18,9 +18,14 @@ const currencyBR = new Intl.NumberFormat("pt-BR", {
   currency: "BRL",
 });
 
-export default async function AdminDashboard() {
+export default async function AdminDashboard({
+  searchParams,
+}: {
+  searchParams: Promise<{ semPermissao?: string }>;
+}) {
   const session = await auth();
   const stats = await getDashboardStats();
+  const { semPermissao } = await searchParams;
 
   return (
     <div>
@@ -30,6 +35,14 @@ export default async function AdminDashboard() {
       <p className="text-sm text-gray-500 mb-6">
         Visão geral do seu e-commerce de guppies premium.
       </p>
+
+      {/* Alguém tentou abrir uma área fora do seu perfil (link antigo ou URL na mão). */}
+      {semPermissao && (
+        <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          Essa área não faz parte do seu perfil de acesso. Se você precisa dela,
+          peça ao dono da loja para ajustar sua permissão.
+        </div>
+      )}
 
       {/* Grid de stats: 2 cols mobile, 3 cols desktop */}
       <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-6">

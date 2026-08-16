@@ -1,10 +1,10 @@
 "use server";
 
-import { assertAuthorized } from "@/lib/utils/action-result";
 import {
   generateProductContent,
   type GeneratedProductContent,
 } from "@/lib/ai/gemini";
+import { assertPermissao } from "@/lib/permissoes-server";
 
 export type GenerateContentResult =
   | { ok: true; data: GeneratedProductContent }
@@ -23,7 +23,7 @@ export async function generateContent(input: {
   pesquisar?: boolean;
 }): Promise<GenerateContentResult> {
   try {
-    await assertAuthorized();
+    await assertPermissao("catalogo.editar");
     const data = await generateProductContent({
       videoTitle: input.videoTitle ?? "",
       videoHashtags: input.videoHashtags,

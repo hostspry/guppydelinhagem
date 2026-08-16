@@ -1,5 +1,3 @@
-import { auth } from "@/lib/auth";
-
 export type ActionResult =
   | { success: true; message?: string }
   | {
@@ -8,16 +6,9 @@ export type ActionResult =
       fieldErrors?: Record<string, string[]>;
     };
 
-/**
- * Garante que há uma sessão autenticada com permissão de admin.
- * Lança em caso de não autenticado ou role CUSTOMER.
- */
-export async function assertAuthorized() {
-  const session = await auth();
-  if (!session?.user) throw new Error("Não autenticado");
-  if (session.user.role === "CUSTOMER") throw new Error("Sem permissão");
-  return session;
-}
+// A checagem de acesso vive em lib/permissoes.ts (assertPermissao). O antigo
+// assertAuthorized só perguntava "não é CUSTOMER?", o que dava a um EDITOR os
+// mesmos poderes do dono — foi removido para ninguém reusá-lo sem querer.
 
 /** Narrow de erro do Prisma para acesso ao `code` (ex: P2002, P2025). */
 export function isPrismaError(e: unknown): e is { code: string } {
