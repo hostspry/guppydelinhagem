@@ -134,9 +134,11 @@ export interface CriarPreferenciaInput {
     cpfCnpj?: string | null;
   };
   backUrls: { success: string; failure: string; pending: string };
-  // Teto de parcelas do cartão (PagBank: payment_methods_configs). MP ignora
-  // (o Checkout Pro define o parcelamento pelas regras da conta).
+  // Teto de parcelas do cartão. PagBank: payment_methods_configs. MP: entra em
+  // payment_methods.installments do Checkout Pro.
   installmentsLimit?: number;
+  /** Fecha o checkout no gateway nesta data (MP: expiration_date_to). */
+  expiraEm?: Date | null;
   idempotencyKey?: string;
 }
 

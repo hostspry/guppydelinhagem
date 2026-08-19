@@ -49,6 +49,16 @@ enum TipoEntrega {
   RETIRADA // cliente retira presencialmente (frete 0, sem endereço)
 }
 
+// Order serve a dois fluxos. PEDIDO é a venda de peixes (carrinho, estoque,
+// envio). COBRANCA é a cobrança avulsa: o admin monta um valor, manda o link
+// pro cliente e ele paga no gateway. Mesma tabela porque webhook, estorno,
+// caixa e histórico já falam "pedido" — o tipo só mantém a cobrança fora das
+// listas de venda e das rotinas de despacho.
+enum TipoOrder {
+  PEDIDO
+  COBRANCA
+}
+
 enum ProviderPagamento {
   MERCADO_PAGO
   PICPAY
@@ -372,6 +382,7 @@ model Order {
   userId          String?
   user            User?           @relation(fields: [userId], references: [id])
 
+  tipo            TipoOrder       @default(PEDIDO) // COBRANCA = cobrança avulsa por link
   status          OrderStatus     @default(RASCUNHO)
   estoqueBaixado  Boolean         @default(false) // baixa de pool já aplicada (evita dupla)
   formaPagamento  FormaPagamento?
@@ -397,6 +408,13 @@ model Order {
   cupom       CupomDesconto? @relation(fields: [cupomId], references: [id], onDelete: SetNull)
   cupomCodigo String?
 
+  // Cobrança avulsa (tipo = COBRANCA). publicToken é o segredo do link que vai
+  // pro cliente (numero é sequencial, logo adivinhável — nunca serve de link).
+  // expiraEm fecha o link; maxParcelas limita o parcelamento no gateway.
+  publicToken String?   @unique
+  expiraEm    DateTime?
+  maxParcelas Int?
+
   // Scaffold de checkout/integrações — dormente (reconciliado nas fases
   // Pagamentos/Envio; não usar/não apagar). parcelas: parcelamento de cartão.
   parcelas        Int?
@@ -417,6 +435,7 @@ model Order {
   @@unique([ano, sequencia])
   @@index([clienteId])
   @@index([status])
+  @@index([tipo])
 }
 
 // Histórico de rastreio de um pedido (uma linha por ocorrência do Melhor Envio).

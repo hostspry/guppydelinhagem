@@ -19,6 +19,7 @@ export async function cancelarPedidosAguardandoExpirados(): Promise<number> {
   const limite = new Date(Date.now() - LIMITE_ORFAO_HORAS * 60 * 60 * 1000);
   const res = await prisma.order.updateMany({
     where: {
+      tipo: "PEDIDO", // cobrança avulsa tem validade própria (Order.expiraEm)
       status: "AGUARDANDO_PAGAMENTO",
       criadoEm: { lt: limite },
       pagamentos: { none: { status: { in: ["PAGO", "EM_ANALISE"] } } },
@@ -52,7 +53,8 @@ export async function listPedidos({
   entrega?: TipoEntrega;
   transporte?: TransporteFiltro;
 }) {
-  const where: Prisma.OrderWhereInput = {};
+  // tipo PEDIDO: cobrança avulsa tem lista própria (/admin/cobrancas).
+  const where: Prisma.OrderWhereInput = { tipo: "PEDIDO" };
   if (status) where.status = status;
   if (entrega) where.tipoEntrega = entrega;
   // Vários grupos OR (busca + transportadora) convivem via AND.
@@ -112,7 +114,7 @@ export type PedidoListItem = Awaited<ReturnType<typeof listPedidos>>[number];
 // Facebook está restrito. Vínculo formal Cliente.userId fica para depois.
 export async function listPedidosDoCliente(email: string) {
   const rows = await prisma.order.findMany({
-    where: { cliente: { email }, status: { not: "RASCUNHO" } },
+    where: { tipo: "PEDIDO", cliente: { email }, status: { not: "RASCUNHO" } },
     orderBy: { criadoEm: "desc" },
     select: { id: true, numero: true, status: true, total: true, criadoEm: true },
   });
@@ -143,7 +145,7 @@ export type PedidoEnvio = {
  */
 export async function listPedidosAguardandoEnvio(): Promise<PedidoEnvio[]> {
   const rows = await prisma.order.findMany({
-    where: { status: "PAGO" },
+    where: { tipo: "PEDIDO", status: "PAGO" }, // cobrança avulsa não se despacha
     orderBy: { atualizadoEm: "asc" },
     select: {
       numero: true,

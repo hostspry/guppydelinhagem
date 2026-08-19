@@ -435,6 +435,17 @@ export const mercadoPagoProvider: PaymentProvider = {
       back_urls: input.backUrls,
       auto_return: "approved",
       notification_url: NOTIFICATION_URL,
+      // Teto de parcelas (cobrança avulsa). Sem isso o MP usa o máximo da conta.
+      ...(input.installmentsLimit
+        ? { payment_methods: { installments: input.installmentsLimit } }
+        : {}),
+      // Validade do link: passou da data, o MP recusa abrir o checkout.
+      ...(input.expiraEm
+        ? {
+            expires: true,
+            expiration_date_to: isoComOffsetBrasil(input.expiraEm),
+          }
+        : {}),
     };
 
     const data = (await mpFetch("/checkout/preferences", {

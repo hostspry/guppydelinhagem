@@ -42,6 +42,7 @@ export async function listPedidosDoUsuario(
 ) {
   const rows = await prisma.order.findMany({
     where: {
+      tipo: "PEDIDO", // cobrança avulsa não entra no histórico de compras
       status: { not: "RASCUNHO" },
       cliente: clienteDoUsuario(userId, email),
     },

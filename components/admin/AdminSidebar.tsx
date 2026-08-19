@@ -16,6 +16,7 @@ import {
   Settings,
   Ticket,
   Fish,
+  Receipt,
 } from "lucide-react";
 import type { Permissao } from "@/lib/permissoes";
 
@@ -77,6 +78,12 @@ const NAV_SECTIONS: NavSection[] = [
         href: "/admin/pedidos",
         label: "Pedidos",
         icon: ShoppingCart,
+        permissao: "pedidos.ver",
+      },
+      {
+        href: "/admin/cobrancas",
+        label: "Cobranças",
+        icon: Receipt,
         permissao: "pedidos.ver",
       },
       {

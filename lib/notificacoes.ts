@@ -18,6 +18,7 @@ import type {
 // (o transporte já é seguro; ainda assim envolvemos tudo em try/catch).
 
 const LINK_ADMIN = "https://guppydelinhagem.com.br/admin/pedidos";
+const LINK_COBRANCAS = "https://guppydelinhagem.com.br/admin/cobrancas";
 
 // ── Rótulos amigáveis para provider/método ────────────────────────────────────
 function rotuloProvider(p?: ProviderPagamento | null): string | null {
@@ -37,6 +38,7 @@ function rotuloMetodo(m?: MetodoPagamento | null): string | null {
 type PedidoNotif = {
   numero: string;
   clienteNome: string;
+  ehCobranca: boolean; // cobrança avulsa: não tem envio nem itens de catálogo
   total: number;
   transportadora: string | null;
   codigoRastreio: string | null;
@@ -50,6 +52,7 @@ async function carregar(orderId: string): Promise<PedidoNotif | null> {
       where: { id: orderId },
       select: {
         numero: true,
+        tipo: true,
         total: true,
         transportadora: true,
         codigoRastreio: true,
@@ -65,6 +68,7 @@ async function carregar(orderId: string): Promise<PedidoNotif | null> {
     return {
       numero: o.numero,
       clienteNome: o.cliente.nome,
+      ehCobranca: o.tipo === "COBRANCA",
       total: Number(o.total),
       transportadora: o.transportadora,
       codigoRastreio: o.codigoRastreio,
@@ -153,6 +157,19 @@ export async function notificarPedidoPago(
   const prov = rotuloProvider(opts?.provider);
   const linhaPag =
     met && prov ? ` · ${met} via ${prov}` : met ? ` · ${met}` : prov ? ` · ${prov}` : "";
+  // Cobrança avulsa não tem o que separar nem para onde enviar: a mensagem para
+  // no dinheiro que entrou e aponta para a tela de cobranças.
+  if (p.ehCobranca) {
+    await enviarSeguro(
+      () =>
+        `💰 <b>COBRANÇA PAGA!</b>\n\n` +
+        `<b>${escapeHtml(p.numero)}</b> — ${escapeHtml(p.clienteNome)}\n` +
+        `${linhasItens(p.itens)}\n` +
+        `Total: <b>${formatBRL(p.total)}</b>${linhaPag}\n\n` +
+        `Ver no admin: ${LINK_COBRANCAS}`,
+    );
+    return;
+  }
   await enviarSeguro(
     () =>
       `💰 <b>PEDIDO PAGO!</b>\n\n` +
