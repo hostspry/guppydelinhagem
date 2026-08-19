@@ -119,6 +119,22 @@ function isoComOffsetBrasil(d: Date): string {
   );
 }
 
+// Categorias aceitas pelo MP em additional_info.items.category_id (GET
+// /item_categories). Qualquer outra coisa — como o id da NOSSA tabela de
+// categorias, que era o que ia antes — é lixo para o scoring: o antifraude não
+// reconhece e o item fica sem contexto. Peixe não tem categoria própria lá, então
+// o certo é "others".
+const CATEGORIAS_MP = new Set([
+  "art", "baby", "coupons", "donations", "computing", "cameras", "video_games",
+  "television", "car_electronics", "electronics", "automotive", "entertainment",
+  "fashion", "games", "home", "musical", "phones", "services", "learnings",
+  "tickets", "travels", "virtual_goods", "others",
+]);
+function categoriaMp(id: string | null | undefined): string {
+  const v = (id ?? "").trim();
+  return CATEGORIAS_MP.has(v) ? v : "others";
+}
+
 // Telefone BR (só dígitos) → { area_code, number } que o MP espera no payer/phone.
 // DDD = 2 primeiros dígitos; o resto é o número. <10 dígitos → não envia (incompleto).
 function telefoneMp(
@@ -315,7 +331,7 @@ export const mercadoPagoProvider: PaymentProvider = {
               id: it.id,
               title: it.title,
               description: it.title,
-              ...(it.categoryId ? { category_id: it.categoryId } : {}),
+              category_id: categoriaMp(it.categoryId),
               quantity: it.quantity,
               unit_price: Math.round(it.unitPrice * 100) / 100,
             })),
@@ -446,7 +462,7 @@ export const mercadoPagoProvider: PaymentProvider = {
         // description e category_id entram no scoring do antifraude: item sem
         // contexto é tratado como compra genérica (risco maior).
         description: it.title,
-        category_id: "others",
+        category_id: categoriaMp(null),
         quantity: it.quantity,
         unit_price: Math.round(it.unitPrice * 100) / 100,
         currency_id: "BRL",
