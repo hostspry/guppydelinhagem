@@ -152,6 +152,7 @@ export type ItemCartaoMp = {
 export type OrderCriado = {
   orderId: string;
   numero: string;
+  clienteId: string; // p/ o histórico do pagador no antifraude do MP
   valorPix: number; // total a cobrar no Pix (com desconto) — recalculado no servidor
   valorCartao: number; // total a cobrar no cartão (cheio) — recalculado no servidor
   pagador: PagadorCheckout;
@@ -932,6 +933,7 @@ export async function criarOrderDoCheckout(
   let orderId = "";
   let numero = "";
   let reused = false;
+  let clienteId = "";
   try {
     const created = await prisma.$transaction(async (tx) => {
       // Reuso de cliente por identidade forte → fraca.
@@ -1035,7 +1037,7 @@ export async function criarOrderDoCheckout(
           },
           select: { id: true, numero: true },
         });
-        return { ...upd, reused: true };
+        return { ...upd, reused: true, clienteId: cliente.id };
       }
 
       // Número sequencial por ano (igual ao pedido manual).
@@ -1071,11 +1073,12 @@ export async function criarOrderDoCheckout(
         },
         select: { id: true, numero: true },
       });
-      return { ...novo, reused: false };
+      return { ...novo, reused: false, clienteId: cliente.id };
     });
     orderId = created.id;
     numero = created.numero;
     reused = created.reused;
+    clienteId = created.clienteId;
   } catch (e) {
     console.error("[checkout] criar pedido", e);
     return { ok: false, error: "Não foi possível criar o pedido. Tente novamente." };
@@ -1113,6 +1116,7 @@ export async function criarOrderDoCheckout(
     data: {
       orderId,
       numero,
+      clienteId,
       valorPix: totalPix,
       valorCartao: totalCheio,
       reused,
@@ -1532,7 +1536,37 @@ export async function pagarComCartao(
       fieldErrors: order.fieldErrors,
     };
   }
-  const { orderId, numero, valorCartao: valor, pagador } = order.data; // cartão cobra o CHEIO
+  const { orderId, numero, valorCartao: valor, pagador, clienteId } = order.data; // cartão cobra o CHEIO
+
+  // Histórico do comprador para o antifraude do MP. Cliente com cadastro antigo
+  // e compra anterior aprovada é tratado como risco baixo — sem isso todo pedido
+  // chega lá como "primeira compra de um desconhecido". Nunca trava o pagamento.
+  const historico = await (async () => {
+    try {
+      const [cli, anterior] = await Promise.all([
+        prisma.cliente.findUnique({
+          where: { id: clienteId },
+          select: { criadoEm: true },
+        }),
+        prisma.order.findFirst({
+          where: {
+            clienteId,
+            id: { not: orderId },
+            status: { in: ["PAGO", "ENVIADO", "ENTREGUE"] },
+          },
+          orderBy: { criadoEm: "desc" },
+          select: { criadoEm: true },
+        }),
+      ]);
+      return {
+        cadastradoEm: cli?.criadoEm ?? null,
+        ultimaCompraEm: anterior?.criadoEm ?? null,
+        primeiraCompra: !anterior,
+      };
+    } catch {
+      return null;
+    }
+  })();
 
   // payer fiel ao Brick: usa o e-mail/CPF que vieram do formulário seguro do MP;
   // só cai no checkout se o Brick não devolver (ex.: campo oculto).
@@ -1577,6 +1611,7 @@ export async function pagarComCartao(
       payerAddress:
         order.data.tipoEntrega === "RETIRADA" ? null : order.data.endereco,
       itens: order.data.itens,
+      historico,
     });
   } catch (e) {
     console.error("[checkout] cobrar cartão", e);

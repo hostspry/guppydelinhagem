@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { Loader2 } from "lucide-react";
 import type { CartaoInput } from "@/actions/checkout";
+import { carregarDeviceMp, esperarDeviceId } from "@/lib/mp-device";
 
 // Dados que o Brick devolve no onSubmit (campos seguros ficam no iframe do MP;
 // aqui só chega o TOKEN de uso único + dados não sensíveis — nunca PAN/CVV).
@@ -34,7 +35,8 @@ type MpConstructor = new (
 declare global {
   interface Window {
     MercadoPago?: MpConstructor;
-    // Device fingerprint criado automaticamente pelo SDK v2 do MP ao carregar.
+    // Device fingerprint do MP. NÃO vem do SDK v2 — quem define é o
+    // security.js carregado por lib/mp-device.
     MP_DEVICE_SESSION_ID?: string;
   }
 }
@@ -100,6 +102,9 @@ export default function CardPaymentBrick({
 
     (async () => {
       try {
+        // Fingerprint em paralelo ao SDK: a coleta é assíncrona e queremos que
+        // esteja pronta quando o cliente terminar de digitar o cartão.
+        carregarDeviceMp("checkout");
         await carregarSdk();
         if (cancelado || !window.MercadoPago) return;
         const mp = new window.MercadoPago(publicKey, { locale: "pt-BR" });
@@ -122,19 +127,17 @@ export default function CardPaymentBrick({
                 err?.message ?? "Erro no formulário de cartão.",
               );
             },
-            onSubmit: (formData: CardBrickFormData) =>
+            onSubmit: async (formData: CardBrickFormData) =>
               onPagarRef.current({
                 token: formData.token,
                 paymentMethodId: formData.payment_method_id,
                 issuerId:
                   formData.issuer_id != null ? String(formData.issuer_id) : null,
                 installments: Number(formData.installments),
-                // Device ID do MP (capturado pelo SDK v2) — vai ao backend e de lá
-                // pro header X-meli-session-id. Sem ele o antifraude recusa.
-                deviceId:
-                  typeof window !== "undefined"
-                    ? (window.MP_DEVICE_SESSION_ID ?? null)
-                    : null,
+                // Device ID → header X-meli-session-id no backend. Espera a coleta
+                // terminar (poucos segundos) em vez de ler a variável na hora: se
+                // for null, o antifraude recusa cartão bom por falta de sinal.
+                deviceId: await esperarDeviceId(),
                 // payer fiel ao que o Brick devolveu (sem reordenar/substituir).
                 payer: formData.payer
                   ? {

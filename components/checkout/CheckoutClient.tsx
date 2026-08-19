@@ -54,6 +54,7 @@ import {
 } from "@/actions/checkout";
 import PixPanel from "@/components/checkout/PixPanel";
 import CardPaymentBrick from "@/components/checkout/CardPaymentBrick";
+import { carregarDeviceMp } from "@/lib/mp-device";
 
 export type CheckoutPrefill = {
   nome: string;
@@ -185,6 +186,13 @@ export default function CheckoutClient({
 }) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
+
+  // Fingerprint do antifraude do MP: começa a coletar já na abertura do
+  // checkout, não só quando o cliente escolhe cartão. Quanto mais cedo carrega,
+  // mais sinal o MP tem na hora de decidir — e menos cartão bom é recusado.
+  useEffect(() => {
+    carregarDeviceMp("checkout");
+  }, []);
 
   const items = useCart((s) => s.items);
   const totalPeixes = useCart(selectTotalPeixes);

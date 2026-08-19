@@ -271,8 +271,9 @@ export const mercadoPagoProvider: PaymentProvider = {
     // legítimos (payer completo + items + endereço de entrega). Só inclui o que
     // existe — campo vazio é pior que ausente pro scoring. Na retirada o payer não
     // tem endereço (payerAddress null) → address é omitido; o shipments usa a loja.
+    const h = input.historico;
     const additionalInfo = {
-      ...(input.pagador.nome || input.pagador.sobrenome || phone || payerCep
+      ...(input.pagador.nome || input.pagador.sobrenome || phone || payerCep || h
         ? {
             payer: {
               ...(input.pagador.nome ? { first_name: input.pagador.nome } : {}),
@@ -294,6 +295,16 @@ export const mercadoPagoProvider: PaymentProvider = {
                         : {}),
                     },
                   }
+                : {}),
+              // Histórico: cadastro antigo + compra anterior = comprador conhecido.
+              ...(h?.cadastradoEm
+                ? { registration_date: isoComOffsetBrasil(h.cadastradoEm) }
+                : {}),
+              ...(h?.ultimaCompraEm
+                ? { last_purchase: isoComOffsetBrasil(h.ultimaCompraEm) }
+                : {}),
+              ...(typeof h?.primeiraCompra === "boolean"
+                ? { is_first_purchase_online: h.primeiraCompra }
                 : {}),
             },
           }
@@ -341,6 +352,9 @@ export const mercadoPagoProvider: PaymentProvider = {
       ...(input.issuerId ? { issuer_id: input.issuerId } : {}),
       external_reference: input.orderId,
       notification_url: NOTIFICATION_URL,
+      // Nome na fatura do cartão. Fatura reconhecível = menos contestação (e
+      // contestação passada é o que faz o emissor recusar as próximas).
+      statement_descriptor: "GUPPYDELINHAGEM",
       payer: {
         email: input.pagador.email,
         ...(input.pagador.nome ? { first_name: input.pagador.nome } : {}),

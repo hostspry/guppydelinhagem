@@ -96,6 +96,16 @@ export interface CriarCartaoInput {
   // retirada o shipments é a loja, mas não há endereço do pagador (fica null/omitido).
   payerAddress?: CartaoEndereco | null;
   itens?: CartaoItem[]; // → additional_info.items
+  /**
+   * Histórico do comprador na loja → additional_info.payer. O antifraude do MP
+   * trata cliente com cadastro antigo e compra anterior como risco baixo; sem
+   * isso todo pedido parece "primeira compra de um desconhecido".
+   */
+  historico?: {
+    cadastradoEm?: Date | null; // → registration_date
+    ultimaCompraEm?: Date | null; // → last_purchase
+    primeiraCompra?: boolean; // → is_first_purchase_online
+  } | null;
   idempotencyKey?: string;
 }
 
