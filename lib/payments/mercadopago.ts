@@ -411,6 +411,20 @@ export const mercadoPagoProvider: PaymentProvider = {
   ): Promise<PreferenciaCriada> {
     const cpfCnpj = input.pagador.cpfCnpj?.replace(/\D/g, "") || null;
     const phone = telefoneMp(input.pagador.telefone);
+    const payerCep = input.payerAddress?.cep?.replace(/\D/g, "") || null;
+    // Endereço do pagador. Só o que existe — campo vazio pontua pior que ausente.
+    const payerAddress =
+      payerCep || input.payerAddress?.logradouro || input.payerAddress?.numero
+        ? {
+            ...(payerCep ? { zip_code: payerCep } : {}),
+            ...(input.payerAddress?.logradouro
+              ? { street_name: input.payerAddress.logradouro }
+              : {}),
+            ...(input.payerAddress?.numero
+              ? { street_number: input.payerAddress.numero }
+              : {}),
+          }
+        : null;
     const body = {
       items: input.itens.map((it) => ({
         id: it.id,
@@ -439,6 +453,7 @@ export const mercadoPagoProvider: PaymentProvider = {
             }
           : {}),
         ...(phone ? { phone } : {}),
+        ...(payerAddress ? { address: payerAddress } : {}),
       },
       // Nome que aparece na fatura do cartão. Fatura reconhecível = menos
       // contestação e menos recusa por desconfiança do emissor.

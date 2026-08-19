@@ -50,6 +50,7 @@ export async function criarCobranca(formData: FormData): Promise<ActionResult> {
     clienteEmail: formData.get("clienteEmail"),
     clienteTelefone: formData.get("clienteTelefone"),
     clienteCpf: formData.get("clienteCpf"),
+    clienteCep: formData.get("clienteCep"),
     descricao: formData.get("descricao"),
     valor: formData.get("valor"),
     validadeDias: formData.get("validadeDias"),
@@ -75,6 +76,7 @@ export async function criarCobranca(formData: FormData): Promise<ActionResult> {
         email: nullify(data.clienteEmail),
         telefone: soDigitos(data.clienteTelefone),
         cpfCnpj: soDigitos(data.clienteCpf),
+        cep: soDigitos(data.clienteCep),
       },
       select: { id: true },
     });
@@ -94,14 +96,23 @@ export async function criarCobranca(formData: FormData): Promise<ActionResult> {
     };
   }
 
-  // CPF digitado agora completa o cadastro de quem ainda não tinha (o antifraude
-  // do MP pesa muito esse campo). Nunca apaga um CPF que já existe.
+  // CPF e CEP digitados agora completam o cadastro de quem ainda não tinha (o
+  // antifraude do MP pesa muito esses campos). Nunca apagam o que já existe.
   const cpfDigitado = soDigitos(data.clienteCpf);
+  const cepDigitado = soDigitos(data.clienteCep);
+  const completar: { cpfCnpj?: string; cep?: string } = {};
   if (cpfDigitado && cpfDigitado !== cliente.cpfCnpj) {
-    await prisma.cliente
-      .update({ where: { id: cliente.id }, data: { cpfCnpj: cpfDigitado } })
-      .catch(() => {});
+    completar.cpfCnpj = cpfDigitado;
     cliente.cpfCnpj = cpfDigitado;
+  }
+  if (cepDigitado && cepDigitado !== cliente.cep) {
+    completar.cep = cepDigitado;
+    cliente.cep = cepDigitado;
+  }
+  if (Object.keys(completar).length) {
+    await prisma.cliente
+      .update({ where: { id: cliente.id }, data: completar })
+      .catch(() => {});
   }
 
   // Snapshot do pagador (mesmo formato do pedido). Cobrança não tem entrega, mas
@@ -309,7 +320,17 @@ export async function pagarCobranca(
       // o link, o pagamento já sai com o pagador completo — sem precisar refazer
       // a cobrança. O snapshot continua valendo como piso.
       cliente: {
-        select: { nome: true, email: true, cpfCnpj: true, telefone: true },
+        select: {
+          nome: true,
+          email: true,
+          cpfCnpj: true,
+          telefone: true,
+          cep: true,
+          logradouro: true,
+          numero: true,
+          cidade: true,
+          uf: true,
+        },
       },
     },
   });
@@ -353,6 +374,18 @@ export async function pagarCobranca(
         pending: `${SITE_URL}/cobrar/${token}`,
         failure: `${SITE_URL}/cobrar/${token}`,
       },
+      // Cobrança não despacha nada, então não há endereço de entrega. O endereço
+      // do CADASTRO vai como endereço do pagador: mais um sinal de que a pessoa
+      // é real. Quando o cliente é novo e não tem endereço, sai omitido.
+      payerAddress: cob.cliente?.cep
+        ? {
+            cep: cob.cliente.cep,
+            logradouro: cob.cliente.logradouro,
+            numero: cob.cliente.numero,
+            cidade: cob.cliente.cidade,
+            uf: cob.cliente.uf,
+          }
+        : null,
       installmentsLimit: cob.maxParcelas ?? undefined,
       expiraEm: cob.expiraEm,
     });

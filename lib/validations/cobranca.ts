@@ -46,6 +46,19 @@ export const cobrancaSchema = z
         },
         { message: "CPF/CNPJ inválido" },
       ),
+    // CEP do pagador. Vai como payer.address no gateway — endereço é o sinal
+    // seguinte em peso depois de e-mail, CPF e telefone.
+    clienteCep: z
+      .string()
+      .optional()
+      .or(z.literal(""))
+      .refine(
+        (v) => {
+          const d = (v ?? "").replace(/\D/g, "");
+          return d === "" || d.length === 8;
+        },
+        { message: "CEP inválido" },
+      ),
 
     descricao: z
       .string()

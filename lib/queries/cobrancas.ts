@@ -82,7 +82,18 @@ export async function listCobrancas({
       publicToken: true,
       maxParcelas: true,
       observacoes: true,
-      cliente: { select: { id: true, nome: true, telefone: true, email: true } },
+      cliente: {
+        select: {
+          id: true,
+          nome: true,
+          telefone: true,
+          email: true,
+          // Usados no aviso de cadastro incompleto: sem eles o antifraude do
+          // gateway recusa cartão legítimo.
+          cpfCnpj: true,
+          cep: true,
+        },
+      },
       items: { select: { nomeProduto: true }, take: 1 },
       pagamentos: {
         orderBy: { criadoEm: "desc" },
@@ -165,7 +176,18 @@ export async function getCobrancaById(id: string) {
       publicToken: true,
       maxParcelas: true,
       observacoes: true,
-      cliente: { select: { id: true, nome: true, telefone: true, email: true } },
+      cliente: {
+        select: {
+          id: true,
+          nome: true,
+          telefone: true,
+          email: true,
+          // Usados no aviso de cadastro incompleto: sem eles o antifraude do
+          // gateway recusa cartão legítimo.
+          cpfCnpj: true,
+          cep: true,
+        },
+      },
       items: { select: { nomeProduto: true }, take: 1 },
       pagamentos: {
         orderBy: { criadoEm: "desc" },

@@ -135,6 +135,12 @@ export interface CriarPreferenciaInput {
     /** Só dígitos. Vai como payer.phone — sinal de antifraude no MP. */
     telefone?: string | null;
   };
+  /**
+   * Endereço do PAGADOR → payer.address da preference. Mais um sinal que o
+   * antifraude usa; no checkout hospedado não há Device ID, então cada campo
+   * do pagador conta. Reusa CartaoEndereco (mesmos campos).
+   */
+  payerAddress?: CartaoEndereco | null;
   backUrls: { success: string; failure: string; pending: string };
   // Teto de parcelas do cartão. PagBank: payment_methods_configs. MP: entra em
   // payment_methods.installments do Checkout Pro.

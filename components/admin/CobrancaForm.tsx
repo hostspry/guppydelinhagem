@@ -111,20 +111,36 @@ export function CobrancaForm({ clientes }: { clientes: Cliente[] }) {
           </div>
         )}
 
-        <FormField
-          label="CPF ou CNPJ de quem vai pagar"
-          name="clienteCpf"
-          error={erros.clienteCpf?.[0]}
-          hint="Peça ao cliente. É o que mais ajuda o cartão a passar — sem CPF o antifraude do Mercado Pago costuma recusar. Se o cadastro já tiver, pode deixar em branco."
-        >
-          <input
-            id="clienteCpf"
+        <div className="grid gap-x-4 sm:grid-cols-2">
+          <FormField
+            label="CPF ou CNPJ de quem vai pagar"
             name="clienteCpf"
-            inputMode="numeric"
-            className={input}
-            placeholder="000.000.000-00"
-          />
-        </FormField>
+            error={erros.clienteCpf?.[0]}
+            hint="É o que mais ajuda o cartão a passar. Se o cadastro já tiver, deixe em branco."
+          >
+            <input
+              id="clienteCpf"
+              name="clienteCpf"
+              inputMode="numeric"
+              className={input}
+              placeholder="000.000.000-00"
+            />
+          </FormField>
+          <FormField
+            label="CEP"
+            name="clienteCep"
+            error={erros.clienteCep?.[0]}
+            hint="Endereço do pagador também conta no antifraude."
+          >
+            <input
+              id="clienteCep"
+              name="clienteCep"
+              inputMode="numeric"
+              className={input}
+              placeholder="29000-000"
+            />
+          </FormField>
+        </div>
       </div>
 
       {/* ── O que está sendo cobrado ── */}

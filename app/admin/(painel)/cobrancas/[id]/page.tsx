@@ -59,6 +59,12 @@ export default async function CobrancaDetalhePage({
 
   const badge = BADGE[c.situacao];
 
+  // O que falta no cadastro para o pagador chegar completo no gateway.
+  const faltando = [
+    !c.cliente.cpfCnpj && "CPF",
+    !c.cliente.cep && "endereço",
+  ].filter((v): v is string => typeof v === "string");
+
   return (
     <div>
       <PageHeader
@@ -78,6 +84,27 @@ export default async function CobrancaDetalhePage({
           </Link>
         }
       />
+
+      {/* Cadastro incompleto = pagador magro no gateway = cartão recusado por
+          risco. O link continua o mesmo: completar o cadastro já vale para ele. */}
+      {faltando.length > 0 && c.situacao === "ABERTA" && (
+        <div className="mb-5 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+          <p className="font-medium">
+            O cadastro de {c.cliente.nome} está sem {faltando.join(" e ")}.
+          </p>
+          <p className="mt-1 text-amber-800">
+            O Mercado Pago analisa quem está pagando. Com o cadastro incompleto,
+            ele costuma recusar o cartão mesmo quando o cartão está bom.{" "}
+            <Link
+              href={`/admin/clientes/${c.cliente.id}/editar`}
+              className="font-medium underline"
+            >
+              Completar o cadastro
+            </Link>{" "}
+            já vale para este link — não precisa gerar outro.
+          </p>
+        </div>
+      )}
 
       <div className="grid gap-5 lg:grid-cols-3">
         <div className="lg:col-span-2 space-y-5">
