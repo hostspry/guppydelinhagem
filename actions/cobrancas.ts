@@ -49,6 +49,7 @@ export async function criarCobranca(formData: FormData): Promise<ActionResult> {
     clienteNome: formData.get("clienteNome"),
     clienteEmail: formData.get("clienteEmail"),
     clienteTelefone: formData.get("clienteTelefone"),
+    clienteCpf: formData.get("clienteCpf"),
     descricao: formData.get("descricao"),
     valor: formData.get("valor"),
     validadeDias: formData.get("validadeDias"),
@@ -73,6 +74,7 @@ export async function criarCobranca(formData: FormData): Promise<ActionResult> {
         nome: (data.clienteNome ?? "").trim(),
         email: nullify(data.clienteEmail),
         telefone: soDigitos(data.clienteTelefone),
+        cpfCnpj: soDigitos(data.clienteCpf),
       },
       select: { id: true },
     });
@@ -81,6 +83,26 @@ export async function criarCobranca(formData: FormData): Promise<ActionResult> {
 
   const cliente = await prisma.cliente.findUnique({ where: { id: clienteId } });
   if (!cliente) return { success: false, error: "Cliente não encontrado." };
+
+  // Cliente já cadastrado sem e-mail: o Checkout Pro até abre, mas o pagamento
+  // sai com pagador anônimo e o antifraude do MP recusa todo cartão. Melhor
+  // barrar aqui do que o cliente descobrir na tela de pagamento.
+  if (!cliente.email) {
+    return {
+      success: false,
+      error: `${cliente.nome} está sem e-mail no cadastro. Preencha o e-mail do cliente antes de cobrar — o Mercado Pago precisa dele para aprovar cartão.`,
+    };
+  }
+
+  // CPF digitado agora completa o cadastro de quem ainda não tinha (o antifraude
+  // do MP pesa muito esse campo). Nunca apaga um CPF que já existe.
+  const cpfDigitado = soDigitos(data.clienteCpf);
+  if (cpfDigitado && cpfDigitado !== cliente.cpfCnpj) {
+    await prisma.cliente
+      .update({ where: { id: cliente.id }, data: { cpfCnpj: cpfDigitado } })
+      .catch(() => {});
+    cliente.cpfCnpj = cpfDigitado;
+  }
 
   // Snapshot do pagador (mesmo formato do pedido). Cobrança não tem entrega, mas
   // o campo é a fonte de nome/e-mail/telefone usada depois pelo gateway.
@@ -283,6 +305,12 @@ export async function pagarCobranca(
       maxParcelas: true,
       enderecoEntrega: true,
       items: { select: { nomeProduto: true }, take: 1 },
+      // Cadastro atual do cliente: se a loja completar CPF/e-mail depois de gerar
+      // o link, o pagamento já sai com o pagador completo — sem precisar refazer
+      // a cobrança. O snapshot continua valendo como piso.
+      cliente: {
+        select: { nome: true, email: true, cpfCnpj: true, telefone: true },
+      },
     },
   });
   if (!cob) return { ok: false, error: "Cobrança não encontrada." };
@@ -295,7 +323,14 @@ export async function pagarCobranca(
   }
 
   const end = cob.enderecoEntrega as unknown as EnderecoEntrega;
-  const partes = (end.nome ?? "").trim().split(/\s+/);
+  // Dados do pagador: o mais completo entre cadastro e snapshot. Campo vazio no
+  // MP é pior que campo ausente — quanto mais o antifraude recebe, mais cartão
+  // legítimo passa (sem isso a recusa vem como cc_rejected_high_risk).
+  const pagadorNome = cob.cliente?.nome || end.nome || "";
+  const pagadorEmail = cob.cliente?.email || end.email || "";
+  const pagadorCpf = cob.cliente?.cpfCnpj || end.cpfCnpj || null;
+  const pagadorTel = cob.cliente?.telefone || end.telefone || null;
+  const partes = pagadorNome.trim().split(/\s+/);
   const descricao = cob.items[0]?.nomeProduto ?? `Cobrança ${cob.numero}`;
   const valor = round2(Number(cob.total));
 
@@ -307,9 +342,11 @@ export async function pagarCobranca(
       pagador: {
         nome: partes[0] || null,
         sobrenome: partes.slice(1).join(" ") || null,
-        // O MP exige e-mail do pagador; sem cadastro, ele pede na própria tela.
-        email: end.email ?? "",
-        cpfCnpj: end.cpfCnpj,
+        // O MP exige e-mail do pagador; sem ele o pagamento sai anônimo e o
+        // antifraude recusa todo cartão.
+        email: pagadorEmail,
+        cpfCnpj: pagadorCpf,
+        telefone: pagadorTel,
       },
       backUrls: {
         success: `${SITE_URL}/cobrar/${token}`,

@@ -132,6 +132,8 @@ export interface CriarPreferenciaInput {
     sobrenome?: string | null;
     email: string;
     cpfCnpj?: string | null;
+    /** Só dígitos. Vai como payer.phone — sinal de antifraude no MP. */
+    telefone?: string | null;
   };
   backUrls: { success: string; failure: string; pending: string };
   // Teto de parcelas do cartão. PagBank: payment_methods_configs. MP: entra em

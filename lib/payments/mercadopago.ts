@@ -410,14 +410,22 @@ export const mercadoPagoProvider: PaymentProvider = {
     input: CriarPreferenciaInput,
   ): Promise<PreferenciaCriada> {
     const cpfCnpj = input.pagador.cpfCnpj?.replace(/\D/g, "") || null;
+    const phone = telefoneMp(input.pagador.telefone);
     const body = {
       items: input.itens.map((it) => ({
         id: it.id,
         title: it.title,
+        // description e category_id entram no scoring do antifraude: item sem
+        // contexto é tratado como compra genérica (risco maior).
+        description: it.title,
+        category_id: "others",
         quantity: it.quantity,
         unit_price: Math.round(it.unitPrice * 100) / 100,
         currency_id: "BRL",
       })),
+      // Pagador o mais completo possível. No Checkout Pro é a ÚNICA fonte de
+      // identidade que o antifraude tem (não há Device ID como no Brick) — sem
+      // e-mail/CPF/telefone o cartão volta cc_rejected_high_risk mesmo bom.
       payer: {
         email: input.pagador.email,
         ...(input.pagador.nome ? { name: input.pagador.nome } : {}),
@@ -430,7 +438,11 @@ export const mercadoPagoProvider: PaymentProvider = {
               },
             }
           : {}),
+        ...(phone ? { phone } : {}),
       },
+      // Nome que aparece na fatura do cartão. Fatura reconhecível = menos
+      // contestação e menos recusa por desconfiança do emissor.
+      statement_descriptor: "GUPPYDELINHAGEM",
       external_reference: input.orderId,
       back_urls: input.backUrls,
       auto_return: "approved",

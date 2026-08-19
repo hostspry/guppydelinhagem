@@ -32,6 +32,20 @@ export const cobrancaSchema = z
       .optional()
       .or(z.literal("")),
     clienteTelefone: z.string().optional().or(z.literal("")),
+    // CPF/CNPJ do pagador. Opcional no formulário (nem sempre a gente tem na
+    // hora), mas é o sinal que mais pesa no antifraude do Mercado Pago: sem ele
+    // o cartão cai em cc_rejected_high_risk mesmo com o cartão bom.
+    clienteCpf: z
+      .string()
+      .optional()
+      .or(z.literal(""))
+      .refine(
+        (v) => {
+          const d = (v ?? "").replace(/\D/g, "");
+          return d === "" || d.length === 11 || d.length === 14;
+        },
+        { message: "CPF/CNPJ inválido" },
+      ),
 
     descricao: z
       .string()
@@ -54,6 +68,12 @@ export const cobrancaSchema = z
   .refine((d) => !!d.clienteId || (d.clienteNome ?? "").trim().length >= 2, {
     message: "Escolha um cliente ou digite o nome",
     path: ["clienteNome"],
+  })
+  // Sem e-mail o Mercado Pago cria o pagamento com pagador anônimo e o antifraude
+  // recusa o cartão. Em cliente novo, exigimos aqui mesmo.
+  .refine((d) => !!d.clienteId || (d.clienteEmail ?? "").trim() !== "", {
+    message: "Informe o e-mail — o Mercado Pago precisa dele para aprovar o cartão",
+    path: ["clienteEmail"],
   });
 
 export type CobrancaInput = z.infer<typeof cobrancaSchema>;
