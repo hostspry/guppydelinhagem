@@ -6,14 +6,17 @@ import type {
 } from "../generated/prisma/client";
 import type { EnderecoEntrega } from "../validations/pedido";
 
-const LIMITE_ORFAO_HORAS = 24;
+// 48h e não 24h: o QR do Pix vale 24h (PIX_EXPIRACAO_MIN), e cancelar no mesmo
+// prazo criaria a corrida "cliente paga no fim da janela e o pedido já foi
+// cancelado". A folga tem que ser sempre maior que a validade do Pix.
+const LIMITE_ORFAO_HORAS = 48;
 
 /**
  * Varredura oportunista (sem cron): cancela pedidos AGUARDANDO_PAGAMENTO órfãos —
- * mais velhos que 24h e SEM pagamento aprovado nem em análise (esses ainda podem
- * virar PAGO pelo webhook). NÃO mexe em estoque (órfãos nunca baixaram — só baixa
- * no PAGO). Idempotente; devolve quantos foram cancelados. Chamada ao abrir
- * /admin/pedidos. Nunca toca pedidos recentes (<24h) nem pagos.
+ * mais velhos que LIMITE_ORFAO_HORAS e SEM pagamento aprovado nem em análise
+ * (esses ainda podem virar PAGO pelo webhook). NÃO mexe em estoque (órfãos nunca
+ * baixaram — só baixa no PAGO). Idempotente; devolve quantos foram cancelados.
+ * Chamada ao abrir /admin/pedidos. Nunca toca pedidos recentes nem pagos.
  */
 export async function cancelarPedidosAguardandoExpirados(): Promise<number> {
   const limite = new Date(Date.now() - LIMITE_ORFAO_HORAS * 60 * 60 * 1000);

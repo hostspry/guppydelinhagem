@@ -18,7 +18,14 @@ function restanteSegundos(expiraEm: string | null): number {
   return Math.max(0, Math.floor(ms / 1000));
 }
 
+// Acima de 1h o mm:ss vira "1439:12" e não diz nada — nessa faixa o cliente só
+// quer saber que tem folga, então mostramos em horas.
 function mmss(seg: number): string {
+  if (seg >= 3600) {
+    const h = Math.floor(seg / 3600);
+    const m = Math.floor((seg % 3600) / 60);
+    return m ? `${h}h${String(m).padStart(2, "0")}` : `${h}h`;
+  }
   const m = Math.floor(seg / 60);
   const s = seg % 60;
   return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;

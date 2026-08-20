@@ -33,8 +33,12 @@ const MP_API = "https://api.mercadopago.com";
 const NOTIFICATION_URL =
   "https://www.guppydelinhagem.com.br/api/webhooks/mercadopago";
 
-// Janela de validade do Pix. Spec: 30–60 min.
-const PIX_EXPIRACAO_MIN = 30;
+// Janela de validade do Pix. 24h: muita gente gera o QR e só paga mais tarde —
+// com 30 min, 8 dos últimos 22 Pix venceram sem pagamento. Nada de estoque fica
+// preso nesse tempo (a baixa só acontece no PAGO). Tem que ser MENOR que o
+// LIMITE_ORFAO_HORAS de lib/queries/pedidos.ts, senão a varredura cancela o
+// pedido enquanto o QR ainda é pagável.
+const PIX_EXPIRACAO_MIN = 24 * 60;
 
 function accessToken(): string {
   const t = process.env.MP_ACCESS_TOKEN;
@@ -90,15 +94,17 @@ export function mensagemRecusa(detalhe: string | null | undefined): string {
     case "cc_rejected_bad_filled_other":
       return "Dados do cartão incorretos. Confira e tente de novo.";
     case "cc_rejected_high_risk":
-      return "Pagamento não autorizado pelo emissor.";
+      // Não é o banco: é a análise de risco do MP. Repetir o mesmo cartão agora
+      // costuma recusar de novo (e piora o histórico) — o caminho útil é o Pix.
+      return "A análise de segurança não liberou esta compra. Pague no Pix (cai na hora) ou tente outro cartão.";
     case "cc_rejected_call_for_authorize":
       return "Autorize o pagamento com o emissor do seu cartão e tente de novo.";
     case "cc_rejected_card_disabled":
       return "Cartão desabilitado. Ative-o com o emissor ou use outro.";
     case "cc_rejected_duplicated_payment":
-      return "Pagamento duplicado. Aguarde alguns minutos antes de tentar de novo.";
+      return "Este pagamento já foi feito. Aguarde alguns minutos antes de tentar de novo.";
     case "cc_rejected_max_attempts":
-      return "Muitas tentativas. Tente mais tarde ou use outro cartão.";
+      return "Muitas tentativas seguidas. Espere alguns minutos, ou pague no Pix agora.";
     case "cc_rejected_blacklist":
       return "Pagamento não autorizado. Use outro cartão.";
     default:
