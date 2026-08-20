@@ -71,6 +71,8 @@ export interface CartaoItem {
   categoryId?: string | null;
   quantity: number;
   unitPrice: number;
+  /** URL absoluta da foto → items.picture_url (recomendado p/ produto físico). */
+  pictureUrl?: string | null;
 }
 
 export interface CriarCartaoInput {
@@ -92,6 +94,14 @@ export interface CriarCartaoInput {
   // X-meli-session-id. Sem ele o antifraude do MP recusa cartões legítimos.
   deviceId?: string | null;
   endereco?: CartaoEndereco | null; // → additional_info.shipments.receiver_address (onde recebe)
+  /**
+   * Retirada na loja → additional_info.shipments.local_pickup. Sinal de risco
+   * para o MP (não há entrega em endereço). Testado contra a API: `express` e
+   * `items.external_code`, que a doc da Orders API cita, são REJEITADOS pelo
+   * /v1/payments com "The name of the following parameters is wrong" — não
+   * adicionar aqui.
+   */
+  envio?: { localPickup?: boolean } | null;
   // Endereço do PAGADOR → additional_info.payer.address. Separado do shipments: na
   // retirada o shipments é a loja, mas não há endereço do pagador (fica null/omitido).
   payerAddress?: CartaoEndereco | null;
@@ -111,10 +121,17 @@ export interface CriarCartaoInput {
 
 export interface CartaoCriado {
   externalId: string;
-  status: StatusPagamento; // PAGO | EM_ANALISE | RECUSADO
+  status: StatusPagamento; // PAGO | EM_ANALISE | RECUSADO | PENDENTE (desafio 3DS)
   statusDetail: string | null; // motivo (mapeia p/ mensagem amigável)
   parcelas: number;
   bandeira: string | null; // payment_method_id (só exibição)
+  /**
+   * 3DS 2.0: o emissor quer autenticar o cliente antes de decidir. Vem quando o
+   * MP responde status_detail "pending_challenge". O navegador precisa abrir o
+   * desafio (POST do creq na external_resource_url dentro de um iframe) em até
+   * 30s, senão o pagamento é recusado.
+   */
+  threeDs?: { externalResourceUrl: string; creq: string } | null;
 }
 
 // Estorno (refund) — devolução do dinheiro ao cliente.

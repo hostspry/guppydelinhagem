@@ -43,6 +43,7 @@ import {
   criarPedidoCheckout,
   registrarLeadCheckout,
   pagarComCartao,
+  finalizarDesafio3ds,
   iniciarCheckoutPro,
   iniciarCheckoutPagbank,
   calcularTetoParcelas,
@@ -54,6 +55,7 @@ import {
 } from "@/actions/checkout";
 import PixPanel from "@/components/checkout/PixPanel";
 import CardPaymentBrick from "@/components/checkout/CardPaymentBrick";
+import ThreeDsChallenge from "@/components/checkout/ThreeDsChallenge";
 import { carregarDeviceMp } from "@/lib/mp-device";
 
 export type CheckoutPrefill = {
@@ -186,6 +188,13 @@ export default function CheckoutClient({
 }) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
+
+  // Desafio 3DS em andamento (o banco pediu confirmação ao cliente).
+  const [desafio3ds, setDesafio3ds] = useState<{
+    paymentId: string;
+    externalResourceUrl: string;
+    creq: string;
+  } | null>(null);
 
   // Fingerprint do antifraude do MP: começa a coletar já na abertura do
   // checkout, não só quando o cliente escolhe cartão. Quanto mais cedo carrega,
@@ -590,12 +599,47 @@ export default function CheckoutClient({
       router.push(`/pedido/${res.numero.replace(/^#/, "")}/analise`);
       return;
     }
+    if (res.resultado === "desafio") {
+      // Banco quer autenticar. Abre o desafio; quem fecha o pedido é o retorno
+      // dele (ou o webhook, se o cliente abandonar).
+      setDesafio3ds({
+        paymentId: res.paymentId,
+        externalResourceUrl: res.externalResourceUrl,
+        creq: res.creq,
+      });
+      return;
+    }
     if (res.resultado === "recusado") {
       setRecusa(res.mensagem);
       throw new Error(res.mensagem);
     }
     setErro(res.mensagem);
     throw new Error(res.mensagem);
+  }
+
+  // Fim do desafio 3DS: o navegador só avisa que a tela fechou — o desfecho vem
+  // da consulta ao MP feita no servidor.
+  async function onFim3ds(paymentId: string) {
+    const res = await finalizarDesafio3ds(paymentId);
+    setDesafio3ds(null);
+    if (res.resultado === "aprovado") {
+      router.push(`/pedido/${res.numero.replace(/^#/, "")}/sucesso`);
+      return;
+    }
+    if (res.resultado === "analise") {
+      router.push(`/pedido/${res.numero.replace(/^#/, "")}/analise`);
+      return;
+    }
+    if (res.resultado === "recusado") {
+      setRecusa(res.mensagem);
+      return;
+    }
+    // "desafio" não volta daqui (a consulta já é o desfecho); trata como erro.
+    setErro(
+      res.resultado === "erro"
+        ? res.mensagem
+        : "Não conseguimos confirmar o pagamento. Tente de novo.",
+    );
   }
 
   // Checkout Pro (Wallet): valida igual ao Pix, cria a preference e redireciona
@@ -706,6 +750,14 @@ export default function CheckoutClient({
   // ── Formulário de checkout ──
   return (
     <div className="container-site py-12">
+      {desafio3ds && (
+        <ThreeDsChallenge
+          externalResourceUrl={desafio3ds.externalResourceUrl}
+          creq={desafio3ds.creq}
+          onConcluido={() => onFim3ds(desafio3ds.paymentId)}
+        />
+      )}
+
       <h1 className="text-primary text-2xl font-semibold mb-6">
         Finalizar pedido
       </h1>

@@ -147,6 +147,7 @@ export type ItemCartaoMp = {
   categoryId: string;
   quantity: number;
   unitPrice: number; // preço efetivo no cartão (com campanha/cupom)
+  pictureUrl: string | null; // foto do produto (o MP pede em produto físico)
 };
 
 export type OrderCriado = {
@@ -1110,6 +1111,7 @@ export async function criarOrderDoCheckout(
     categoryId: it.categoryId,
     quantity: it.quantidade,
     unitPrice: round2(Math.max(0, it.precoCheio - descItens[i].descontoCartaoUnit)),
+    pictureUrl: it.imagemSnapshot,
   }));
   return {
     ok: true,
@@ -1476,6 +1478,15 @@ export type CartaoDesfecho =
   | { resultado: "aprovado"; numero: string }
   | { resultado: "analise"; numero: string }
   | { resultado: "recusado"; mensagem: string }
+  // 3DS: o banco quer autenticar o cliente antes de decidir. O navegador abre o
+  // desafio e depois chama finalizarDesafio3ds com o paymentId.
+  | {
+      resultado: "desafio";
+      numero: string;
+      paymentId: string;
+      externalResourceUrl: string;
+      creq: string;
+    }
   | {
       resultado: "erro";
       mensagem: string;
@@ -1610,6 +1621,7 @@ export async function pagarComCartao(
           : order.data.endereco,
       payerAddress:
         order.data.tipoEntrega === "RETIRADA" ? null : order.data.endereco,
+      envio: { localPickup: order.data.tipoEntrega === "RETIRADA" },
       itens: order.data.itens,
       historico,
     });
@@ -1656,6 +1668,19 @@ export async function pagarComCartao(
   }
 
   // ── Desfechos ──
+  // 3DS antes de tudo: não é aprovado nem recusado ainda — o cliente precisa
+  // autenticar no banco. O pedido segue AGUARDANDO; quem fecha é o retorno do
+  // desafio (finalizarDesafio3ds) ou o webhook.
+  if (pago.threeDs) {
+    return {
+      resultado: "desafio",
+      numero,
+      paymentId: pago.externalId,
+      externalResourceUrl: pago.threeDs.externalResourceUrl,
+      creq: pago.threeDs.creq,
+    };
+  }
+
   if (pago.status === StatusPagamento.PAGO) {
     // approved já vem na hora → transiciona aqui (trava evita baixa dupla quando
     // o webhook chegar com a mesma aprovação).
@@ -1691,6 +1716,89 @@ export async function pagarComCartao(
 
   // RECUSADO (ou qualquer não-pago): pedido segue aguardando; tenta de novo.
   return { resultado: "recusado", mensagem: mensagemRecusa(pago.statusDetail) };
+}
+
+/**
+ * Fecha o pagamento depois do desafio 3DS. O navegador avisa quando o banco
+ * terminou, mas o desfecho REAL só a API do MP conhece — então consultamos e
+ * aplicamos o mesmo tratamento do fluxo normal (baixa de estoque com trava,
+ * notificação). Idempotente: se o webhook chegar antes, a trava impede baixa
+ * dupla. Pública porque o checkout é guest; só aceita um paymentId e nada mais.
+ */
+export async function finalizarDesafio3ds(
+  paymentId: string,
+): Promise<CartaoDesfecho> {
+  const id = (paymentId ?? "").trim();
+  if (!/^\d+$/.test(id)) {
+    return { resultado: "erro", mensagem: "Pagamento inválido." };
+  }
+
+  let consulta;
+  try {
+    const provider = getPaymentProvider(ProviderPagamento.MERCADO_PAGO);
+    consulta = await provider.consultarPagamento(id);
+  } catch (e) {
+    console.error("[checkout] consultar 3ds", e);
+    return {
+      resultado: "erro",
+      mensagem: "Não conseguimos confirmar o pagamento. Aguarde alguns instantes.",
+    };
+  }
+
+  const orderId = consulta.externalReference;
+  if (!orderId) {
+    return { resultado: "erro", mensagem: "Pedido não encontrado." };
+  }
+
+  const pedido = await prisma.order.findUnique({
+    where: { id: orderId },
+    select: { numero: true },
+  });
+  const numero = pedido?.numero ?? "";
+
+  // Espelha o status no Pagamento já gravado (o webhook faz o mesmo; os dois
+  // convergem no mesmo estado).
+  await prisma.pagamento
+    .updateMany({
+      where: { externalId: consulta.externalId },
+      data: { status: consulta.status },
+    })
+    .catch(() => {});
+
+  if (consulta.status === StatusPagamento.PAGO) {
+    let baixou = false;
+    try {
+      const res = await prisma.$transaction((tx) =>
+        transicionarParaPago(tx, orderId),
+      );
+      baixou = res.baixou;
+      revalidatePath("/admin/produtos");
+      revalidatePath("/admin/pedidos");
+    } catch (e) {
+      console.error("[checkout] transicionar 3ds aprovado", e);
+    }
+    if (baixou) {
+      await notificarPedidoPago(orderId, {
+        provider: ProviderPagamento.MERCADO_PAGO,
+        metodo: MetodoPagamento.CARTAO,
+      });
+    }
+    return { resultado: "aprovado", numero };
+  }
+
+  if (consulta.status === StatusPagamento.EM_ANALISE) {
+    return { resultado: "analise", numero };
+  }
+  if (consulta.status === StatusPagamento.PENDENTE) {
+    // Ainda processando do lado do banco: o webhook fecha. Manda pra tela de
+    // acompanhamento em vez de dizer que recusou.
+    return { resultado: "analise", numero };
+  }
+
+  return {
+    resultado: "recusado",
+    mensagem: "A autenticação com o banco não foi concluída. Tente de novo ou use o Pix.",
+  };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

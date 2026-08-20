@@ -213,6 +213,7 @@ type MpPaymentResponse = {
   payment_type_id?: string;
   transaction_amount?: number;
   date_of_expiration?: string;
+  three_ds_info?: { external_resource_url?: string; creq?: string };
   point_of_interaction?: {
     transaction_data?: {
       qr_code?: string;
@@ -322,6 +323,8 @@ export const mercadoPagoProvider: PaymentProvider = {
               ...(typeof h?.primeiraCompra === "boolean"
                 ? { is_first_purchase_online: h.primeiraCompra }
                 : {}),
+              // Canal da compra. Nosso checkout é sempre navegador.
+              authentication_type: "WEB",
             },
           }
         : {}),
@@ -332,6 +335,7 @@ export const mercadoPagoProvider: PaymentProvider = {
               title: it.title,
               description: it.title,
               category_id: categoriaMp(it.categoryId),
+              ...(it.pictureUrl ? { picture_url: it.pictureUrl } : {}),
               quantity: it.quantity,
               unit_price: Math.round(it.unitPrice * 100) / 100,
             })),
@@ -340,6 +344,7 @@ export const mercadoPagoProvider: PaymentProvider = {
       ...(cep
         ? {
             shipments: {
+              ...(input.envio?.localPickup ? { local_pickup: true } : {}),
               receiver_address: {
                 zip_code: cep,
                 ...(input.endereco?.uf ? { state_name: input.endereco.uf } : {}),
@@ -371,6 +376,11 @@ export const mercadoPagoProvider: PaymentProvider = {
       // Nome na fatura do cartão. Fatura reconhecível = menos contestação (e
       // contestação passada é o que faz o emissor recusar as próximas).
       statement_descriptor: "GUPPYDELINHAGEM",
+      // 3DS 2.0 no modo recomendado pelo MP: o desafio só aparece quando a
+      // transação é considerada arriscada. Na prática troca uma RECUSA por uma
+      // autenticação no banco — e, autenticado, o risco de fraude passa a ser do
+      // emissor (liability shift), então o MP deixa passar.
+      three_d_secure_mode: "optional",
       payer: {
         email: input.pagador.email,
         ...(input.pagador.nome ? { first_name: input.pagador.nome } : {}),
@@ -396,12 +406,23 @@ export const mercadoPagoProvider: PaymentProvider = {
       idempotencyKey: input.idempotencyKey ?? randomUUID(),
     })) as MpPaymentResponse;
 
+    const tds =
+      data.status_detail === "pending_challenge" &&
+      data.three_ds_info?.external_resource_url &&
+      data.three_ds_info?.creq
+        ? {
+            externalResourceUrl: data.three_ds_info.external_resource_url,
+            creq: data.three_ds_info.creq,
+          }
+        : null;
+
     return {
       externalId: String(data.id),
       status: mapStatus(data.status, data.status_detail),
       statusDetail: data.status_detail ?? null,
       parcelas: data.installments ?? input.installments,
       bandeira: data.payment_method_id ?? input.paymentMethodId ?? null,
+      threeDs: tds,
     };
   },
 

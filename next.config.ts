@@ -47,6 +47,7 @@ const cspDirectives: Record<string, string[]> = {
     "https://*.mercadolivre.com", // pixel de sessão do antifraude (grafia BR, com V)
     "https://*.pagseguro.com", // PNG do QR do Pix PagBank (api.pagseguro.com)
     "https://www.google-analytics.com",
+    "https://www.googletagmanager.com", // pixel /a do GTM (estava bloqueado)
   ],
   "font-src": ["'self'", "data:"],
   "connect-src": [
@@ -82,10 +83,16 @@ const cspDirectives: Record<string, string[]> = {
     // aparecer dinamicamente no desafio; os wildcards Cardinal cobrem o SDK.
     "https://*.cardinalcommerce.com",
     "https://*.cardinaltrusted.com",
+    // 3DS do Mercado Pago: o desafio abre no ACS do EMISSOR do cartão, e cada
+    // banco tem o seu domínio — não há lista para enumerar. Sem isto o iframe do
+    // desafio é bloqueado e a compra é recusada. Continua exigindo https.
+    "https:",
   ],
   "object-src": ["'none'"],
   "base-uri": ["'self'"],
-  "form-action": ["'self'"],
+  // O desafio 3DS é um POST do creq para o ACS do emissor (domínio variável),
+  // então 'self' sozinho bloquearia a autenticação. Restrito a https.
+  "form-action": ["'self'", "https:"],
   "frame-ancestors": ["'self'"],
 };
 
