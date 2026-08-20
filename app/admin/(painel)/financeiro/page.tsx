@@ -13,8 +13,11 @@ import { ListaLancamentos } from "@/components/admin/financeiro/ListaLancamentos
 import {
   contadoresPendencia,
   resumoMensal,
+  serieDoCaixa,
+  type GranularidadeSerie,
   type ResumoMensal,
 } from "@/lib/queries/financeiro";
+import { GraficoCaixa } from "@/components/admin/financeiro/GraficoCaixa";
 import {
   competenciaAtual,
   ehCompetencia,
@@ -76,14 +79,20 @@ function PorCategoria({ dados }: { dados: ResumoMensal["porCategoria"] }) {
 export default async function FinanceiroPage({
   searchParams,
 }: {
-  searchParams: Promise<{ mes?: string }>;
+  searchParams: Promise<{ mes?: string; g?: string }>;
 }) {
-  const { mes } = await searchParams;
+  const { mes, g } = await searchParams;
   const competencia = mes && ehCompetencia(mes) ? mes : competenciaAtual();
 
-  const [resumo, pendencias] = await Promise.all([
+  const GRAOS_VALIDOS: GranularidadeSerie[] = ["dia", "semana", "mes", "ano"];
+  const granularidade = GRAOS_VALIDOS.includes(g as GranularidadeSerie)
+    ? (g as GranularidadeSerie)
+    : "mes";
+
+  const [resumo, pendencias, serie] = await Promise.all([
     resumoMensal(competencia),
     contadoresPendencia(),
+    serieDoCaixa(granularidade),
   ]);
 
   const temPendencia =
@@ -181,6 +190,14 @@ export default async function FinanceiroPage({
           description="de todos os meses até aqui"
         />
       </div>
+
+      {/* A curva vem antes do detalhe por categoria: primeiro o movimento no
+          tempo, depois onde o dinheiro entrou e saiu. */}
+      <GraficoCaixa
+        pontos={serie}
+        granularidade={granularidade}
+        mes={mes && ehCompetencia(mes) ? mes : undefined}
+      />
 
       <PorCategoria dados={resumo.porCategoria} />
 

@@ -297,6 +297,142 @@ export async function campanhasUsadas(): Promise<string[]> {
     .filter((c): c is string => !!c && c.trim() !== "");
 }
 
+// ── Série do caixa (gráfico de entradas x saídas ao longo do tempo) ──────────
+export type GranularidadeSerie = "dia" | "semana" | "mes" | "ano";
+
+export type PontoSerie = {
+  /** Início do balde, em ISO (chave estável para o React e para a tabela). */
+  chave: string;
+  rotulo: string; // eixo X, já em pt-BR
+  rotuloLongo: string; // tooltip e tabela
+  entradas: number;
+  saidas: number;
+};
+
+// Janela de cada granularidade. Dia num período longo vira ruído ilegível, então
+// cada grão tem a sua janela — quem escolhe "por dia" quer o mês, não 3 anos.
+const JANELA: Record<GranularidadeSerie, number> = {
+  dia: 30,
+  semana: 12,
+  mes: 12,
+  ano: 5,
+};
+
+const TRUNC: Record<GranularidadeSerie, string> = {
+  dia: "day",
+  semana: "week",
+  mes: "month",
+  ano: "year",
+};
+
+/** Começo do balde que contém `d`, em UTC (as datas são gravadas ao meio-dia UTC). */
+function inicioDoBalde(d: Date, g: GranularidadeSerie): Date {
+  const x = new Date(
+    Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()),
+  );
+  if (g === "ano") return new Date(Date.UTC(x.getUTCFullYear(), 0, 1));
+  if (g === "mes") return new Date(Date.UTC(x.getUTCFullYear(), x.getUTCMonth(), 1));
+  if (g === "semana") {
+    // date_trunc('week') do Postgres começa na SEGUNDA — o passo aqui tem que
+    // usar a mesma âncora, senão os baldes não casam com os do banco.
+    const diaSemana = (x.getUTCDay() + 6) % 7; // 0 = segunda
+    x.setUTCDate(x.getUTCDate() - diaSemana);
+    return x;
+  }
+  return x;
+}
+
+function passoAtras(d: Date, g: GranularidadeSerie, n: number): Date {
+  const x = new Date(d);
+  if (g === "ano") x.setUTCFullYear(x.getUTCFullYear() - n);
+  else if (g === "mes") x.setUTCMonth(x.getUTCMonth() - n);
+  else if (g === "semana") x.setUTCDate(x.getUTCDate() - 7 * n);
+  else x.setUTCDate(x.getUTCDate() - n);
+  return x;
+}
+
+const MES_CURTO = [
+  "jan", "fev", "mar", "abr", "mai", "jun",
+  "jul", "ago", "set", "out", "nov", "dez",
+];
+
+function rotulos(d: Date, g: GranularidadeSerie): { curto: string; longo: string } {
+  const dd = String(d.getUTCDate()).padStart(2, "0");
+  const mm = MES_CURTO[d.getUTCMonth()];
+  const aaaa = d.getUTCFullYear();
+  if (g === "ano") return { curto: String(aaaa), longo: String(aaaa) };
+  if (g === "mes") {
+    return { curto: `${mm}/${String(aaaa).slice(2)}`, longo: `${mm} de ${aaaa}` };
+  }
+  if (g === "semana") {
+    const fim = new Date(d);
+    fim.setUTCDate(fim.getUTCDate() + 6);
+    const fdd = String(fim.getUTCDate()).padStart(2, "0");
+    return {
+      curto: `${dd}/${mm}`,
+      longo: `semana de ${dd}/${mm} a ${fdd}/${MES_CURTO[fim.getUTCMonth()]}`,
+    };
+  }
+  return { curto: `${dd}/${mm}`, longo: `${dd}/${mm}/${aaaa}` };
+}
+
+/**
+ * Entradas e saídas por período, para o gráfico do caixa.
+ *
+ * Só CONFIRMADO: conta a pagar que ainda não foi quitada não mexeu no caixa e
+ * não pode aparecer como se tivesse mexido.
+ *
+ * Baldes vazios são preenchidos com zero — sem isso a linha pularia de um dia
+ * com movimento para o próximo, mentindo sobre o eixo do tempo.
+ */
+export async function serieDoCaixa(
+  granularidade: GranularidadeSerie,
+): Promise<PontoSerie[]> {
+  const quantos = JANELA[granularidade];
+  const fim = inicioDoBalde(new Date(), granularidade);
+  const inicio = passoAtras(fim, granularidade, quantos - 1);
+
+  const linhas = await prisma.$queryRawUnsafe<
+    { bucket: Date; entradas: unknown; saidas: unknown }[]
+  >(
+    `SELECT date_trunc('${TRUNC[granularidade]}', "data") AS bucket,
+            SUM(CASE WHEN "tipo" = 'ENTRADA' THEN "valor" ELSE 0 END) AS entradas,
+            SUM(CASE WHEN "tipo" = 'SAIDA'   THEN "valor" ELSE 0 END) AS saidas
+       FROM "Lancamento"
+      WHERE "status" = 'CONFIRMADO' AND "data" >= $1
+      GROUP BY 1
+      ORDER BY 1`,
+    inicio,
+  );
+
+  const porChave = new Map<string, { entradas: number; saidas: number }>();
+  for (const l of linhas) {
+    const chave = inicioDoBalde(new Date(l.bucket), granularidade)
+      .toISOString()
+      .slice(0, 10);
+    porChave.set(chave, {
+      entradas: Number(l.entradas ?? 0),
+      saidas: Number(l.saidas ?? 0),
+    });
+  }
+
+  const pontos: PontoSerie[] = [];
+  for (let i = quantos - 1; i >= 0; i--) {
+    const d = passoAtras(fim, granularidade, i);
+    const chave = d.toISOString().slice(0, 10);
+    const v = porChave.get(chave) ?? { entradas: 0, saidas: 0 };
+    const r = rotulos(d, granularidade);
+    pontos.push({
+      chave,
+      rotulo: r.curto,
+      rotuloLongo: r.longo,
+      entradas: v.entradas,
+      saidas: v.saidas,
+    });
+  }
+  return pontos;
+}
+
 export type RecorrenciaItem = {
   id: string;
   tipo: "ENTRADA" | "SAIDA";
