@@ -1,7 +1,11 @@
 import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/admin/PageHeader";
 import { LancamentoForm } from "@/components/admin/financeiro/LancamentoForm";
-import { categoriasParaFormulario, getLancamento } from "@/lib/queries/financeiro";
+import {
+  categoriasParaFormulario,
+  campanhasUsadas,
+  getLancamento,
+} from "@/lib/queries/financeiro";
 import { paraInputDate } from "@/lib/financeiro/periodo";
 
 export default async function EditarLancamentoPage({
@@ -10,9 +14,10 @@ export default async function EditarLancamentoPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [lancamento, categorias] = await Promise.all([
+  const [lancamento, categorias, campanhas] = await Promise.all([
     getLancamento(id),
     categoriasParaFormulario(),
+    campanhasUsadas(),
   ]);
   if (!lancamento) notFound();
 
@@ -29,6 +34,7 @@ export default async function EditarLancamentoPage({
       />
       <LancamentoForm
         categorias={categorias}
+        campanhas={campanhas}
         hoje={paraInputDate(new Date())}
         initialData={{
           id: lancamento.id,
@@ -43,6 +49,8 @@ export default async function EditarLancamentoPage({
             ? paraInputDate(lancamento.vencimento)
             : null,
           pendente: lancamento.status === "PENDENTE",
+          canal: lancamento.canal,
+          campanha: lancamento.campanha,
         }}
       />
     </div>

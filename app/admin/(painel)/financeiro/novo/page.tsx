@@ -1,10 +1,16 @@
 import { PageHeader } from "@/components/admin/PageHeader";
 import { LancamentoForm } from "@/components/admin/financeiro/LancamentoForm";
-import { categoriasParaFormulario } from "@/lib/queries/financeiro";
+import {
+  categoriasParaFormulario,
+  campanhasUsadas,
+} from "@/lib/queries/financeiro";
 import { paraInputDate } from "@/lib/financeiro/periodo";
 
 export default async function NovoLancamentoPage() {
-  const categorias = await categoriasParaFormulario();
+  const [categorias, campanhas] = await Promise.all([
+    categoriasParaFormulario(),
+    campanhasUsadas(),
+  ]);
 
   return (
     <div>
@@ -17,7 +23,11 @@ export default async function NovoLancamentoPage() {
           { label: "Novo" },
         ]}
       />
-      <LancamentoForm categorias={categorias} hoje={paraInputDate(new Date())} />
+      <LancamentoForm
+        categorias={categorias}
+        campanhas={campanhas}
+        hoje={paraInputDate(new Date())}
+      />
     </div>
   );
 }

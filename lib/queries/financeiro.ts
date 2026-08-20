@@ -23,6 +23,8 @@ export type LancamentoItem = {
   orderId: string | null;
   orderNumero: string | null;
   criadoPorNome: string | null;
+  canal: string | null; // marcação de venda (só entrada)
+  campanha: string | null;
 };
 
 const SELECT = {
@@ -41,6 +43,8 @@ const SELECT = {
   orderId: true,
   order: { select: { numero: true } },
   criadoPor: { select: { nome: true } },
+  canal: true,
+  campanha: true,
 } as const;
 
 type Row = {
@@ -59,6 +63,8 @@ type Row = {
   orderId: string | null;
   order: { numero: string } | null;
   criadoPor: { nome: string } | null;
+  canal: string | null;
+  campanha: string | null;
 };
 
 function paraItem(l: Row): LancamentoItem {
@@ -78,6 +84,8 @@ function paraItem(l: Row): LancamentoItem {
     orderId: l.orderId,
     orderNumero: l.order?.numero ?? null,
     criadoPorNome: l.criadoPor?.nome ?? null,
+    canal: l.canal,
+    campanha: l.campanha,
   };
 }
 
@@ -269,6 +277,24 @@ export async function categoriasParaFormulario(): Promise<
     tipo: c.tipo as "ENTRADA" | "SAIDA" | null,
     slug: c.slug,
   }));
+}
+
+/**
+ * Campanhas já usadas em lançamentos, para sugerir no formulário. Campanha é
+ * texto livre (cada uma tem nome próprio), e sugerir o que já existe é o que
+ * evita "Black Friday", "black friday" e "BlackFriday" virarem três coisas.
+ */
+export async function campanhasUsadas(): Promise<string[]> {
+  const linhas = await prisma.lancamento.findMany({
+    where: { campanha: { not: null } },
+    distinct: ["campanha"],
+    orderBy: { data: "desc" },
+    take: 40,
+    select: { campanha: true },
+  });
+  return linhas
+    .map((l) => l.campanha)
+    .filter((c): c is string => !!c && c.trim() !== "");
 }
 
 export type RecorrenciaItem = {

@@ -9,6 +9,7 @@ import { FileText } from "lucide-react";
 import { FormField } from "@/components/admin/FormField";
 import { LeitorComprovante, type RascunhoLido } from "./LeitorComprovante";
 import { criarLancamento, atualizarLancamento } from "@/actions/financeiro";
+import { CANAIS_VENDA } from "@/lib/validations/financeiro";
 
 type Categoria = { id: string; nome: string; tipo: "ENTRADA" | "SAIDA" | null };
 
@@ -21,6 +22,8 @@ type Campos = {
   observacoes: string;
   aPagar: boolean;
   vencimento: string;
+  canal: string;
+  campanha: string;
 };
 
 export type LancamentoInicial = {
@@ -34,6 +37,8 @@ export type LancamentoInicial = {
   comprovanteUrl: string | null;
   vencimento: string | null;
   pendente: boolean;
+  canal: string | null;
+  campanha: string | null;
 };
 
 const inputClass =
@@ -41,10 +46,13 @@ const inputClass =
 
 export function LancamentoForm({
   categorias,
+  campanhas = [],
   initialData,
   hoje,
 }: {
   categorias: Categoria[];
+  /** Campanhas já usadas — viram sugestão no campo (evita grafia solta). */
+  campanhas?: string[];
   initialData?: LancamentoInicial;
   hoje: string;
 }) {
@@ -72,6 +80,8 @@ export function LancamentoForm({
           observacoes: initialData.observacoes ?? "",
           aPagar: initialData.pendente,
           vencimento: initialData.vencimento ?? "",
+          canal: initialData.canal ?? "",
+          campanha: initialData.campanha ?? "",
         }
       : {
           tipo: "SAIDA",
@@ -82,6 +92,8 @@ export function LancamentoForm({
           observacoes: "",
           aPagar: false,
           vencimento: "",
+          canal: "",
+          campanha: "",
         },
   });
 
@@ -231,6 +243,50 @@ export function LancamentoForm({
             ))}
           </select>
         </FormField>
+
+        {/* Marcação de venda: só em entrada, e nunca obrigatória. Serve para
+            depois saber que canal e que campanha trouxeram dinheiro. */}
+        {tipo === "ENTRADA" && (
+          <div className="mb-4 rounded-md border border-gray-200 bg-gray-50/60 p-3">
+            <p className="text-xs font-medium text-gray-600 mb-2">
+              De onde veio essa venda{" "}
+              <span className="font-normal text-gray-400">
+                — opcional, ajuda a saber o que dá resultado
+              </span>
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4">
+              <FormField label="Cliente veio de" name="canal">
+                <select id="canal" {...register("canal")} className={inputClass}>
+                  <option value="">Não sei / não informar</option>
+                  {CANAIS_VENDA.map((c) => (
+                    <option key={c.valor} value={c.valor}>
+                      {c.rotulo}
+                    </option>
+                  ))}
+                </select>
+              </FormField>
+
+              <FormField
+                label="Campanha"
+                name="campanha"
+                error={errors.campanha?.message}
+              >
+                <input
+                  id="campanha"
+                  list="campanhas-usadas"
+                  {...register("campanha")}
+                  className={inputClass}
+                  placeholder="Black Friday, promoção avulsa…"
+                />
+                <datalist id="campanhas-usadas">
+                  {campanhas.map((c) => (
+                    <option key={c} value={c} />
+                  ))}
+                </datalist>
+              </FormField>
+            </div>
+          </div>
+        )}
 
         {/* Conta a pagar: fica fora do caixa até ser quitada. */}
         <label className="flex items-start gap-2 text-sm text-gray-700 mb-4">

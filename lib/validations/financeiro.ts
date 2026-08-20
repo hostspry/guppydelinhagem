@@ -38,6 +38,27 @@ const opcionalVazio = (s: z.ZodString) =>
     .union([s, z.literal(""), z.null(), z.undefined()])
     .transform((v) => (v === "" || v == null ? null : v));
 
+/**
+ * Canais de origem do cliente. Mesma lista do enum CanalVenda do banco — a
+ * ordem aqui é a que aparece no formulário (mais usados primeiro).
+ */
+export const CANAIS_VENDA = [
+  { valor: "WHATSAPP", rotulo: "WhatsApp" },
+  { valor: "INSTAGRAM", rotulo: "Instagram" },
+  { valor: "SITE", rotulo: "Site" },
+  { valor: "GOOGLE", rotulo: "Google" },
+  { valor: "FACEBOOK", rotulo: "Facebook" },
+  { valor: "YOUTUBE", rotulo: "YouTube" },
+  { valor: "TIKTOK", rotulo: "TikTok" },
+  { valor: "MERCADO_LIVRE", rotulo: "Mercado Livre" },
+  { valor: "OLX", rotulo: "OLX" },
+  { valor: "INDICACAO", rotulo: "Indicação de cliente" },
+  { valor: "EVENTO", rotulo: "Feira ou evento" },
+  { valor: "OUTRO", rotulo: "Outro" },
+] as const;
+
+const canaisValores = CANAIS_VENDA.map((c) => c.valor);
+
 export const lancamentoSchema = z.object({
   tipo: z.enum(["ENTRADA", "SAIDA"], { message: "Escolha entrada ou saída." }),
   descricao: z.string().trim().min(2, "Descreva o lançamento."),
@@ -51,6 +72,11 @@ export const lancamentoSchema = z.object({
     .union([z.string().regex(/^\d{4}-\d{2}-\d{2}$/), z.literal(""), z.null(), z.undefined()])
     .transform((v) => (v === "" || v == null ? null : v)),
   aPagar: z.coerce.boolean().default(false),
+  /** Marcação de venda — opcional, e a action ignora quando o tipo é SAIDA. */
+  canal: z
+    .union([z.enum(canaisValores), z.literal(""), z.null(), z.undefined()])
+    .transform((v) => (v === "" || v == null ? null : v)),
+  campanha: opcionalVazio(z.string().trim().max(60, "Nome de campanha muito longo")),
 });
 
 export type LancamentoInput = z.output<typeof lancamentoSchema>;

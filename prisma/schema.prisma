@@ -666,6 +666,24 @@ enum StatusLancamento {
   DESCARTADO // sugestão recusada; fica no histórico, fora das contas
 }
 
+/// De onde veio o cliente dessa venda. Só faz sentido em ENTRADA e é sempre
+/// opcional — serve para saber que canal traz dinheiro, não para travar o
+/// lançamento.
+enum CanalVenda {
+  GOOGLE
+  SITE
+  INSTAGRAM
+  FACEBOOK
+  YOUTUBE
+  TIKTOK
+  WHATSAPP
+  MERCADO_LIVRE
+  OLX
+  INDICACAO
+  EVENTO
+  OUTRO
+}
+
 enum OrigemLancamento {
   MANUAL
   PEDIDO // venda do site
@@ -717,6 +735,12 @@ model Lancamento {
   comprovanteUrl String? // PDF/imagem no S3
   observacoes    String?
 
+  // Marcação de venda (opcional, só em ENTRADA): por onde o cliente chegou e em
+  // que campanha a venda entrou. Campanha é texto livre porque cada uma tem nome
+  // próprio; o formulário sugere as já usadas para não virar grafia solta.
+  canal    CanalVenda?
+  campanha String?
+
   recorrenciaId String?
   recorrencia   RecorrenciaFinanceira? @relation(fields: [recorrenciaId], references: [id], onDelete: SetNull)
 
@@ -731,6 +755,8 @@ model Lancamento {
   @@index([data])
   @@index([categoriaId])
   @@index([orderId])
+  @@index([canal])
+  @@index([campanha])
   @@index([status, vencimento])
 }
 

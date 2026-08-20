@@ -65,6 +65,9 @@ export async function criarLancamento(input: unknown): Promise<ActionResult> {
         categoriaId: d.categoriaId,
         observacoes: d.observacoes,
         comprovanteUrl: d.comprovanteUrl,
+        // Marcação de venda só existe em entrada; numa saída não guarda nada.
+        canal: d.tipo === "ENTRADA" ? d.canal : null,
+        campanha: d.tipo === "ENTRADA" ? d.campanha : null,
         criadoPorId: membro.id,
       },
     });
@@ -128,6 +131,8 @@ export async function atualizarLancamento(
         categoriaId: d.categoriaId,
         observacoes: d.observacoes,
         comprovanteUrl: d.comprovanteUrl,
+        canal: d.tipo === "ENTRADA" ? d.canal : null,
+        campanha: d.tipo === "ENTRADA" ? d.campanha : null,
       },
     });
   } catch (e) {

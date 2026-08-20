@@ -12,6 +12,22 @@ const ORIGEM_ROTULO: Record<string, string> = {
   COMPROVANTE: "comprovante",
 };
 
+// Canal → rótulo legível. Espelha CANAIS_VENDA (lib/validations/financeiro).
+const CANAL_ROTULO: Record<string, string> = {
+  GOOGLE: "Google",
+  SITE: "site",
+  INSTAGRAM: "Instagram",
+  FACEBOOK: "Facebook",
+  YOUTUBE: "YouTube",
+  TIKTOK: "TikTok",
+  WHATSAPP: "WhatsApp",
+  MERCADO_LIVRE: "Mercado Livre",
+  OLX: "OLX",
+  INDICACAO: "indicação",
+  EVENTO: "feira/evento",
+  OUTRO: "outro",
+};
+
 export function ListaLancamentos({
   lancamentos,
   vazio,
@@ -68,6 +84,16 @@ export function ListaLancamentos({
                       >
                         {l.orderNumero}
                       </Link>
+                    )}
+                    {l.canal && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-700">
+                        veio de {CANAL_ROTULO[l.canal] ?? l.canal}
+                      </span>
+                    )}
+                    {l.campanha && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-purple-50 text-purple-700">
+                        {l.campanha}
+                      </span>
                     )}
                     {l.comprovanteUrl && (
                       <a
