@@ -4,7 +4,7 @@ import { CheckCircle2, Clock, XCircle } from "lucide-react";
 import { getCobrancaPorToken } from "@/lib/queries/cobrancas";
 import { whatsappLink, WHATSAPP_DISPLAY } from "@/lib/constants";
 import { WhatsAppIcon } from "@/components/icons/WhatsAppIcon";
-import PagarCobrancaButton from "@/components/cobranca/PagarCobrancaButton";
+import CobrancaPagamento from "@/components/cobranca/CobrancaPagamento";
 import CobrancaStatusPoll from "@/components/cobranca/CobrancaStatusPoll";
 
 export const dynamic = "force-dynamic";
@@ -89,7 +89,17 @@ export default async function CobrarPage({
               )}
             </ul>
 
-            <PagarCobrancaButton token={token} />
+            <CobrancaPagamento
+              token={token}
+              total={c.total}
+              maxParcelas={c.maxParcelas ?? 12}
+              mpPublicKey={
+                process.env.MP_PUBLIC_KEY ||
+                process.env.NEXT_PUBLIC_MP_PUBLIC_KEY ||
+                null
+              }
+              clienteEmail={c.clienteEmail}
+            />
             <CobrancaStatusPoll token={token} />
           </>
         ) : (

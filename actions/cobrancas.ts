@@ -13,7 +13,14 @@ import { assertPermissao } from "@/lib/permissoes-server";
 import { auditar } from "@/lib/auditoria";
 import { rateLimit, clientIp } from "@/lib/rate-limit";
 import { situacaoDaCobranca } from "@/lib/queries/cobrancas";
-import { ProviderPagamento } from "@/lib/generated/prisma/enums";
+import {
+  ProviderPagamento,
+  StatusPagamento,
+  MetodoPagamento,
+} from "@/lib/generated/prisma/enums";
+import { transicionarParaPago } from "@/lib/pedido-baixa";
+import { mensagemRecusa } from "@/lib/payments/mercadopago";
+import type { CartaoInput, CartaoDesfecho } from "@/actions/checkout";
 import type { Prisma } from "@/lib/generated/prisma/client";
 import { type ActionResult } from "@/lib/utils/action-result";
 
@@ -408,6 +415,220 @@ export async function pagarCobranca(
       error: "Não foi possível abrir o pagamento agora. Tente novamente.",
     };
   }
+}
+
+/**
+ * Cartão DIRETO no link de cobrança (Card Payment Brick), no lugar de mandar o
+ * cliente ao Checkout Pro.
+ *
+ * Motivo: no Checkout Pro quem cria o pagamento é o MP, então não dá para enviar
+ * Device ID nem pedir 3DS — e era exatamente por isso que o link recusava cartão
+ * bom (`security:none` + cc_rejected_high_risk em toda tentativa). Aqui o
+ * pagamento sai do NOSSO servidor com os mesmos sinais do checkout da loja:
+ * fingerprint no header, pagador completo, histórico e 3DS.
+ *
+ * Valor, descrição e teto de parcelas vêm do banco — do navegador só vem o token
+ * do cartão (o servidor nunca vê número/CVV).
+ */
+export async function pagarCobrancaCartao(
+  token: string,
+  cartao: CartaoInput,
+): Promise<CartaoDesfecho> {
+  const ip = clientIp(await headers());
+  const limite = rateLimit(`cobranca-cartao:${ip}`, 8, 60_000);
+  if (!limite.ok) {
+    return {
+      resultado: "erro",
+      mensagem: `Muitas tentativas. Tente de novo em ${limite.retryAfter}s.`,
+    };
+  }
+
+  if (!cartao?.token || !cartao?.paymentMethodId) {
+    return { resultado: "erro", mensagem: "Dados do cartão incompletos." };
+  }
+
+  const cob = await prisma.order.findFirst({
+    where: { tipo: "COBRANCA", publicToken: token },
+    select: {
+      id: true,
+      numero: true,
+      status: true,
+      total: true,
+      expiraEm: true,
+      maxParcelas: true,
+      enderecoEntrega: true,
+      items: { select: { nomeProduto: true }, take: 1 },
+      cliente: {
+        select: {
+          id: true,
+          nome: true,
+          email: true,
+          cpfCnpj: true,
+          telefone: true,
+          cep: true,
+          logradouro: true,
+          numero: true,
+          criadoEm: true,
+        },
+      },
+    },
+  });
+  if (!cob) return { resultado: "erro", mensagem: "Cobrança não encontrada." };
+
+  const situacao = situacaoDaCobranca(cob);
+  if (situacao === "PAGA") {
+    return { resultado: "erro", mensagem: "Esta cobrança já foi paga." };
+  }
+  if (situacao === "CANCELADA") {
+    return { resultado: "erro", mensagem: "Esta cobrança foi cancelada." };
+  }
+  if (situacao === "EXPIRADA") {
+    return {
+      resultado: "erro",
+      mensagem: "Este link de pagamento venceu. Peça um novo à loja.",
+    };
+  }
+
+  // Parcelamento sai do banco (anti-tamper): o navegador não define o teto.
+  const teto = cob.maxParcelas ?? 12;
+  const parcelas = Number(cartao.installments);
+  if (!Number.isInteger(parcelas) || parcelas < 1 || parcelas > teto) {
+    return { resultado: "erro", mensagem: "Opção de parcelamento inválida." };
+  }
+
+  const end = cob.enderecoEntrega as unknown as EnderecoEntrega;
+  const nome = cob.cliente?.nome || end.nome || "";
+  const partes = nome.trim().split(/\s+/);
+  const descricao = cob.items[0]?.nomeProduto ?? `Cobrança ${cob.numero}`;
+  const valor = round2(Number(cob.total));
+  const emailPagador =
+    cartao.payer?.email || cob.cliente?.email || end.email || "";
+  const cpfPagador =
+    cartao.payer?.identification?.number || cob.cliente?.cpfCnpj || end.cpfCnpj;
+
+  // Histórico do comprador (mesmos sinais do checkout da loja).
+  const historico = await (async () => {
+    if (!cob.cliente) return null;
+    try {
+      const anterior = await prisma.order.findFirst({
+        where: {
+          clienteId: cob.cliente.id,
+          id: { not: cob.id },
+          status: { in: ["PAGO", "ENVIADO", "ENTREGUE"] },
+        },
+        orderBy: { criadoEm: "desc" },
+        select: { criadoEm: true },
+      });
+      return {
+        cadastradoEm: cob.cliente.criadoEm,
+        ultimaCompraEm: anterior?.criadoEm ?? null,
+        primeiraCompra: !anterior,
+      };
+    } catch {
+      return null;
+    }
+  })();
+
+  let pago;
+  try {
+    const provider = getPaymentProvider(ProviderPagamento.MERCADO_PAGO);
+    pago = await provider.criarPagamentoCartao({
+      orderId: cob.id, // external_reference — o webhook acha por aqui
+      valor,
+      descricao: `${cob.numero} — Guppy de Linhagem`,
+      token: cartao.token,
+      paymentMethodId: cartao.paymentMethodId,
+      issuerId: cartao.issuerId,
+      installments: parcelas,
+      deviceId: cartao.deviceId ?? null,
+      pagador: {
+        email: emailPagador,
+        cpfCnpj: cpfPagador,
+        nome: partes[0] || null,
+        sobrenome: partes.slice(1).join(" ") || null,
+        telefone: cob.cliente?.telefone || end.telefone,
+      },
+      // Cobrança não despacha nada: sem shipments; o endereço do cadastro vai
+      // como endereço do pagador.
+      endereco: null,
+      payerAddress: cob.cliente?.cep
+        ? {
+            cep: cob.cliente.cep,
+            logradouro: cob.cliente.logradouro,
+            numero: cob.cliente.numero,
+          }
+        : null,
+      itens: [
+        {
+          id: cob.id,
+          title: descricao,
+          quantity: 1,
+          unitPrice: valor,
+        },
+      ],
+      historico,
+    });
+  } catch (e) {
+    console.error("[cobranca] cartão", e);
+    return {
+      resultado: "erro",
+      mensagem:
+        e instanceof Error ? e.message : "Não foi possível processar o cartão.",
+    };
+  }
+
+  // Grava a tentativa (aprovada ou não) — mesma trilha do checkout.
+  try {
+    await prisma.pagamento.create({
+      data: {
+        orderId: cob.id,
+        provider: ProviderPagamento.MERCADO_PAGO,
+        metodo: MetodoPagamento.CARTAO,
+        status: pago.status,
+        valor,
+        externalId: pago.externalId,
+        parcelas: pago.parcelas,
+        bandeira: pago.bandeira,
+        payloadRaw: {
+          statusDetail: pago.statusDetail,
+          deviceId: cartao.deviceId ? "ok" : "vazio",
+        } as Prisma.InputJsonValue,
+      },
+    });
+    await prisma.order.update({
+      where: { id: cob.id },
+      data: { mpPaymentId: pago.externalId, parcelas: pago.parcelas },
+    });
+  } catch (e) {
+    console.error("[cobranca] gravar Pagamento cartão", e);
+  }
+
+  // 3DS: o banco quer autenticar antes de decidir.
+  if (pago.threeDs) {
+    return {
+      resultado: "desafio",
+      numero: cob.numero,
+      paymentId: pago.externalId,
+      externalResourceUrl: pago.threeDs.externalResourceUrl,
+      creq: pago.threeDs.creq,
+    };
+  }
+
+  if (pago.status === StatusPagamento.PAGO) {
+    try {
+      await prisma.$transaction((tx) => transicionarParaPago(tx, cob.id));
+      revalidatePath("/admin/cobrancas");
+    } catch (e) {
+      console.error("[cobranca] transicionar cartão aprovado", e);
+    }
+    return { resultado: "aprovado", numero: cob.numero };
+  }
+
+  if (pago.status === StatusPagamento.EM_ANALISE) {
+    return { resultado: "analise", numero: cob.numero };
+  }
+
+  return { resultado: "recusado", mensagem: mensagemRecusa(pago.statusDetail) };
 }
 
 /**

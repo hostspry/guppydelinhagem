@@ -139,7 +139,7 @@ export async function getCobrancaPorToken(token: string) {
       expiraEm: true,
       maxParcelas: true,
       observacoes: true,
-      cliente: { select: { nome: true } },
+      cliente: { select: { nome: true, email: true } },
       items: { select: { nomeProduto: true }, take: 1 },
     },
   });
@@ -154,6 +154,7 @@ export async function getCobrancaPorToken(token: string) {
     maxParcelas: o.maxParcelas,
     observacoes: o.observacoes,
     clienteNome: o.cliente.nome,
+    clienteEmail: o.cliente.email, // pré-preenche o Brick
     situacao: situacaoDaCobranca(o),
   };
 }
