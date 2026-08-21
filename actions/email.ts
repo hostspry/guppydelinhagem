@@ -9,12 +9,7 @@ import {
   contaEmailSchema,
   emailTesteSchema,
 } from "@/lib/validations/email";
-import {
-  contaAtiva,
-  enviarComConta,
-  verificarConta,
-  type ContaSmtp,
-} from "@/lib/email";
+import { contaAtiva, enviarComConta, type ContaSmtp } from "@/lib/email";
 import { descriptografar } from "@/lib/cripto";
 import type { ActionResult } from "@/lib/utils/action-result";
 
@@ -114,9 +109,9 @@ export async function salvarContaEmail(input: unknown): Promise<ActionResult> {
 export type TesteResult = { ok: boolean; mensagem: string };
 
 /**
- * Testa a conta SALVA: primeiro conexão + autenticação, depois um e-mail de
- * verdade para o endereço informado. Guarda o desfecho na própria linha, para a
- * tela mostrar se a conta está funcionando sem precisar testar de novo.
+ * Testa a conta SALVA mandando um e-mail de verdade para o endereço informado.
+ * Guarda o desfecho na própria linha, para a tela mostrar se a conta está
+ * funcionando sem precisar testar de novo.
  */
 export async function testarContaEmail(input: unknown): Promise<TesteResult> {
   await assertPermissao("config.editar");
@@ -150,12 +145,9 @@ export async function testarContaEmail(input: unknown): Promise<TesteResult> {
     };
   }
 
-  const conexao = await verificarConta(conta);
-  if (!conexao.ok) {
-    await registrarTeste(false, conexao.erro);
-    return { ok: false, mensagem: conexao.erro };
-  }
-
+  // Manda direto, sem verify() antes: seriam DUAS conexões, e este servidor
+  // segura ~10s cada uma antes de responder — o teste levaria meio minuto sem
+  // necessidade. O próprio envio já prova conexão, TLS e senha.
   const envio = await enviarComConta(conta, {
     para: parsed.data.para,
     assunto: "Teste de envio — Guppy de Linhagem",

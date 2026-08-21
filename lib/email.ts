@@ -28,7 +28,14 @@ export type ResultadoEnvio =
   | { ok: true; messageId: string | null }
   | { ok: false; erro: string };
 
-const TIMEOUT_MS = 15_000;
+// Servidor de hospedagem compartilhada costuma "segurar" a conexão de IP que ele
+// não conhece antes de responder. No nosso caso medimos 10,3s só até o banner e
+// 14,4s até o AUTH terminar — com o limite antigo de 15s, um envio legítimo
+// estourava por poucos segundos e parecia porta errada. Estes valores dão folga
+// para o tarpit sem deixar a tela pendurada para sempre.
+const TIMEOUT_CONEXAO_MS = 30_000; // conectar
+const TIMEOUT_SAUDACAO_MS = 30_000; // esperar o 220 do servidor
+const TIMEOUT_SOCKET_MS = 60_000; // diálogo inteiro (EHLO, TLS, AUTH, DATA)
 
 function transporte(c: ContaSmtp) {
   return nodemailer.createTransport({
@@ -38,9 +45,9 @@ function transporte(c: ContaSmtp) {
     secure: c.seguranca === "SSL",
     requireTLS: c.seguranca === "STARTTLS",
     auth: { user: c.usuario, pass: c.senha },
-    connectionTimeout: TIMEOUT_MS,
-    greetingTimeout: TIMEOUT_MS,
-    socketTimeout: TIMEOUT_MS,
+    connectionTimeout: TIMEOUT_CONEXAO_MS,
+    greetingTimeout: TIMEOUT_SAUDACAO_MS,
+    socketTimeout: TIMEOUT_SOCKET_MS,
   });
 }
 
@@ -55,11 +62,19 @@ export function explicarErroSmtp(e: unknown): string {
   if (/ENOTFOUND|EAI_AGAIN|getaddrinfo/i.test(msg + code)) {
     return "Servidor não encontrado. Confira o endereço do servidor de saída (host).";
   }
-  if (/ETIMEDOUT|ECONNREFUSED|ESOCKET|timeout/i.test(msg + code)) {
-    return "Não deu para conectar nessa porta. Tente 587 com STARTTLS, ou 465 com SSL.";
-  }
-  if (/self.signed|certificate|CERT/i.test(msg)) {
+  // Certificado ANTES de ESOCKET: o nodemailer devolve ESOCKET nos dois casos, e
+  // pela ordem inversa um problema de certificado saía como "porta errada".
+  if (/self.signed|certificate|CERT|altnames/i.test(msg)) {
     return "O certificado do servidor não confere com o endereço informado. Use o host oficial do provedor.";
+  }
+  if (/ECONNREFUSED/i.test(msg + code)) {
+    return "O servidor recusou a conexão nessa porta. Tente 587 com STARTTLS, ou 465 com SSL.";
+  }
+  // Timeout não é porta errada: quase sempre é o servidor demorando a responder
+  // (hospedagem compartilhada segura conexão de IP novo) ou a porta bloqueada
+  // pela saída do nosso servidor. As duas coisas pedem a mesma tentativa.
+  if (/ETIMEDOUT|ESOCKET|timeout/i.test(msg + code)) {
+    return "O servidor de e-mail não respondeu a tempo. Tente de novo — se insistir, troque para 465 com SSL (ou 587 com STARTTLS).";
   }
   if (/550|553|relay|not permitted|sender/i.test(msg)) {
     return "O servidor recusou o remetente. O e-mail do remetente precisa ser uma caixa desse mesmo servidor.";
@@ -73,6 +88,9 @@ export async function verificarConta(c: ContaSmtp): Promise<ResultadoEnvio> {
     await transporte(c).verify();
     return { ok: true, messageId: null };
   } catch (e) {
+    // Log com o código cru: a mensagem amigável é para o dono, isto é para achar
+    // o motivo quando ela não bastar.
+    console.error("[email] verify falhou:", (e as { code?: string })?.code, e);
     return { ok: false, erro: explicarErroSmtp(e) };
   }
 }
@@ -93,6 +111,7 @@ export async function enviarComConta(
     });
     return { ok: true, messageId: info.messageId ?? null };
   } catch (e) {
+    console.error("[email] envio falhou:", (e as { code?: string })?.code, e);
     return { ok: false, erro: explicarErroSmtp(e) };
   }
 }
