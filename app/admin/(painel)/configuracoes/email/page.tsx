@@ -1,6 +1,3 @@
-import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
-import { PageHeader } from "@/components/admin/PageHeader";
 import { ContaEmailForm } from "@/components/admin/ContaEmailForm";
 import { prisma } from "@/lib/prisma";
 
@@ -32,25 +29,6 @@ export default async function ConfiguracaoEmailPage() {
 
   return (
     <div>
-      <PageHeader
-        title="E-mail"
-        description="A conta que o site usa para mandar e-mail aos clientes."
-        breadcrumb={[
-          { label: "Admin", href: "/admin" },
-          { label: "Configurações", href: "/admin/configuracoes" },
-          { label: "E-mail" },
-        ]}
-        action={
-          <Link
-            href="/admin/configuracoes"
-            className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700"
-          >
-            <ArrowLeft className="w-4 h-4" aria-hidden="true" />
-            Voltar
-          </Link>
-        }
-      />
-
       <ContaEmailForm
         inicial={{
           existe: !!c,

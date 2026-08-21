@@ -10,7 +10,17 @@ import {
 
 const DEFAULT_ID = "default";
 
-/** Salva as configurações globais da loja (singleton). Admin only. */
+/**
+ * Salva as configurações globais da loja (singleton). Admin only.
+ *
+ * A tela é dividida em abas, e cada aba manda só a SUA parte — junto com um
+ * campo `secao` por bloco enviado. Sem isso, salvar em "Entrega" gravaria os
+ * campos de "Pagamentos" como ausentes (checkbox que não vem no FormData é
+ * indistinguível de checkbox desmarcado) e apagaria o que estava lá.
+ *
+ * Sem nenhum `secao` no formulário, grava tudo — é o formato antigo, de quando
+ * havia um form só.
+ */
 export async function salvarConfiguracaoLoja(
   formData: FormData,
 ): Promise<ActionResult> {
@@ -18,6 +28,9 @@ export async function salvarConfiguracaoLoja(
   const anterior = await prisma.configuracaoLoja.findUnique({
     where: { id: "default" },
   });
+
+  const secoes = new Set(formData.getAll("secao").map(String));
+  const enviou = (s: string) => secoes.size === 0 || secoes.has(s);
 
   const raw = Number(formData.get("descontoPixGlobalPercent"));
   const pct = Number.isFinite(raw)
@@ -55,9 +68,26 @@ export async function salvarConfiguracaoLoja(
   // PagBank: liga/desliga as opções PagBank no checkout (sem deploy).
   const pagbankAtivo = formData.get("pagbankAtivo") === "on";
 
+  // Só entra no update o que a aba realmente mandou.
+  const doPagamento = enviou("pagamentos")
+    ? { descontoPixGlobalPercent: pct, pagbankAtivo }
+    : {};
+  const daEntrega = enviou("entrega")
+    ? {
+        freteGratisAtivo,
+        freteGratisAcimaDe,
+        maxPeixesFreteAuto,
+        retiradaLocalAtiva,
+        retiradaInstrucoes,
+      }
+    : {};
+  const daLoja = enviou("loja") ? { tarjaAtiva, tarjaTexto } : {};
+
   try {
     await prisma.configuracaoLoja.upsert({
       where: { id: DEFAULT_ID },
+      // Na criação a linha precisa nascer completa; o que a aba não mandou fica
+      // com o default de cada campo.
       create: {
         id: DEFAULT_ID,
         descontoPixGlobalPercent: pct,
@@ -70,17 +100,7 @@ export async function salvarConfiguracaoLoja(
         tarjaTexto,
         pagbankAtivo,
       },
-      update: {
-        descontoPixGlobalPercent: pct,
-        freteGratisAtivo,
-        freteGratisAcimaDe,
-        maxPeixesFreteAuto,
-        retiradaLocalAtiva,
-        retiradaInstrucoes,
-        tarjaAtiva,
-        tarjaTexto,
-        pagbankAtivo,
-      },
+      update: { ...doPagamento, ...daEntrega, ...daLoja },
     });
   } catch (e) {
     console.error(e);
