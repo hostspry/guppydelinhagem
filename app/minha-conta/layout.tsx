@@ -15,6 +15,11 @@ export default async function MinhaContaLayout({
   const session = await auth();
   if (!session?.user) redirect("/login?callbackUrl=/minha-conta");
 
+  // Senha temporária (acesso criado pela loja numa venda direta): o cliente
+  // define a dele ANTES de ver o painel. A página fica fora deste layout, senão
+  // o redirect entraria em laço.
+  if (session.user.senhaPrecisaTroca) redirect("/definir-senha");
+
   // Idempotente e barato — liga os Clientes deste e-mail ao usuário logado.
   await vincularClientesAoUsuario(session.user.id, session.user.email);
 

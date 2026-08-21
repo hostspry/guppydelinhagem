@@ -10,7 +10,14 @@ type Campos = { atual: string; nova: string; confirmacao: string };
 const inputClass =
   "w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:border-[#FF035C] focus:ring-1 focus:ring-[#FF035C]";
 
-export function TrocarSenhaForm({ obrigatoria }: { obrigatoria: boolean }) {
+export function TrocarSenhaForm({
+  obrigatoria,
+  destino = "/admin",
+}: {
+  obrigatoria: boolean;
+  /** Para onde ir depois de trocar. Cliente vai para o painel dele. */
+  destino?: string;
+}) {
   const [isPending, startTransition] = useTransition();
   const {
     register,
@@ -36,7 +43,7 @@ export function TrocarSenhaForm({ obrigatoria }: { obrigatoria: boolean }) {
       // ainda guarda o /admin que redirecionava para cá, e um refresh() logo
       // depois do replace() cancela a navegação. Trocar senha acontece uma vez
       // na vida do acesso — vale a página recarregar limpa.
-      window.location.assign("/admin");
+      window.location.assign(destino);
     });
   });
 

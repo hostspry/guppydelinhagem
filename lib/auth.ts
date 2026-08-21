@@ -84,7 +84,9 @@ const providers = [
       const valid = await bcrypt.compare(password, user.senhaHash);
       if (!valid) return null;
 
-      if (user.role === "CUSTOMER") return null;
+      // CUSTOMER entra por aqui desde que a loja tenha criado uma senha para
+      // ele (venda direta). Quem barra o painel é o callback `authorized`, que
+      // checa o role em toda rota /admin — não este provider.
 
       // Fire-and-forget — não bloqueia o login
       prisma.user

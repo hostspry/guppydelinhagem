@@ -5,6 +5,7 @@ import { getPedidoById } from "@/lib/queries/pedidos";
 import { PageHeader } from "@/components/admin/PageHeader";
 import { StatusPedidoControl } from "@/components/admin/StatusPedidoControl";
 import { EnvioCard } from "@/components/admin/EnvioCard";
+import { AcessoCliente } from "@/components/admin/AcessoCliente";
 import { EstornarButton } from "@/components/admin/EstornarButton";
 import { podeEditarItens } from "@/lib/pedido-status";
 import {
@@ -170,6 +171,16 @@ export default async function PedidoDetalhePage({ params }: Props) {
               clienteTelefone={e.telefone}
             />
           )}
+
+          {/* Venda direta: o cliente não passou pelo cadastro do site, então não
+              tem como acompanhar sozinho. Aqui a loja cria o acesso dele. */}
+          <AcessoCliente
+            clienteId={pedido.clienteId}
+            clienteNome={pedido.clienteNome}
+            clienteEmail={pedido.clienteEmail}
+            clienteTelefone={pedido.clienteTelefone ?? e.telefone}
+            jaTemAcesso={pedido.clienteTemAcesso}
+          />
 
           <div className="bg-white border border-gray-200 rounded-lg p-5 text-sm space-y-1">
             <h2 className="text-xs font-semibold text-[#07366A] uppercase tracking-wide mb-2">

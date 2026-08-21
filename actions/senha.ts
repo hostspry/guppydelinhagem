@@ -45,8 +45,14 @@ export async function trocarMinhaSenha(input: unknown): Promise<ActionResult> {
     where: { id: session.user.id },
     select: { senhaHash: true, role: true },
   });
-  if (!user?.senhaHash || user.role === "CUSTOMER") {
-    return { success: false, error: "Conta sem acesso ao painel." };
+  // Cliente também troca a própria senha: a conta criada pela loja na venda
+  // direta nasce com senha temporária e precisa virar senha dele no 1º login.
+  // Conta só de login social não tem hash — aí não há o que trocar.
+  if (!user?.senhaHash) {
+    return {
+      success: false,
+      error: "Esta conta entra pelo Google ou Facebook e não usa senha.",
+    };
   }
 
   if (!(await bcrypt.compare(parsed.data.atual, user.senhaHash))) {

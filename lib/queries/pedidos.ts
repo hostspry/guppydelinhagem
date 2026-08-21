@@ -194,7 +194,17 @@ export async function getPedidoById(id: string) {
   const p = await prisma.order.findUnique({
     where: { id },
     include: {
-      cliente: { select: { id: true, nome: true } },
+      // email/telefone e userId vêm do CADASTRO (não do snapshot do pedido):
+      // é o cadastro que vira o acesso do cliente ao painel.
+      cliente: {
+        select: {
+          id: true,
+          nome: true,
+          email: true,
+          telefone: true,
+          userId: true,
+        },
+      },
       items: true,
       pagamentos: { orderBy: { criadoEm: "desc" } },
     },
@@ -218,6 +228,9 @@ export async function getPedidoById(id: string) {
     observacoes: p.observacoes,
     clienteId: p.clienteId,
     clienteNome: p.cliente.nome,
+    clienteEmail: p.cliente.email,
+    clienteTelefone: p.cliente.telefone,
+    clienteTemAcesso: p.cliente.userId != null,
     enderecoEntrega: p.enderecoEntrega as unknown as EnderecoEntrega,
     subtotal: Number(p.subtotal),
     frete: Number(p.frete),

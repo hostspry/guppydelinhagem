@@ -42,10 +42,45 @@ export default function LoginClient({
   error: string | null;
   callbackUrl: string;
 }) {
-  const [carregando, setCarregando] = useState<"google" | "facebook" | null>(null);
+  const [carregando, setCarregando] = useState<
+    "google" | "facebook" | "senha" | null
+  >(null);
+  const [email, setEmail] = useState("");
+  const [senha, setSenha] = useState("");
+  const [erroSenha, setErroSenha] = useState<string | null>(null);
   const mensagemErro = error
     ? (MENSAGENS_ERRO[error] ?? "Não foi possível entrar. Tente novamente.")
     : null;
+
+  /**
+   * Entrada por e-mail e senha. Existe para o cliente da VENDA DIRETA: a loja
+   * cria a conta dele e manda uma senha temporária, então ele não tem conta
+   * Google vinculada. Depois do primeiro login o site pede para ele criar a
+   * senha dele.
+   */
+  async function entrarComSenha(e: React.FormEvent) {
+    e.preventDefault();
+    if (carregando) return;
+    setErroSenha(null);
+    setCarregando("senha");
+    try {
+      const res = await signIn("credentials", {
+        email: email.trim(),
+        password: senha,
+        redirect: false,
+      });
+      if (!res || res.error) {
+        setErroSenha("E-mail ou senha incorretos.");
+        setCarregando(null);
+        return;
+      }
+      // Recarrega de verdade: o middleware precisa enxergar o cookie novo.
+      window.location.href = callbackUrl;
+    } catch {
+      setErroSenha("Não foi possível entrar agora. Tente de novo.");
+      setCarregando(null);
+    }
+  }
 
   function entrar(provider: "google" | "facebook") {
     if (carregando) return;
@@ -116,6 +151,70 @@ export default function LoginClient({
               </button>
             )}
           </div>
+
+          {/* Separador + entrada por senha (conta criada pela loja). */}
+          <div className="flex items-center gap-3">
+            <span className="h-px flex-1 bg-gray-200" />
+            <span className="text-[11px] uppercase tracking-wide text-gray-400">
+              ou com e-mail
+            </span>
+            <span className="h-px flex-1 bg-gray-200" />
+          </div>
+
+          <form onSubmit={entrarComSenha} className="space-y-3">
+            <div>
+              <label
+                htmlFor="email"
+                className="block text-xs font-medium text-[#07366A] mb-1"
+              >
+                E-mail
+              </label>
+              <input
+                id="email"
+                type="email"
+                autoComplete="email"
+                value={email}
+                onChange={(ev) => setEmail(ev.target.value)}
+                className="w-full h-11 px-3 rounded-lg border border-gray-300 text-sm focus:outline-none focus:border-[#FF035C] focus:ring-1 focus:ring-[#FF035C]"
+              />
+            </div>
+            <div>
+              <label
+                htmlFor="senha"
+                className="block text-xs font-medium text-[#07366A] mb-1"
+              >
+                Senha
+              </label>
+              <input
+                id="senha"
+                type="password"
+                autoComplete="current-password"
+                value={senha}
+                onChange={(ev) => setSenha(ev.target.value)}
+                className="w-full h-11 px-3 rounded-lg border border-gray-300 text-sm focus:outline-none focus:border-[#FF035C] focus:ring-1 focus:ring-[#FF035C]"
+              />
+            </div>
+
+            {erroSenha && (
+              <p role="alert" className="text-sm text-red-700">
+                {erroSenha}
+              </p>
+            )}
+
+            <button
+              type="submit"
+              disabled={carregando !== null || !email || !senha}
+              className="inline-flex items-center justify-center gap-2 w-full h-11 rounded-lg bg-[#FF035C] text-sm font-semibold text-white hover:brightness-110 disabled:opacity-60 disabled:cursor-not-allowed transition-all"
+            >
+              {carregando === "senha" && (
+                <Loader2 size={18} className="animate-spin" aria-hidden="true" />
+              )}
+              Entrar
+            </button>
+            <p className="text-[11px] text-gray-400">
+              Comprou pelo WhatsApp e recebeu uma senha da loja? Entre por aqui.
+            </p>
+          </form>
 
           <p className="text-xs text-gray-400 leading-relaxed">
             Ao entrar, você concorda em criar uma conta de cliente para acompanhar

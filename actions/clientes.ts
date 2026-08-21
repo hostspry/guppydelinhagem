@@ -1,5 +1,7 @@
 "use server";
 
+import { randomBytes } from "node:crypto";
+import bcrypt from "bcryptjs";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
@@ -171,4 +173,102 @@ export async function deleteCliente(id: string): Promise<ActionResult> {
   });
 
   return { success: true, message: "Cliente excluído." };
+}
+
+// ── Acesso do cliente ao painel (venda direta) ───────────────────────────────
+
+export type AcessoCriado =
+  | { ok: true; email: string; senha: string; recriado: boolean }
+  | { ok: false; error: string };
+
+/** Senha temporária: aleatória, não adivinhável, curta o bastante para digitar. */
+function senhaProvisoria(): string {
+  return randomBytes(6).toString("base64url"); // ~8 caracteres
+}
+
+/**
+ * Cria (ou renova) o acesso do cliente ao painel /minha-conta.
+ *
+ * Existe para a venda direta: o cliente que comprou pelo WhatsApp nunca passou
+ * pelo cadastro do site, então não tem como acompanhar o pedido sozinho. Aqui a
+ * loja cria a conta e entrega a senha.
+ *
+ * A senha volta EM TEXTO uma única vez, para o admin repassar — não fica salva em
+ * lugar nenhum (só o hash) e não entra na auditoria. Nasce com
+ * `senhaPrecisaTroca`, então serve para UM login: na entrada o cliente é obrigado
+ * a definir a dele, e a senha que circulou no WhatsApp morre ali.
+ *
+ * Nunca toca conta da EQUIPE: se o e-mail for de um admin, recusa.
+ */
+export async function criarAcessoCliente(
+  clienteId: string,
+): Promise<AcessoCriado> {
+  const membro = await assertPermissao("clientes.editar");
+
+  const cliente = await prisma.cliente.findUnique({
+    where: { id: clienteId },
+    select: { id: true, nome: true, email: true, userId: true },
+  });
+  if (!cliente) return { ok: false, error: "Cliente não encontrado." };
+  if (!cliente.email) {
+    return {
+      ok: false,
+      error: `${cliente.nome} está sem e-mail no cadastro. O e-mail é o usuário do acesso — preencha antes.`,
+    };
+  }
+  const email = cliente.email.trim().toLowerCase();
+
+  const existente = await prisma.user.findUnique({
+    where: { email },
+    select: { id: true, role: true, nome: true },
+  });
+  if (existente && existente.role !== "CUSTOMER") {
+    return {
+      ok: false,
+      error: `Este e-mail é de um acesso da equipe (${existente.nome}). Não dá para transformar em conta de cliente.`,
+    };
+  }
+
+  const senha = senhaProvisoria();
+  const senhaHash = await bcrypt.hash(senha, 10);
+
+  try {
+    const user = await prisma.user.upsert({
+      where: { email },
+      create: {
+        email,
+        nome: cliente.nome,
+        senhaHash,
+        role: "CUSTOMER",
+        senhaPrecisaTroca: true,
+      },
+      // Já existia (comprou pelo site ou entrou com Google): só renova a senha.
+      // Não mexe no nome — o cliente pode ter corrigido o dele.
+      update: { senhaHash, senhaPrecisaTroca: true },
+      select: { id: true },
+    });
+
+    // Liga este cliente e todos os homônimos por e-mail: é assim que os pedidos
+    // antigos aparecem no painel dele.
+    await prisma.cliente.updateMany({
+      where: { OR: [{ id: cliente.id }, { email, userId: null }] },
+      data: { userId: user.id },
+    });
+  } catch (e) {
+    console.error("[cliente] criar acesso", e);
+    return { ok: false, error: "Não foi possível criar o acesso." };
+  }
+
+  await auditar(membro, {
+    acao: existente ? "cliente.acesso-renovar" : "cliente.acesso-criar",
+    entidade: "Cliente",
+    entidadeId: cliente.id,
+    // A senha NUNCA entra aqui.
+    descricao: existente
+      ? `Gerou nova senha de acesso para ${cliente.nome}`
+      : `Criou acesso ao painel para ${cliente.nome}`,
+  });
+
+  revalidatePath(`/admin/clientes/${cliente.id}/editar`);
+  return { ok: true, email, senha, recriado: !!existente };
 }
