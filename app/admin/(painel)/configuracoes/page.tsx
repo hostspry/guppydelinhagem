@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Ticket } from "lucide-react";
+import { Mail, Ticket } from "lucide-react";
 import { PageHeader } from "@/components/admin/PageHeader";
 import { ConfiguracoesForm } from "@/components/admin/ConfiguracoesForm";
 import { getConfiguracaoLoja } from "@/lib/queries/config";
@@ -20,6 +20,29 @@ export default async function ConfiguracoesPage() {
         ]}
       />
       <ConfiguracoesForm inicial={config} />
+
+      <div className="bg-white border border-gray-200 rounded-lg p-5 max-w-2xl mt-6">
+        <div className="flex items-start gap-3">
+          <div className="w-9 h-9 bg-[#07366A]/10 text-[#07366A] rounded-md flex items-center justify-center shrink-0">
+            <Mail className="w-5 h-5" aria-hidden="true" />
+          </div>
+          <div className="flex-1">
+            <h2 className="text-sm font-semibold text-[#07366A]">
+              Conta de e-mail
+            </h2>
+            <p className="text-sm text-gray-500 mt-0.5">
+              Cadastre o servidor de saída (SMTP) para o site mandar e-mail aos
+              clientes. Dá para testar o envio na própria tela.
+            </p>
+          </div>
+          <Link
+            href="/admin/configuracoes/email"
+            className="shrink-0 inline-flex items-center gap-1.5 border border-gray-300 text-sm font-medium text-gray-700 px-4 py-2 rounded-md hover:border-gray-400 transition-all"
+          >
+            Configurar e-mail
+          </Link>
+        </div>
+      </div>
 
       <div className="bg-white border border-gray-200 rounded-lg p-5 max-w-2xl mt-6">
         <div className="flex items-start gap-3">

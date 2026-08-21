@@ -581,6 +581,40 @@ model HeroSettings {
 
 // Configurações globais da loja (singleton: 1 linha, id "default"). Enxuto —
 // começa só com o desconto Pix global; vamos reaproveitar para outras configs.
+/// Como o servidor de e-mail espera a conexão. STARTTLS é a porta 587 (conexão
+/// limpa que vira TLS); SSL é a 465 (TLS desde o primeiro byte).
+enum SegurancaSmtp {
+  STARTTLS
+  SSL
+  NENHUMA
+}
+
+/// Conta de e-mail que o site usa para enviar (singleton, cadastrada no admin).
+///
+/// A senha fica CRIPTOGRAFADA (AES-256-GCM, chave derivada do AUTH_SECRET) e não
+/// volta para a tela em momento nenhum — o SMTP precisa dela em texto na hora do
+/// envio, então hash não serve, mas um dump do banco sozinho não a revela.
+model ConfiguracaoEmail {
+  id       String        @id @default("default")
+  ativo    Boolean       @default(false) // desligado = site não tenta enviar nada
+  host     String
+  porta    Int           @default(587)
+  seguranca SegurancaSmtp @default(STARTTLS)
+  usuario  String
+  senhaCriptografada String
+
+  remetenteNome  String // o que aparece como nome do remetente
+  remetenteEmail String // precisa ser um endereço que o servidor autorize
+  responderPara  String? // Reply-To, quando as respostas vão para outro endereço
+
+  // Resultado do último teste — o admin vê se a conta está mesmo funcionando.
+  ultimoTesteEm   DateTime?
+  ultimoTesteOk   Boolean?
+  ultimoTesteErro String?
+
+  atualizadoEm DateTime @updatedAt
+}
+
 model ConfiguracaoLoja {
   id                       String   @id @default("default")
   descontoPixGlobalPercent Int      @default(0) // 0–100, aplicado a produtos com usarDescontoPixGlobal
