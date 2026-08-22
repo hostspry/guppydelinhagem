@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CreditCard, Mail, Store, Truck } from "lucide-react";
+import { CreditCard, Mail, MessageSquareText, Store, Truck } from "lucide-react";
 
 /**
  * Abas de Configurações. Links de verdade (uma rota por assunto), não estado
@@ -14,6 +14,11 @@ const ABAS = [
   { href: "/admin/configuracoes/pagamentos", label: "Pagamentos", icon: CreditCard },
   { href: "/admin/configuracoes/entrega", label: "Entrega", icon: Truck },
   { href: "/admin/configuracoes/email", label: "E-mail", icon: Mail },
+  {
+    href: "/admin/configuracoes/mensagens",
+    label: "Mensagens",
+    icon: MessageSquareText,
+  },
 ];
 
 export function ConfigTabs() {

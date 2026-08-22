@@ -581,6 +581,21 @@ model HeroSettings {
 
 // Configurações globais da loja (singleton: 1 linha, id "default"). Enxuto —
 // começa só com o desconto Pix global; vamos reaproveitar para outras configs.
+/// Texto de um e-mail automático, editável no painel.
+///
+/// A chave é string (não enum) de propósito: acrescentar uma mensagem nova não
+/// deve exigir migration. O que o código garante é o CATÁLOGO em
+/// lib/emails/catalogo.ts — chave desconhecida no banco é simplesmente ignorada,
+/// e chave do catálogo sem linha no banco usa o texto padrão.
+model TemplateEmail {
+  chave        String   @id
+  assunto      String
+  titulo       String
+  corpo        String
+  ativo        Boolean  @default(true) // desligado = esse aviso não é enviado
+  atualizadoEm DateTime @updatedAt
+}
+
 /// Como o servidor de e-mail espera a conexão. STARTTLS é a porta 587 (conexão
 /// limpa que vira TLS); SSL é a 465 (TLS desde o primeiro byte).
 enum SegurancaSmtp {

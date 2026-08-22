@@ -4,23 +4,18 @@ import { enviarEmail } from "@/lib/email";
 import { buildTrackingUrl, transportadoraLabel } from "@/lib/tracking";
 import type { Transportadora } from "@/lib/generated/prisma/enums";
 import type { EnderecoEntrega } from "@/lib/validations/pedido";
-import {
-  botao,
-  destaque,
-  esc,
-  h1,
-  layoutEmail,
-  listaItens,
-  moeda,
-  p,
-} from "./layout";
+import { botao, destaque, listaItens, moeda } from "./layout";
+import { montarEmail } from "./render";
 
 /**
  * E-mails do ciclo do pedido para o CLIENTE.
  *
  * Complemento das notificações do Telegram (aquelas avisam a loja; estas avisam
- * quem comprou). Nada aqui pode derrubar o fluxo: sem conta de e-mail cadastrada
- * ou sem e-mail no cliente, a função simplesmente não faz nada e devolve false.
+ * quem comprou). O TEXTO vem do painel (Configurações → Mensagens); aqui ficam
+ * só os dados e os blocos visuais que o texto pode encaixar.
+ *
+ * Nada aqui derruba o fluxo: sem conta de e-mail, sem e-mail no cliente ou com a
+ * mensagem desligada no painel, a função devolve false e a vida segue.
  */
 
 const SITE = "https://www.guppydelinhagem.com.br";
@@ -86,37 +81,28 @@ export async function emailPedidoPago(orderId: string): Promise<boolean> {
   const d = await carregar(orderId);
   if (!d?.email) return false;
 
-  const oi = esc(primeiroNome(d.nome));
-  const conteudo = d.ehCobranca
-    ? h1("Pagamento confirmado") +
-      p(`Oi ${oi}, recebi seu pagamento de <strong>${moeda(d.total)}</strong>. Obrigado!`) +
-      p(`Qualquer coisa, é só responder este e-mail.`)
-    : h1("Pagamento confirmado!") +
-      p(`Oi ${oi}, seu pagamento entrou e o pedido <strong>${esc(d.numero)}</strong> já está na fila de separação.`) +
-      listaItens(d.itens) +
-      p(`Total: <strong>${moeda(d.total)}</strong>`) +
-      (d.tipoEntrega === "RETIRADA"
-        ? p(
-            `Como você escolheu retirar pessoalmente, é só combinar o horário comigo pelo WhatsApp.`,
-          )
-        : p(
-            `Assim que eu despachar, te mando o código de rastreio por aqui. Peixe vivo eu separo com calma e embalo com oxigênio no mesmo dia do envio.`,
-          )) +
-      botao("Acompanhar meu pedido", `${SITE}/minha-conta/pedidos`);
+  const chave = d.ehCobranca
+    ? "cobranca-paga"
+    : d.tipoEntrega === "RETIRADA"
+      ? "pedido-pago-retirada"
+      : "pedido-pago";
 
-  return enviarEmail({
-    para: d.email,
-    assunto: d.ehCobranca
-      ? "Pagamento confirmado — Guppy de Linhagem"
-      : `Pagamento confirmado — pedido ${d.numero}`,
-    html: layoutEmail({
-      titulo: "Pagamento confirmado",
-      preheader: d.ehCobranca
-        ? `Recebi seu pagamento de ${moeda(d.total)}.`
-        : `Pedido ${d.numero} pago. Já vou separar.`,
-      conteudo,
-    }),
-  });
+  const email = await montarEmail(
+    chave,
+    {
+      nome: primeiroNome(d.nome),
+      numero: d.numero,
+      total: moeda(d.total),
+      itens: listaItens(d.itens),
+      botao_acompanhar: botao("Acompanhar meu pedido", `${SITE}/minha-conta/pedidos`),
+    },
+    d.ehCobranca
+      ? `Recebi seu pagamento de ${moeda(d.total)}.`
+      : `Pedido ${d.numero} pago. Já vou separar.`,
+  );
+  if (!email) return false;
+
+  return enviarEmail({ para: d.email, assunto: email.assunto, html: email.html });
 }
 
 /** Pedido despachado, com o código de rastreio quando existe. */
@@ -128,25 +114,22 @@ export async function emailPedidoEnviado(orderId: string): Promise<boolean> {
   const url = buildTrackingUrl(d.selfTracking, d.codigoRastreio);
   const transp = d.transportadora ? transportadoraLabel(d.transportadora) : null;
 
-  const conteudo =
-    h1("Seu pedido saiu para entrega") +
-    p(`Oi ${esc(primeiroNome(d.nome))}, o pedido <strong>${esc(d.numero)}</strong> foi despachado${transp ? ` pela ${esc(transp)}` : ""}.`) +
-    (codigo ? destaque("Código de rastreio", codigo) : "") +
-    (url ? botao("Rastrear entrega", url) : "") +
-    p(
-      `Peixe viaja embalado com oxigênio. Quando chegar, deixe o saquinho fechado boiando no aquário por uns 20 minutos antes de abrir, para a temperatura igualar.`,
-    ) +
-    p(`Qualquer coisa no caminho, me chama no WhatsApp.`);
+  const email = await montarEmail(
+    "pedido-enviado",
+    {
+      nome: primeiroNome(d.nome),
+      numero: d.numero,
+      // Sai por extenso na frase; vazio quando não há transportadora definida.
+      transportadora: transp ? `pela ${transp}` : "",
+      rastreio: codigo ?? "",
+      caixa_rastreio: codigo ? destaque("Código de rastreio", codigo) : "",
+      botao_rastrear: url ? botao("Rastrear entrega", url) : "",
+    },
+    codigo ? `Código de rastreio: ${codigo}` : `Pedido ${d.numero} despachado.`,
+  );
+  if (!email) return false;
 
-  return enviarEmail({
-    para: d.email,
-    assunto: `Pedido ${d.numero} enviado${codigo ? ` — rastreio ${codigo}` : ""}`,
-    html: layoutEmail({
-      titulo: "Pedido enviado",
-      preheader: codigo
-        ? `Código de rastreio: ${codigo}`
-        : `Pedido ${d.numero} despachado.`,
-      conteudo,
-    }),
-  });
+  // O código no assunto ajuda quem procura o e-mail depois.
+  const assunto = codigo ? `${email.assunto} — rastreio ${codigo}` : email.assunto;
+  return enviarEmail({ para: d.email, assunto, html: email.html });
 }
