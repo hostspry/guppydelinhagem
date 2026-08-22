@@ -103,6 +103,9 @@ const cspValue = [
 ].join("; ");
 
 const nextConfig: NextConfig = {
+  // Não anunciar a stack: "X-Powered-By: Next.js" é dica de graça para quem
+  // varre a internet procurando versão vulnerável.
+  poweredByHeader: false,
   output: "standalone",
   images: {
     remotePatterns: [
@@ -162,13 +165,36 @@ const nextConfig: NextConfig = {
             key: "Content-Security-Policy",
             value: cspValue,
           },
-          // HSTS — HABILITAR após confirmar HTTPS forçado no proxy (Traefik/Let's
-          // Encrypt) para TODAS as rotas, inclusive /admin. Antes disso pode
-          // travar o acesso. Pendente de confirmação de infra.
-          // {
-          //   key: "Strict-Transport-Security",
-          //   value: "max-age=63072000; includeSubDomains; preload",
-          // },
+          // HSTS LIGADO. A pendência era confirmar HTTPS forçado em todas as
+          // rotas: conferido em /, /loja, /admin, /admin/login e /api/health,
+          // apex e www — todas redirecionam 302 para https. Os dois subdomínios
+          // em uso (www e media) servem HTTPS, então includeSubDomains é seguro.
+          //
+          // SEM `preload` de propósito: entrar na lista dos navegadores exige
+          // submissão manual e sair dela leva meses. Dois anos de max-age já
+          // resolvem o ataque real (o primeiro acesso numa rede hostil).
+          {
+            key: "Strict-Transport-Security",
+            value: "max-age=63072000; includeSubDomains",
+          },
+          // Impede o navegador de "adivinhar" o tipo do arquivo: um upload que
+          // finge ser imagem não vira HTML executável.
+          {
+            key: "X-Content-Type-Options",
+            value: "nosniff",
+          },
+          // Não vaza a URL interna (com token de cobrança, por exemplo) no
+          // Referer ao clicar para fora. Mesma origem continua completa.
+          {
+            key: "Referrer-Policy",
+            value: "strict-origin-when-cross-origin",
+          },
+          // O site não usa câmera, microfone nem localização. Negar explícito
+          // impede que um script de terceiro peça em nome do domínio.
+          {
+            key: "Permissions-Policy",
+            value: "camera=(), microphone=(), geolocation=(), interest-cohort=()",
+          },
         ],
       },
     ];
