@@ -1,6 +1,6 @@
 "use client";
 
-import { useTransition } from "react";
+import { useTransition, useMemo } from "react";
 import { useForm, useFieldArray, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import Link from "next/link";
 import { Plus, Trash2 } from "lucide-react";
 import { FormField } from "./FormField";
+import { semanasDisponiveis, chaveSemana, rotuloSemana, segundaDaSemana } from "@/lib/semana-envio";
 import { pedidoSchema, type PedidoInput } from "@/lib/validations/pedido";
 import { createPedido, updatePedido } from "@/actions/pedidos";
 import { formatBRL } from "@/lib/utils/format";
@@ -49,6 +50,7 @@ export type PedidoInicial = {
   formaPagamento: string;
   transportadora: string;
   observacoes: string;
+  semanaEnvio: string;
 };
 
 const FORMA_PAGAMENTO = [
@@ -77,6 +79,15 @@ const ITEM_VAZIO: ItemInicial = {
   qtdFemeas: null,
 };
 
+/** Semanas para o admin: da atual em diante (a venda avulsa costuma sair já). */
+function semanasParaAdmin() {
+  const atual = segundaDaSemana(new Date());
+  return [
+    { chave: chaveSemana(atual), rotulo: `${rotuloSemana(atual)} (esta semana)` },
+    ...semanasDisponiveis(),
+  ];
+}
+
 export function PedidoForm({
   clientes,
   produtos,
@@ -86,6 +97,7 @@ export function PedidoForm({
   produtos: FormProduto[];
   initialData?: PedidoInicial;
 }) {
+  const semanasAdmin = useMemo(() => semanasParaAdmin(), []);
   const [isPending, startTransition] = useTransition();
 
   const {
@@ -105,6 +117,7 @@ export function PedidoForm({
           formaPagamento: initialData.formaPagamento,
           transportadora: initialData.transportadora,
           observacoes: initialData.observacoes,
+          semanaEnvio: initialData.semanaEnvio ?? "",
         }
       : {
           clienteId: "",
@@ -114,6 +127,7 @@ export function PedidoForm({
           formaPagamento: "",
           transportadora: "",
           observacoes: "",
+          semanaEnvio: "",
         },
   });
 
@@ -182,6 +196,7 @@ export function PedidoForm({
     fd.append("formaPagamento", data.formaPagamento ?? "");
     fd.append("transportadora", data.transportadora ?? "");
     fd.append("observacoes", data.observacoes ?? "");
+    fd.append("semanaEnvio", data.semanaEnvio ?? "");
 
     startTransition(async () => {
       const result = initialData
@@ -428,6 +443,24 @@ export function PedidoForm({
             </select>
           </FormField>
         </div>
+
+        {/* Semana do envio: é o que faz o resumo do Telegram lembrar a loja na
+            hora certa. Aqui a lista começa na semana ATUAL — venda avulsa muitas
+            vezes sai nos próximos dias. */}
+        <FormField
+          label="Semana do envio"
+          name="semanaEnvio"
+          hint="Quando você pretende despachar. Entra no lembrete semanal do Telegram."
+        >
+          <select id="semanaEnvio" {...register("semanaEnvio")} className={input}>
+            <option value="">Sem data definida</option>
+            {semanasAdmin.map((s) => (
+              <option key={s.chave} value={s.chave}>
+                Semana de {s.rotulo}
+              </option>
+            ))}
+          </select>
+        </FormField>
 
         <FormField label="Observações" name="observacoes">
           <textarea

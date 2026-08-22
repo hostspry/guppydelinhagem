@@ -45,6 +45,12 @@ export const checkoutBaseSchema = z.object({
   // Modalidade escolhida pelo cliente: terrestre (Jadlog) ou aéreo (Gollog). O
   // valor é sempre recalculado no servidor conforme a modalidade.
   modalidadeFrete: z.enum(["TERRESTRE", "AEREO"]).default("TERRESTRE"),
+  // Semana que o cliente prefere receber (segunda-feira, "AAAA-MM-DD"). Vazio =
+  // "assim que estiver pronto". O servidor confere se está na janela oferecida.
+  semanaEnvio: z
+    .union([z.string().regex(/^\d{4}-\d{2}-\d{2}$/), z.literal("")])
+    .optional()
+    .default(""),
   // Código de cupom aplicado no carrinho (opcional). O desconto é SEMPRE revalidado
   // e recalculado no servidor — o valor do client é ignorado.
   cupomCodigo: z.string().trim().optional().default(""),

@@ -46,6 +46,7 @@ import {
   Transportadora,
 } from "@/lib/generated/prisma/enums";
 import type { Prisma, OrderStatus } from "@/lib/generated/prisma/client";
+import { semanaDaChave, semanasDisponiveis } from "@/lib/semana-envio";
 
 const TETO_PARCELAS = 12;
 
@@ -799,6 +800,18 @@ export async function criarOrderDoCheckout(
     cupomCodigo: descItens[i].cupomCodigo,
   }));
 
+  // Semana pedida para o envio. Só aceita uma das que o site OFERECE — a lista
+  // é recalculada aqui, então mexer no HTML não consegue marcar uma semana fora
+  // da janela (nem uma que já passou). Na retirada não faz sentido: o cliente
+  // combina a hora pelo WhatsApp.
+  const semanaEnvio = (() => {
+    if (data.tipoEntrega === "RETIRADA") return null;
+    const escolhida = (data.semanaEnvio ?? "").trim();
+    if (!escolhida) return null;
+    const validas = new Set(semanasDisponiveis().map((o) => o.chave));
+    return validas.has(escolhida) ? semanaDaChave(escolhida) : null;
+  })();
+
   // Desconto do pedido (por item, base cartão e Pix) — calculado já aqui pois o
   // frete grátis incide sobre o subtotal EFETIVO do cartão.
   const descontoCartao = round2(
@@ -1033,6 +1046,7 @@ export async function criarOrderDoCheckout(
             cupomId,
             cupomCodigo,
             total: totalCheio,
+            semanaEnvio,
             // Recria os itens para refletir os descontos por item recalculados.
             items: { deleteMany: {}, create: itensData },
           },
@@ -1063,6 +1077,7 @@ export async function criarOrderDoCheckout(
           tipoEntrega: data.tipoEntrega,
           transportadora,
           modalidadeFrete: modalidade,
+          semanaEnvio,
           enderecoEntrega: endereco as unknown as Prisma.InputJsonValue,
           subtotal: subtotalCheio,
           frete,

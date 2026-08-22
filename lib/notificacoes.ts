@@ -12,6 +12,7 @@ import type {
   ProviderPagamento,
 } from "@/lib/generated/prisma/enums";
 import { emailPedidoPago, emailPedidoEnviado } from "@/lib/emails/pedido";
+import { rotuloSemana, segundaDaSemana } from "@/lib/semana-envio";
 
 // Camada de eventos semânticos do ciclo do pedido. Os pontos de disparo (checkout,
 // webhooks, actions) chamam estes eventos — não montam texto. Um lugar só para
@@ -45,6 +46,7 @@ type PedidoNotif = {
   codigoRastreio: string | null;
   endereco: Partial<EnderecoEntrega>;
   itens: { nome: string; qtd: number }[];
+  semanaEnvio: Date | null;
 };
 
 async function carregar(orderId: string): Promise<PedidoNotif | null> {
@@ -58,6 +60,7 @@ async function carregar(orderId: string): Promise<PedidoNotif | null> {
         transportadora: true,
         codigoRastreio: true,
         enderecoEntrega: true,
+        semanaEnvio: true,
         cliente: { select: { nome: true } },
         items: { select: { nomeProduto: true, quantidade: true } },
       },
@@ -75,6 +78,7 @@ async function carregar(orderId: string): Promise<PedidoNotif | null> {
       codigoRastreio: o.codigoRastreio,
       endereco: (o.enderecoEntrega ?? {}) as Partial<EnderecoEntrega>,
       itens: o.items.map((i) => ({ nome: i.nomeProduto, qtd: i.quantidade })),
+      semanaEnvio: o.semanaEnvio,
     };
   } catch (e) {
     console.error("[notificacoes] carregar pedido", e);
@@ -183,7 +187,8 @@ export async function notificarPedidoPago(
       `<b>${escapeHtml(p.numero)}</b> — ${escapeHtml(p.clienteNome)}\n` +
       `${linhasItens(p.itens)}\n` +
       `Total: <b>${formatBRL(p.total)}</b>${linhaPag}\n\n` +
-      `📦 <b>Separar para envio:</b> ${destino(p.endereco)}\n` +
+      `📦 <b>Separar para envio:</b> ${destino(p.endereco)}${p.semanaEnvio ? `
+📅 <b>Cliente pediu:</b> semana de ${rotuloSemana(p.semanaEnvio)}` : ""}\n` +
       `Ver no admin: ${LINK_ADMIN}`,
   );
 }
@@ -339,11 +344,26 @@ function destinoDoPedido(p: PedidoEnvio): string {
 }
 
 // Linha de pedido para as seções de despacho (com alerta de parado > 7 dias).
+/**
+ * Como a semana pedida entra na linha do pedido:
+ *  - é ESTA semana → 🎯, é o que a loja precisa despachar agora;
+ *  - já passou → ⏰ com a semana, porque virou dívida com o cliente;
+ *  - é futura → aparece discreta, só para não separar antes da hora.
+ */
+function marcaSemana(semana: Date | null, agora: number): string {
+  if (!semana) return "";
+  const dela = segundaDaSemana(semana).getTime();
+  const atual = segundaDaSemana(new Date(agora)).getTime();
+  if (dela === atual) return " · 🎯 pediu esta semana";
+  if (dela < atual) return ` · ⏰ pediu ${rotuloSemana(semana)}`;
+  return ` · 📅 ${rotuloSemana(semana)}`;
+}
+
 function linhaEnvio(p: PedidoEnvio, agora: number): string {
   const atrasado = agora - p.pagoEm.getTime() > UMA_SEMANA_MS ? " ⚠️" : "";
   return (
     `• <b>${escapeHtml(p.numero)}</b> — ${escapeHtml(p.clienteNome)} · ` +
-    `${destinoDoPedido(p)} · ${peixesDoPedido(p)} peixes${atrasado}`
+    `${destinoDoPedido(p)} · ${peixesDoPedido(p)} peixes${marcaSemana(p.semanaEnvio, agora)}${atrasado}`
   );
 }
 

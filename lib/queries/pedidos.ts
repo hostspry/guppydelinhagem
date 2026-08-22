@@ -138,6 +138,8 @@ export type PedidoEnvio = {
   // "Pago em": criadoEm do Pagamento PAGO (estável); fallback atualizadoEm do
   // pedido. Base do alerta de pedido parado há > 7 dias.
   pagoEm: Date;
+  /** Semana que o cliente pediu (ou que a loja combinou). null = sem data. */
+  semanaEnvio: Date | null;
 };
 
 /**
@@ -157,6 +159,7 @@ export async function listPedidosAguardandoEnvio(): Promise<PedidoEnvio[]> {
       modalidadeFrete: true,
       enderecoEntrega: true,
       atualizadoEm: true,
+      semanaEnvio: true,
       cliente: { select: { nome: true } },
       items: { select: { nomeProduto: true, quantidade: true } },
       pagamentos: {
@@ -185,6 +188,7 @@ export async function listPedidosAguardandoEnvio(): Promise<PedidoEnvio[]> {
       uf: e.uf ?? null,
       itens: o.items.map((i) => ({ nome: i.nomeProduto, qtd: i.quantidade })),
       pagoEm: o.pagamentos[0]?.criadoEm ?? o.atualizadoEm,
+      semanaEnvio: o.semanaEnvio,
     };
   });
 }
@@ -226,6 +230,7 @@ export async function getPedidoById(id: string) {
     etiquetaUrl: p.etiquetaUrl,
     enviadoEm: p.enviadoEm,
     observacoes: p.observacoes,
+    semanaEnvio: p.semanaEnvio,
     clienteId: p.clienteId,
     clienteNome: p.cliente.nome,
     clienteEmail: p.cliente.email,

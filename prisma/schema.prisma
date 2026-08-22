@@ -412,6 +412,12 @@ model Order {
   // Cobrança avulsa (tipo = COBRANCA). publicToken é o segredo do link que vai
   // pro cliente (numero é sequencial, logo adivinhável — nunca serve de link).
   // expiraEm fecha o link; maxParcelas limita o parcelamento no gateway.
+  /// Semana em que o cliente PEDIU para receber (segunda-feira, meio-dia UTC).
+  /// É um desejo, não um compromisso: a loja tenta encaixar. Nulo = "assim que
+  /// estiver pronto". Também é preenchido na venda avulsa, para o resumo do
+  /// Telegram lembrar a loja na semana certa.
+  semanaEnvio DateTime?
+
   publicToken String?   @unique
   expiraEm    DateTime?
   maxParcelas Int?
@@ -437,6 +443,7 @@ model Order {
   @@index([clienteId])
   @@index([status])
   @@index([tipo])
+  @@index([semanaEnvio])
 }
 
 // Histórico de rastreio de um pedido (uma linha por ocorrência do Melhor Envio).

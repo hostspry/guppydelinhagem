@@ -54,6 +54,13 @@ export const pedidoSchema = z.object({
     z.enum(Transportadora).optional(),
   ),
   observacoes: z.string().optional().or(z.literal("")),
+  // Semana combinada para o envio (segunda-feira, "AAAA-MM-DD"). Aqui é a LOJA
+  // que informa, então aceita qualquer semana — inclusive a atual, que é o caso
+  // comum de "vou mandar essa semana".
+  semanaEnvio: z
+    .union([z.string().regex(/^\d{4}-\d{2}-\d{2}$/), z.literal("")])
+    .optional()
+    .default(""),
 });
 
 export type PedidoInput = z.infer<typeof pedidoSchema>;

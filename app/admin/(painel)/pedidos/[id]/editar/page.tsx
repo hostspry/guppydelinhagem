@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/admin/PageHeader";
 import { PedidoForm } from "@/components/admin/PedidoForm";
+import { chaveSemana } from "@/lib/semana-envio";
 import { getPedidoById, getPedidoFormData } from "@/lib/queries/pedidos";
 import { podeEditarItens } from "@/lib/pedido-status";
 
@@ -48,6 +49,7 @@ export default async function EditarPedidoPage({ params }: Props) {
             formaPagamento: pedido.formaPagamento ?? "",
             transportadora: pedido.transportadora ?? "",
             observacoes: pedido.observacoes ?? "",
+          semanaEnvio: pedido.semanaEnvio ? chaveSemana(pedido.semanaEnvio) : "",
           }}
         />
       ) : (

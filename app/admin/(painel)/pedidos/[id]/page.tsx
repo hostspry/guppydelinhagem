@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/admin/PageHeader";
 import { StatusPedidoControl } from "@/components/admin/StatusPedidoControl";
 import { EnvioCard } from "@/components/admin/EnvioCard";
 import { AcessoCliente } from "@/components/admin/AcessoCliente";
+import { rotuloSemana, semanaVencida } from "@/lib/semana-envio";
 import { EstornarButton } from "@/components/admin/EstornarButton";
 import { podeEditarItens } from "@/lib/pedido-status";
 import {
@@ -186,6 +187,22 @@ export default async function PedidoDetalhePage({ params }: Props) {
             <h2 className="text-xs font-semibold text-[#07366A] uppercase tracking-wide mb-2">
               Entrega &amp; pagamento
             </h2>
+            {pedido.semanaEnvio && (
+              <p className="text-gray-600">
+                Semana pedida:{" "}
+                <span
+                  className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                    semanaVencida(pedido.semanaEnvio) &&
+                    pedido.status !== "ENVIADO" &&
+                    pedido.status !== "ENTREGUE"
+                      ? "bg-amber-50 text-amber-700"
+                      : "bg-blue-50 text-blue-700"
+                  }`}
+                >
+                  {rotuloSemana(pedido.semanaEnvio)}
+                </span>
+              </p>
+            )}
             <p className="text-gray-600">
               Entrega:{" "}
               <span

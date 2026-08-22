@@ -31,6 +31,7 @@ import type {
 } from "@/lib/generated/prisma/client";
 import { assertPermissao } from "@/lib/permissoes-server";
 import { auditar } from "@/lib/auditoria";
+import { semanaDaChave } from "@/lib/semana-envio";
 import {
   checarDescontoDoPedido,
   checarLimiteValor,
@@ -189,6 +190,7 @@ export async function createPedido(formData: FormData): Promise<ActionResult> {
           formaPagamento: data.formaPagamento ?? null,
           transportadora: data.transportadora ?? null,
           observacoes: nullify(data.observacoes ?? null),
+          semanaEnvio: semanaDaChave(data.semanaEnvio ?? ""),
           enderecoEntrega: endereco as unknown as Prisma.InputJsonValue,
           subtotal,
           frete: data.frete,
@@ -265,6 +267,7 @@ export async function updatePedido(
           formaPagamento: data.formaPagamento ?? null,
           transportadora: data.transportadora ?? null,
           observacoes: nullify(data.observacoes ?? null),
+          semanaEnvio: semanaDaChave(data.semanaEnvio ?? ""),
           enderecoEntrega: endereco as unknown as Prisma.InputJsonValue,
           subtotal,
           frete: data.frete,

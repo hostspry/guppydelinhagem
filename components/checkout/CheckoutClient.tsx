@@ -57,6 +57,7 @@ import PixPanel from "@/components/checkout/PixPanel";
 import CardPaymentBrick from "@/components/checkout/CardPaymentBrick";
 import ThreeDsChallenge from "@/components/checkout/ThreeDsChallenge";
 import { carregarDeviceMp } from "@/lib/mp-device";
+import { semanasDisponiveis } from "@/lib/semana-envio";
 
 export type CheckoutPrefill = {
   nome: string;
@@ -262,6 +263,10 @@ export default function CheckoutClient({
   // Tipo de entrega: ENVIO (despacha) | RETIRADA (cliente busca, frete 0). Sincroniza
   // no RHF para o refine do schema dispensar o endereço na retirada.
   const [tipoEntrega, setTipoEntrega] = useState<"ENVIO" | "RETIRADA">("ENVIO");
+  // Semana que o cliente prefere receber. "" = assim que estiver pronto.
+  const [semanaEnvio, setSemanaEnvio] = useState("");
+  // Calculado uma vez por render do componente: a lista não muda durante a compra.
+  const semanas = useMemo(() => semanasDisponiveis(), []);
   const isRetirada = tipoEntrega === "RETIRADA";
   function escolherEntrega(tipo: "ENVIO" | "RETIRADA") {
     setTipoEntrega(tipo);
@@ -538,6 +543,7 @@ export default function CheckoutClient({
         tipoEntrega,
         transportadora: modalidade === "AEREO" ? "GOLLOG" : "JADLOG",
         modalidadeFrete: modalidade,
+        semanaEnvio,
         cupomCodigo: cupom ?? "",
         itens: itensPedido(),
       });
@@ -585,6 +591,7 @@ export default function CheckoutClient({
         tipoEntrega,
         transportadora: modalidade === "AEREO" ? "GOLLOG" : "JADLOG",
         modalidadeFrete: modalidade,
+        semanaEnvio,
         cupomCodigo: cupom ?? "",
         itens: itensPedido(),
       },
@@ -666,6 +673,7 @@ export default function CheckoutClient({
         tipoEntrega,
         transportadora: modalidade === "AEREO" ? "GOLLOG" : "JADLOG",
         modalidadeFrete: modalidade,
+        semanaEnvio,
         cupomCodigo: cupom ?? "",
         itens: itensPedido(),
       });
@@ -703,6 +711,7 @@ export default function CheckoutClient({
         tipoEntrega,
         transportadora: modalidade === "AEREO" ? "GOLLOG" : "JADLOG",
         modalidadeFrete: modalidade,
+        semanaEnvio,
         cupomCodigo: cupom ?? "",
         itens: itensPedido(),
       });
@@ -1152,11 +1161,42 @@ export default function CheckoutClient({
                       {frete.endereco.uf ? ` - ${frete.endereco.uf}` : ""}
                     </p>
                   )}
+
                 </fieldset>
               )}
             </div>
             </>
             )}
+
+            {/* Semana preferida fica FORA do bloco de cotação: se o frete falhar
+                ou o cliente ainda não tiver calculado, a escolha continua à
+                mostra. É um pedido, não uma data fechada — o texto diz isso. */}
+            <div className="border-t border-border pt-4">
+              <label
+                htmlFor="semanaEnvio"
+                className="block text-xs font-medium text-primary mb-1"
+              >
+                Prefere receber em alguma semana?
+              </label>
+              <select
+                id="semanaEnvio"
+                value={semanaEnvio}
+                onChange={(e) => setSemanaEnvio(e.target.value)}
+                className="w-full h-11 px-3 rounded-lg border border-border text-sm bg-white focus:outline-none focus:border-secondary focus:ring-1 focus:ring-secondary"
+              >
+                <option value="">Assim que estiver pronto</option>
+                {semanas.map((s) => (
+                  <option key={s.chave} value={s.chave}>
+                    Semana de {s.rotulo}
+                  </option>
+                ))}
+              </select>
+              <p className="text-[11px] text-muted-foreground mt-1.5 leading-snug">
+                A gente tenta encaixar na semana que você escolher. Peixe vivo só
+                viaja quando está pronto e o tempo ajuda, então isso é um pedido,
+                não uma data fechada.
+              </p>
+            </div>
           </section>
 
           {/* ── Seção 3 — Endereço de entrega (envio; some na retirada) ── */}
