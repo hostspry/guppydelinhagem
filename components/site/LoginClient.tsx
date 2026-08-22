@@ -211,9 +211,17 @@ export default function LoginClient({
               )}
               Entrar
             </button>
-            <p className="text-[11px] text-gray-400">
-              Comprou pelo WhatsApp e recebeu uma senha da loja? Entre por aqui.
-            </p>
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-[11px] text-gray-400">
+                Comprou pelo WhatsApp e recebeu uma senha da loja? Entre por aqui.
+              </p>
+              <Link
+                href="/esqueci-senha"
+                className="shrink-0 text-[11px] text-[#FF035C] hover:underline"
+              >
+                Esqueci a senha
+              </Link>
+            </div>
           </form>
 
           <p className="text-xs text-gray-400 leading-relaxed">

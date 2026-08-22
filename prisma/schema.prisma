@@ -166,6 +166,7 @@ model User {
   cliente      Cliente?
   notificacoes Notificacao[]
   accounts     Account[]
+  tokensSenha  TokenSenha[]
   lancamentos  Lancamento[]
   auditorias   AuditoriaAdmin[]
   visitas      Visitante[]
@@ -581,6 +582,24 @@ model HeroSettings {
 
 // Configurações globais da loja (singleton: 1 linha, id "default"). Enxuto —
 // começa só com o desconto Pix global; vamos reaproveitar para outras configs.
+/// Pedido de "esqueci minha senha".
+///
+/// Guarda o HASH do token, nunca ele: com o hash, um vazamento do banco não
+/// permite redefinir a senha de ninguém. Uso único (usadoEm) e vida curta
+/// (expiraEm) — link antigo no histórico do e-mail não vale mais nada.
+model TokenSenha {
+  id        String    @id @default(cuid())
+  tokenHash String    @unique
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiraEm  DateTime
+  usadoEm   DateTime?
+  criadoEm  DateTime  @default(now())
+
+  @@index([userId])
+  @@index([expiraEm])
+}
+
 /// Texto de um e-mail automático, editável no painel.
 ///
 /// A chave é string (não enum) de propósito: acrescentar uma mensagem nova não

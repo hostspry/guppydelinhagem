@@ -110,6 +110,21 @@ export const TEMPLATES: TemplateDef[] = [
     ],
   },
   {
+    chave: "recuperar-senha",
+    rotulo: "Recuperar senha",
+    quando: "Sai quando o cliente pede uma nova senha na tela de login.",
+    variaveis: [
+      VAR_NOME,
+      { nome: "validade", descricao: "Por quanto tempo o link vale (ex.: 1 hora)" },
+      {
+        nome: "botao_redefinir",
+        descricao: "Botão “Criar nova senha”",
+        bloco: true,
+      },
+      { nome: "link", descricao: "Endereço do link, em texto" },
+    ],
+  },
+  {
     chave: "cobranca-paga",
     rotulo: "Cobrança paga",
     quando: "Sai quando uma cobrança avulsa (link de pagamento) é paga.",
