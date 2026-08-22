@@ -23,10 +23,13 @@ const STATUS_PAGO = ["PAGO", "ENVIADO", "ENTREGUE"];
 
 export default async function SucessoPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ numero: string }>;
+  searchParams: Promise<{ t?: string }>;
 }) {
   const { numero: raw } = await params;
+  const { t } = await searchParams;
   // Rota usa o número sem o "#"; o banco guarda "#2026-0001".
   const numero = `#${decodeURIComponent(raw).replace(/^#/, "")}`;
 
@@ -38,6 +41,7 @@ export default async function SucessoPage({
       total: true,
       frete: true,
       transportadora: true,
+      publicToken: true,
       items: {
         select: {
           id: true,
@@ -51,6 +55,17 @@ export default async function SucessoPage({
   });
 
   if (!order) notFound();
+
+  /**
+   * O número do pedido é sequencial, então qualquer um chuta #2026-0011 e cai
+   * aqui. Sem o token do link, a página mostra só o ANDAMENTO — nada de itens
+   * nem valores, que juntos revelariam a operação inteira da loja a quem
+   * percorresse a sequência.
+   *
+   * Pedido antigo (sem token gravado) segue aberto: quebrar um link que já foi
+   * mandado ao cliente seria pior do que o risco que resta neles.
+   */
+  const donoDoLink = !order.publicToken || order.publicToken === (t ?? "");
 
   const pago = STATUS_PAGO.includes(order.status);
   const total = Number(order.total);
@@ -111,37 +126,50 @@ export default async function SucessoPage({
         )}
       </div>
 
-      {/* Resumo do pedido */}
-      <div className="mt-8 bg-white border border-border rounded-xl p-5 space-y-4">
-        <h2 className="text-primary font-semibold">Resumo do pedido</h2>
-        <ul className="divide-y divide-border text-sm">
-          {order.items.map((it) => (
-            <li key={it.id} className="py-2 flex justify-between gap-3">
-              <span className="text-primary">
-                {it.nomeProduto}
-                <span className="text-muted-foreground"> ×{it.quantidade}</span>
+      {/* Resumo do pedido — só para quem chegou pelo link completo. */}
+      {donoDoLink ? (
+        <div className="mt-8 bg-white border border-border rounded-xl p-5 space-y-4">
+          <h2 className="text-primary font-semibold">Resumo do pedido</h2>
+          <ul className="divide-y divide-border text-sm">
+            {order.items.map((it) => (
+              <li key={it.id} className="py-2 flex justify-between gap-3">
+                <span className="text-primary">
+                  {it.nomeProduto}
+                  <span className="text-muted-foreground"> ×{it.quantidade}</span>
+                </span>
+                <span className="text-primary font-medium shrink-0 tabular-nums">
+                  {formatBRL(Number(it.precoUnitario) * it.quantidade)}
+                </span>
+              </li>
+            ))}
+          </ul>
+          <div className="border-t border-border pt-3 space-y-1 text-sm">
+            <div className="flex justify-between text-muted-foreground">
+              <span>Frete</span>
+              <span className="tabular-nums">{formatBRL(frete)}</span>
+            </div>
+            <div className="flex items-end justify-between pt-1">
+              <span className="text-sm font-medium text-primary">
+                Total {pago ? "pago" : ""}
               </span>
-              <span className="text-primary font-medium shrink-0 tabular-nums">
-                {formatBRL(Number(it.precoUnitario) * it.quantidade)}
+              <span className="text-green-600 text-2xl font-bold tabular-nums">
+                {formatBRL(total)}
               </span>
-            </li>
-          ))}
-        </ul>
-        <div className="border-t border-border pt-3 space-y-1 text-sm">
-          <div className="flex justify-between text-muted-foreground">
-            <span>Frete</span>
-            <span className="tabular-nums">{formatBRL(frete)}</span>
-          </div>
-          <div className="flex items-end justify-between pt-1">
-            <span className="text-sm font-medium text-primary">
-              Total {pago ? "pago" : ""}
-            </span>
-            <span className="text-green-600 text-2xl font-bold tabular-nums">
-              {formatBRL(total)}
-            </span>
+            </div>
           </div>
         </div>
-      </div>
+      ) : (
+        <div className="mt-8 bg-white border border-border rounded-xl p-5 text-sm text-muted-foreground">
+          <p>
+            Para ver os itens e o valor deste pedido, abra o link que você
+            recebeu ao finalizar a compra, ou entre em{" "}
+            <Link href="/minha-conta/pedidos" className="text-secondary underline">
+              Minha conta
+            </Link>
+            .
+          </p>
+        </div>
+      )}
 
       {/* Envio — prazo honesto (sem inventar data fixa) */}
       <div className="mt-4 text-sm text-muted-foreground bg-bg-alt rounded-xl p-4 leading-relaxed">

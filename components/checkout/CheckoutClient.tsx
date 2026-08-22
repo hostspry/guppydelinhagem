@@ -599,11 +599,11 @@ export default function CheckoutClient({
     );
 
     if (res.resultado === "aprovado") {
-      router.push(`/pedido/${res.numero.replace(/^#/, "")}/sucesso`);
+      router.push(`/pedido/${res.numero.replace(/^#/, "")}/sucesso${res.token ? `?t=${res.token}` : ""}`);
       return;
     }
     if (res.resultado === "analise") {
-      router.push(`/pedido/${res.numero.replace(/^#/, "")}/analise`);
+      router.push(`/pedido/${res.numero.replace(/^#/, "")}/analise${res.token ? `?t=${res.token}` : ""}`);
       return;
     }
     if (res.resultado === "desafio") {
@@ -630,11 +630,11 @@ export default function CheckoutClient({
     const res = await finalizarDesafio3ds(paymentId);
     setDesafio3ds(null);
     if (res.resultado === "aprovado") {
-      router.push(`/pedido/${res.numero.replace(/^#/, "")}/sucesso`);
+      router.push(`/pedido/${res.numero.replace(/^#/, "")}/sucesso${res.token ? `?t=${res.token}` : ""}`);
       return;
     }
     if (res.resultado === "analise") {
-      router.push(`/pedido/${res.numero.replace(/^#/, "")}/analise`);
+      router.push(`/pedido/${res.numero.replace(/^#/, "")}/analise${res.token ? `?t=${res.token}` : ""}`);
       return;
     }
     if (res.resultado === "recusado") {

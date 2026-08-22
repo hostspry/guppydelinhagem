@@ -51,7 +51,7 @@ export default function PixPanel({ pix: pixInicial }: { pix: CheckoutPixData }) 
       setRestante(restanteSegundos(pix.expiraEm));
     }, 1000);
     return () => clearInterval(id);
-  }, [pix.expiraEm]);
+  }, [pix.expiraEm, pix.token]);
 
   // Poll do status no banco; ao confirmar PAGO → vai pra página de sucesso.
   useEffect(() => {
@@ -64,7 +64,7 @@ export default function PixPanel({ pix: pixInicial }: { pix: CheckoutPixData }) 
           redirecionando.current = true;
           clearInterval(id);
           // numero "#2026-0001" → rota limpa "/pedido/2026-0001/sucesso".
-          router.push(`/pedido/${numero.replace(/^#/, "")}/sucesso`);
+          router.push(`/pedido/${numero.replace(/^#/, "")}/sucesso${pix.token ? `?t=${pix.token}` : ""}`);
         }
       } catch {
         // rede instável — tenta de novo no próximo tick
@@ -74,7 +74,7 @@ export default function PixPanel({ pix: pixInicial }: { pix: CheckoutPixData }) 
       ativo = false;
       clearInterval(id);
     };
-  }, [numero, router]);
+  }, [numero, router, pix.token]);
 
   const copiar = useCallback(async () => {
     if (!pix.copiaECola) return;

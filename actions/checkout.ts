@@ -46,7 +46,34 @@ import {
   Transportadora,
 } from "@/lib/generated/prisma/enums";
 import type { Prisma, OrderStatus } from "@/lib/generated/prisma/client";
+import { randomBytes } from "node:crypto";
+import { headers } from "next/headers";
+import { rateLimit, clientIp } from "@/lib/rate-limit";
 import { semanaDaChave, semanasDisponiveis } from "@/lib/semana-envio";
+
+/**
+ * Freio das ações públicas do checkout.
+ *
+ * Elas rodam sem login (o checkout é guest), então sem trava viram ferramenta:
+ * cartão para testar número roubado em lote, cupom para descobrir código secreto
+ * por tentativa, pedido/Pix para encher o banco e gastar chamada de gateway.
+ *
+ * Os limites são folgados para gente de verdade — quem compra não clica 20 vezes
+ * em um minuto — e apertados para script.
+ */
+async function travaCheckout(
+  acao: string,
+  limite: number,
+  janelaMs: number,
+): Promise<{ ok: true } | { ok: false; erro: string }> {
+  const ip = clientIp(await headers());
+  const r = rateLimit(`checkout-${acao}:${ip}`, limite, janelaMs);
+  if (r.ok) return { ok: true };
+  return {
+    ok: false,
+    erro: `Muitas tentativas seguidas. Espere ${r.retryAfter}s e tente de novo.`,
+  };
+}
 
 const TETO_PARCELAS = 12;
 
@@ -57,6 +84,8 @@ const round2 = (n: number) => Math.round(n * 100) / 100;
 
 export type CheckoutPixData = {
   numero: string;
+  /** Vai na URL de acompanhamento; sem ele a página mostra só o status. */
+  token?: string;
   valor: number;
   qrCodeBase64: string | null; // MP: PNG embutido em base64
   qrPngUrl: string | null; // PagBank: link do PNG do QR (renderiza direto)
@@ -85,6 +114,8 @@ async function emitirPix(args: {
     email: string;
     cpfCnpj?: string | null;
   };
+  /** Segredo do link de acompanhamento (vai na URL de sucesso). */
+  token?: string;
 }): Promise<CheckoutPixData> {
   const provider = getPaymentProvider(ProviderPagamento.MERCADO_PAGO);
   const pix = await provider.criarPagamentoPix({
@@ -125,6 +156,7 @@ async function emitirPix(args: {
 
   return {
     numero: args.numero,
+    token: args.token,
     valor: args.valor,
     qrCodeBase64: pix.qrCodeBase64,
     qrPngUrl: null,
@@ -154,6 +186,8 @@ export type ItemCartaoMp = {
 export type OrderCriado = {
   orderId: string;
   numero: string;
+  /** Segredo do link de acompanhamento — sem ele a página mostra só o status. */
+  publicToken: string;
   clienteId: string; // p/ o histórico do pagador no antifraude do MP
   valorPix: number; // total a cobrar no Pix (com desconto) — recalculado no servidor
   valorCartao: number; // total a cobrar no cartão (cheio) — recalculado no servidor
@@ -461,6 +495,11 @@ export async function validarCupom(
   codigo: string,
   itens: CheckoutFormInput["itens"],
 ): Promise<ValidarCupomResult> {
+  // Cupom secreto é adivinhável por tentativa se ninguém segurar: 15/min por IP
+  // deixa o cliente digitar errado à vontade e mata o script que varre palavras.
+  const trava = await travaCheckout("cupom", 15, 60_000);
+  if (!trava.ok) return { ok: false, motivo: trava.erro };
+
   // "Vazio" é só quando NÃO há itens. Shape inválido (carrinho antigo) é outro
   // caso — não dá pra mascarar de "carrinho vazio", senão o cupom fica travado.
   if (!Array.isArray(itens) || itens.length === 0) {
@@ -948,6 +987,8 @@ export async function criarOrderDoCheckout(
   let numero = "";
   let reused = false;
   let clienteId = "";
+  // 32 hex = 128 bits. O número do pedido é sequencial e adivinhável; este não.
+  let publicToken = randomBytes(16).toString("hex");
   try {
     const created = await prisma.$transaction(async (tx) => {
       // Reuso de cliente por identidade forte → fraca.
@@ -1050,7 +1091,7 @@ export async function criarOrderDoCheckout(
             // Recria os itens para refletir os descontos por item recalculados.
             items: { deleteMany: {}, create: itensData },
           },
-          select: { id: true, numero: true },
+          select: { id: true, numero: true, publicToken: true },
         });
         return { ...upd, reused: true, clienteId: cliente.id };
       }
@@ -1085,9 +1126,10 @@ export async function criarOrderDoCheckout(
           cupomId,
           cupomCodigo,
           total: totalCheio,
+          publicToken,
           items: { create: itensData },
         },
-        select: { id: true, numero: true },
+        select: { id: true, numero: true, publicToken: true },
       });
       return { ...novo, reused: false, clienteId: cliente.id };
     });
@@ -1095,6 +1137,8 @@ export async function criarOrderDoCheckout(
     numero = created.numero;
     reused = created.reused;
     clienteId = created.clienteId;
+    // Pedido reusado já tinha token; o novo usa o que acabamos de gerar.
+    publicToken = created.publicToken ?? publicToken;
   } catch (e) {
     console.error("[checkout] criar pedido", e);
     return { ok: false, error: "Não foi possível criar o pedido. Tente novamente." };
@@ -1133,6 +1177,7 @@ export async function criarOrderDoCheckout(
     data: {
       orderId,
       numero,
+      publicToken,
       clienteId,
       valorPix: totalPix,
       valorCartao: totalCheio,
@@ -1172,6 +1217,11 @@ export async function registrarLeadCheckout(input: {
   email?: string;
   telefone?: string;
 }): Promise<{ ok: boolean }> {
+  // Lead é gravação silenciosa disparada enquanto o cliente digita: sem trava,
+  // um script enche a tabela e o cron de abandono manda mensagem à toa.
+  const trava = await travaCheckout("lead", 12, 60_000);
+  if (!trava.ok) return { ok: false };
+
   try {
     const nome = (input.nome ?? "").trim() || null;
     const email = (input.email ?? "").trim().toLowerCase() || null;
@@ -1220,6 +1270,7 @@ export async function criarPedidoCheckout(
     const pixData = await emitirPix({
       orderId: order.data.orderId,
       numero: order.data.numero,
+      token: order.data.publicToken,
       valor: order.data.valorPix, // Pix cobra o total COM desconto
       pagador: order.data.pagador,
     });
@@ -1350,11 +1401,15 @@ export async function consultarStatusPedido(
  * expirou). Reusa o cliente/endereço/total do pedido — não recria o Order.
  */
 export async function gerarNovoPix(numero: string): Promise<CheckoutResult> {
+  const trava = await travaCheckout("pix", 10, 60_000);
+  if (!trava.ok) return { ok: false, error: trava.erro };
+
   const order = await prisma.order.findUnique({
     where: { numero },
     select: {
       id: true,
       numero: true,
+      publicToken: true,
       total: true,
       frete: true,
       status: true,
@@ -1409,6 +1464,7 @@ export async function gerarNovoPix(numero: string): Promise<CheckoutResult> {
     const pixData = await emitirPix({
       orderId: order.id,
       numero: order.numero,
+      token: order.publicToken ?? undefined,
       valor: valorPix,
       pagador: {
         nome: partes[0],
@@ -1490,8 +1546,8 @@ export type CartaoInput = {
 };
 
 export type CartaoDesfecho =
-  | { resultado: "aprovado"; numero: string }
-  | { resultado: "analise"; numero: string }
+  | { resultado: "aprovado"; numero: string; token?: string }
+  | { resultado: "analise"; numero: string; token?: string }
   | { resultado: "recusado"; mensagem: string }
   // 3DS: o banco quer autenticar o cliente antes de decidir. O navegador abre o
   // desafio e depois chama finalizarDesafio3ds com o paymentId.
@@ -1542,6 +1598,12 @@ export async function pagarComCartao(
   input: CheckoutFormInput,
   cartao: CartaoInput,
 ): Promise<CartaoDesfecho> {
+  // 6 tentativas por minuto: recusa legítima o cliente repete uma ou duas vezes,
+  // fraudador testando lista de cartões precisa de muito mais. É a trava que
+  // impede a loja de virar validador de cartão roubado.
+  const trava = await travaCheckout("cartao", 6, 60_000);
+  if (!trava.ok) return { resultado: "erro", mensagem: trava.erro };
+
   // Valida o parcelamento ANTES de criar o pedido (anti-tamper, evita órfão).
   const parcelas = Number(cartao.installments);
   const teto = await calcularTetoParcelas(
@@ -1562,7 +1624,14 @@ export async function pagarComCartao(
       fieldErrors: order.fieldErrors,
     };
   }
-  const { orderId, numero, valorCartao: valor, pagador, clienteId } = order.data; // cartão cobra o CHEIO
+  const {
+    orderId,
+    numero,
+    valorCartao: valor,
+    pagador,
+    clienteId,
+    publicToken,
+  } = order.data; // cartão cobra o CHEIO
 
   // Histórico do comprador para o antifraude do MP. Cliente com cadastro antigo
   // e compra anterior aprovada é tratado como risco baixo — sem isso todo pedido
@@ -1718,7 +1787,7 @@ export async function pagarComCartao(
         metodo: MetodoPagamento.CARTAO,
       });
     }
-    return { resultado: "aprovado", numero };
+    return { resultado: "aprovado", numero, token: publicToken };
   }
 
   if (pago.status === StatusPagamento.EM_ANALISE) {
@@ -1726,7 +1795,7 @@ export async function pagarComCartao(
     if (!order.data.reused) {
       await notificarTentativaCompra(orderId, "Cartão (em análise)");
     }
-    return { resultado: "analise", numero };
+    return { resultado: "analise", numero, token: publicToken };
   }
 
   // RECUSADO (ou qualquer não-pago): pedido segue aguardando; tenta de novo.
@@ -1767,9 +1836,10 @@ export async function finalizarDesafio3ds(
 
   const pedido = await prisma.order.findUnique({
     where: { id: orderId },
-    select: { numero: true },
+    select: { numero: true, publicToken: true },
   });
   const numero = pedido?.numero ?? "";
+  const publicToken = pedido?.publicToken ?? undefined;
 
   // Espelha o status no Pagamento já gravado (o webhook faz o mesmo; os dois
   // convergem no mesmo estado).
@@ -1798,16 +1868,16 @@ export async function finalizarDesafio3ds(
         metodo: MetodoPagamento.CARTAO,
       });
     }
-    return { resultado: "aprovado", numero };
+    return { resultado: "aprovado", numero, token: publicToken };
   }
 
   if (consulta.status === StatusPagamento.EM_ANALISE) {
-    return { resultado: "analise", numero };
+    return { resultado: "analise", numero, token: publicToken };
   }
   if (consulta.status === StatusPagamento.PENDENTE) {
     // Ainda processando do lado do banco: o webhook fecha. Manda pra tela de
     // acompanhamento em vez de dizer que recusou.
-    return { resultado: "analise", numero };
+    return { resultado: "analise", numero, token: publicToken };
   }
 
   return {

@@ -19,10 +19,13 @@ const STATUS_PAGO = ["PAGO", "ENVIADO", "ENTREGUE"];
 
 export default async function AnalisePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ numero: string }>;
+  searchParams: Promise<{ t?: string }>;
 }) {
   const { numero: raw } = await params;
+  const { t } = await searchParams;
   // Rota usa o número sem o "#"; o banco guarda "#2026-0001".
   const numeroLimpo = decodeURIComponent(raw).replace(/^#/, "");
   const numero = `#${numeroLimpo}`;
@@ -34,6 +37,7 @@ export default async function AnalisePage({
       status: true,
       total: true,
       parcelas: true,
+      publicToken: true,
       items: {
         select: {
           id: true,
@@ -57,7 +61,7 @@ export default async function AnalisePage({
   return (
     <div className="container-site py-12 max-w-lg mx-auto">
       {/* Poll: quando o webhook aprovar, avança pro sucesso. */}
-      <AnaliseStatusPoll numero={order.numero} />
+      <AnaliseStatusPoll numero={order.numero} token={order.publicToken ?? undefined} />
 
       <div className="text-center space-y-3">
         <Hourglass
@@ -75,31 +79,33 @@ export default async function AnalisePage({
         </p>
       </div>
 
-      {/* Resumo */}
-      <div className="mt-8 bg-white border border-border rounded-xl p-5 space-y-4">
-        <h2 className="text-primary font-semibold">Resumo do pedido</h2>
-        <ul className="divide-y divide-border text-sm">
-          {order.items.map((it) => (
-            <li key={it.id} className="py-2 flex justify-between gap-3">
-              <span className="text-primary">
-                {it.nomeProduto}
-                <span className="text-muted-foreground"> ×{it.quantidade}</span>
-              </span>
-              <span className="text-primary font-medium shrink-0 tabular-nums">
-                {formatBRL(Number(it.precoUnitario) * it.quantidade)}
-              </span>
-            </li>
-          ))}
-        </ul>
-        <div className="border-t border-border pt-3 flex items-end justify-between text-sm">
-          <span className="font-medium text-primary">
-            Total{order.parcelas && order.parcelas > 1 ? ` (${order.parcelas}x)` : ""}
-          </span>
-          <span className="text-primary text-2xl font-bold tabular-nums">
-            {formatBRL(total)}
-          </span>
+      {/* Resumo — só com o token do link; ver a página de sucesso. */}
+      {(!order.publicToken || order.publicToken === (t ?? "")) && (
+        <div className="mt-8 bg-white border border-border rounded-xl p-5 space-y-4">
+          <h2 className="text-primary font-semibold">Resumo do pedido</h2>
+          <ul className="divide-y divide-border text-sm">
+            {order.items.map((it) => (
+              <li key={it.id} className="py-2 flex justify-between gap-3">
+                <span className="text-primary">
+                  {it.nomeProduto}
+                  <span className="text-muted-foreground"> ×{it.quantidade}</span>
+                </span>
+                <span className="text-primary font-medium shrink-0 tabular-nums">
+                  {formatBRL(Number(it.precoUnitario) * it.quantidade)}
+                </span>
+              </li>
+            ))}
+          </ul>
+          <div className="border-t border-border pt-3 flex items-end justify-between text-sm">
+            <span className="font-medium text-primary">
+              Total{order.parcelas && order.parcelas > 1 ? ` (${order.parcelas}x)` : ""}
+            </span>
+            <span className="text-primary text-2xl font-bold tabular-nums">
+              {formatBRL(total)}
+            </span>
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="mt-4 text-sm text-muted-foreground bg-bg-alt rounded-xl p-4 leading-relaxed">
         <p>

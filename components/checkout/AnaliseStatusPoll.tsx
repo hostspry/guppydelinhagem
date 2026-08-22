@@ -9,7 +9,14 @@ const POLL_MS = 6000;
 // Na tela de análise: enquanto o cartão está "em análise", consulta o status do
 // pedido no banco (atualizado pelo webhook). Quando aprovado (PAGO), avança pra
 // página de sucesso. Não limpa o carrinho aqui — só no sucesso confirmado.
-export default function AnaliseStatusPoll({ numero }: { numero: string }) {
+export default function AnaliseStatusPoll({
+  numero,
+  token,
+}: {
+  numero: string;
+  /** Repassado para a página de sucesso mostrar o resumo do pedido. */
+  token?: string;
+}) {
   const router = useRouter();
   const indo = useRef(false);
 
@@ -22,7 +29,7 @@ export default function AnaliseStatusPoll({ numero }: { numero: string }) {
         if (ativo && res?.pago) {
           indo.current = true;
           clearInterval(id);
-          router.push(`/pedido/${numero.replace(/^#/, "")}/sucesso`);
+          router.push(`/pedido/${numero.replace(/^#/, "")}/sucesso${token ? `?t=${token}` : ""}`);
         }
       } catch {
         // rede instável — tenta no próximo tick
@@ -32,7 +39,7 @@ export default function AnaliseStatusPoll({ numero }: { numero: string }) {
       ativo = false;
       clearInterval(id);
     };
-  }, [numero, router]);
+  }, [numero, router, token]);
 
   return null;
 }
