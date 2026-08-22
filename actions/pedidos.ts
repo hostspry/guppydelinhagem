@@ -22,6 +22,7 @@ import {
   notificarEstorno,
   notificarLoteEnviado,
 } from "@/lib/notificacoes";
+import { emailPedidoEnviado } from "@/lib/emails/pedido";
 import { COMPOSICAO_LABEL } from "@/lib/composicoes";
 import type {
   Prisma,
@@ -655,8 +656,18 @@ export async function marcarPedidosComoEnviados(input: {
   }
 
   // Telegram: individual (1) ou lote agregado (2+). Sempre após persistir.
-  if (idsSucesso.length === 1) await notificarPedidoEnviado(idsSucesso[0]);
-  else if (idsSucesso.length >= 2) await notificarLoteEnviado(sucessos);
+  if (idsSucesso.length === 1) {
+    await notificarPedidoEnviado(idsSucesso[0]); // já dispara o e-mail do cliente
+  } else if (idsSucesso.length >= 2) {
+    await notificarLoteEnviado(sucessos);
+    // O lote é agregado só para a LOJA. Cada cliente recebe o e-mail dele, com
+    // o próprio código de rastreio — ninguém quer a lista dos outros pedidos.
+    for (const id of idsSucesso) {
+      void emailPedidoEnviado(id).catch((e) =>
+        console.error("[pedidos] e-mail de enviado (lote)", e),
+      );
+    }
+  }
 
   revalidatePath("/admin/pedidos");
   return { ok: true, resultados };

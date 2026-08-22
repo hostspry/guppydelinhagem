@@ -11,6 +11,7 @@ import type {
   MetodoPagamento,
   ProviderPagamento,
 } from "@/lib/generated/prisma/enums";
+import { emailPedidoPago, emailPedidoEnviado } from "@/lib/emails/pedido";
 
 // Camada de eventos semânticos do ciclo do pedido. Os pontos de disparo (checkout,
 // webhooks, actions) chamam estes eventos — não montam texto. Um lugar só para
@@ -153,6 +154,12 @@ export async function notificarPedidoPago(
 ): Promise<void> {
   const p = await carregar(orderId);
   if (!p) return;
+
+  // O cliente também é avisado. Nunca bloqueia o aviso da loja: se o e-mail
+  // falhar (ou não houver conta cadastrada), o Telegram sai do mesmo jeito.
+  void emailPedidoPago(orderId).catch((e) =>
+    console.error("[notificacoes] e-mail de pago", e),
+  );
   const met = rotuloMetodo(opts?.metodo);
   const prov = rotuloProvider(opts?.provider);
   const linhaPag =
@@ -185,6 +192,10 @@ export async function notificarPedidoPago(
 export async function notificarPedidoEnviado(orderId: string): Promise<void> {
   const p = await carregar(orderId);
   if (!p) return;
+
+  void emailPedidoEnviado(orderId).catch((e) =>
+    console.error("[notificacoes] e-mail de enviado", e),
+  );
   const transp = p.transportadora ? escapeHtml(p.transportadora) : "";
   const rastreio = p.codigoRastreio
     ? `${transp ? " " : ""}· Rastreio: <code>${escapeHtml(p.codigoRastreio)}</code>`
