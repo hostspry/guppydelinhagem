@@ -12,6 +12,7 @@ import {
   type ActionResult,
   isPrismaError,
 } from "@/lib/utils/action-result";
+import { emailAcessoCliente } from "@/lib/emails/acesso";
 
 const onlyDigits = (s: string | undefined) => (s ?? "").replace(/\D/g, "");
 const nullify = (s: string | undefined) => {
@@ -178,7 +179,14 @@ export async function deleteCliente(id: string): Promise<ActionResult> {
 // ── Acesso do cliente ao painel (venda direta) ───────────────────────────────
 
 export type AcessoCriado =
-  | { ok: true; email: string; senha: string; recriado: boolean }
+  | {
+      ok: true;
+      email: string;
+      senha: string;
+      recriado: boolean;
+      /** O e-mail com os dados saiu? false = mandar pelo WhatsApp. */
+      enviadoPorEmail: boolean;
+    }
   | { ok: false; error: string };
 
 /** Senha temporária: aleatória, não adivinhável, curta o bastante para digitar. */
@@ -269,6 +277,18 @@ export async function criarAcessoCliente(
       : `Criou acesso ao painel para ${cliente.nome}`,
   });
 
+  // Manda o acesso por e-mail. Se não sair (conta de e-mail desligada, mensagem
+  // desligada no painel, servidor fora do ar), a tela mostra as credenciais do
+  // mesmo jeito e o WhatsApp continua ali — o acesso já foi criado.
+  const enviadoPorEmail = await emailAcessoCliente({
+    nome: cliente.nome,
+    email,
+    senha,
+  }).catch((e) => {
+    console.error("[cliente] e-mail de acesso", e);
+    return false;
+  });
+
   revalidatePath(`/admin/clientes/${cliente.id}/editar`);
-  return { ok: true, email, senha, recriado: !!existente };
+  return { ok: true, email, senha, recriado: !!existente, enviadoPorEmail };
 }

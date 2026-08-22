@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/admin/PageHeader";
 import { ClienteForm } from "@/components/admin/ClienteForm";
+import { AcessoCliente } from "@/components/admin/AcessoCliente";
 import { getClienteById } from "@/lib/queries/clientes";
 
 type Props = { params: Promise<{ id: string }> };
@@ -38,6 +39,18 @@ export default async function EditarClientePage({ params }: Props) {
           observacoes: cliente.observacoes ?? "",
         }}
       />
+
+      {/* O acesso mora aqui: é a ficha do cliente. O mesmo card aparece na página
+          do pedido, que é onde a venda direta costuma começar. */}
+      <div className="max-w-2xl mt-6">
+        <AcessoCliente
+          clienteId={cliente.id}
+          clienteNome={cliente.nome}
+          clienteEmail={cliente.email}
+          clienteTelefone={cliente.telefone}
+          jaTemAcesso={cliente.userId != null}
+        />
+      </div>
     </div>
   );
 }

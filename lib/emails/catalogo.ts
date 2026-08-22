@@ -93,6 +93,23 @@ export const TEMPLATES: TemplateDef[] = [
     ],
   },
   {
+    chave: "acesso-cliente",
+    rotulo: "Acesso do cliente",
+    quando:
+      "Sai quando você cria (ou renova) o acesso de um cliente na página do pedido.",
+    variaveis: [
+      VAR_NOME,
+      { nome: "email_login", descricao: "E-mail que ele usa para entrar" },
+      { nome: "senha", descricao: "Senha temporária gerada agora" },
+      {
+        nome: "caixa_acesso",
+        descricao: "Caixa destacada com e-mail e senha",
+        bloco: true,
+      },
+      { nome: "botao_entrar", descricao: "Botão “Entrar na minha conta”", bloco: true },
+    ],
+  },
+  {
     chave: "cobranca-paga",
     rotulo: "Cobrança paga",
     quando: "Sai quando uma cobrança avulsa (link de pagamento) é paga.",

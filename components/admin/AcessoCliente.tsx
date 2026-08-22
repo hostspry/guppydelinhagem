@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Copy, KeyRound, MessageCircle, RefreshCw } from "lucide-react";
+import { Copy, KeyRound, MailCheck, MailX, MessageCircle, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { criarAcessoCliente } from "@/actions/clientes";
 
@@ -28,7 +28,11 @@ export function AcessoCliente({
   jaTemAcesso: boolean;
 }) {
   const [isPending, startTransition] = useTransition();
-  const [cred, setCred] = useState<{ email: string; senha: string } | null>(null);
+  const [cred, setCred] = useState<{
+    email: string;
+    senha: string;
+    enviadoPorEmail: boolean;
+  } | null>(null);
 
   const primeiroNome = clienteNome.trim().split(/\s+/)[0] ?? "";
 
@@ -55,8 +59,18 @@ export function AcessoCliente({
         toast.error(r.error);
         return;
       }
-      setCred({ email: r.email, senha: r.senha });
-      toast.success(r.recriado ? "Nova senha gerada." : "Acesso criado.");
+      setCred({
+        email: r.email,
+        senha: r.senha,
+        enviadoPorEmail: r.enviadoPorEmail,
+      });
+      toast.success(
+        r.enviadoPorEmail
+          ? "Acesso criado e enviado por e-mail."
+          : r.recriado
+            ? "Nova senha gerada."
+            : "Acesso criado.",
+      );
     });
   }
 
@@ -99,9 +113,22 @@ export function AcessoCliente({
             </p>
           </div>
 
+          {cred.enviadoPorEmail ? (
+            <p className="flex items-start gap-1.5 text-[11px] text-green-700">
+              <MailCheck className="w-3.5 h-3.5 mt-px shrink-0" aria-hidden="true" />
+              Já mandei estes dados para {cred.email}. Se quiser reforçar, mande
+              também pelo WhatsApp.
+            </p>
+          ) : (
+            <p className="flex items-start gap-1.5 text-[11px] text-amber-700">
+              <MailX className="w-3.5 h-3.5 mt-px shrink-0" aria-hidden="true" />
+              Não consegui mandar por e-mail (confira Configurações → E-mail).
+              Mande pelo WhatsApp.
+            </p>
+          )}
           <p className="text-[11px] text-gray-500">
-            Anote ou mande agora: esta senha some quando você sair da página. Ela
-            serve para uma entrada só — depois o cliente cria a dele.
+            Esta senha some quando você sair da página. Ela serve para uma entrada
+            só — depois o cliente cria a dele.
           </p>
 
           <div className="flex flex-wrap gap-2">
