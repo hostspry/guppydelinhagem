@@ -21,32 +21,51 @@ export type TemplateResolvido = {
   titulo: string;
   corpo: string;
   ativo: boolean;
-  /** true = o texto foi editado no painel; false = está usando o padrão. */
+  /** Texto de fábrica, para o botão "voltar ao texto padrão". */
+  padrao: { assunto: string; titulo: string; corpo: string };
+  /** true = o texto atual difere do de fábrica. */
   personalizado: boolean;
 };
 
-/** Texto salvo no painel; sem linha no banco, devolve o padrão do catálogo. */
+/**
+ * Texto da mensagem. Fonte única é o BANCO — o código não guarda cópia.
+ *
+ * Sem linha (chave nova ainda não semeada, ou linha apagada à mão), devolve null
+ * e quem chama não envia. Preferimos não mandar a mandar um e-mail vazio para o
+ * cliente; o log diz qual chave está faltando.
+ */
 export async function carregarTemplate(
   chave: string,
 ): Promise<TemplateResolvido | null> {
   const def = templateDef(chave);
   if (!def) return null;
   try {
-    const salvo = await prisma.templateEmail.findUnique({ where: { chave } });
-    if (salvo) {
-      return {
-        assunto: salvo.assunto,
-        titulo: salvo.titulo,
-        corpo: salvo.corpo,
-        ativo: salvo.ativo,
-        personalizado: true,
-      };
+    const t = await prisma.templateEmail.findUnique({ where: { chave } });
+    if (!t) {
+      console.error(
+        `[email] template "${chave}" não existe no banco — e-mail não enviado`,
+      );
+      return null;
     }
+    return {
+      assunto: t.assunto,
+      titulo: t.titulo,
+      corpo: t.corpo,
+      ativo: t.ativo,
+      padrao: {
+        assunto: t.assuntoPadrao,
+        titulo: t.tituloPadrao,
+        corpo: t.corpoPadrao,
+      },
+      personalizado:
+        t.assunto !== t.assuntoPadrao ||
+        t.titulo !== t.tituloPadrao ||
+        t.corpo !== t.corpoPadrao,
+    };
   } catch (e) {
-    // Banco fora do ar não pode impedir o e-mail: cai no padrão.
     console.error("[email] carregar template", chave, e);
+    return null;
   }
-  return { ...def.padrao, ativo: true, personalizado: false };
 }
 
 /** Substitui {{variavel}} num texto de UMA linha (assunto/título). */

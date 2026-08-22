@@ -588,11 +588,19 @@ model HeroSettings {
 /// lib/emails/catalogo.ts — chave desconhecida no banco é simplesmente ignorada,
 /// e chave do catálogo sem linha no banco usa o texto padrão.
 model TemplateEmail {
-  chave        String   @id
-  assunto      String
-  titulo       String
-  corpo        String
-  ativo        Boolean  @default(true) // desligado = esse aviso não é enviado
+  chave   String  @id
+  assunto String
+  titulo  String
+  corpo   String
+  ativo   Boolean @default(true) // desligado = esse aviso não é enviado
+
+  // Texto de fábrica, gravado junto na criação e nunca alterado pelo painel. É a
+  // referência do botão "voltar ao texto padrão" — sem isso, estragar o texto
+  // não teria volta, já que o código não guarda mais cópia nenhuma.
+  assuntoPadrao String
+  tituloPadrao  String
+  corpoPadrao   String
+
   atualizadoEm DateTime @updatedAt
 }
 

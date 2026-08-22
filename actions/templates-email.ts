@@ -14,9 +14,10 @@ import type { ActionResult } from "@/lib/utils/action-result";
 /**
  * Textos dos e-mails automáticos.
  *
- * O banco guarda só o que foi editado; sem linha, vale o padrão do catálogo. Por
- * isso "voltar ao texto padrão" é apagar a linha, não copiar o padrão para
- * dentro dela — assim uma melhoria futura no padrão chega a quem nunca editou.
+ * O texto vive no BANCO — o código não guarda cópia. Cada linha carrega também o
+ * texto de fábrica (colunas *Padrao), que é o que o botão "voltar ao texto
+ * padrão" restaura; essas colunas são gravadas na migration e o painel nunca as
+ * altera.
  */
 
 /** Exemplo de conteúdo para a prévia — não toca em pedido de verdade. */
@@ -80,22 +81,24 @@ export async function salvarTemplateEmail(input: unknown): Promise<ActionResult>
   }
 
   try {
-    await prisma.templateEmail.upsert({
+    // update, não upsert: a linha (com o texto de fábrica) nasce na migration.
+    // Se não existir, é falha de instalação e a mensagem tem que aparecer, não
+    // criar uma linha sem padrão para restaurar depois.
+    const r = await prisma.templateEmail.updateMany({
       where: { chave: d.chave },
-      create: {
-        chave: d.chave,
-        assunto: d.assunto,
-        titulo: d.titulo,
-        corpo: d.corpo,
-        ativo: d.ativo,
-      },
-      update: {
+      data: {
         assunto: d.assunto,
         titulo: d.titulo,
         corpo: d.corpo,
         ativo: d.ativo,
       },
     });
+    if (r.count === 0) {
+      return {
+        success: false,
+        error: "Esta mensagem ainda não existe no banco. Rode a migration dos textos.",
+      };
+    }
   } catch (e) {
     console.error("[template-email] salvar", e);
     return { success: false, error: "Não foi possível salvar o texto." };
@@ -121,8 +124,18 @@ export async function restaurarTemplateEmail(
   if (!def) return { success: false, error: "Mensagem desconhecida." };
 
   try {
-    // Apagar = voltar ao padrão (que vive no código).
-    await prisma.templateEmail.deleteMany({ where: { chave } });
+    // Volta o texto de fábrica guardado na própria linha. Apagar a linha não
+    // serve mais: o padrão mora nela, não no código.
+    const t = await prisma.templateEmail.findUnique({ where: { chave } });
+    if (!t) return { success: false, error: "Mensagem não encontrada." };
+    await prisma.templateEmail.update({
+      where: { chave },
+      data: {
+        assunto: t.assuntoPadrao,
+        titulo: t.tituloPadrao,
+        corpo: t.corpoPadrao,
+      },
+    });
   } catch (e) {
     console.error("[template-email] restaurar", e);
     return { success: false, error: "Não foi possível restaurar o texto." };
@@ -150,13 +163,13 @@ export async function previewTemplateEmail(input: {
   if (!def) return { ok: false, erro: "Mensagem desconhecida." };
 
   const vars = variaveisDeExemplo(input.chave);
-  const titulo = aplicarVariaveisTexto(input.titulo || def.padrao.titulo, vars);
+  const titulo = aplicarVariaveisTexto(input.titulo, vars);
   return {
     ok: true,
     html: layoutEmail({
       titulo,
       preheader: "",
-      conteudo: h1(titulo) + corpoParaHtml(input.corpo || def.padrao.corpo, vars),
+      conteudo: h1(titulo) + corpoParaHtml(input.corpo, vars),
     }),
   };
 }
