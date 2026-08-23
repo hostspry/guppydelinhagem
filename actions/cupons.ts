@@ -82,7 +82,7 @@ function checarCupomNoLimite(
 ): string | null {
   if (membro.semLimites || membro.limiteDescontoPercent == null) return null;
   if (d.tipoValor === "PERCENTUAL") return checarLimiteDesconto(membro, d.valor);
-  return `Seu limite de desconto é ${membro.limiteDescontoPercent}%, então você só pode criar cupons percentuais. Peça a um administrador para criar cupons de valor fixo.`;
+  return `Seu limite de desconto é ${membro.limiteDescontoPercent}%, então você só pode criar cupons percentuais. Peça a um administrador para criar cupons em reais.`;
 }
 
 export async function createCupom(input: unknown): Promise<ActionResult> {

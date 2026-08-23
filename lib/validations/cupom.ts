@@ -63,6 +63,19 @@ export const cupomSchema = z
     path: ["valor"],
     message: "O percentual não pode passar de 100%",
   })
+  // Preço final é preço POR PRODUTO: só faz sentido no cupom de campanha, que
+  // aplica produto a produto. No cupom digitado o desconto sai sobre o carrinho.
+  .refine((d) => d.tipoValor !== "PRECO_FIXO" || d.tipoCupom === "CAMPANHA", {
+    path: ["tipoValor"],
+    message:
+      "Preço final só funciona em cupom de campanha, que aplica produto a produto.",
+  })
+  // Preço final sem escolher os produtos viraria preço único da loja inteira.
+  .refine((d) => d.tipoValor !== "PRECO_FIXO" || d.escopo !== "TODOS", {
+    path: ["escopo"],
+    message:
+      "Escolha as categorias ou os produtos: preço final na loja toda deixaria tudo pelo mesmo valor.",
+  })
   // Janela de datas coerente.
   .refine(
     (d) => !d.validoDe || !d.validoAte || d.validoAte >= d.validoDe,

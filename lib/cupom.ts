@@ -20,7 +20,7 @@ export function normalizarCodigo(codigo: string): string {
 
 // Dados do cupom necessários para o cálculo (Decimais já convertidos p/ number).
 export type CupomCalculo = {
-  tipoValor: "PERCENTUAL" | "VALOR_FIXO";
+  tipoValor: "PERCENTUAL" | "VALOR_FIXO" | "PRECO_FIXO";
   valor: number;
   escopo: "TODOS" | "CATEGORIAS" | "PRODUTOS";
   modoAplicacao:
@@ -99,9 +99,17 @@ export function cupomVigente(
   return { ok: true };
 }
 
-/** Desconto bruto sobre uma base: percentual ou valor fixo (sem ultrapassar a base). */
+/**
+ * Desconto bruto sobre uma base: percentual ou valor fixo (sem ultrapassar a base).
+ *
+ * PRECO_FIXO não passa por aqui: ele é preço POR ITEM e este caminho trabalha
+ * sobre o subtotal elegível, onde "preço final" não significa nada. A validação
+ * já barra a combinação; se algum dia escapar, não desconta nada em vez de
+ * subtrair R$ 140 do carrinho inteiro.
+ */
 function descontoSobre(cupom: CupomCalculo, base: number): number {
   if (base <= 0) return 0;
+  if (cupom.tipoValor === "PRECO_FIXO") return 0;
   return cupom.tipoValor === "PERCENTUAL"
     ? base * (cupom.valor / 100)
     : Math.min(cupom.valor, base);

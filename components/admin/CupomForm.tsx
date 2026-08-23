@@ -211,6 +211,18 @@ export function CupomForm({ initialData, categorias, produtos }: CupomFormProps)
               />
               Valor fixo (R$)
             </label>
+            <label
+              className="flex items-center gap-1.5 text-sm text-gray-700"
+              title="O valor vira o preço do produto. Use quando a promoção junta peixes de preços diferentes no mesmo valor."
+            >
+              <input
+                type="radio"
+                value={TipoValorCupom.PRECO_FIXO}
+                {...register("tipoValor")}
+                className="accent-[#FF035C]"
+              />
+              Preço final (R$)
+            </label>
           </div>
         </FormField>
 
@@ -223,7 +235,7 @@ export function CupomForm({ initialData, categorias, produtos }: CupomFormProps)
               min="0"
               {...register("valor")}
               className={inputClass}
-              placeholder={tipoValor === "PERCENTUAL" ? "10" : "15,00"}
+              placeholder={tipoValor === "PERCENTUAL" ? "10" : tipoValor === "PRECO_FIXO" ? "140,00" : "15,00"}
             />
             <span className="text-sm text-gray-500 shrink-0">
               {tipoValor === "PERCENTUAL" ? "%" : "R$"}

@@ -15,7 +15,7 @@ import {
 type CampanhaVigente = {
   id: string;
   codigo: string;
-  tipoValor: "PERCENTUAL" | "VALOR_FIXO";
+  tipoValor: "PERCENTUAL" | "VALOR_FIXO" | "PRECO_FIXO";
   valor: number;
   escopo: "TODOS" | "CATEGORIAS" | "PRODUTOS";
   precoUnico: boolean;

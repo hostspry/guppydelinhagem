@@ -39,6 +39,11 @@ function formatarValor(c: CupomListItem): string {
   if (c.tipoValor === "PERCENTUAL") {
     return `${c.valor}%`;
   }
+  // "R$ 140 de desconto" e "sai por R$ 140" são coisas opostas: sem o rótulo,
+  // a lista mostra o mesmo número para as duas.
+  if (c.tipoValor === "PRECO_FIXO") {
+    return `sai por ${moeda.format(c.valor)}`;
+  }
   return moeda.format(c.valor);
 }
 

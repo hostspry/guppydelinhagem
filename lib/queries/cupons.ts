@@ -39,7 +39,7 @@ export type CupomListItem = {
   id: string;
   codigo: string;
   descricao: string | null;
-  tipoValor: "PERCENTUAL" | "VALOR_FIXO";
+  tipoValor: "PERCENTUAL" | "VALOR_FIXO" | "PRECO_FIXO";
   valor: number;
   escopo: "TODOS" | "CATEGORIAS" | "PRODUTOS";
   modoAplicacao: "AMBOS_VENCE_MAIOR" | "AMBOS_ACUMULA" | "SO_PIX" | "SO_CARTAO";
@@ -96,7 +96,7 @@ export type CupomDetalhe = {
   id: string;
   codigo: string;
   descricao: string | null;
-  tipoValor: "PERCENTUAL" | "VALOR_FIXO";
+  tipoValor: "PERCENTUAL" | "VALOR_FIXO" | "PRECO_FIXO";
   valor: number;
   escopo: "TODOS" | "CATEGORIAS" | "PRODUTOS";
   modoAplicacao: "AMBOS_VENCE_MAIOR" | "AMBOS_ACUMULA" | "SO_PIX" | "SO_CARTAO";

@@ -9,7 +9,7 @@ const round2 = (n: number) => Math.round(n * 100) / 100;
 export type CampanhaInfo = {
   cupomId: string;
   codigo: string;
-  tipoValor: "PERCENTUAL" | "VALOR_FIXO";
+  tipoValor: "PERCENTUAL" | "VALOR_FIXO" | "PRECO_FIXO";
   valor: number;
   precoUnico: boolean; // precoUnicoNaCampanha: Pix = cartão durante a campanha
 };
@@ -25,6 +25,8 @@ export type CampanhaProduto = CampanhaInfo & {
  * Aplica a campanha sobre um preço cheio (cartão à vista). Com `precoUnico`, o Pix
  * fica igual ao cartão (o desconto Pix do produto some). Sem ele, o Pix mantém a
  * vantagem por cima do preço promocional. Valor fixo: subtrai e faz clamp ≥ 0.
+ * Preço fixo: o valor VIRA o preço, e nunca encarece um produto que já custava
+ * menos que ele (é promoção, não tabela de preço).
  */
 export function precoComCampanha(
   precoCheio: number,
@@ -34,7 +36,9 @@ export function precoComCampanha(
   const promoCheio =
     c.tipoValor === "PERCENTUAL"
       ? precoCheio * (1 - c.valor / 100)
-      : Math.max(0, precoCheio - c.valor);
+      : c.tipoValor === "PRECO_FIXO"
+        ? Math.min(precoCheio, c.valor)
+        : Math.max(0, precoCheio - c.valor);
   const promoPix = c.precoUnico
     ? promoCheio
     : promoCheio * (1 - descontoPixPercentProduto / 100);

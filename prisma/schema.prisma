@@ -109,6 +109,7 @@ enum VideoPlatform {
 enum TipoValorCupom {
   PERCENTUAL
   VALOR_FIXO
+  PRECO_FIXO // "de R$ 250 por R$ 140": o valor É o preço final, não o desconto
 }
 
 enum EscopoCupom {
