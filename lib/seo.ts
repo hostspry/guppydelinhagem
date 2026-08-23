@@ -14,7 +14,7 @@ export const SITE_NAME = "Guppy de Linhagem";
 // Trocou a arte? Suba o número, senão quem já compartilhou continua vendo a
 // versão velha por dias.
 export const OG_DEFAULT = {
-  url: "/images/og-home.jpg?v=2",
+  url: "/images/og-home.jpg?v=3",
   width: 1200,
   height: 630,
   type: "image/jpeg",

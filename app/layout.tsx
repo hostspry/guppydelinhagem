@@ -30,7 +30,7 @@ export const metadata: Metadata = {
       "Guppys de linhagem selecionados, saudáveis e com genética apurada. Campeões mundiais World Guppy Contest.",
     images: [
       {
-        url: "/images/og-home.jpg?v=2",
+        url: "/images/og-home.jpg?v=3",
         width: 1200,
         height: 630,
         type: "image/jpeg",
@@ -43,7 +43,7 @@ export const metadata: Metadata = {
     title: "Guppy de Linhagem | Guppys Premiados",
     description:
       "Guppys de linhagem selecionados, saudáveis e com genética apurada. Campeões mundiais World Guppy Contest.",
-    images: ["/images/og-home.jpg?v=2"],
+    images: ["/images/og-home.jpg?v=3"],
   },
   // Ícones de aba (navegador) e de dispositivo. O /favicon.ico vem da convenção
   // app/favicon.ico; aqui declaramos os PNG (navegadores modernos) e o ícone de

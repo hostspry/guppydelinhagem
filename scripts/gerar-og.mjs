@@ -83,8 +83,8 @@ const texto = Buffer.from(`<svg width="640" height="200" xmlns="http://www.w3.or
     .t { font-family: 'Nunito','Trebuchet MS',sans-serif; font-weight:800; fill:#ffffff; font-size:44px }
     .s { font-family: 'Nunito','Trebuchet MS',sans-serif; font-weight:600; fill:#cfe3f7; font-size:26px }
   </style>
-  <text x="0" y="46" class="t">Guppys de linhagem</text>
-  <text x="0" y="96" class="t">padrão premium</text>
+  <text x="0" y="46" class="t">Guppies de linhagem</text>
+  <text x="0" y="96" class="t">para criadores exigentes</text>
   <text x="0" y="146" class="s">Envio de peixe vivo para todo o Brasil</text>
 </svg>`);
 
