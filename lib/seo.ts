@@ -5,12 +5,17 @@ import type { Metadata } from "next";
 export const SITE_URL = "https://www.guppydelinhagem.com.br";
 export const SITE_NAME = "Guppy de Linhagem";
 
-// Imagem OG padrão (fallback institucional) — selo da marca em WebP.
+// Cartão de compartilhamento (WhatsApp, Facebook, X). Três exigências que o
+// selo quadrado em WebP não atendia: 1200x630 (senão vira miniatura pequena em
+// vez do banner), JPEG (WebP é o formato que o WhatsApp menos suporta em prévia)
+// e a arte do hero, que é a cara do site. Gerado de public/images/hero +
+// public/logo.png; para refazer, veja docs/og-cartao-compartilhamento.md.
 export const OG_DEFAULT = {
-  url: "/images/selo.webp",
-  width: 797,
-  height: 760,
-  alt: "Guppy de Linhagem — Marchezi Guppy Farm",
+  url: "/images/og-home.jpg",
+  width: 1200,
+  height: 630,
+  type: "image/jpeg",
+  alt: "Guppys de linhagem da Marchezi Guppy Farm em aquário plantado",
 } as const;
 
 type OgImage = { url: string; width?: number; height?: number; alt?: string; type?: string };
