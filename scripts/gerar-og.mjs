@@ -12,11 +12,36 @@
 //
 // O texto também não cita prêmio: o título de tricampeão é da criação, não dos
 // peixes que aparecem na arte.
-import { createRequire } from "node:module";
-import { statSync, existsSync } from "node:fs";
+import { statSync, existsSync, readdirSync } from "node:fs";
 
-const require = createRequire(import.meta.url);
-const sharp = require("sharp");
+// O sharp vem junto do Next (é ele quem otimiza imagem), mas o pnpm não o
+// deixa visível na raiz. Declarar como dependência quebraria o deploy: o
+// Dockerfile instala com pnpm 9 e este micro aqui usa pnpm 10, e as duas
+// versões escrevem a especificação de forma diferente por causa do
+// `pnpm.overrides` — o `--frozen-lockfile` recusa. Como isto é ferramenta de
+// mesa, não build, procuramos o pacote onde ele já está.
+async function carregarSharp() {
+  const raiz = "node_modules/.pnpm";
+  const candidatos = existsSync(raiz)
+    ? readdirSync(raiz)
+        .filter((d) => d.startsWith("sharp@"))
+        .map((d) => `${raiz}/${d}/node_modules/sharp/lib/index.js`)
+        // A pasta existir não garante o pacote dentro: o pnpm deixa diretório
+        // vazio para versão que já saiu do lockfile.
+        .filter((f) => existsSync(f))
+        .sort()
+    : [];
+  if (candidatos.length === 0) {
+    console.error(
+      "sharp não encontrado. Rode `pnpm install` primeiro — ele vem junto do Next.",
+    );
+    process.exit(1);
+  }
+  const mod = await import(`../${candidatos.at(-1)}`);
+  return mod.default;
+}
+
+const sharp = await carregarSharp();
 
 const L = 1200;
 const A = 630;
