@@ -227,6 +227,10 @@ model Cliente {
   uf          String? @db.VarChar(2)
   observacoes String?
 
+  /// Descadastro de campanhas. Aviso de pedido continua saindo — é resposta a
+  /// uma compra que a pessoa fez, não divulgação.
+  aceitaEmails Boolean @default(true)
+
   userId String? @unique // futuro: conta do cliente
   user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
 
@@ -605,6 +609,70 @@ model TokenSenha {
 
   @@index([userId])
   @@index([expiraEm])
+}
+
+/// Quem recebe uma campanha.
+enum PublicoCampanha {
+  TODOS // todo cliente com e-mail
+  COMPRADORES // já teve pedido pago
+  SEM_COMPRA // cadastrado, nunca comprou
+  LEADS // deixou contato no checkout e não converteu
+}
+
+enum StatusCampanha {
+  RASCUNHO
+  AGENDADA
+  ENVIANDO
+  ENVIADA
+  CANCELADA
+}
+
+/// Campanha de e-mail: promoção ou aviso disparado para uma lista.
+///
+/// Diferente de TemplateEmail (que é o texto de um aviso automático do sistema),
+/// esta é uma mensagem pontual, com público, agendamento e histórico de envio.
+model CampanhaEmail {
+  id      String          @id @default(cuid())
+  nome    String // uso interno, na lista do painel
+  assunto String
+  titulo  String
+  corpo   String
+  publico PublicoCampanha @default(TODOS)
+  status  StatusCampanha  @default(RASCUNHO)
+
+  /// Quando disparar. Nulo = envio manual.
+  agendadaPara DateTime?
+  iniciadaEm   DateTime?
+  concluidaEm  DateTime?
+
+  criadaEm     DateTime @default(now())
+  atualizadaEm DateTime @updatedAt
+
+  envios EnvioCampanha[]
+
+  @@index([status, agendadaPara])
+}
+
+/// Um destinatário de uma campanha.
+///
+/// A lista é congelada no disparo: quem entrar na base depois não recebe uma
+/// campanha que já saiu, e reenviar não duplica para quem já recebeu.
+model EnvioCampanha {
+  id         String        @id @default(cuid())
+  campanhaId String
+  campanha   CampanhaEmail @relation(fields: [campanhaId], references: [id], onDelete: Cascade)
+
+  email String
+  nome  String
+
+  enviadoEm DateTime?
+  erro      String?
+  tentativas Int      @default(0)
+
+  criadoEm DateTime @default(now())
+
+  @@unique([campanhaId, email])
+  @@index([campanhaId, enviadoEm])
 }
 
 /// Texto de um e-mail automático, editável no painel.
