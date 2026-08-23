@@ -110,12 +110,15 @@ function capFirst(s: string): string {
 export default function ProductDetail({
   product,
   relacionados,
+  relacionadosMedidos = false,
   descontoPixGlobalPercent,
   campanha,
   freteGratis,
 }: {
   product: ProductDetailData;
   relacionados: PublicProductCard[];
+  /** true = a lista saiu de co-visualização medida, e o título pode dizer isso. */
+  relacionadosMedidos?: boolean;
   descontoPixGlobalPercent: number;
   campanha: CampanhaInfo | null;
   freteGratis: { ativo: boolean; acimaDe: number | null };
@@ -857,17 +860,19 @@ export default function ProductDetail({
         })}
       </section>
 
-      {/* ═══ Outros peixes da loja ═══
-          Título antigo era "Quem viu este peixe também viu", o que afirmava um
-          comportamento de visitante que ninguém media: a lista é a mesma
-          categoria, mais recentes primeiro.
+      {/* ═══ Quem viu também viu / Outros peixes ═══
+          O título depende de ter medição: com co-visualização apurada ele
+          afirma o comportamento, sem ela diz só o que a lista é. Afirmar
+          sempre foi o problema da versão anterior.
           O preço sai do ProductCardSimple, o MESMO card da /loja. A marcação
           escrita à mão que existia aqui só olhava precoPix e mostrava o preço
           cheio de peixe em promoção. */}
       {relacionados.length > 0 && (
         <section className="space-y-4">
           <h2 className="text-primary text-lg font-semibold">
-            Outros peixes da loja
+            {relacionadosMedidos
+              ? "Quem viu este peixe também viu"
+              : "Outros peixes da loja"}
           </h2>
           <div className="flex gap-4 overflow-x-auto pb-2 -mx-1 px-1">
             {relacionados.map((r) => (

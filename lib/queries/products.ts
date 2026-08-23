@@ -4,6 +4,7 @@ import { ordenarVitrine } from "../estoque";
 import { calcularPrecos, type ConfigPreco } from "../precos";
 import { getConfigPreco } from "./config";
 import { resolverCampanhas } from "../campanha";
+import { EVENTOS } from "../rastreio/eventos";
 import type { CampanhaProduto, CampanhaInfo } from "../campanha-core";
 import type { Prisma } from "../generated/prisma/client";
 import type { ProductType, TipoComposicao } from "../generated/prisma/enums";
@@ -154,13 +155,77 @@ export function getCasais(): Promise<PublicProductCard[]> {
   return findCards({ ativo: true, category: { slug: "casais" } });
 }
 
-/** Relacionados: mesma categoria, exceto o próprio (placeholder da Leva 2). */
+/** Relacionados: mesma categoria, exceto o próprio. Usado quando não há medição. */
 export function getRelacionados(
   categoryId: string,
   excluirId: string,
   take = 8,
 ): Promise<PublicProductCard[]> {
   return findCards({ ativo: true, categoryId, id: { not: excluirId } }, take);
+}
+
+// ── "Quem viu este peixe também viu" (medido de verdade) ─────────────────────
+
+/** Janela de apuração. Fora disso o gosto do visitante já mudou. */
+const COVISTO_DIAS = 90;
+/**
+ * Mínimo de pessoas por par. Com 1 só, "quem viu também viu" seria a opinião de
+ * uma pessoa apresentada como tendência.
+ */
+const COVISTO_MIN_PESSOAS = 2;
+/** Abaixo disso a seção não afirma medição e cai para os relacionados. */
+export const COVISTO_MIN_ITENS = 3;
+
+/**
+ * Peixes que as MESMAS pessoas que viram este também viram, contando pessoas
+ * distintas (não visitas): quem abre o mesmo produto dez vezes conta uma.
+ *
+ * Conta por visitante e não por sessão de propósito — voltar dias depois e
+ * olhar outro peixe é o mesmo interesse, e a frase continua verdadeira.
+ *
+ * Quem está logado como equipe fica de fora: a gente navega no próprio site o
+ * dia inteiro e enviesaria o resultado.
+ */
+export async function getCoVistos(
+  produtoId: string,
+  take = 8,
+): Promise<PublicProductCard[]> {
+  const desde = new Date(Date.now() - COVISTO_DIAS * 24 * 60 * 60 * 1000);
+
+  const pares = await prisma.$queryRaw<{ id: string; pessoas: number }[]>`
+    WITH quem AS (
+      SELECT DISTINCT e."visitanteId"
+      FROM "EventoVisitante" e
+      LEFT JOIN "Visitante" v ON v.id = e."visitanteId"
+      LEFT JOIN "User" u ON u.id = v."userId"
+      WHERE e.tipo = ${EVENTOS.PRODUTO}
+        AND e."produtoId" = ${produtoId}
+        AND e."ocorridoEm" >= ${desde}
+        AND (u.id IS NULL OR u.role = 'CUSTOMER')
+    )
+    SELECT e."produtoId" AS id, COUNT(DISTINCT e."visitanteId")::int AS pessoas
+    FROM "EventoVisitante" e
+    JOIN quem q ON q."visitanteId" = e."visitanteId"
+    WHERE e.tipo = ${EVENTOS.PRODUTO}
+      AND e."ocorridoEm" >= ${desde}
+      AND e."produtoId" IS NOT NULL
+      AND e."produtoId" <> ${produtoId}
+    GROUP BY e."produtoId"
+    HAVING COUNT(DISTINCT e."visitanteId") >= ${COVISTO_MIN_PESSOAS}
+    ORDER BY pessoas DESC, e."produtoId" ASC
+    LIMIT ${take}
+  `;
+  if (pares.length === 0) return [];
+
+  const ids = pares.map((p) => p.id);
+  const cards = await findCards({ ativo: true, id: { in: ids } }, ids.length);
+
+  // findCards ordena por mais recente; aqui a ordem que importa é a da medição.
+  // Produto desativado some da lista sem quebrar nada.
+  const posicao = new Map(ids.map((id, i) => [id, i]));
+  return cards.sort(
+    (a, b) => (posicao.get(a.id) ?? 999) - (posicao.get(b.id) ?? 999),
+  );
 }
 
 // ── Listagem /loja (vitrine: busca + categoria + ordenação + paginação) ───────

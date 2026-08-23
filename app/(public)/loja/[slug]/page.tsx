@@ -5,6 +5,8 @@ import {
   getProductBySlug,
   getRelacionados,
   getUltimosAdicionados,
+  getCoVistos,
+  COVISTO_MIN_ITENS,
 } from "@/lib/queries/products";
 import { getConfigPreco, getFreteGratisConfig } from "@/lib/queries/config";
 import { calcularPrecos } from "@/lib/precos";
@@ -97,11 +99,18 @@ export default async function ProdutoPage({ params }: Props) {
   if (!produto) notFound();
   const prod = produto;
 
-  // Mesma categoria; se a categoria só tem este produto, cai para recentes (sem
-  // o atual) — evita o carrossel vazio.
-  let relacionados = await getRelacionados(prod.categoryId, prod.id);
-  if (relacionados.length === 0) {
-    relacionados = (await getUltimosAdicionados()).filter((p) => p.id !== prod.id);
+  // Primeiro o que foi medido: peixes que as mesmas pessoas também abriram.
+  // Só vale como "quem viu também viu" se der lista suficiente — abaixo disso
+  // seria coincidência de dois ou três cliques virando recomendação.
+  let relacionados = await getCoVistos(prod.id);
+  const medido = relacionados.length >= COVISTO_MIN_ITENS;
+
+  if (!medido) {
+    // Sem medição: mesma categoria e, se ela só tiver este produto, os recentes.
+    relacionados = await getRelacionados(prod.categoryId, prod.id);
+    if (relacionados.length === 0) {
+      relacionados = (await getUltimosAdicionados()).filter((p) => p.id !== prod.id);
+    }
   }
 
   // Desconto Pix global (lib/precos é a fonte única; o ProductDetail calcula o
@@ -193,6 +202,7 @@ export default async function ProdutoPage({ params }: Props) {
       <ProductDetail
         product={prod}
         relacionados={relacionados}
+        relacionadosMedidos={medido}
         descontoPixGlobalPercent={descontoPixGlobalPercent}
         campanha={campanha}
         freteGratis={freteGratis}
