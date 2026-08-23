@@ -12,6 +12,9 @@
 //
 // O texto também não cita prêmio: o título de tricampeão é da criação, não dos
 // peixes que aparecem na arte.
+//
+// Depois de gerar, suba o ?v= em lib/seo.ts e app/layout.tsx. WhatsApp e
+// Facebook guardam a prévia pela URL: mesmo nome de arquivo, imagem velha.
 import { statSync, existsSync, readdirSync } from "node:fs";
 
 // O sharp vem junto do Next (é ele quem otimiza imagem), mas o pnpm não o
@@ -81,7 +84,7 @@ const texto = Buffer.from(`<svg width="640" height="200" xmlns="http://www.w3.or
     .s { font-family: 'Nunito','Trebuchet MS',sans-serif; font-weight:600; fill:#cfe3f7; font-size:26px }
   </style>
   <text x="0" y="46" class="t">Guppys de linhagem</text>
-  <text x="0" y="96" class="t">criados em Guarapari/ES</text>
+  <text x="0" y="96" class="t">padrão premium</text>
   <text x="0" y="146" class="s">Envio de peixe vivo para todo o Brasil</text>
 </svg>`);
 

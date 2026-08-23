@@ -10,8 +10,11 @@ export const SITE_NAME = "Guppy de Linhagem";
 // vez do banner), JPEG (WebP é o formato que o WhatsApp menos suporta em prévia)
 // e a arte do hero, que é a cara do site. Gerado de public/images/hero +
 // public/logo.png; para refazer, veja docs/og-cartao-compartilhamento.md.
+// O ?v= existe porque WhatsApp e Facebook guardam a prévia pela URL da imagem.
+// Trocou a arte? Suba o número, senão quem já compartilhou continua vendo a
+// versão velha por dias.
 export const OG_DEFAULT = {
-  url: "/images/og-home.jpg",
+  url: "/images/og-home.jpg?v=2",
   width: 1200,
   height: 630,
   type: "image/jpeg",
