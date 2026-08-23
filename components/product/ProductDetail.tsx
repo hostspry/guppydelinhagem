@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { VideoThumb } from "@/components/admin/VideoThumb";
+import ProductCardSimple from "@/components/product/ProductCardSimple";
 import { WhatsAppIcon } from "@/components/icons/WhatsAppIcon";
 import { TricampeaoBadge } from "@/components/site/TricampeaoBadge";
 import ProductFreteEstimator from "./ProductFreteEstimator";
@@ -856,40 +857,23 @@ export default function ProductDetail({
         })}
       </section>
 
-      {/* ═══ Quem viu também viu (placeholder Leva 2: mesma categoria) ═══ */}
+      {/* ═══ Outros peixes da loja ═══
+          Título antigo era "Quem viu este peixe também viu", o que afirmava um
+          comportamento de visitante que ninguém media: a lista é a mesma
+          categoria, mais recentes primeiro.
+          O preço sai do ProductCardSimple, o MESMO card da /loja. A marcação
+          escrita à mão que existia aqui só olhava precoPix e mostrava o preço
+          cheio de peixe em promoção. */}
       {relacionados.length > 0 && (
         <section className="space-y-4">
           <h2 className="text-primary text-lg font-semibold">
-            Quem viu este peixe também viu
+            Outros peixes da loja
           </h2>
           <div className="flex gap-4 overflow-x-auto pb-2 -mx-1 px-1">
             {relacionados.map((r) => (
-              <Link
-                key={r.id}
-                href={`/loja/${r.slug}`}
-                className="shrink-0 w-40 group"
-              >
-                <div className="relative aspect-[9/16] rounded-lg overflow-hidden bg-muted">
-                  {r.video?.thumbnailUrl ? (
-                    <VideoThumb src={r.video.thumbnailUrl} alt={r.nome} sizes="160px" />
-                  ) : (
-                    <div className="w-full h-full" />
-                  )}
-                </div>
-                <p className="mt-2 text-sm font-medium text-primary line-clamp-2 group-hover:text-accent transition-colors">
-                  {r.nome}
-                </p>
-                {/* Preço já calculado no servidor (mesmo desconto global da página) */}
-                <p className="text-green-600 font-bold text-sm">
-                  {formatBRL(r.precoPix)}
-                </p>
-                {r.descontoPixPercent > 0 && (
-                  <p className="text-xs text-muted-foreground">
-                    <span className="line-through">{formatBRL(r.precoCheio)}</span>{" "}
-                    no cartão
-                  </p>
-                )}
-              </Link>
+              <div key={r.id} className="shrink-0 w-44 sm:w-52">
+                <ProductCardSimple product={r} />
+              </div>
             ))}
           </div>
         </section>
