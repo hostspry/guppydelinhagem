@@ -9,6 +9,11 @@ import {
   MIMES_COMPROVANTE,
   type ComprovanteLido,
 } from "@/lib/ai/comprovante";
+import {
+  procurarMesmoPagamento,
+  procurarOrigemDoRepasse,
+  type LancamentoParecido,
+} from "@/lib/queries/financeiro";
 
 export type LeituraResult =
   | {
@@ -16,6 +21,14 @@ export type LeituraResult =
       dados: ComprovanteLido;
       comprovanteUrl: string | null;
       categoriaId: string | null;
+      /**
+       * Lançamentos que já parecem ser esse mesmo dinheiro. Quando o comprovante
+       * é transferência entre os sócios, são as entradas que podem ser a venda de
+       * origem (não lançar de novo). Nos demais casos, é o mesmo pagamento já
+       * registrado por outro documento.
+       */
+      parecidos: LancamentoParecido[];
+      parecidosSao: "ORIGEM_DO_REPASSE" | "MESMO_PAGAMENTO";
     }
   | { ok: false; error: string; comprovanteUrl?: string | null };
 
@@ -100,7 +113,32 @@ export async function lerComprovanteEnviado(
     const categoriaId = dados.categoriaSlug
       ? (categorias.find((c) => c.slug === dados.categoriaSlug)?.id ?? null)
       : null;
-    return { ok: true, dados, comprovanteUrl, categoriaId };
+
+    // Sem valor lido não dá pra procurar nada parecido — a busca é por valor exato.
+    // Sem data, assume hoje: comprovante costuma ser encaminhado no mesmo dia.
+    const data = dados.data ? new Date(`${dados.data}T12:00:00`) : new Date();
+    const parecidosSao = dados.entreTitulares
+      ? ("ORIGEM_DO_REPASSE" as const)
+      : ("MESMO_PAGAMENTO" as const);
+
+    let parecidos: LancamentoParecido[] = [];
+    if (dados.valor && dados.valor > 0) {
+      parecidos = dados.entreTitulares
+        ? await procurarOrigemDoRepasse({ valor: dados.valor, data })
+        : await procurarMesmoPagamento({
+            tipo: dados.tipo,
+            valor: dados.valor,
+            data,
+            contraparte: dados.contraparte,
+          });
+      // Sem nome batendo é quase sempre coincidência de preço de tabela, não
+      // duplicata. Só o repasse mostra os fracos, porque ali a pergunta é outra.
+      if (parecidosSao === "MESMO_PAGAMENTO") {
+        parecidos = parecidos.filter((p) => p.forca === "FORTE");
+      }
+    }
+
+    return { ok: true, dados, comprovanteUrl, categoriaId, parecidos, parecidosSao };
   } catch (e) {
     console.error("[comprovante] leitura", e);
     const msg =

@@ -480,3 +480,143 @@ export async function getRecorrencia(id: string): Promise<RecorrenciaItem | null
   const todas = await listarRecorrencias();
   return todas.find((r) => r.id === id) ?? null;
 }
+
+// ─────────────────────────────────────────────
+// "Esse dinheiro eu já conheço?"
+//
+// Duas perguntas diferentes que o leitor de comprovante precisa fazer antes de
+// criar mais uma linha no caixa:
+//
+//  1. MESMO PAGAMENTO, OUTRO DOCUMENTO. O cliente manda o print e depois o PDF;
+//     ou ele manda o print e o banco manda o aviso. Bytes diferentes, então a
+//     trava por hash do arquivo não pega. Entrada duplicada é pior que entrada
+//     faltando: o caixa fica maior do que o dinheiro real e nada parece errado.
+//
+//  2. REPASSE DE UMA VENDA QUE JÁ ENTROU. Um sócio passa pro outro dinheiro que
+//     já foi lançado quando o cliente pagou. Lançar de novo como saída faz a
+//     venda desaparecer do caixa.
+//
+// Cuidado que vale para as duas: peixe tem preço de tabela, então dois clientes
+// pagando R$ 250 no mesmo dia é rotina, não coincidência. Valor e data sozinhos
+// NÃO indicam duplicata — sem nome batendo, o alerta vira ruído e o dono para de
+// ler. Por isso a comparação de contraparte manda no resultado.
+// ─────────────────────────────────────────────
+
+export type LancamentoParecido = {
+  id: string;
+  tipo: "ENTRADA" | "SAIDA";
+  descricao: string;
+  valor: number;
+  data: Date;
+  status: string;
+  /** FORTE = nome bateu também. FRACO = só valor e data, sem nome pra comparar. */
+  forca: "FORTE" | "FRACO";
+};
+
+/** "José da Silva Souza" → ["JOSE", "SILVA", "SOUZA"] (descarta "da", "de"...). */
+function tokens(texto: string): string[] {
+  return texto
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase()
+    .split(/[^A-Z0-9]+/)
+    .filter((t) => t.length >= 4);
+}
+
+const JANELA_DUPLICATA_MS = 24 * 60 * 60 * 1000; // comprovante emitido no dia seguinte
+const DIAS_BUSCA_REPASSE = 30;
+
+/**
+ * Lançamentos que parecem ser ESTE MESMO pagamento já registrado. Compara valor
+ * exato (Pix não arredonda), data com um dia de folga e o nome da contraparte.
+ * Sem nome batendo, devolve FRACO — para o aviso poder ser mais discreto.
+ */
+export async function procurarMesmoPagamento(args: {
+  tipo: "ENTRADA" | "SAIDA";
+  valor: number;
+  data: Date;
+  contraparte: string | null;
+  ignorarId?: string;
+}): Promise<LancamentoParecido[]> {
+  const { tipo, valor, data, contraparte, ignorarId } = args;
+
+  const linhas = await prisma.lancamento.findMany({
+    where: {
+      tipo,
+      valor,
+      status: { not: "DESCARTADO" },
+      data: {
+        gte: new Date(data.getTime() - JANELA_DUPLICATA_MS),
+        lte: new Date(data.getTime() + JANELA_DUPLICATA_MS),
+      },
+      ...(ignorarId ? { id: { not: ignorarId } } : {}),
+    },
+    select: {
+      id: true,
+      tipo: true,
+      descricao: true,
+      valor: true,
+      data: true,
+      status: true,
+      observacoes: true,
+    },
+    orderBy: { data: "desc" },
+    take: 5,
+  });
+
+  const alvo = contraparte ? tokens(contraparte) : [];
+
+  return linhas.map((l) => {
+    const texto = tokens(`${l.descricao} ${l.observacoes ?? ""}`);
+    const comuns = alvo.filter((t) => texto.includes(t));
+    // Um sobrenome incomum já identifica; dois pedaços batendo dispensa dúvida.
+    const bateu = comuns.length >= 2 || (alvo.length === 1 && comuns.length === 1);
+    return {
+      id: l.id,
+      tipo: l.tipo as "ENTRADA" | "SAIDA",
+      descricao: l.descricao,
+      valor: Number(l.valor),
+      data: l.data,
+      status: l.status,
+      forca: bateu ? ("FORTE" as const) : ("FRACO" as const),
+    };
+  });
+}
+
+/**
+ * Para um repasse entre os sócios: entradas do mesmo valor já no caixa, que
+ * podem ser a venda de onde esse dinheiro veio. Nenhuma resposta aqui é prova —
+ * serve para o dono reconhecer a venda e decidir não lançar de novo.
+ *
+ * Só casa valor exato. Repasse que junta várias vendas numa transferência só não
+ * aparece, e é por isso que o aviso precisa dizer que não achou em vez de ficar
+ * calado.
+ */
+export async function procurarOrigemDoRepasse(args: {
+  valor: number;
+  data: Date;
+}): Promise<LancamentoParecido[]> {
+  const desde = new Date(args.data.getTime() - DIAS_BUSCA_REPASSE * 24 * 60 * 60 * 1000);
+
+  const linhas = await prisma.lancamento.findMany({
+    where: {
+      tipo: "ENTRADA",
+      valor: args.valor,
+      status: { not: "DESCARTADO" },
+      data: { gte: desde, lte: new Date(args.data.getTime() + JANELA_DUPLICATA_MS) },
+    },
+    select: { id: true, tipo: true, descricao: true, valor: true, data: true, status: true },
+    orderBy: { data: "desc" },
+    take: 5,
+  });
+
+  return linhas.map((l) => ({
+    id: l.id,
+    tipo: l.tipo as "ENTRADA" | "SAIDA",
+    descricao: l.descricao,
+    valor: Number(l.valor),
+    data: l.data,
+    status: l.status,
+    forca: "FORTE" as const,
+  }));
+}
