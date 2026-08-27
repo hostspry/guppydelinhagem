@@ -33,6 +33,7 @@ export function LeitorComprovante({
   const [texto, setTexto] = useState("");
   const [arquivo, setArquivo] = useState<File | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
+  const [entreTitulares, setEntreTitulares] = useState(false);
   const inputFile = useRef<HTMLInputElement>(null);
 
   function enviar() {
@@ -64,6 +65,7 @@ export function LeitorComprovante({
               observacoes: null,
               confianca: "BAIXA",
               aviso: null,
+              entreTitulares: false,
             },
             comprovanteUrl: r.comprovanteUrl,
             categoriaId: null,
@@ -79,6 +81,7 @@ export function LeitorComprovante({
         categoriaId: r.categoriaId,
       });
       setAviso(r.dados.aviso ?? AVISO_CONFIANCA[r.dados.confianca]);
+      setEntreTitulares(r.dados.entreTitulares);
       toast.success("Comprovante lido. Confira os campos abaixo.");
     });
   }
@@ -159,6 +162,20 @@ export function LeitorComprovante({
       {aviso && (
         <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded px-3 py-2 mt-3">
           {aviso}
+        </p>
+      )}
+
+      {/* Um sócio pagando o outro não dá para classificar sozinho: repasse de
+          venda já lançada não mexe no caixa, retirada de sócio é saída de
+          verdade. Só o motivo separa os dois, e errar aqui faz o dinheiro
+          aparecer ou sumir do caixa. */}
+      {entreTitulares && (
+        <p className="text-xs text-[#FF035C] bg-[#FF035C]/5 border border-[#FF035C]/30 rounded px-3 py-2 mt-3">
+          <strong className="font-semibold">Transferência entre vocês.</strong>{" "}
+          Antes de salvar, diga no campo de descrição qual foi o motivo. Se for
+          repasse de uma venda que já está no caixa, não lance de novo: o
+          dinheiro já entrou e lançar a saída faz ele sumir. Lance só quando for
+          retirada, pró-labore ou despesa que um pagou pelo outro.
         </p>
       )}
     </div>

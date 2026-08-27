@@ -94,10 +94,11 @@ Migration nova. Não mexe em `Lancamento`.
 
 ```prisma
 enum StatusIngestaoWa {
-  IGNORADA      // sem anexo, ou grupo/remetente fora da allowlist
-  LIDA          // IA leu, sugestão criada
-  FALHA_LEITURA // IA não conseguiu; arquivo guardado assim mesmo
-  DUPLICADA     // mesmo arquivo já virou lançamento
+  IGNORADA          // sem anexo, ou grupo/remetente fora da allowlist
+  LIDA              // IA leu, sugestão criada
+  AGUARDANDO_MOTIVO // transferência entre sócios; esperando a resposta no grupo
+  FALHA_LEITURA     // IA não conseguiu; arquivo guardado assim mesmo
+  DUPLICADA         // mesmo arquivo já virou lançamento
 }
 
 model MensagemWhatsapp {
@@ -144,18 +145,24 @@ Nada de corpo de mensagem aqui. Só metadado.
    o anexo já está guardado e dá pra lançar à mão. Mesma ordem que
    `actions/comprovante.ts` já usa.
 7. `lerComprovante()` com as categorias ativas, igual `actions/comprovante.ts:47`.
-8. Cria o `Lancamento`:
+8. **`entreTitulares === true` não vira lançamento nenhum.** Um sócio pagando o
+   outro não dá pra classificar sozinho: repasse de venda já lançada não mexe no
+   caixa, retirada de sócio é saída de verdade, e o comprovante é idêntico nos
+   dois casos. O robô pergunta o motivo no grupo e só lança depois da resposta.
+   Registra como `AGUARDANDO_MOTIVO` até lá. Nunca chutar: lançar repasse como
+   saída faz o dinheiro que entrou sumir do caixa.
+9. Cria o `Lancamento`:
    - `status: PENDENTE`, `origem: COMPROVANTE`, `canal: WHATSAPP`
    - `valor`, `data`, `descricao`, `categoriaId` do que a IA leu
    - `comprovanteUrl` preenchido
    - `observacoes` com contraparte, aviso da IA e confiança
    - `criadoPorId: null` (não foi pessoa do painel)
    - `data` ausente na leitura → usa a data da mensagem, e diz isso no aviso
-9. Responde no grupo com o resumo e o link pra `/admin/financeiro/pendencias`.
-10. **Falha da IA** → `FALHA_LEITURA` e mensagem no grupo com o link do arquivo
+10. Responde no grupo com o resumo e o link pra `/admin/financeiro/pendencias`.
+11. **Falha da IA** → `FALHA_LEITURA` e mensagem no grupo com o link do arquivo
     guardado, pedindo lançamento manual. Nunca ficar em silêncio: comprovante
     que some sem aviso é pior que erro de leitura.
-11. Sempre 200, salvo o 401 do passo 1. Erro interno vira log + aviso no grupo,
+12. Sempre 200, salvo o 401 do passo 1. Erro interno vira log + aviso no grupo,
     nunca 500 (o Evolution reenvia e vira loop).
 
 ## Fase E — Painel: gaveta própria pras sugestões de comprovante
@@ -182,7 +189,7 @@ Sem isso a sugestão cai na lista de contas a pagar (ver "Estado atual").
 - Confiança `BAIXA` destacada em vermelho. É o caso em que o dono precisa abrir
   o comprovante antes de confirmar.
 
-## Fase F — O sinal vai inverter (a parte mais importante)
+## Fase F — O sinal vai inverter (FEITA, commit 71672d3 e o seguinte)
 
 Hoje a regra 2 do prompt em `lib/ai/comprovante.ts` diz que `SAIDA` é
 "Pix enviado, transferência para terceiros". Só que o comprovante que o **cliente**
@@ -204,6 +211,13 @@ Correção: **decidir pelo destinatário, não pelo verbo.**
   chamada existente em `actions/comprovante.ts` junto — o painel ganha a mesma
   correção de graça.
 - Sem `CAIXA_TITULARES` configurado, mantém o comportamento de hoje.
+
+Feito também aqui: `ComprovanteLido.entreTitulares`. Quando os dois lados são do
+criadouro (um sócio pagando o outro), a IA marca e **não** classifica. O painel
+já mostra o alerta em vermelho; o webhook do WhatsApp precisa perguntar o motivo
+antes de lançar (passo 8 da Fase D). Verificado com 6 casos, incluindo o falso
+positivo perigoso: cliente chamado "Lucas da Silva Pereira" pagando o Manassés
+**não** é marcado como transferência interna.
 
 ## Fase G — Monitor de instância caída
 
@@ -247,6 +261,9 @@ Todas lidas em runtime. Nenhuma exposta no client.
 7. Com o Gemini fora do ar, o arquivo está no S3 e o grupo recebe o aviso de
    lançar à mão.
 8. Nenhum lançamento entra como `CONFIRMADO` sem alguém clicar.
+8b. Pix de um sócio para o outro **não** gera lançamento sozinho: o robô pergunta
+    o motivo no grupo e só lança depois da resposta. Repasse de venda já lançada
+    não vira saída.
 9. Sugestão de comprovante **não** aparece na lista de contas a pagar nem conta
    como vencida no selo da navegação.
 10. Derrubar a instância do Evolution dispara alerta no Telegram em até 15 min.

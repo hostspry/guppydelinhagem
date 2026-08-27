@@ -53,6 +53,14 @@ export type ComprovanteLido = {
   observacoes: string | null;
   confianca: "ALTA" | "MEDIA" | "BAIXA";
   aviso: string | null; // o que o modelo não conseguiu ler com segurança
+  /**
+   * Os DOIS lados da transação são do criadouro (um sócio pagando o outro,
+   * ou troca entre contas próprias). Não dá para classificar sozinho: repasse
+   * de venda já lançada não mexe no caixa, retirada de sócio é saída de
+   * verdade. Quem lança precisa dizer o motivo. Ver `tipo`: vem preenchido
+   * com o palpite, mas não deve ser usado sem confirmação.
+   */
+  entreTitulares: boolean;
 };
 
 const RESPONSE_SCHEMA = {
@@ -67,6 +75,7 @@ const RESPONSE_SCHEMA = {
     observacoes: { type: "string" },
     confianca: { type: "string", enum: ["ALTA", "MEDIA", "BAIXA"] },
     aviso: { type: "string" },
+    entreTitulares: { type: "boolean" },
   },
   required: ["tipo", "descricao", "confianca"],
 } as const;
@@ -81,6 +90,7 @@ const outputSchema = z.object({
   observacoes: z.string().optional(),
   confianca: z.enum(["ALTA", "MEDIA", "BAIXA"]),
   aviso: z.string().optional(),
+  entreTitulares: z.boolean().optional(),
 });
 
 /**
@@ -110,8 +120,10 @@ Como comparar: o nome pode vir abreviado, incompleto, sem acento ou em ordem dif
 Regras, nesta ordem:
 - RECEBEDOR (destino, favorecido, "para", "quem recebeu") é do nosso lado, então ENTRADA. Vale mesmo que o documento diga "Pix enviado", "você transferiu" ou "comprovante de envio": esse comprovante foi tirado pelo cliente, na perspectiva dele, e encaminhado para nós. É o caso mais comum aqui.
 - PAGADOR (origem, remetente, "de", "quem pagou") é do nosso lado, então SAIDA. Vale mesmo que o documento diga "Pix recebido".
-- Os dois lados são nossos (transferência entre contas próprias), então SAIDA, e explique em "aviso" que parece movimentação entre contas do próprio criadouro.
+- Os DOIS lados são nossos (um da lista pagando outro da lista, ou troca entre contas próprias): marque "entreTitulares" como true, preencha "tipo" com SAIDA só como palpite e diga em "aviso" quem pagou quem. NÃO tente adivinhar se foi repasse, acerto de contas ou retirada — quem lança vai informar o motivo.
 - Nenhum dos lados casa com a lista: aí sim use o verbo do documento como pista, marque confianca BAIXA e diga em "aviso" que não deu para identificar o titular.
+
+Em qualquer outro caso, "entreTitulares" é false.
 
 Nunca decida o tipo só porque leu a palavra "enviado" ou "recebido". Quem manda é o lado.`;
 }
@@ -268,5 +280,8 @@ export async function lerComprovante(
     observacoes: lido.observacoes?.trim() || null,
     confianca: lido.confianca,
     aviso: lido.aviso?.trim() || null,
+    // Sem titulares configurados não há como saber que os dois lados são nossos,
+    // então a marcação nunca liga sozinha.
+    entreTitulares: titulares.length > 0 && lido.entreTitulares === true,
   };
 }
