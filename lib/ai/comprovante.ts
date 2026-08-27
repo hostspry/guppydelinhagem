@@ -83,7 +83,44 @@ const outputSchema = z.object({
   aviso: z.string().optional(),
 });
 
-function instrucao(categorias: CategoriaDisponivel[], hoje: string): string {
+/**
+ * Regra de ENTRADA vs SAIDA.
+ *
+ * Sem titulares configurados, cai no comportamento antigo: decidir pelo verbo do
+ * documento ("Pix enviado" → saída). Isso é suficiente para quem sobe o próprio
+ * extrato no painel e confere o rascunho antes de salvar.
+ *
+ * Com titulares, decide pelo LADO da transação. Isso existe porque comprovante
+ * encaminhado por cliente está escrito na perspectiva DELE — diz "enviado" para
+ * um dinheiro que, para nós, entrou. Pelo verbo, a IA inverteria o sinal do
+ * caixa; pelo recebedor, acerta.
+ */
+function regraDoTipo(titulares: string[]): string {
+  if (titulares.length === 0) {
+    return `2. TIPO: ENTRADA quando o dinheiro veio para o dono do criadouro (recebimento, venda, Pix recebido, depósito). SAIDA quando o dinheiro saiu (pagamento, compra, boleto pago, Pix enviado, transferência para terceiros). Na dúvida entre os dois, escolha o mais provável, marque confianca BAIXA e explique em "aviso".`;
+  }
+
+  return `2. TIPO: decida por QUEM ESTÁ EM CADA LADO da transação, nunca pelo verbo do documento.
+
+Estes nomes, documentos e chaves Pix são do criadouro (o "nosso lado"):
+${titulares.map((t) => `- ${t}`).join("\n")}
+
+Como comparar: o nome pode vir abreviado, incompleto, sem acento ou em ordem diferente. CPF e CNPJ quase sempre vêm mascarados (***.456.789-**) — considere compatível quando as partes visíveis batem. Basta um dos dados casar.
+
+Regras, nesta ordem:
+- RECEBEDOR (destino, favorecido, "para", "quem recebeu") é do nosso lado, então ENTRADA. Vale mesmo que o documento diga "Pix enviado", "você transferiu" ou "comprovante de envio": esse comprovante foi tirado pelo cliente, na perspectiva dele, e encaminhado para nós. É o caso mais comum aqui.
+- PAGADOR (origem, remetente, "de", "quem pagou") é do nosso lado, então SAIDA. Vale mesmo que o documento diga "Pix recebido".
+- Os dois lados são nossos (transferência entre contas próprias), então SAIDA, e explique em "aviso" que parece movimentação entre contas do próprio criadouro.
+- Nenhum dos lados casa com a lista: aí sim use o verbo do documento como pista, marque confianca BAIXA e diga em "aviso" que não deu para identificar o titular.
+
+Nunca decida o tipo só porque leu a palavra "enviado" ou "recebido". Quem manda é o lado.`;
+}
+
+function instrucao(
+  categorias: CategoriaDisponivel[],
+  hoje: string,
+  titulares: string[],
+): string {
   const lista = categorias
     .map((c) => `- ${c.slug} (${c.nome}${c.tipo ? `, ${c.tipo.toLowerCase()}` : ""})`)
     .join("\n");
@@ -96,7 +133,7 @@ Regras que importam:
 
 1. VALOR: pegue o valor da transação, não o saldo da conta, não a tarifa, não o limite. Em comprovante de Pix é o "valor" ou "valor enviado/recebido". Use ponto como separador decimal (ex: 1234.56). Se houver mais de um valor possível e você não tiver certeza de qual é a transação, deixe "valor" fora e explique em "aviso".
 
-2. TIPO: ENTRADA quando o dinheiro veio para o dono do criadouro (recebimento, venda, Pix recebido, depósito). SAIDA quando o dinheiro saiu (pagamento, compra, boleto pago, Pix enviado, transferência para terceiros). Na dúvida entre os dois, escolha o mais provável, marque confianca BAIXA e explique em "aviso".
+${regraDoTipo(titulares)}
 
 3. DATA: formato AAAA-MM-DD, a data em que o dinheiro se moveu. Hoje é ${hoje}. Comprovante brasileiro usa DD/MM/AAAA — não troque dia com mês. Sem data legível, deixe o campo fora.
 
@@ -140,9 +177,23 @@ function dataValida(iso: string | undefined): string | null {
   return iso;
 }
 
+/**
+ * Nome, razão social, CPF/CNPJ e chaves Pix do criadouro, separados por ";" em
+ * CAIXA_TITULARES. É o que permite decidir entrada/saída pelo lado da transação
+ * em vez do verbo do documento. Lido em RUNTIME (nunca no topo do módulo).
+ * Vazio ou ausente mantém o comportamento antigo.
+ */
+export function titularesConfigurados(): string[] {
+  return (process.env.CAIXA_TITULARES ?? "")
+    .split(";")
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
 export async function lerComprovante(
   entrada: EntradaComprovante,
   categorias: CategoriaDisponivel[],
+  titulares: string[] = titularesConfigurados(),
 ): Promise<ComprovanteLido> {
   const hoje = new Date().toISOString().slice(0, 10);
 
@@ -161,7 +212,9 @@ export async function lerComprovante(
         ];
 
   const body = JSON.stringify({
-    systemInstruction: { parts: [{ text: instrucao(categorias, hoje) }] },
+    systemInstruction: {
+      parts: [{ text: instrucao(categorias, hoje, titulares) }],
+    },
     contents: [{ role: "user", parts }],
     generationConfig: {
       responseMimeType: "application/json",
