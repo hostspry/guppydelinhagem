@@ -127,6 +127,12 @@ export default function ProductDetail({
   const [qtd, setQtd] = useState(1);
   const [playing, setPlaying] = useState(false);
   const [selectedId, setSelectedId] = useState(product.videos[0]?.id ?? null);
+  // Produto sem vídeo (ração, filtro, criadeira) mostra a galeria de fotos no
+  // lugar do player. Peixe continua entrando pelo vídeo, como sempre.
+  const [fotoIdx, setFotoIdx] = useState(0);
+  const semVideo = product.videos.length === 0;
+  const fotos = product.fotos ?? [];
+  const fotoAtual = fotos[fotoIdx] ?? fotos[0] ?? null;
   const [descExpandida, setDescExpandida] = useState(false);
   const [barFill, setBarFill] = useState(0); // anima o preenchimento ao montar
   const addItem = useCart((s) => s.addItem);
@@ -184,7 +190,10 @@ export default function ProductDetail({
   const promo = campanha
     ? precoComCampanha(precoCheio, descontoPercent, campanha)
     : null;
-  const capa = product.videos.find((v) => v.principal)?.thumbnailUrl ?? null;
+  const capa =
+    product.videos.find((v) => v.principal)?.thumbnailUrl ??
+    fotos[0]?.url ??
+    null;
 
   // GA4 view_item — uma vez por produto (preço Pix da composição inicial).
   const viewFired = useRef(false);
@@ -356,12 +365,48 @@ export default function ProductDetail({
                   <Play className="w-7 h-7 text-white fill-white" aria-hidden="true" />
                 </button>
               </>
+            ) : fotoAtual ? (
+              <Image
+                src={fotoAtual.url}
+                alt={fotoAtual.alt || product.nome}
+                fill
+                sizes="(max-width: 1024px) 100vw, 40vw"
+                className="object-cover"
+                priority
+              />
             ) : (
               <div className="w-full h-full flex items-center justify-center text-sm text-muted-foreground">
-                sem vídeo
+                sem mídia
               </div>
             )}
           </div>
+
+          {/* Miniaturas das fotos — só quando a galeria é a mídia principal. */}
+          {semVideo && fotos.length > 1 && (
+            <div className="flex flex-wrap gap-2">
+              {fotos.map((f, i) => (
+                <button
+                  type="button"
+                  key={f.url}
+                  onClick={() => setFotoIdx(i)}
+                  aria-label={`Ver foto ${i + 1}`}
+                  className={`relative w-14 aspect-square rounded-lg overflow-hidden border-2 transition-colors ${
+                    i === fotoIdx
+                      ? "border-secondary"
+                      : "border-transparent hover:border-border"
+                  }`}
+                >
+                  <Image
+                    src={f.url}
+                    alt=""
+                    fill
+                    sizes="56px"
+                    className="object-cover"
+                  />
+                </button>
+              ))}
+            </div>
+          )}
 
           {product.videos.length > 1 && (
             <div className="flex flex-wrap gap-2">

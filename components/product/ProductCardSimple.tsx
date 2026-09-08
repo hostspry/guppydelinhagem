@@ -42,10 +42,18 @@ export default function ProductCardSimple({
     >
       {/* Capa 9:16 — só thumbnail (leve e escaneável) */}
       <div className="relative aspect-[9/16] overflow-hidden bg-muted">
+        {/* Vídeo manda na capa quando existe (é como o peixe se vende); sem
+            vídeo, entra a foto do produto. */}
         {product.video?.thumbnailUrl ? (
           <VideoThumb
             src={product.video.thumbnailUrl}
             alt={product.nome}
+            sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+          />
+        ) : product.imagem ? (
+          <VideoThumb
+            src={product.imagem.url}
+            alt={product.imagem.alt || product.nome}
             sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
           />
         ) : (

@@ -34,6 +34,13 @@ export type PublicProductCard = {
     videoId: string | null;
     originalUrl: string;
   } | null;
+  /**
+   * Foto de capa, usada quando o produto não tem vídeo.
+   *
+   * Peixe se vende por vídeo e continua assim; ração, criadeira e filtro não
+   * têm vídeo nenhum, e sem isto apareceriam como "sem mídia" na vitrine.
+   */
+  imagem: { url: string; alt: string | null } | null;
 };
 
 const cardSelect = {
@@ -53,6 +60,8 @@ const cardSelect = {
   estoqueMachos: true,
   estoqueFemeas: true,
   tipo: true, // ordenarVitrine: em não-peixe a disponibilidade é `estoque`
+  // Foto de capa: a primeira da lista. Só é usada quando não há vídeo.
+  imagens: { orderBy: { ordem: "asc" }, take: 1, select: { url: true, alt: true } },
   // Vídeo de capa: principal primeiro, senão o de menor ordem. Só ativos (loja).
   videos: {
     where: { ativo: true },
@@ -100,6 +109,7 @@ function toCard(p: CardRow, config: ConfigPreco): PublicProductCard {
           originalUrl: v.originalUrl,
         }
       : null,
+    imagem: p.imagens[0] ?? null,
   };
 }
 
@@ -341,6 +351,8 @@ export type ProductDetail = {
   alimentacao: string | null;
   expectativaVida: string | null;
   videos: ProductDetailVideo[];
+  /** Fotos do produto. Viram a galeria quando não há vídeo. */
+  fotos: { url: string; alt: string | null }[];
   // Composições ativas (TRIO/padrão primeiro). Vazio em produtos não-peixe.
   variantes: {
     id: string;
@@ -393,6 +405,7 @@ export const getProductBySlug = cache(
         alimentacao: true,
         expectativaVida: true,
         category: { select: { nome: true, slug: true } },
+        imagens: { orderBy: { ordem: "asc" }, select: { url: true, alt: true } },
         videos: {
           where: { ativo: true }, // loja mostra só vídeos ativos
           orderBy: [{ principal: "desc" }, { ordem: "asc" }],
@@ -453,6 +466,7 @@ export const getProductBySlug = cache(
       alimentacao: p.alimentacao,
       expectativaVida: p.expectativaVida,
       videos: p.videos,
+      fotos: p.imagens,
       variantes: p.variantes.map((v) => ({
         id: v.id,
         composicao: v.composicao,
@@ -594,6 +608,7 @@ export async function getProductById(id: string) {
     include: {
       // Principal primeiro, depois pela ordem dos adicionais.
       videos: { orderBy: [{ principal: "desc" }, { ordem: "asc" }] },
+      imagens: { orderBy: { ordem: "asc" } },
       variantes: { orderBy: [{ padrao: "desc" }, { ordem: "asc" }] },
     },
   });
@@ -607,6 +622,7 @@ export async function getProductById(id: string) {
     comprimento: p.comprimento == null ? null : Number(p.comprimento),
     largura: p.largura == null ? null : Number(p.largura),
     altura: p.altura == null ? null : Number(p.altura),
+    imagens: p.imagens.map((img) => ({ url: img.url, alt: img.alt ?? "" })),
     variantes: p.variantes.map((v) => ({
       composicao: v.composicao,
       preco: Number(v.preco),

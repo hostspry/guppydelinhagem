@@ -1,5 +1,6 @@
 "use server";
 
+import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
@@ -158,6 +159,43 @@ function parseVideos(
   return { ok: true, videos: parsed.data };
 }
 
+const imagensSchema = z
+  .array(
+    z.object({
+      url: z.string().url("URL de imagem inválida"),
+      alt: z.string().max(200).optional().default(""),
+    }),
+  )
+  .max(8, "Máximo de 8 fotos");
+
+/** Fotos do produto, serializadas em JSON pelo ProductImagesField. */
+function parseImagens(
+  formData: FormData,
+): { ok: true; imagens: { url: string; alt: string }[] } | { ok: false } {
+  const raw = formData.get("imagens");
+  if (typeof raw !== "string" || raw.trim() === "") {
+    return { ok: true, imagens: [] };
+  }
+  let json: unknown;
+  try {
+    json = JSON.parse(raw);
+  } catch {
+    return { ok: false };
+  }
+  const parsed = imagensSchema.safeParse(json);
+  if (!parsed.success) return { ok: false };
+  return { ok: true, imagens: parsed.data };
+}
+
+/** Ordem pela posição na lista: a primeira é a capa. */
+function buildImagemCreates(imagens: { url: string; alt: string }[]) {
+  return imagens.map((img, i) => ({
+    url: img.url,
+    alt: img.alt.trim() ? img.alt.trim() : null,
+    ordem: i,
+  }));
+}
+
 /**
  * Aplica a regra do principal (exatamente um) e mapeia para o input de create
  * aninhado do Prisma, atribuindo `ordem` pela posição. Se nenhum vier marcado e
@@ -196,6 +234,10 @@ export async function createProduct(formData: FormData): Promise<ActionResult> {
   if (!videos.ok) {
     return { success: false, error: "Dados de vídeo inválidos." };
   }
+  const imagens = parseImagens(formData);
+  if (!imagens.ok) {
+    return { success: false, error: "Dados de foto inválidos." };
+  }
 
   let criadoId = "";
   try {
@@ -204,6 +246,7 @@ export async function createProduct(formData: FormData): Promise<ActionResult> {
       data: {
         ...scalarData(parsed.data),
         videos: { create: buildVideoCreates(videos.videos) },
+        imagens: { create: buildImagemCreates(imagens.imagens) },
         variantes: { create: buildVariantCreates(parsed.data.variantes) },
       },
       select: { id: true },
@@ -274,6 +317,10 @@ export async function updateProduct(
   if (!videos.ok) {
     return { success: false, error: "Dados de vídeo inválidos." };
   }
+  const imagens = parseImagens(formData);
+  if (!imagens.ok) {
+    return { success: false, error: "Dados de foto inválidos." };
+  }
 
   // Variantes: reconcilia por COMPOSIÇÃO (upsert) — NÃO recria IDs (mantém o
   // variantId estável p/ carrinhos salvos no localStorage). Composições ausentes
@@ -288,6 +335,13 @@ export async function updateProduct(
           videos: {
             deleteMany: {},
             create: buildVideoCreates(videos.videos),
+          },
+          // Fotos por substituição, igual aos vídeos: a lista que chega é a
+          // verdade. O arquivo no Garage não é apagado aqui de propósito —
+          // remover a linha é reversível, apagar o arquivo não.
+          imagens: {
+            deleteMany: {},
+            create: buildImagemCreates(imagens.imagens),
           },
         },
       }),

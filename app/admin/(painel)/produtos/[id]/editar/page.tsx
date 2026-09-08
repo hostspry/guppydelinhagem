@@ -82,6 +82,7 @@ export default async function EditarProdutoPage({ params }: Props) {
             principal: v.principal,
             ativo: v.ativo,
           })),
+          imagens: produto.imagens,
           variantes: produto.variantes,
         }}
       />

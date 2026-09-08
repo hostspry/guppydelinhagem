@@ -32,6 +32,10 @@ import { MARCHEZI_SIGNATURE } from "@/lib/constants";
 import { createProduct, updateProduct } from "@/actions/products";
 import { generateContent } from "@/actions/ai";
 import { ProductVideosField } from "./ProductVideosField";
+import {
+  ProductImagesField,
+  type ImagemDraft,
+} from "./ProductImagesField";
 import { KeywordsField } from "./KeywordsField";
 import { SuggestInput } from "./SuggestInput";
 
@@ -96,6 +100,7 @@ type ProductFormProps = {
     metaTitle: string | null;
     metaDescription: string | null;
     keywords: string[];
+    imagens?: ImagemDraft[];
     padraoCor: string | null;
     cauda: string | null;
     caracteristica: string | null;
@@ -113,6 +118,9 @@ export function ProductForm({ categorias, initialData }: ProductFormProps) {
   const [isPending, startTransition] = useTransition();
   const [slugManuallyEdited, setSlugManuallyEdited] = useState(!!initialData);
   const [videos, setVideos] = useState<VideoDraft[]>(initialData?.videos ?? []);
+  const [imagens, setImagens] = useState<ImagemDraft[]>(
+    initialData?.imagens ?? [],
+  );
   const [keywords, setKeywords] = useState<string[]>(
     initialData?.keywords ?? [],
   );
@@ -241,6 +249,9 @@ export function ProductForm({ categorias, initialData }: ProductFormProps) {
 
   const tipo = watch("tipo");
   const isPeixe = tipo === "PEIXE";
+  // Fotos e vídeos valem para qualquer tipo: peixe também tem foto, ração
+  // também pode ter vídeo. O que muda entre os dois é a ficha técnica.
+  const semVideo = videos.length === 0;
   // Pool p/ o texto "dá para N trios · M casais" (só conferência).
   const poolMachos = Number(watch("estoqueMachos")) || 0;
   const poolFemeas = Number(watch("estoqueFemeas")) || 0;
@@ -430,6 +441,7 @@ export function ProductForm({ categorias, initialData }: ProductFormProps) {
     formData.append("ativo", String(data.ativo));
     formData.append("destaque", String(data.destaque));
     formData.append("linhagemCampea", String(data.linhagemCampea));
+    formData.append("imagens", JSON.stringify(imagens));
     if (data.metaTitle) formData.append("metaTitle", data.metaTitle);
     if (data.metaDescription)
       formData.append("metaDescription", data.metaDescription);
@@ -465,7 +477,10 @@ export function ProductForm({ categorias, initialData }: ProductFormProps) {
 
   return (
     <form onSubmit={onSubmit} className="max-w-2xl space-y-5">
-      {/* Gerar conteúdo com IA */}
+      {/* Gerar conteúdo com IA. O prompt é de guppy de linhagem (fala de cauda,
+          padrão de cor, manejo) — apontá-lo para uma ração produziria texto
+          errado com cara de certo, que é pior do que não gerar nada. */}
+      {isPeixe && (
       <fieldset className="bg-white border border-gray-200 rounded-lg p-5">
         <legend className="px-2 text-xs font-semibold text-[#07366A] uppercase tracking-wide">
           Gerar conteúdo com IA
@@ -548,6 +563,7 @@ export function ProductForm({ categorias, initialData }: ProductFormProps) {
           )}
         </div>
       </fieldset>
+      )}
 
       {/* Básico */}
       <fieldset className="bg-white border border-gray-200 rounded-lg p-5">
@@ -644,10 +660,13 @@ export function ProductForm({ categorias, initialData }: ProductFormProps) {
         </FormField>
       </fieldset>
 
-      {/* Atributos */}
+      {/* Ficha do peixe. Padrão de cor, cauda, temperatura e pH não dizem nada
+          sobre uma ração ou um filtro, então a seção inteira some fora do
+          peixe em vez de ficar pedindo dado que não existe. */}
+      {isPeixe && (
       <fieldset className="bg-white border border-gray-200 rounded-lg p-5">
         <legend className="px-2 text-xs font-semibold text-[#07366A] uppercase tracking-wide">
-          Atributos
+          Atributos do peixe
         </legend>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4">
@@ -729,9 +748,16 @@ export function ProductForm({ categorias, initialData }: ProductFormProps) {
           </FormField>
         </div>
       </fieldset>
+      )}
 
       {/* Vídeos */}
       <ProductVideosField value={videos} onChange={setVideos} />
+
+      <ProductImagesField
+        value={imagens}
+        onChange={setImagens}
+        semVideo={semVideo}
+      />
 
       {/* Preço / Composições */}
       <fieldset className="bg-white border border-gray-200 rounded-lg p-5">
@@ -1085,18 +1111,24 @@ export function ProductForm({ categorias, initialData }: ProductFormProps) {
           </span>
         </label>
 
-        <label className="flex items-start gap-2.5 cursor-pointer">
-          <input
-            type="checkbox"
-            {...register("linhagemCampea")}
-            className="mt-0.5 w-4 h-4 accent-[#FF035C]"
-          />
-          <span className="text-sm text-gray-700">
-            <span className="font-medium text-[#07366A]">Linhagem campeã mundial</span>{" "}
-            — mostra o selo de tricampeão (World Guppy Contest) no card e na página.
-            Marque só linhas que realmente foram campeãs.
-          </span>
-        </label>
+        {/* Selo de campeão mundial é coisa de linhagem de peixe; num filtro
+            não faz sentido nenhum. */}
+        {isPeixe && (
+          <label className="flex items-start gap-2.5 cursor-pointer">
+            <input
+              type="checkbox"
+              {...register("linhagemCampea")}
+              className="mt-0.5 w-4 h-4 accent-[#FF035C]"
+            />
+            <span className="text-sm text-gray-700">
+              <span className="font-medium text-[#07366A]">
+                Linhagem campeã mundial
+              </span>{" "}
+              — mostra o selo de tricampeão (World Guppy Contest) no card e na
+              página. Marque só linhas que realmente foram campeãs.
+            </span>
+          </label>
+        )}
       </fieldset>
 
       {/* SEO */}
