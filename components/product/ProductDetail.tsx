@@ -265,6 +265,7 @@ export default function ProductDetail({
         precoPix,
         precoCheio,
         qtdPeixes: variant ? qtdPeixesDe(variant) : 0,
+        tipo: product.tipo,
         thumbnail: capa,
         estoque: estoqueAtual,
       },

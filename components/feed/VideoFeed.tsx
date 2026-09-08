@@ -331,6 +331,7 @@ export default function VideoFeed({
         precoPix: precos.precoPix,
         precoCheio: precos.precoCartao,
         qtdPeixes: variant ? variant.qtdMachos + variant.qtdFemeas : 0,
+        tipo: p.tipo,
         thumbnail: current.video.thumbnailUrl,
         estoque: estoqueAtual,
       },

@@ -130,7 +130,10 @@ export type MeOpcoes = {
 };
 
 export type InserirCarrinhoInput = {
-  service: number; // 4 = Jadlog .Com
+  // Id do serviço no ME. Pedido de peixe é sempre 4 (Jadlog .Com, a única que
+  // leva carga viva); pedido seco usa o que o cliente escolheu no checkout,
+  // gravado em Order.servicoEnvioId.
+  service: number;
   from: MeEndereco;
   to: MeEndereco;
   products: MeProduto[];

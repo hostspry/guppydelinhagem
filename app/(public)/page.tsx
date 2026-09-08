@@ -9,7 +9,7 @@ import {
   listProductsLoja,
   type LojaOrdenacao,
 } from "@/lib/queries/products";
-import { listCategories } from "@/lib/queries/categories";
+import { listCategoriasPublicas } from "@/lib/queries/categories";
 import { HOME_BANNERS } from "@/lib/home-content";
 import { pageMeta, SITE_URL } from "@/lib/seo";
 import { onlineStoreJsonLd } from "@/lib/seo/jsonld";
@@ -63,7 +63,7 @@ export default async function HomePage({ searchParams }: Props) {
 
   const [{ items, total }, categorias] = await Promise.all([
     listProductsLoja({ busca, categoriaSlug: categoria, ordenacao: ordem }),
-    listCategories(),
+    listCategoriasPublicas(),
   ]);
 
   const { estufa: banner1, aprenda: banner2 } = HOME_BANNERS;

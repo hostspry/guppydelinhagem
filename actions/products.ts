@@ -45,6 +45,10 @@ function parseForm(formData: FormData) {
     estoque: formData.get("estoque"),
     estoqueMachos: formData.get("estoqueMachos"),
     estoqueFemeas: formData.get("estoqueFemeas"),
+    peso: formData.get("peso") || undefined,
+    comprimento: formData.get("comprimento") || undefined,
+    largura: formData.get("largura") || undefined,
+    altura: formData.get("altura") || undefined,
     categoryId: formData.get("categoryId"),
     ativo: formData.get("ativo"),
     destaque: formData.get("destaque"),
@@ -97,6 +101,12 @@ function scalarData(input: ProductInput) {
     estoque,
     estoqueMachos: machos,
     estoqueFemeas: femeas,
+    // Peixe despacha pela regra de caixa fixa: zera para não confundir quem
+    // olha o cadastro depois.
+    peso: isPeixe ? null : (input.peso ?? null),
+    comprimento: isPeixe ? null : (input.comprimento ?? null),
+    largura: isPeixe ? null : (input.largura ?? null),
+    altura: isPeixe ? null : (input.altura ?? null),
     categoryId: input.categoryId,
     ativo: input.ativo,
     destaque: input.destaque,

@@ -1,27 +1,11 @@
 import "server-only";
 import { MAX_PEIXES_POR_CAIXA } from "@/lib/constants";
 import type { ProductType } from "@/lib/generated/prisma/enums";
+import { FRETE_POR_TIPO } from "./frete-tipos";
 
-// Comportamento de frete por tipo de produto (mapa central — não espalhar `if`).
-// PEIXE é o caminho completo desta fase; os demais usam Product.peso (sem a regra
-// de caixa por nº de peixes). DIGITAL não calcula frete.
-export const FRETE_POR_TIPO: Record<
-  ProductType,
-  {
-    calculaFrete: boolean;
-    cargaViva: boolean;
-    regraCaixaPeixe: boolean;
-    avisoIdade: boolean;
-  }
-> = {
-  PEIXE: { calculaFrete: true, cargaViva: true, regraCaixaPeixe: true, avisoIdade: true },
-  CORAL: { calculaFrete: true, cargaViva: true, regraCaixaPeixe: false, avisoIdade: true },
-  PLANTA: { calculaFrete: true, cargaViva: true, regraCaixaPeixe: false, avisoIdade: false },
-  ALIMENTO_VIVO: { calculaFrete: true, cargaViva: true, regraCaixaPeixe: false, avisoIdade: false },
-  RACAO: { calculaFrete: true, cargaViva: false, regraCaixaPeixe: false, avisoIdade: false },
-  ACESSORIO: { calculaFrete: true, cargaViva: false, regraCaixaPeixe: false, avisoIdade: false },
-  DIGITAL: { calculaFrete: false, cargaViva: false, regraCaixaPeixe: false, avisoIdade: false },
-};
+// Regras por tipo moram em lib/frete-tipos (módulo puro): o checkout no browser
+// precisa da mesma tabela e não pode importar deste arquivo (server-only).
+export { FRETE_POR_TIPO } from "./frete-tipos";
 
 // Config interna de frete. NUNCA importar de Client Component — o `server-only`
 // quebra o build se isso acontecer, evitando vazar markup/regras pro browser.
@@ -227,5 +211,256 @@ export async function cotarFrete(params: {
     };
   } catch {
     return { ok: false, status: 502, error: "Não foi possível calcular o frete agora." };
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PRODUTO SECO (não é carga viva): ração, criadeira, filtro, acessório.
+//
+// O peixe viaja em caixa de isopor e só pela Jadlog/aéreo, e por isso paga
+// markup + R$ 20 de isopor. Nada disso vale para uma ração de 300 g: ela cabe
+// em envelope, aceita qualquer transportadora do Melhor Envio e sai por menos
+// da metade. Aqui cotamos o catálogo inteiro do ME e cobramos a cotação + uma
+// taxa fixa de embalagem (editável no admin).
+//
+// Carrinho MISTO (peixe + seco) NÃO passa por aqui: manda a regra de carga viva,
+// tudo vai na mesma caixa de isopor. Ver carrinhoTemCargaViva.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Fallback de volume p/ produto seco sem peso/dimensão cadastrados. */
+export const PACOTE_SECO_PADRAO = {
+  pesoGramas: 500,
+  comprimento: 20,
+  largura: 15,
+  altura: 10,
+};
+
+// Mínimos aceitos pelas transportadoras (Correios é a mais restritiva: 16x11x2).
+// Mandar menos que isso faz o ME recusar a cotação inteira em vez de recusar só
+// aquele serviço, então normalizamos antes de perguntar.
+const MIN_CM = { comprimento: 16, largura: 11, altura: 2 };
+const MIN_PESO_KG = 0.3;
+
+type MeVolumeCalc = {
+  height: number;
+  width: number;
+  length: number;
+  weight: number;
+  insurance_value: number;
+};
+
+export type ItemFreteSeco = {
+  tipo: ProductType;
+  quantidade: number;
+  pesoGramas: number | null;
+  comprimento: number | null;
+  largura: number | null;
+  altura: number | null;
+};
+
+/** true se QUALQUER item do carrinho é carga viva (peixe, planta, coral…). */
+export function carrinhoTemCargaViva(itens: { tipo: ProductType }[]): boolean {
+  return itens.some((it) => FRETE_POR_TIPO[it.tipo].cargaViva);
+}
+
+/** true se o carrinho tem ao menos um item que cobra frete. */
+export function carrinhoCobraFrete(itens: { tipo: ProductType }[]): boolean {
+  return itens.some((it) => FRETE_POR_TIPO[it.tipo].calculaFrete);
+}
+
+/**
+ * Um volume por unidade comprada. Não tentamos "encaixotar" nada: o ME aceita
+ * vários volumes e cada transportadora aplica a própria cubagem, o que dá um
+ * preço mais honesto do que chutar uma caixa única.
+ */
+export function volumesDoCarrinhoSeco(itens: ItemFreteSeco[]): MeVolumeCalc[] {
+  const volumes: MeVolumeCalc[] = [];
+  for (const it of itens) {
+    if (!FRETE_POR_TIPO[it.tipo].calculaFrete) continue; // DIGITAL não despacha
+    const vol = {
+      height: Math.max(it.altura ?? PACOTE_SECO_PADRAO.altura, MIN_CM.altura),
+      width: Math.max(it.largura ?? PACOTE_SECO_PADRAO.largura, MIN_CM.largura),
+      length: Math.max(
+        it.comprimento ?? PACOTE_SECO_PADRAO.comprimento,
+        MIN_CM.comprimento,
+      ),
+      weight: Math.max(
+        (it.pesoGramas ?? PACOTE_SECO_PADRAO.pesoGramas) / 1000,
+        MIN_PESO_KG,
+      ),
+      insurance_value: 0,
+    };
+    for (let i = 0; i < it.quantidade; i++) volumes.push({ ...vol });
+  }
+  return volumes;
+}
+
+export type OpcaoFreteSeco = {
+  servicoId: number;
+  empresa: string;
+  servico: string;
+  /** Rótulo pro cliente: "Loggi Express". */
+  label: string;
+  preco: number;
+  prazoDias: number;
+};
+
+export type CotacaoSeco = {
+  endereco: FreteEndereco | null;
+  /** Menor preço e menor prazo. Vem só uma quando é a mesma transportadora. */
+  opcoes: OpcaoFreteSeco[];
+};
+
+export type CotarSecoResult =
+  | { ok: true; data: CotacaoSeco }
+  | { ok: false; status: number; error: string };
+
+/**
+ * Cota TODAS as transportadoras do Melhor Envio para um pacote seco e devolve
+ * no máximo duas opções: a mais barata e a mais rápida.
+ *
+ * taxaEmbalagem entra UMA vez no preço final (é a caixa do pedido, não de cada
+ * volume) e vem da config da loja — nunca hardcode aqui.
+ */
+export async function cotarFreteSeco(params: {
+  cepDestino: string;
+  volumes: MeVolumeCalc[];
+  valorSegurado: number;
+  taxaEmbalagem: number;
+}): Promise<CotarSecoResult> {
+  const token = process.env.MELHOR_ENVIO_TOKEN;
+  if (!token) {
+    return {
+      ok: false,
+      status: 502,
+      error: "Serviço de frete indisponível no momento.",
+    };
+  }
+  const cep = String(params.cepDestino ?? "").replace(/\D/g, "");
+  if (!/^\d{8}$/.test(cep)) {
+    return {
+      ok: false,
+      status: 400,
+      error: "CEP de destino inválido. Use 8 dígitos.",
+    };
+  }
+  if (params.volumes.length === 0) {
+    return { ok: false, status: 400, error: "Nenhum item para despachar." };
+  }
+
+  // O seguro é do pedido inteiro; concentramos no primeiro volume para não
+  // multiplicar o valor segurado (e o preço) por volume.
+  const volumes = params.volumes.map((v, i) => ({
+    ...v,
+    insurance_value: i === 0 ? params.valorSegurado : 0,
+  }));
+
+  const [meSettled, viacepSettled] = await Promise.allSettled([
+    fetch(ME_ENDPOINT, {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+        "User-Agent": "Guppy de Linhagem (contato@guppydelinhagem.com.br)",
+      },
+      // SEM services: queremos o catálogo inteiro e escolhemos depois. Serviço
+      // que não atende o trecho volta com error e é descartado no filtro.
+      body: JSON.stringify({
+        from: { postal_code: FRETE_CONFIG.cepOrigem },
+        to: { postal_code: cep },
+        volumes,
+        options: { receipt: false, own_hand: false },
+      }),
+      cache: "no-store",
+    }),
+    fetch(VIACEP_ENDPOINT(cep), { cache: "no-store" }),
+  ]);
+
+  let endereco: FreteEndereco | null = null;
+  if (viacepSettled.status === "fulfilled" && viacepSettled.value.ok) {
+    try {
+      const data = (await viacepSettled.value.json()) as ViaCepResponse;
+      if (data.erro === true || data.erro === "true") {
+        return {
+          ok: false,
+          status: 400,
+          error: "CEP não encontrado. Confira o número ou use o CEP da sua rua.",
+        };
+      }
+      endereco = {
+        rua: data.logradouro?.trim() || null,
+        bairro: data.bairro?.trim() || null,
+        cidade: data.localidade?.trim() || null,
+        uf: data.uf?.trim() || null,
+      };
+    } catch {
+      // payload inválido — segue sem endereço
+    }
+  }
+
+  if (meSettled.status === "rejected" || !meSettled.value.ok) {
+    return {
+      ok: false,
+      status: 502,
+      error: "Não foi possível calcular o frete agora.",
+    };
+  }
+
+  try {
+    const rawResp = (await meSettled.value.json()) as unknown;
+    const raw: MeQuote[] = Array.isArray(rawResp)
+      ? (rawResp as MeQuote[])
+      : ([rawResp] as MeQuote[]);
+
+    const taxa = Math.max(0, params.taxaEmbalagem);
+    const validas = raw
+      .filter(
+        (q): q is MeQuoteOk =>
+          !("error" in q && q.error) && typeof (q as MeQuoteOk).price === "string",
+      )
+      .map((q) => {
+        const empresa = q.company?.name ?? "";
+        return {
+          servicoId: q.id,
+          empresa,
+          servico: q.name,
+          label: [empresa, q.name].filter(Boolean).join(" "),
+          preco: Math.round((parseFloat(q.price) + taxa) * 100) / 100,
+          prazoDias: q.delivery_time,
+        };
+      })
+      .filter((o) => Number.isFinite(o.preco) && o.preco > 0);
+
+    if (validas.length === 0) {
+      return {
+        ok: false,
+        status: 502,
+        error:
+          "Nenhuma transportadora atende esse CEP no momento. Finalize no WhatsApp.",
+      };
+    }
+
+    // Mais barata; empate de preço decide pelo menor prazo.
+    const maisBarata = [...validas].sort(
+      (a, b) => a.preco - b.preco || a.prazoDias - b.prazoDias,
+    )[0];
+    // Mais rápida; empate de prazo decide pelo menor preço.
+    const maisRapida = [...validas].sort(
+      (a, b) => a.prazoDias - b.prazoDias || a.preco - b.preco,
+    )[0];
+
+    const opcoes =
+      maisRapida.servicoId === maisBarata.servicoId
+        ? [maisBarata]
+        : [maisBarata, maisRapida];
+
+    return { ok: true, data: { endereco, opcoes } };
+  } catch {
+    return {
+      ok: false,
+      status: 502,
+      error: "Não foi possível calcular o frete agora.",
+    };
   }
 }

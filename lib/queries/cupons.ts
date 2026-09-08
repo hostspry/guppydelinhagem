@@ -158,11 +158,24 @@ export async function getCupomByCodigo(codigoNormalizado: string) {
       categorias: {
         select: {
           id: true,
-          produtos: { select: { estoqueMachos: true, estoqueFemeas: true } },
+          produtos: {
+              select: {
+                estoqueMachos: true,
+                estoqueFemeas: true,
+                tipo: true,
+                estoque: true,
+              },
+            },
         },
       },
       produtos: {
-        select: { id: true, estoqueMachos: true, estoqueFemeas: true },
+        select: {
+            id: true,
+            estoqueMachos: true,
+            estoqueFemeas: true,
+            tipo: true,
+            estoque: true,
+          },
       },
     },
   });

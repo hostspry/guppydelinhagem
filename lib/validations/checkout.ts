@@ -44,7 +44,12 @@ export const checkoutBaseSchema = z.object({
   transportadora: z.enum(Transportadora),
   // Modalidade escolhida pelo cliente: terrestre (Jadlog) ou aéreo (Gollog). O
   // valor é sempre recalculado no servidor conforme a modalidade.
-  modalidadeFrete: z.enum(["TERRESTRE", "AEREO"]).default("TERRESTRE"),
+  // SECO = carrinho sem carga viva: aí quem manda é o serviço do Melhor Envio
+  // escolhido em `servicoEnvioId`, não a dupla terrestre/aéreo do peixe.
+  modalidadeFrete: z.enum(["TERRESTRE", "AEREO", "SECO"]).default("TERRESTRE"),
+  // Serviço do Melhor Envio escolhido no carrinho seco. O servidor RE-COTA e só
+  // aceita um id que ele mesmo ofereceu; se vier lixo, cai na opção mais barata.
+  servicoEnvioId: z.coerce.number().int().positive().optional(),
   // Semana que o cliente prefere receber (segunda-feira, "AAAA-MM-DD"). Vazio =
   // "assim que estiver pronto". O servidor confere se está na janela oferecida.
   semanaEnvio: z

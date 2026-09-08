@@ -12,6 +12,7 @@ export default async function ConfiguracoesEntregaPage() {
         freteGratisAtivo: config.freteGratisAtivo,
         freteGratisAcimaDe: config.freteGratisAcimaDe,
         maxPeixesFreteAuto: config.maxPeixesFreteAuto,
+        taxaEmbalagemSeco: config.taxaEmbalagemSeco,
         retiradaLocalAtiva: config.retiradaLocalAtiva,
         retiradaInstrucoes: config.retiradaInstrucoes,
       }}

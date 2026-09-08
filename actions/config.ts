@@ -53,6 +53,14 @@ export async function salvarConfiguracaoLoja(
   const maxPeixesFreteAuto =
     Number.isFinite(maxRaw) && maxRaw >= 1 ? Math.round(maxRaw) : 10;
 
+  // Taxa fixa de embalagem do produto seco (caixa/plástico bolha). Somada à
+  // cotação do Melhor Envio — o isopor de R$ 20 continua sendo só do peixe.
+  const taxaRaw = Number(
+    String(formData.get("taxaEmbalagemSeco") ?? "").replace(",", "."),
+  );
+  const taxaEmbalagemSeco =
+    Number.isFinite(taxaRaw) && taxaRaw >= 0 ? Math.round(taxaRaw * 100) / 100 : 5;
+
   // Retirada local: toggle + texto livre das instruções (vazio → null).
   const retiradaLocalAtiva = formData.get("retiradaLocalAtiva") === "on";
   const retiradaInstrucoesRaw = String(
@@ -77,6 +85,7 @@ export async function salvarConfiguracaoLoja(
         freteGratisAtivo,
         freteGratisAcimaDe,
         maxPeixesFreteAuto,
+        taxaEmbalagemSeco,
         retiradaLocalAtiva,
         retiradaInstrucoes,
       }
@@ -94,6 +103,7 @@ export async function salvarConfiguracaoLoja(
         freteGratisAtivo,
         freteGratisAcimaDe,
         maxPeixesFreteAuto,
+        taxaEmbalagemSeco,
         retiradaLocalAtiva,
         retiradaInstrucoes,
         tarjaAtiva,

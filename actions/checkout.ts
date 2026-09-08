@@ -9,7 +9,14 @@ import {
   type CheckoutInput,
   type CheckoutFormInput,
 } from "@/lib/validations/checkout";
-import { calcularPesoECaixa, cotarFrete } from "@/lib/shipping";
+import type { ProductType } from "@/lib/generated/prisma/enums";
+import {
+  calcularPesoECaixa,
+  carrinhoTemCargaViva,
+  cotarFrete,
+  cotarFreteSeco,
+  volumesDoCarrinhoSeco,
+} from "@/lib/shipping";
 import { getPaymentProvider } from "@/lib/payments/registry";
 import { mensagemRecusa } from "@/lib/payments/mercadopago";
 import { transicionarParaPago } from "@/lib/pedido-baixa";
@@ -34,6 +41,7 @@ import {
   getFreteGratisConfig,
   getConfiguracaoLoja,
   getMaxPeixesFreteAuto,
+  getTaxaEmbalagemSeco,
 } from "@/lib/queries/config";
 import { COMPOSICAO_LABEL } from "@/lib/composicoes";
 import { freteGollog, LOJA_ENDERECO } from "@/lib/constants";
@@ -222,6 +230,12 @@ type ItemPrecificado = {
   qtdMachos: number | null;
   qtdFemeas: number | null;
   qtdPeixes: number;
+  // Insumos de frete: decidem carga viva x seco e montam o volume do ME.
+  tipo: ProductType;
+  pesoGramas: number | null;
+  comprimento: number | null;
+  largura: number | null;
+  altura: number | null;
 };
 
 type PrecificacaoResult =
@@ -233,6 +247,15 @@ type PrecificacaoResult =
       subtotalPix: number;
     }
   | { ok: false; error: string };
+
+/**
+ * Empresa do Melhor Envio → enum Transportadora. O enum tem 3 valores e o
+ * catálogo do ME muda sozinho, então só Jadlog tem correspondência direta; o
+ * resto vira OUTRO e o nome real fica em Order.servicoEnvioNome.
+ */
+function transportadoraDoServico(empresa: string): Transportadora {
+  return /jadlog/i.test(empresa) ? Transportadora.JADLOG : Transportadora.OUTRO;
+}
 
 /**
  * Recalcula preço de cada item DO BANCO (cheio + Pix com desconto efetivo via
@@ -252,6 +275,11 @@ async function precificarItens(
         preco: true,
         descontoPix: true,
         usarDescontoPixGlobal: true,
+        tipo: true,
+        peso: true,
+        comprimento: true,
+        largura: true,
+        altura: true,
         videos: {
           where: { principal: true },
           take: 1,
@@ -320,6 +348,11 @@ async function precificarItens(
         qtdMachos: variante.qtdMachos,
         qtdFemeas: variante.qtdFemeas,
         qtdPeixes,
+        tipo: prod.tipo,
+        pesoGramas: prod.peso == null ? null : Math.round(Number(prod.peso) * 1000),
+        comprimento: prod.comprimento == null ? null : Number(prod.comprimento),
+        largura: prod.largura == null ? null : Number(prod.largura),
+        altura: prod.altura == null ? null : Number(prod.altura),
       });
     } else {
       const calc = calcularPrecos(
@@ -345,6 +378,11 @@ async function precificarItens(
         qtdMachos: null,
         qtdFemeas: null,
         qtdPeixes: 0,
+        tipo: prod.tipo,
+        pesoGramas: prod.peso == null ? null : Math.round(Number(prod.peso) * 1000),
+        comprimento: prod.comprimento == null ? null : Number(prod.comprimento),
+        largura: prod.largura == null ? null : Number(prod.largura),
+        altura: prod.altura == null ? null : Number(prod.altura),
       });
     }
   }
@@ -872,9 +910,54 @@ export async function criarOrderDoCheckout(
   const isRetirada = data.tipoEntrega === "RETIRADA";
   let frete = 0;
   let transportadora: Transportadora | null = null;
-  let modalidade: "TERRESTRE" | "AEREO" | null = null;
+  let modalidade: "TERRESTRE" | "AEREO" | "SECO" | null = null;
+  let servicoEnvioId: number | null = null;
+  let servicoEnvioNome: string | null = null;
 
-  if (!isRetirada) {
+  // Carga viva manda no despacho: basta UM peixe no carrinho para tudo ir na
+  // caixa de isopor pela Jadlog/aéreo. Só quando não há nada vivo é que abrimos
+  // o catálogo do Melhor Envio e cobramos a cotação + taxa de embalagem.
+  const temCargaViva = carrinhoTemCargaViva(prec.itens);
+
+  if (!isRetirada && !temCargaViva) {
+    // ── Carrinho 100% seco: cota tudo e valida o serviço escolhido ──
+    const volumes = volumesDoCarrinhoSeco(prec.itens);
+    if (volumes.length === 0) {
+      // Só item DIGITAL: não despacha nada, frete 0.
+      frete = 0;
+    } else {
+      const taxaEmbalagem = await getTaxaEmbalagemSeco();
+      const cot = await cotarFreteSeco({
+        cepDestino: data.cep,
+        volumes,
+        valorSegurado: subtotalCheio,
+        taxaEmbalagem,
+      });
+      if (!cot.ok) {
+        return { ok: false, error: cot.error };
+      }
+      // Anti-tamper: só vale um id que ACABAMOS de cotar. Qualquer outra coisa
+      // (id inventado, preço adulterado, opção que sumiu) cai na mais barata.
+      const escolhido =
+        cot.data.opcoes.find((o) => o.servicoId === data.servicoEnvioId) ??
+        cot.data.opcoes[0];
+      frete = round2(escolhido.preco);
+      transportadora = transportadoraDoServico(escolhido.empresa);
+      modalidade = "SECO";
+      servicoEnvioId = escolhido.servicoId;
+      servicoEnvioNome = escolhido.label;
+    }
+
+    // Frete grátis vale igual no seco (mesma base do carrinho de peixe).
+    const subtotalCheioEfetivoSeco = round2(subtotalCheio - descontoCartao);
+    const freteGratisSeco = await getFreteGratisConfig();
+    if (
+      freteGratisSeco.ativo &&
+      subtotalCheioEfetivoSeco >= (freteGratisSeco.acimaDe ?? Infinity)
+    ) {
+      frete = 0;
+    }
+  } else if (!isRetirada) {
     // Acima do limite de peixes (config) → frete combinado por WhatsApp.
     const maxPeixes = await getMaxPeixesFreteAuto();
     if (totalPeixes > maxPeixes) {
@@ -1081,6 +1164,8 @@ export async function criarOrderDoCheckout(
             tipoEntrega: data.tipoEntrega,
             transportadora,
             modalidadeFrete: modalidade,
+            servicoEnvioId,
+            servicoEnvioNome,
             subtotal: subtotalCheio,
             frete,
             desconto: descontoCartao,
@@ -1117,6 +1202,8 @@ export async function criarOrderDoCheckout(
           formaPagamento: FormaPagamento.PIX,
           tipoEntrega: data.tipoEntrega,
           transportadora,
+          servicoEnvioId,
+          servicoEnvioNome,
           modalidadeFrete: modalidade,
           semanaEnvio,
           enderecoEntrega: endereco as unknown as Prisma.InputJsonValue,

@@ -33,6 +33,7 @@ import {
   RETIRADA_INSTRUCOES_PADRAO,
 } from "@/lib/constants";
 import { checkoutBaseSchema, refineEntrega } from "@/lib/validations/checkout";
+import { carrinhoSoSeco } from "@/lib/frete-tipos";
 import {
   useCart,
   selectTotalPeixes,
@@ -107,15 +108,26 @@ type JadlogOpt = {
   deliveryTime: number;
   requerAvaliacao: boolean;
 };
+type FreteEndereco = {
+  rua: string | null;
+  bairro: string | null;
+  cidade: string | null;
+  uf: string | null;
+};
 type FreteResponse = {
-  endereco: {
-    rua: string | null;
-    bairro: string | null;
-    cidade: string | null;
-    uf: string | null;
-  } | null;
+  endereco: FreteEndereco | null;
   jadlog: JadlogOpt[];
   gollog: { min: number; max: number };
+};
+// Opção de frete de produto seco, como /api/frete/seco devolve. Declarada aqui
+// (e não importada de lib/shipping) porque aquele módulo é server-only.
+type OpcaoSeco = {
+  servicoId: number;
+  empresa: string;
+  servico: string;
+  label: string;
+  preco: number;
+  prazoDias: number;
 };
 
 function formatCep(raw: string) {
@@ -282,6 +294,11 @@ export default function CheckoutClient({
   const [freteLoading, setFreteLoading] = useState(false);
   const [freteErro, setFreteErro] = useState<string | null>(null);
   const [frete, setFrete] = useState<FreteResponse | null>(null);
+  // Carrinho 100% seco: em vez de terrestre/aéreo, o cliente escolhe entre a
+  // transportadora mais barata e a mais rápida que o Melhor Envio devolveu.
+  const [opcoesSeco, setOpcoesSeco] = useState<OpcaoSeco[] | null>(null);
+  const [servicoSel, setServicoSel] = useState<number | null>(null);
+  const [enderecoSeco, setEnderecoSeco] = useState<FreteEndereco | null>(null);
 
   // Submit / Pix
   const [pending, startTransition] = useTransition();
@@ -291,8 +308,12 @@ export default function CheckoutClient({
   const cepDigits = (watch("cep") ?? "").replace(/\D/g, "");
   const cepValido = /^\d{8}$/.test(cepDigits);
   const maxPeixes = resolvido?.maxPeixesFreteAuto ?? 10;
+  // Carrinho sem nenhuma carga viva: ração, criadeira, filtro. Não usa isopor
+  // nem Jadlog obrigatória. O servidor reconfere pelo banco no fechamento.
+  const soSeco = carrinhoSoSeco(items);
   // Na retirada a quantidade não importa (não há frete) — o limite de caixa some.
-  const excedeCaixa = !isRetirada && totalPeixes > maxPeixes;
+  // No carrinho seco também não: o limite é de peixes por caixa.
+  const excedeCaixa = !isRetirada && !soSeco && totalPeixes > maxPeixes;
 
   // Terrestre = Jadlog .Com (id 4, via Melhor Envio). Aéreo = Gollog fixo por UF.
   const jadlogSel = useMemo(
@@ -301,20 +322,29 @@ export default function CheckoutClient({
   );
   const ufAtual = (watch("uf") ?? "").toUpperCase();
   const gollogInfo = freteGollog(ufAtual); // {preco, regiao} | null
+  // Opção seca escolhida (padrão: a primeira, que é sempre a mais barata).
+  const secoSel = useMemo(() => {
+    if (!opcoesSeco || opcoesSeco.length === 0) return null;
+    return opcoesSeco.find((o) => o.servicoId === servicoSel) ?? opcoesSeco[0];
+  }, [opcoesSeco, servicoSel]);
   // Valor do frete conforme a modalidade escolhida. Na retirada é sempre 0.
   const freteValor = isRetirada
     ? 0
-    : modalidade === "AEREO"
-      ? (gollogInfo?.preco ?? null)
-      : (jadlogSel?.price ?? null);
-  // Há opções a mostrar quando o frete foi calculado (Jadlog) — aí a UF também já
-  // foi preenchida (autofill do ViaCEP), liberando o Gollog.
-  const freteCalculado = frete != null;
+    : soSeco
+      ? (secoSel?.preco ?? null)
+      : modalidade === "AEREO"
+        ? (gollogInfo?.preco ?? null)
+        : (jadlogSel?.price ?? null);
+  // Há opções a mostrar quando o frete foi calculado (Jadlog ou secas) — aí a UF
+  // também já foi preenchida (autofill do ViaCEP), liberando o Gollog.
+  const freteCalculado = frete != null || opcoesSeco != null;
+  // Endereço do ViaCEP: vem da cotação de peixe ou da cotação seca.
+  const enderecoCep = frete?.endereco ?? enderecoSeco;
 
   // Endereço (Seção 3): bloqueado até calcular o CEP. Quando o ViaCEP não devolve
   // a rua (CEP genérico/sem dados ou ViaCEP fora), desbloqueia vazio p/ manual.
   const enderecoBloqueado = !freteCalculado;
-  const viacepSemResultado = freteCalculado && !frete?.endereco?.rua;
+  const viacepSemResultado = freteCalculado && !enderecoCep?.rua;
 
   // Subtotais EFETIVOS (com campanha + código secreto). Base = "de/por". Cart é
   // fallback até o servidor responder.
@@ -406,37 +436,60 @@ export default function CheckoutClient({
     if (!cepValido || freteLoading) return;
     setFreteLoading(true);
     setFreteErro(null);
+    // Autofill do endereço a partir do ViaCEP (preenche o que estiver vazio).
+    const autofill = (e: FreteEndereco | null) => {
+      if (!e) return;
+      const fill = (
+        campo: "logradouro" | "bairro" | "cidade" | "uf",
+        valor: string | null,
+      ) => {
+        if (!getValues(campo) && valor) {
+          setValue(campo, valor, { shouldValidate: isSubmitted });
+        }
+      };
+      fill("logradouro", e.rua);
+      fill("bairro", e.bairro);
+      fill("cidade", e.cidade);
+      fill("uf", e.uf);
+    };
     try {
-      const res = await fetch("/api/frete", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cepDestino: cepDigits, qtd: totalPeixes }),
-      });
+      // Carrinho seco cota o catálogo inteiro do ME; carrinho com peixe segue
+      // na rota antiga (caixa de isopor, Jadlog .Com).
+      const res = soSeco
+        ? await fetch("/api/frete/seco", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              cepDestino: cepDigits,
+              itens: items.map((i) => ({
+                produtoId: i.produtoId,
+                quantidade: i.quantidade,
+              })),
+            }),
+          })
+        : await fetch("/api/frete", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ cepDestino: cepDigits, qtd: totalPeixes }),
+          });
       const data = await res.json();
       if (!res.ok) {
         setFrete(null);
+        setOpcoesSeco(null);
         setFreteErro(data?.error ?? "Não foi possível calcular o frete.");
+      } else if (soSeco) {
+        const d = data as { endereco: FreteEndereco | null; opcoes: OpcaoSeco[] };
+        setOpcoesSeco(d.opcoes);
+        setServicoSel(d.opcoes[0]?.servicoId ?? null);
+        setEnderecoSeco(d.endereco);
+        autofill(d.endereco);
       } else {
         setFrete(data as FreteResponse);
-        // Autofill do endereço a partir do ViaCEP (preenche o que estiver vazio).
-        const e = (data as FreteResponse).endereco;
-        if (e) {
-          const fill = (
-            campo: "logradouro" | "bairro" | "cidade" | "uf",
-            valor: string | null,
-          ) => {
-            if (!getValues(campo) && valor) {
-              setValue(campo, valor, { shouldValidate: isSubmitted });
-            }
-          };
-          fill("logradouro", e.rua);
-          fill("bairro", e.bairro);
-          fill("cidade", e.cidade);
-          fill("uf", e.uf);
-        }
+        autofill((data as FreteResponse).endereco);
       }
     } catch {
       setFrete(null);
+      setOpcoesSeco(null);
       setFreteErro("Falha de rede ao calcular o frete.");
     } finally {
       setFreteLoading(false);
@@ -541,8 +594,13 @@ export default function CheckoutClient({
         ...data,
         complemento: data.complemento ?? "",
         tipoEntrega,
-        transportadora: modalidade === "AEREO" ? "GOLLOG" : "JADLOG",
-        modalidadeFrete: modalidade,
+        transportadora: soSeco
+          ? "OUTRO"
+          : modalidade === "AEREO"
+            ? "GOLLOG"
+            : "JADLOG",
+        modalidadeFrete: soSeco ? "SECO" : modalidade,
+        servicoEnvioId: soSeco ? (secoSel?.servicoId ?? undefined) : undefined,
         semanaEnvio,
         cupomCodigo: cupom ?? "",
         itens: itensPedido(),
@@ -589,8 +647,13 @@ export default function CheckoutClient({
         ...dados,
         complemento: dados.complemento ?? "",
         tipoEntrega,
-        transportadora: modalidade === "AEREO" ? "GOLLOG" : "JADLOG",
-        modalidadeFrete: modalidade,
+        transportadora: soSeco
+          ? "OUTRO"
+          : modalidade === "AEREO"
+            ? "GOLLOG"
+            : "JADLOG",
+        modalidadeFrete: soSeco ? "SECO" : modalidade,
+        servicoEnvioId: soSeco ? (secoSel?.servicoId ?? undefined) : undefined,
         semanaEnvio,
         cupomCodigo: cupom ?? "",
         itens: itensPedido(),
@@ -671,8 +734,13 @@ export default function CheckoutClient({
         ...dados,
         complemento: dados.complemento ?? "",
         tipoEntrega,
-        transportadora: modalidade === "AEREO" ? "GOLLOG" : "JADLOG",
-        modalidadeFrete: modalidade,
+        transportadora: soSeco
+          ? "OUTRO"
+          : modalidade === "AEREO"
+            ? "GOLLOG"
+            : "JADLOG",
+        modalidadeFrete: soSeco ? "SECO" : modalidade,
+        servicoEnvioId: soSeco ? (secoSel?.servicoId ?? undefined) : undefined,
         semanaEnvio,
         cupomCodigo: cupom ?? "",
         itens: itensPedido(),
@@ -709,8 +777,13 @@ export default function CheckoutClient({
         ...dados,
         complemento: dados.complemento ?? "",
         tipoEntrega,
-        transportadora: modalidade === "AEREO" ? "GOLLOG" : "JADLOG",
-        modalidadeFrete: modalidade,
+        transportadora: soSeco
+          ? "OUTRO"
+          : modalidade === "AEREO"
+            ? "GOLLOG"
+            : "JADLOG",
+        modalidadeFrete: soSeco ? "SECO" : modalidade,
+        servicoEnvioId: soSeco ? (secoSel?.servicoId ?? undefined) : undefined,
         semanaEnvio,
         cupomCodigo: cupom ?? "",
         itens: itensPedido(),
@@ -1030,7 +1103,64 @@ export default function CheckoutClient({
                 </div>
               )}
 
-              {!excedeCaixa && (freteCalculado || !!gollogInfo) && (
+              {/* Carrinho seco: transportadoras reais do Melhor Envio. Sem
+                  isopor, sem Jadlog obrigatória — é o que barateia o envio. */}
+              {soSeco && opcoesSeco != null && (
+                <fieldset className="space-y-2">
+                  <legend className="text-xs font-medium text-primary mb-1">
+                    Escolha o frete
+                  </legend>
+                  {opcoesSeco.map((o, i) => (
+                    <label
+                      key={o.servicoId}
+                      className={`flex items-center gap-3 rounded-lg border p-3 text-sm cursor-pointer transition-all ${
+                        secoSel?.servicoId === o.servicoId
+                          ? "border-primary/60 bg-primary/5"
+                          : "border-border hover:border-primary/40"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="servicoEnvio"
+                        className="accent-secondary"
+                        checked={secoSel?.servicoId === o.servicoId}
+                        onChange={() => setServicoSel(o.servicoId)}
+                      />
+                      <span className="flex-1">
+                        <span className="flex items-center gap-1.5 text-primary font-medium">
+                          <Clock size={14} aria-hidden="true" />
+                          {o.label}
+                        </span>
+                        <span className="block text-xs text-muted-foreground">
+                          {o.prazoDias} dias úteis
+                          {opcoesSeco.length > 1
+                            ? i === 0
+                              ? " · mais barato"
+                              : " · mais rápido"
+                            : ""}
+                        </span>
+                      </span>
+                      <span
+                        className={`font-bold shrink-0 ${
+                          freteGratisAplicado ? "text-green-600" : "text-primary"
+                        }`}
+                      >
+                        {freteGratisAplicado ? "Grátis" : formatBRL(o.preco)}
+                      </span>
+                    </label>
+                  ))}
+
+                  {enderecoCep?.cidade && (
+                    <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                      <MapPin size={12} aria-hidden="true" />
+                      {enderecoCep.cidade}
+                      {enderecoCep.uf ? ` - ${enderecoCep.uf}` : ""}
+                    </p>
+                  )}
+                </fieldset>
+              )}
+
+              {!soSeco && !excedeCaixa && (freteCalculado || !!gollogInfo) && (
                 <fieldset className="space-y-2">
                   <legend className="text-xs font-medium text-primary mb-1">
                     Escolha o frete
@@ -1154,11 +1284,11 @@ export default function CheckoutClient({
                     </p>
                   )}
 
-                  {frete?.endereco?.cidade && (
+                  {enderecoCep?.cidade && (
                     <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
                       <MapPin size={12} aria-hidden="true" />
-                      {frete.endereco.cidade}
-                      {frete.endereco.uf ? ` - ${frete.endereco.uf}` : ""}
+                      {enderecoCep.cidade}
+                      {enderecoCep.uf ? ` - ${enderecoCep.uf}` : ""}
                     </p>
                   )}
 

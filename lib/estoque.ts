@@ -1,17 +1,28 @@
+import type { ProductType } from "@/lib/generated/prisma/enums";
+
 // ─────────────────────────────────────────────────────────────
 // Disponibilidade para ORDENAÇÃO de vitrine — fonte única.
 //
-// "Esgotado" aqui = pool TOTALMENTE zerado: nenhum macho E nenhuma fêmea.
-// (Se houver qualquer macho OU fêmea, é disponível.) Esse critério é usado
+// "Esgotado" aqui, para PEIXE, = pool TOTALMENTE zerado: nenhum macho E nenhuma
+// fêmea. (Se houver qualquer macho OU fêmea, é disponível.) Para produto que não
+// é peixe vale o estoque real da linha do produto. Esse critério é usado
 // igual em /loja, na home e no feed para mandar esgotados para o fim — sem
 // ocultar. NÃO confundir com a regra de disponibilidade por composição usada
 // no resto do site (lá vale o pool por variante).
 // ─────────────────────────────────────────────────────────────
 
+// `tipo`/`estoque` são opcionais para não quebrar quem só tem o pool em mãos,
+// mas TODO chamador que lida com catálogo misto precisa passar os dois: sem
+// `tipo`, uma ração (que nasce com pool 0/0) seria lida como esgotada.
 export function estaEsgotado(p: {
+  tipo?: ProductType;
+  estoque?: number;
   estoqueMachos: number;
   estoqueFemeas: number;
 }): boolean {
+  // Peixe vive do pool macho/fêmea. Todo o resto (ração, criadeira, filtro)
+  // tem estoque real na própria linha do produto.
+  if (p.tipo != null && p.tipo !== "PEIXE") return (p.estoque ?? 0) <= 0;
   return p.estoqueMachos === 0 && p.estoqueFemeas === 0;
 }
 
@@ -22,7 +33,13 @@ export function estaEsgotado(p: {
 // decorado), que já vem ordenada do banco (recentes/preço/destaque-recentes).
 // O destaque só desempata ENTRE disponíveis; entre esgotados não conta.
 export function ordenarVitrine<
-  T extends { estoqueMachos: number; estoqueFemeas: number; destaque: boolean },
+  T extends {
+    tipo?: ProductType;
+    estoque?: number;
+    estoqueMachos: number;
+    estoqueFemeas: number;
+    destaque: boolean;
+  },
 >(itens: T[]): T[] {
   return itens
     .map((item, idx) => ({ item, idx }))

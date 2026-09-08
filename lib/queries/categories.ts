@@ -23,3 +23,19 @@ export async function getNextOrdem() {
   });
   return (last?.ordem ?? -1) + 1;
 }
+
+/**
+ * Categorias que o SITE pode mostrar: só as que têm ao menos um produto ativo.
+ *
+ * Categoria vazia não vira filtro nem item de menu — o cliente não deve clicar
+ * em "Filtros e bombas" e cair numa vitrine sem nada. A categoria segue existindo
+ * no admin (listCategories) para o dono cadastrar em paz antes de publicar; ela
+ * aparece sozinha assim que o primeiro produto ativo entrar.
+ */
+export async function listCategoriasPublicas() {
+  return prisma.category.findMany({
+    where: { produtos: { some: { ativo: true } } },
+    orderBy: { ordem: "asc" },
+    select: { id: true, slug: true, nome: true },
+  });
+}

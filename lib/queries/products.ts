@@ -52,6 +52,7 @@ const cardSelect = {
   linhagemCampea: true, // ESTE vai para o card (selo de tricampeão mundial)
   estoqueMachos: true,
   estoqueFemeas: true,
+  tipo: true, // ordenarVitrine: em não-peixe a disponibilidade é `estoque`
   // Vídeo de capa: principal primeiro, senão o de menor ordem. Só ativos (loja).
   videos: {
     where: { ativo: true },
@@ -660,6 +661,7 @@ export type FeedProduto = {
   estoque: number;
   estoqueMachos: number;
   estoqueFemeas: number;
+  tipo: ProductType; // decide o frete no carrinho (carga viva x seco)
   campanha: CampanhaInfo | null;
   variantes: FeedVariante[];
   videos: FeedVideo[];
@@ -683,6 +685,7 @@ export async function getVideoFeed(): Promise<FeedProduto[]> {
         estoque: true,
         estoqueMachos: true,
         estoqueFemeas: true,
+        tipo: true,
         categoryId: true, // escopo de campanha
         destaque: true, // p/ ordenarVitrine (destaque entre disponíveis)
         variantes: {
@@ -751,6 +754,7 @@ export async function getVideoFeed(): Promise<FeedProduto[]> {
       estoque: p.estoque,
       estoqueMachos: p.estoqueMachos,
       estoqueFemeas: p.estoqueFemeas,
+      tipo: p.tipo,
       campanha: camp
         ? {
             cupomId: camp.cupomId,

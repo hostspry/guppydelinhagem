@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { TipoComposicao } from "@/lib/generated/prisma/enums";
+import type { ProductType, TipoComposicao } from "@/lib/generated/prisma/enums";
 
 export type CartItem = {
   produtoId: string;
@@ -14,6 +14,9 @@ export type CartItem = {
   precoPix: number;
   precoCheio: number;
   qtdPeixes: number; // alimenta a regra dos >10; 0 em não-peixe
+  // Decide, no browser, se o checkout mostra frete de carga viva (Jadlog/aéreo)
+  // ou as transportadoras do produto seco. O servidor reconfere pelo banco.
+  tipo: ProductType;
   thumbnail: string | null;
   estoque: number; // teto de quantidade (da variante)
   quantidade: number;
@@ -40,6 +43,16 @@ const COMPOSICOES_VALIDAS: TipoComposicao[] = [
   "MACHO",
   "FEMEA",
   "LOTE",
+];
+
+const TIPOS_VALIDOS: ProductType[] = [
+  "PEIXE",
+  "CORAL",
+  "PLANTA",
+  "ALIMENTO_VIVO",
+  "RACAO",
+  "ACESSORIO",
+  "DIGITAL",
 ];
 
 const numSeguro = (v: unknown, fallback: number) =>
@@ -78,6 +91,11 @@ function normalizarItem(raw: unknown): CartItem | null {
     // Sem peixes-por-unidade no item antigo: assume 1 (nunca NaN). Itens novos já
     // gravam o valor real da variante (ProductDetail/VideoFeed).
     qtdPeixes: numSeguro(it.qtdPeixes, 1),
+    // Item salvo antes deste campo existir: assume PEIXE. Errar para carga viva
+    // é o lado seguro (frete mais caro, nunca peixe em transportadora seca).
+    tipo: TIPOS_VALIDOS.includes(it.tipo as ProductType)
+      ? (it.tipo as ProductType)
+      : "PEIXE",
     thumbnail: typeof it.thumbnail === "string" ? it.thumbnail : null,
     estoque: Math.max(quantidade, Math.round(numSeguro(it.estoque, quantidade))),
     quantidade,

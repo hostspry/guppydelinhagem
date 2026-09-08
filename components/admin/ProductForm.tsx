@@ -84,6 +84,11 @@ type ProductFormProps = {
     estoque: number;
     estoqueMachos: number;
     estoqueFemeas: number;
+    // Despacho (só não-peixe): alimentam a cotação no Melhor Envio.
+    peso: number | null;
+    comprimento: number | null;
+    largura: number | null;
+    altura: number | null;
     categoryId: string;
     ativo: boolean;
     destaque: boolean;
@@ -174,6 +179,10 @@ export function ProductForm({ categorias, initialData }: ProductFormProps) {
           usarDescontoPixGlobal: initialData.usarDescontoPixGlobal,
           parcelasMax: initialData.parcelasMax,
           tipo: initialData.tipo,
+          peso: initialData.peso ?? "",
+          comprimento: initialData.comprimento ?? "",
+          largura: initialData.largura ?? "",
+          altura: initialData.altura ?? "",
           estoque: initialData.tipo === "PEIXE" ? "" : initialData.estoque,
           estoqueMachos:
             initialData.tipo === "PEIXE" ? initialData.estoqueMachos : "",
@@ -205,6 +214,10 @@ export function ProductForm({ categorias, initialData }: ProductFormProps) {
           usarDescontoPixGlobal: false,
           parcelasMax: 3,
           tipo: "PEIXE",
+          peso: "",
+          comprimento: "",
+          largura: "",
+          altura: "",
           estoque: "",
           estoqueMachos: "",
           estoqueFemeas: "",
@@ -403,6 +416,10 @@ export function ProductForm({ categorias, initialData }: ProductFormProps) {
     formData.append("usarDescontoPixGlobal", String(data.usarDescontoPixGlobal));
     formData.append("parcelasMax", String(data.parcelasMax));
     formData.append("tipo", data.tipo);
+    formData.append("peso", String(data.peso ?? ""));
+    formData.append("comprimento", String(data.comprimento ?? ""));
+    formData.append("largura", String(data.largura ?? ""));
+    formData.append("altura", String(data.altura ?? ""));
     if (data.estoque !== undefined && data.estoque !== null)
       formData.append("estoque", String(data.estoque));
     if (data.estoqueMachos !== undefined && data.estoqueMachos !== null)
@@ -949,6 +966,78 @@ export function ProductForm({ categorias, initialData }: ProductFormProps) {
                 className={inputClass}
               />
             </FormField>
+
+            {/* Despacho: é o que a transportadora cobra. Sem peso o frete cai
+                num chute de 500 g, então ele é obrigatório aqui. */}
+            <p className="sm:col-span-2 text-xs text-gray-500 border-t border-gray-200 pt-3 mt-1">
+              <strong className="text-[#07366A]">Peso e medidas do pacote.</strong>{" "}
+              O frete deste produto é cotado com esses números em todas as
+              transportadoras do Melhor Envio. Meça a caixa já embalada.
+            </p>
+            <FormField
+              label="Peso (kg)"
+              name="peso"
+              required
+              error={errors.peso?.message}
+              hint="Já embalado. Ex.: 0.35 para um pacote de 350 g."
+            >
+              <input
+                id="peso"
+                type="number"
+                step="0.001"
+                min="0"
+                {...register("peso")}
+                className={inputClass}
+                placeholder="0.35"
+              />
+            </FormField>
+            <div className="grid grid-cols-3 gap-x-2 sm:col-span-1">
+              <FormField
+                label="Compr. (cm)"
+                name="comprimento"
+                error={errors.comprimento?.message}
+              >
+                <input
+                  id="comprimento"
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  {...register("comprimento")}
+                  className={inputClass}
+                  placeholder="20"
+                />
+              </FormField>
+              <FormField
+                label="Larg. (cm)"
+                name="largura"
+                error={errors.largura?.message}
+              >
+                <input
+                  id="largura"
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  {...register("largura")}
+                  className={inputClass}
+                  placeholder="15"
+                />
+              </FormField>
+              <FormField
+                label="Alt. (cm)"
+                name="altura"
+                error={errors.altura?.message}
+              >
+                <input
+                  id="altura"
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  {...register("altura")}
+                  className={inputClass}
+                  placeholder="10"
+                />
+              </FormField>
+            </div>
             <label className="flex items-start gap-2.5 cursor-pointer sm:col-span-2 pt-1">
               <input
                 type="checkbox"

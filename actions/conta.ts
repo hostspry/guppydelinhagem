@@ -60,6 +60,7 @@ export async function comprarNovamente(
         estoque: true,
         estoqueMachos: true,
         estoqueFemeas: true,
+        tipo: true,
         variantes: {
           where: { ativo: true },
           select: {
@@ -120,6 +121,7 @@ export async function comprarNovamente(
 
     itens.push({
       produtoId: prod.id,
+      tipo: prod.tipo,
       variantId: variante ? variante.id : prod.id,
       composicao: variante ? variante.composicao : null,
       composicaoLabel: variante ? COMPOSICAO_LABEL[variante.composicao] : null,

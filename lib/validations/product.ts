@@ -65,6 +65,26 @@ export const productSchema = z
     estoqueFemeas: numOpt(
       z.coerce.number().int("Deve ser número inteiro").min(0, "Não pode ser negativo").optional(),
     ),
+    // ── Despacho (só NÃO-PEIXE) ──
+    // Peixe usa caixa/peso fixos (lib/shipping), então estes campos ficam
+    // vazios nele. No produto seco eles são o que a transportadora cobra: sem
+    // peso real, a cotação cai no chute de 500 g e o frete sai errado.
+    peso: numOpt(
+      z.coerce
+        .number()
+        .positive("Informe um peso maior que zero")
+        .max(30, "Acima de 30 kg o envio é combinado à parte")
+        .optional(),
+    ),
+    comprimento: numOpt(
+      z.coerce.number().positive("Maior que zero").max(200, "Máx 200 cm").optional(),
+    ),
+    largura: numOpt(
+      z.coerce.number().positive("Maior que zero").max(200, "Máx 200 cm").optional(),
+    ),
+    altura: numOpt(
+      z.coerce.number().positive("Maior que zero").max(200, "Máx 200 cm").optional(),
+    ),
     categoryId: z.string().min(1, "Selecione uma categoria"),
     ativo: checkboxBool.default(true),
     destaque: checkboxBool.default(false),
@@ -96,6 +116,15 @@ export const productSchema = z
     expectativaVida: z.string().max(40, "Máx 40 caracteres").optional().or(z.literal("")),
   })
   .superRefine((data, ctx) => {
+    // Produto que não é peixe precisa de peso para cotar frete de verdade. As
+    // dimensões são opcionais (o padrão do pacote cobre), o peso não.
+    if (data.tipo !== "PEIXE" && data.tipo !== "DIGITAL" && data.peso == null) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["peso"],
+        message: "Informe o peso: é ele que define o frete deste produto.",
+      });
+    }
     if (data.tipo === "PEIXE") {
       const ativas = data.variantes.filter((v) => v.ativo);
       if (ativas.length < 1) {

@@ -19,6 +19,7 @@ export type ConfiguracaoLojaData = {
   tarjaAtiva: boolean;
   tarjaTexto: string | null;
   pagbankAtivo: boolean;
+  taxaEmbalagemSeco: number;
 };
 
 /**
@@ -43,6 +44,7 @@ export const getConfiguracaoLoja = cache(
         tarjaAtiva: true,
         tarjaTexto: true,
         pagbankAtivo: true,
+        taxaEmbalagemSeco: true,
       },
     });
     return {
@@ -56,6 +58,8 @@ export const getConfiguracaoLoja = cache(
       tarjaAtiva: c?.tarjaAtiva ?? false,
       tarjaTexto: c?.tarjaTexto ?? null,
       pagbankAtivo: c?.pagbankAtivo ?? false,
+      taxaEmbalagemSeco:
+        c?.taxaEmbalagemSeco == null ? 5 : Number(c.taxaEmbalagemSeco),
     };
   },
 );
@@ -84,4 +88,10 @@ export async function getMaxPeixesFreteAuto(): Promise<number> {
 export async function getConfigPreco(): Promise<ConfigPreco> {
   const { descontoPixGlobalPercent } = await getConfiguracaoLoja();
   return { descontoPixGlobalPercent };
+}
+
+/** Taxa fixa de embalagem somada ao frete de produto seco (não carga viva). */
+export async function getTaxaEmbalagemSeco(): Promise<number> {
+  const c = await getConfiguracaoLoja();
+  return c.taxaEmbalagemSeco;
 }

@@ -13,6 +13,7 @@ export function ConfigEntregaForm({ inicial }: { inicial: {
     freteGratisAtivo: boolean;
     freteGratisAcimaDe: number | null;
     maxPeixesFreteAuto: number;
+    taxaEmbalagemSeco: number;
     retiradaLocalAtiva: boolean;
     retiradaInstrucoes: string | null;
   } }) {
@@ -23,6 +24,9 @@ export function ConfigEntregaForm({ inicial }: { inicial: {
     inicial.freteGratisAcimaDe == null ? "" : String(inicial.freteGratisAcimaDe),
   );
   const [maxPeixes, setMaxPeixes] = useState(String(inicial.maxPeixesFreteAuto));
+  const [taxaEmbalagem, setTaxaEmbalagem] = useState(
+    String(inicial.taxaEmbalagemSeco),
+  );
   const [retiradaAtiva, setRetiradaAtiva] = useState(inicial.retiradaLocalAtiva);
   const [retiradaInstrucoes, setRetiradaInstrucoes] = useState(
     inicial.retiradaInstrucoes ?? "",
@@ -37,6 +41,7 @@ export function ConfigEntregaForm({ inicial }: { inicial: {
     if (freteGratisAtivo) fd.set("freteGratisAtivo", "on");
     fd.set("freteGratisAcimaDe", freteGratisAcimaDe);
     fd.set("maxPeixesFreteAuto", maxPeixes);
+    fd.set("taxaEmbalagemSeco", taxaEmbalagem);
     if (retiradaAtiva) fd.set("retiradaLocalAtiva", "on");
     fd.set("retiradaInstrucoes", retiradaInstrucoes);
     startTransition(async () => {
@@ -125,6 +130,35 @@ export function ConfigEntregaForm({ inicial }: { inicial: {
         <p className="text-xs text-gray-500 mt-2 leading-snug max-w-md">
           Acima deste número de peixes no pedido, o frete é combinado por WhatsApp
           (a cotação automática só roda até este limite).
+        </p>
+      </div>
+
+      {/* ── Embalagem do produto seco ── */}
+      <div className="border-t border-gray-100 pt-6">
+        <h2 className="text-xs font-semibold text-[#07366A] uppercase tracking-wide mb-3">
+          Frete de produto seco
+        </h2>
+        <label
+          htmlFor="taxaEmbalagemSeco"
+          className="block text-sm text-gray-700 mb-1"
+        >
+          Taxa de embalagem (R$)
+        </label>
+        <input
+          id="taxaEmbalagemSeco"
+          type="number"
+          min={0}
+          step="0.01"
+          value={taxaEmbalagem}
+          onChange={(e) => setTaxaEmbalagem(e.target.value)}
+          className={inputClass}
+        />
+        <p className="text-xs text-gray-500 mt-2 leading-snug max-w-md">
+          Ração, criadeira, filtro e afins não vão em caixa de isopor: o cliente
+          paga a cotação do Melhor Envio mais esta taxa, e o site oferece a
+          transportadora mais barata e a mais rápida. Só vale para carrinho sem
+          nenhum bicho vivo — com peixe, continua valendo a caixa de isopor e a
+          Jadlog/aéreo.
         </p>
       </div>
 
