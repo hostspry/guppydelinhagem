@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { SEGMENTO_LABEL, SEGMENTOS } from "@/lib/permissoes";
+import type { SegmentoFinanceiro } from "@/lib/generated/prisma/enums";
 import { toast } from "sonner";
 import { CalendarClock, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react";
 import {
@@ -18,6 +20,8 @@ const inputClass =
 
 const VAZIO = {
   id: null as string | null,
+  // Conta que se repete costuma ser estrutura (luz, internet, aluguel).
+  segmento: "GERAL" as SegmentoFinanceiro,
   tipo: "SAIDA" as "ENTRADA" | "SAIDA",
   descricao: "",
   valor: "",
@@ -42,6 +46,7 @@ export function RecorrentesAdmin({
   function editar(r: RecorrenciaItem) {
     setForm({
       id: r.id,
+      segmento: r.segmento,
       tipo: r.tipo,
       descricao: r.descricao,
       valor: r.valor.toFixed(2).replace(".", ","),
@@ -55,6 +60,7 @@ export function RecorrentesAdmin({
   function salvar() {
     startTransition(async () => {
       const r = await salvarRecorrencia(form.id, {
+        segmento: form.segmento,
         tipo: form.tipo,
         descricao: form.descricao,
         valor: form.valor,
@@ -183,6 +189,28 @@ export function RecorrentesAdmin({
               >
                 <option value="SAIDA">Conta a pagar</option>
                 <option value="ENTRADA">Recebimento fixo</option>
+              </select>
+            </label>
+
+            <label className="block">
+              <span className="block text-xs font-medium text-[#07366A] mb-1">
+                De qual negócio
+              </span>
+              <select
+                value={form.segmento}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    segmento: e.target.value as SegmentoFinanceiro,
+                  })
+                }
+                className={inputClass}
+              >
+                {SEGMENTOS.map((sg) => (
+                  <option key={sg} value={sg}>
+                    {SEGMENTO_LABEL[sg]}
+                  </option>
+                ))}
               </select>
             </label>
 

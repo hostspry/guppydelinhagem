@@ -9,6 +9,9 @@ import {
 import { PageHeader } from "@/components/admin/PageHeader";
 import { StatCard } from "@/components/admin/StatCard";
 import { NavegacaoMes } from "@/components/admin/financeiro/NavegacaoMes";
+import { SEGMENTO_LABEL } from "@/lib/permissoes";
+import { segmentosPermitidos } from "@/lib/permissoes-server";
+import type { SegmentoFinanceiro } from "@/lib/generated/prisma/enums";
 import { ListaLancamentos } from "@/components/admin/financeiro/ListaLancamentos";
 import {
   contadoresPendencia,
@@ -76,13 +79,61 @@ function PorCategoria({ dados }: { dados: ResumoMensal["porCategoria"] }) {
   );
 }
 
+/**
+ * Abas por unidade de negócio. Só aparecem para quem enxerga mais de uma: com
+ * um segmento só, a aba seria uma decoração que não filtra nada.
+ */
+function AbasSegmento({
+  segmentos,
+  ativo,
+  competencia,
+  granularidade,
+}: {
+  segmentos: SegmentoFinanceiro[];
+  ativo: SegmentoFinanceiro | null;
+  competencia: string;
+  granularidade: string;
+}) {
+  if (segmentos.length < 2) return null;
+  const base = `?mes=${competencia}&g=${granularidade}`;
+  const abas: { chave: SegmentoFinanceiro | null; rotulo: string }[] = [
+    { chave: null, rotulo: "Tudo" },
+    ...segmentos.map((sg) => ({ chave: sg, rotulo: SEGMENTO_LABEL[sg] })),
+  ];
+  return (
+    <div className="flex flex-wrap gap-1 mb-4 border-b border-gray-200">
+      {abas.map((a) => {
+        const atual = a.chave === ativo;
+        return (
+          <Link
+            key={a.chave ?? "tudo"}
+            href={a.chave ? `${base}&seg=${a.chave}` : base}
+            className={`px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-all ${
+              atual
+                ? "border-[#FF035C] text-[#07366A]"
+                : "border-transparent text-gray-500 hover:text-[#07366A]"
+            }`}
+          >
+            {a.rotulo}
+          </Link>
+        );
+      })}
+    </div>
+  );
+}
+
 export default async function FinanceiroPage({
   searchParams,
 }: {
-  searchParams: Promise<{ mes?: string; g?: string }>;
+  searchParams: Promise<{ mes?: string; g?: string; seg?: string }>;
 }) {
-  const { mes, g } = await searchParams;
+  const { mes, g, seg } = await searchParams;
   const competencia = mes && ehCompetencia(mes) ? mes : competenciaAtual();
+  const meusSegmentos = await segmentosPermitidos();
+  const segmentoFiltro =
+    seg && meusSegmentos.includes(seg as SegmentoFinanceiro)
+      ? (seg as SegmentoFinanceiro)
+      : null;
 
   const GRAOS_VALIDOS: GranularidadeSerie[] = ["dia", "semana", "mes", "ano"];
   const granularidade = GRAOS_VALIDOS.includes(g as GranularidadeSerie)
@@ -90,7 +141,7 @@ export default async function FinanceiroPage({
     : "mes";
 
   const [resumo, pendencias, serie] = await Promise.all([
-    resumoMensal(competencia),
+    resumoMensal(competencia, segmentoFiltro),
     contadoresPendencia(),
     serieDoCaixa(granularidade),
   ]);
@@ -129,6 +180,13 @@ export default async function FinanceiroPage({
       />
 
       <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+        <AbasSegmento
+          segmentos={meusSegmentos}
+          ativo={segmentoFiltro}
+          competencia={competencia}
+          granularidade={granularidade}
+        />
+
         <NavegacaoMes competencia={competencia} />
         <div className="flex gap-3 text-xs">
           <Link

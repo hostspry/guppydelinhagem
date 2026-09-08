@@ -14,8 +14,12 @@ import {
   PAPEIS_EQUIPE,
   PAPEL_DESCRICAO,
   PAPEL_LABEL,
+  SEGMENTO_DESCRICAO,
+  SEGMENTO_LABEL,
+  SEGMENTOS,
   type PapelEquipe,
 } from "@/lib/permissoes";
+import type { SegmentoFinanceiro } from "@/lib/generated/prisma/enums";
 import { criarMembro, atualizarMembro } from "@/actions/equipe";
 
 type MembroInitial = {
@@ -27,6 +31,7 @@ type MembroInitial = {
   podeCancelarPedido: boolean;
   podeEstornar: boolean;
   limiteValorFinanceiro: number | null;
+  segmentosFinanceiros: SegmentoFinanceiro[];
 };
 
 const inputClass =
@@ -59,6 +64,7 @@ export function MembroForm({
           limiteDescontoPercent: initialData.limiteDescontoPercent ?? "",
           podeCancelarPedido: initialData.podeCancelarPedido,
           podeEstornar: initialData.podeEstornar,
+          segmentosFinanceiros: initialData.segmentosFinanceiros,
           limiteValorFinanceiro: initialData.limiteValorFinanceiro ?? "",
         }
       : {
@@ -68,6 +74,7 @@ export function MembroForm({
           limiteDescontoPercent: "",
           podeCancelarPedido: false,
           podeEstornar: false,
+          segmentosFinanceiros: [],
           limiteValorFinanceiro: "",
         },
   });
@@ -186,6 +193,37 @@ export function MembroForm({
           mesmo, para ninguém ficar de fora do painel por engano.
         </p>
       )}
+
+      {/* Divisória do financeiro. Aparece para TODOS os papéis, inclusive dono:
+          não é alçada, é separar o caixa de dois negócios entre dois sócios. */}
+      <h2 className="text-xs font-semibold text-[#07366A] uppercase tracking-wide mb-1 mt-4">
+        Financeiro que esta pessoa enxerga
+      </h2>
+      <p className="text-xs text-gray-500 mb-3">
+        Sem nenhum marcado, ela vê o caixa inteiro. Marcando, ela só enxerga (e
+        só lança em) o que estiver marcado — vale até para o dono.
+      </p>
+      <div className="space-y-2 mb-5">
+        {SEGMENTOS.map((sg) => (
+          <label
+            key={sg}
+            className="flex items-start gap-2 text-sm text-gray-700"
+          >
+            <input
+              type="checkbox"
+              value={sg}
+              {...register("segmentosFinanceiros")}
+              className="mt-0.5 accent-[#FF035C]"
+            />
+            <span>
+              {SEGMENTO_LABEL[sg]}
+              <span className="block text-xs text-gray-400">
+                {SEGMENTO_DESCRICAO[sg]}
+              </span>
+            </span>
+          </label>
+        ))}
+      </div>
 
       {/* Limites só existem para quem não é dono. */}
       {ehDono ? (

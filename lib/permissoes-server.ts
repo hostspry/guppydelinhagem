@@ -4,12 +4,17 @@ import { prisma } from "./prisma";
 import { auth } from "./auth";
 import {
   ehPapelEquipe,
+  escopoDeSegmentos,
+  SEGMENTOS,
   PAPEL_LABEL,
   PERMISSOES_POR_PAPEL,
+  podeNoSegmento,
+  SEGMENTO_LABEL,
   SemPermissaoError,
   type MembroAtual,
   type Permissao,
 } from "./permissoes";
+import type { SegmentoFinanceiro } from "@/lib/generated/prisma/enums";
 
 /**
  * Quem está agindo, lido do BANCO (não do JWT).
@@ -35,6 +40,7 @@ export async function membroAtual(): Promise<MembroAtual> {
       podeEstornar: true,
       limiteValorFinanceiro: true,
       senhaPrecisaTroca: true,
+      segmentosFinanceiros: true,
     },
   });
 
@@ -54,7 +60,46 @@ export async function membroAtual(): Promise<MembroAtual> {
       u.limiteValorFinanceiro == null ? null : Number(u.limiteValorFinanceiro),
     senhaPrecisaTroca: u.senhaPrecisaTroca,
     semLimites: u.role === "SUPER_ADMIN",
+    segmentosFinanceiros: escopoDeSegmentos(u.segmentosFinanceiros),
   };
+}
+
+/**
+ * Filtro de segmento para as consultas do financeiro. Devolve `{}` quando a
+ * pessoa vê tudo, para poder ser espalhado dentro de qualquer `where`.
+ *
+ * Ponto único: toda consulta do caixa passa por aqui. Se uma consulta nova
+ * esquecer de aplicar, ela vaza o caixa do outro sócio — por isso o filtro é uma
+ * função só, e não um `if` repetido.
+ */
+export async function filtroSegmento(): Promise<
+  { segmento?: { in: SegmentoFinanceiro[] } }
+> {
+  const membro = await membroAtual();
+  return membro.segmentosFinanceiros === null
+    ? {}
+    : { segmento: { in: membro.segmentosFinanceiros } };
+}
+
+/** Segmentos que o membro atual pode lançar — para popular o formulário. */
+export async function segmentosPermitidos(): Promise<SegmentoFinanceiro[]> {
+  const membro = await membroAtual();
+  return membro.segmentosFinanceiros ?? [...SEGMENTOS];
+}
+
+/**
+ * Garante que o membro pode mexer NESTE segmento. Usada nas actions, depois da
+ * permissão: ter `financeiro.gerenciar` não dá acesso ao caixa do outro sócio.
+ */
+export function assertSegmento(
+  membro: MembroAtual,
+  segmento: SegmentoFinanceiro,
+): void {
+  if (!podeNoSegmento(membro, segmento)) {
+    throw new SemPermissaoError(
+      `Você não tem acesso ao financeiro de ${SEGMENTO_LABEL[segmento]}.`,
+    );
+  }
 }
 
 /**

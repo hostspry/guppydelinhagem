@@ -13,6 +13,8 @@
  * gerencia o time não se auto-limita (e assim ninguém se tranca fora do painel).
  */
 
+import type { SegmentoFinanceiro } from "@/lib/generated/prisma/enums";
+
 export type Permissao =
   // Catálogo
   | "catalogo.ver"
@@ -114,7 +116,56 @@ export type MembroAtual = {
   senhaPrecisaTroca: boolean;
   /** SUPER_ADMIN não é limitado por nenhum teto. */
   semLimites: boolean;
+  /**
+   * Segmentos do financeiro que este membro enxerga. `null` = todos.
+   *
+   * NÃO é um teto de alçada, é uma divisória entre sócios — por isso o
+   * SUPER_ADMIN também respeita (ao contrário de `semLimites`).
+   */
+  segmentosFinanceiros: SegmentoFinanceiro[] | null;
 };
+
+// ─────────────────────────────────────────────
+// Segmentos do financeiro
+// ─────────────────────────────────────────────
+
+export const SEGMENTOS: readonly SegmentoFinanceiro[] = [
+  "GERAL",
+  "PEIXES_VIVOS",
+  "PRODUTOS",
+] as const;
+
+export const SEGMENTO_LABEL: Record<SegmentoFinanceiro, string> = {
+  GERAL: "Geral",
+  PEIXES_VIVOS: "Peixes vivos",
+  PRODUTOS: "Produtos",
+};
+
+export const SEGMENTO_DESCRICAO: Record<SegmentoFinanceiro, string> = {
+  GERAL: "Custo que serve os dois negócios: energia, água, internet, aluguel, imposto.",
+  PEIXES_VIVOS: "A estufa: venda de peixe, ração, medicamento, matriz, caixa de isopor.",
+  PRODUTOS: "A loja de aquarismo: venda e compra de criadeira, filtro, aquário, acessório.",
+};
+
+/** Normaliza o que veio do banco: lista vazia significa "vê tudo". */
+export function escopoDeSegmentos(
+  segmentos: SegmentoFinanceiro[] | null | undefined,
+): SegmentoFinanceiro[] | null {
+  if (!segmentos || segmentos.length === 0) return null;
+  const validos = segmentos.filter((s) => SEGMENTOS.includes(s));
+  return validos.length > 0 ? validos : null;
+}
+
+/** O membro pode mexer neste segmento? Escopo nulo = pode em todos. */
+export function podeNoSegmento(
+  membro: Pick<MembroAtual, "segmentosFinanceiros">,
+  segmento: SegmentoFinanceiro,
+): boolean {
+  return (
+    membro.segmentosFinanceiros === null ||
+    membro.segmentosFinanceiros.includes(segmento)
+  );
+}
 
 // ─────────────────────────────────────────────
 // Limites (dinheiro)

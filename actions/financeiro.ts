@@ -2,7 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { assertPermissao } from "@/lib/permissoes-server";
+import { assertPermissao, assertSegmento } from "@/lib/permissoes-server";
+import type { MembroAtual } from "@/lib/permissoes";
 import { auditar } from "@/lib/auditoria";
 import { type ActionResult, isPrismaError } from "@/lib/utils/action-result";
 import {
@@ -37,12 +38,36 @@ function erroDeCampos(parsed: { error: { flatten: () => { fieldErrors: Record<st
 // Lançamentos
 // ─────────────────────────────────────────────
 
+/**
+ * Confere que a linha pertence a um segmento que o membro enxerga.
+ *
+ * Existe porque a permissão sozinha não basta: `financeiro.gerenciar` diz que a
+ * pessoa mexe no caixa, não em QUAL caixa. Toda action que recebe um id de
+ * lançamento passa por aqui antes de tocar na linha — senão bastaria adivinhar
+ * um id para editar o caixa do outro sócio.
+ */
+async function assertSegmentoDoLancamento(
+  membro: MembroAtual,
+  id: string,
+): Promise<boolean> {
+  const l = await prisma.lancamento.findUnique({
+    where: { id },
+    select: { segmento: true },
+  });
+  if (!l) return false;
+  assertSegmento(membro, l.segmento);
+  return true;
+}
+
 export async function criarLancamento(input: unknown): Promise<ActionResult> {
   const membro = await assertPermissao("financeiro.gerenciar");
 
   const parsed = lancamentoSchema.safeParse(input);
   if (!parsed.success) return erroDeCampos(parsed);
   const d = parsed.data;
+
+  // Ter `financeiro.gerenciar` não dá acesso ao caixa do outro sócio.
+  assertSegmento(membro, d.segmento);
 
   const data = dataDoDia(d.data);
   if (!data) return { success: false, error: "Data inválida." };
@@ -55,6 +80,7 @@ export async function criarLancamento(input: unknown): Promise<ActionResult> {
   try {
     await prisma.lancamento.create({
       data: {
+        segmento: d.segmento,
         tipo: d.tipo,
         status: ehConta ? "PENDENTE" : "CONFIRMADO",
         origem: d.comprovanteUrl ? "COMPROVANTE" : "MANUAL",
@@ -95,9 +121,13 @@ export async function atualizarLancamento(
 
   const atual = await prisma.lancamento.findUnique({
     where: { id },
-    select: { origem: true, status: true },
+    select: { origem: true, status: true, segmento: true },
   });
   if (!atual) return { success: false, error: "Lançamento não encontrado." };
+  // Duas checagens: não mexer numa linha que não é sua (segmento atual) nem
+  // empurrar uma linha para um segmento que você não enxerga (segmento novo,
+  // conferido depois do parse).
+  assertSegmento(membro, atual.segmento);
 
   // Linhas geradas pelo sistema espelham um pedido: mexer nelas à mão faria o
   // caixa descolar da venda. Para corrigir, mexe-se no pedido.
@@ -113,6 +143,8 @@ export async function atualizarLancamento(
   if (!parsed.success) return erroDeCampos(parsed);
   const d = parsed.data;
 
+  assertSegmento(membro, d.segmento);
+
   const data = dataDoDia(d.data);
   if (!data) return { success: false, error: "Data inválida." };
   const vencimento = d.vencimento ? dataDoDia(d.vencimento) : null;
@@ -122,6 +154,7 @@ export async function atualizarLancamento(
     await prisma.lancamento.update({
       where: { id },
       data: {
+        segmento: d.segmento,
         tipo: d.tipo,
         descricao: d.descricao,
         valor: d.valor,
@@ -158,9 +191,17 @@ export async function excluirLancamento(id: string): Promise<ActionResult> {
 
   const atual = await prisma.lancamento.findUnique({
     where: { id },
-    select: { origem: true, status: true, descricao: true, valor: true, tipo: true },
+    select: {
+      origem: true,
+      status: true,
+      descricao: true,
+      valor: true,
+      tipo: true,
+      segmento: true,
+    },
   });
   if (!atual) return { success: false, error: "Lançamento não encontrado." };
+  assertSegmento(membro, atual.segmento);
 
   if (atual.origem === "PEDIDO" && atual.status === "CONFIRMADO") {
     return {
@@ -198,6 +239,10 @@ export async function marcarComoPago(
   dataPagamento?: string,
 ): Promise<ActionResult> {
   const membro = await assertPermissao("financeiro.gerenciar");
+
+  if (!(await assertSegmentoDoLancamento(membro, id))) {
+    return { success: false, error: "Lançamento não encontrado." };
+  }
 
   const quando = dataPagamento ? dataDoDia(dataPagamento) : new Date();
   if (!quando) return { success: false, error: "Data inválida." };
@@ -254,9 +299,20 @@ export async function confirmarVenda(
   const data = dataDoDia(dataStr);
   if (!data) return { success: false, error: "Data inválida." };
 
+  if (!(await assertSegmentoDoLancamento(membro, id))) {
+    return { success: false, error: "Lançamento não encontrado." };
+  }
+
   const sugestao = await prisma.lancamento.findUnique({
     where: { id },
-    select: { id: true, status: true, orderId: true, pagamentoId: true, origem: true },
+    select: {
+      id: true,
+      status: true,
+      orderId: true,
+      pagamentoId: true,
+      origem: true,
+      segmento: true,
+    },
   });
   if (!sugestao) return { success: false, error: "Lançamento não encontrado." };
   if (sugestao.status === "CONFIRMADO") {
@@ -286,6 +342,8 @@ export async function confirmarVenda(
             },
           },
           create: {
+            // Custo da venda pertence ao caixa da venda.
+            segmento: sugestao.segmento,
             tipo: "SAIDA",
             status: "CONFIRMADO",
             origem: "TAXA_PAGAMENTO",
@@ -310,6 +368,7 @@ export async function confirmarVenda(
             },
           },
           create: {
+            segmento: sugestao.segmento,
             tipo: "SAIDA",
             status: "CONFIRMADO",
             origem: "FRETE",
@@ -345,6 +404,9 @@ export async function confirmarVenda(
 /** Sugestão que não deve entrar no caixa (venda de teste, duplicada…). */
 export async function descartarSugestao(id: string): Promise<ActionResult> {
   const membro = await assertPermissao("financeiro.gerenciar");
+  if (!(await assertSegmentoDoLancamento(membro, id))) {
+    return { success: false, error: "Lançamento não encontrado." };
+  }
 
   try {
     await prisma.lancamento.update({
@@ -486,13 +548,24 @@ export async function salvarRecorrencia(
   id: string | null,
   input: unknown,
 ): Promise<ActionResult> {
-  await assertPermissao("financeiro.gerenciar");
+  const membro = await assertPermissao("financeiro.gerenciar");
 
   const parsed = recorrenciaSchema.safeParse(input);
   if (!parsed.success) return erroDeCampos(parsed);
   const d = parsed.data;
 
+  assertSegmento(membro, d.segmento);
+  if (id) {
+    const atual = await prisma.recorrenciaFinanceira.findUnique({
+      where: { id },
+      select: { segmento: true },
+    });
+    if (!atual) return { success: false, error: "Conta recorrente não encontrada." };
+    assertSegmento(membro, atual.segmento);
+  }
+
   const dados = {
+    segmento: d.segmento,
     tipo: d.tipo,
     descricao: d.descricao,
     valor: d.valor,
@@ -518,7 +591,14 @@ export async function salvarRecorrencia(
 }
 
 export async function excluirRecorrencia(id: string): Promise<ActionResult> {
-  await assertPermissao("financeiro.gerenciar");
+  const membro = await assertPermissao("financeiro.gerenciar");
+
+  const atual = await prisma.recorrenciaFinanceira.findUnique({
+    where: { id },
+    select: { segmento: true },
+  });
+  if (!atual) return { success: false, error: "Conta recorrente não encontrada." };
+  assertSegmento(membro, atual.segmento);
 
   try {
     // As contas já geradas ficam (recorrenciaId vira null pela FK SetNull) — o

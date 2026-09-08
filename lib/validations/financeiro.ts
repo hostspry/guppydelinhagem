@@ -59,7 +59,11 @@ export const CANAIS_VENDA = [
 
 const canaisValores = CANAIS_VENDA.map((c) => c.valor);
 
+/** Unidade de negócio do lançamento (ver enum SegmentoFinanceiro no schema). */
+export const segmentoEnum = z.enum(["GERAL", "PEIXES_VIVOS", "PRODUTOS"]);
+
 export const lancamentoSchema = z.object({
+  segmento: segmentoEnum,
   tipo: z.enum(["ENTRADA", "SAIDA"], { message: "Escolha entrada ou saída." }),
   descricao: z.string().trim().min(2, "Descreva o lançamento."),
   valor: valorSchema,
@@ -82,11 +86,14 @@ export const lancamentoSchema = z.object({
 export type LancamentoInput = z.output<typeof lancamentoSchema>;
 
 export const categoriaFinanceiraSchema = z.object({
+  // Só sugere o segmento no formulário; quem lança decide.
+  segmentoPadrao: segmentoEnum.nullable().optional(),
   nome: z.string().trim().min(2, "Dê um nome à categoria."),
   tipo: z.enum(["ENTRADA", "SAIDA"], { message: "Escolha entrada ou saída." }),
 });
 
 export const recorrenciaSchema = z.object({
+  segmento: segmentoEnum,
   tipo: z.enum(["ENTRADA", "SAIDA"]).default("SAIDA"),
   descricao: z.string().trim().min(2, "Descreva a conta."),
   valor: valorSchema,

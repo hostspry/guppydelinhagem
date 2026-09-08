@@ -34,6 +34,7 @@ export default async function EditarMembroPage({
           podeCancelarPedido: membro.podeCancelarPedido,
           podeEstornar: membro.podeEstornar,
           limiteValorFinanceiro: membro.limiteValorFinanceiro,
+          segmentosFinanceiros: membro.segmentosFinanceiros,
         }}
         souEu={membro.id === eu.id}
       />

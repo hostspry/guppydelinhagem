@@ -1,3 +1,4 @@
+import type { SegmentoFinanceiro } from "@/lib/generated/prisma/enums";
 import { prisma } from "@/lib/prisma";
 import { ehPapelEquipe, type PapelEquipe } from "@/lib/permissoes";
 
@@ -10,6 +11,7 @@ export type MembroListItem = {
   podeCancelarPedido: boolean;
   podeEstornar: boolean;
   limiteValorFinanceiro: number | null;
+  segmentosFinanceiros: SegmentoFinanceiro[];
   senhaPrecisaTroca: boolean;
   temSenha: boolean;
   ultimoLogin: Date | null;
@@ -25,6 +27,7 @@ const SELECT = {
   podeCancelarPedido: true,
   podeEstornar: true,
   limiteValorFinanceiro: true,
+  segmentosFinanceiros: true,
   senhaPrecisaTroca: true,
   senhaHash: true,
   ultimoLogin: true,
@@ -40,6 +43,7 @@ type Row = {
   podeCancelarPedido: boolean;
   podeEstornar: boolean;
   limiteValorFinanceiro: unknown;
+  segmentosFinanceiros: SegmentoFinanceiro[];
   senhaPrecisaTroca: boolean;
   senhaHash: string | null;
   ultimoLogin: Date | null;
@@ -58,6 +62,7 @@ function paraItem(u: Row): MembroListItem | null {
     podeEstornar: u.podeEstornar,
     limiteValorFinanceiro:
       u.limiteValorFinanceiro == null ? null : Number(u.limiteValorFinanceiro),
+    segmentosFinanceiros: u.segmentosFinanceiros,
     senhaPrecisaTroca: u.senhaPrecisaTroca,
     // O hash nunca sai daqui — a lista só precisa saber se existe senha.
     temSenha: u.senhaHash != null,

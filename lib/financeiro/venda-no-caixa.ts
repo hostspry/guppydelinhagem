@@ -1,5 +1,6 @@
 import "server-only";
 import type { Prisma } from "@/lib/generated/prisma/client";
+import type { SegmentoFinanceiro } from "@/lib/generated/prisma/enums";
 import { SLUG_VENDAS_SITE } from "./categorias-padrao";
 
 /**
@@ -21,6 +22,73 @@ import { SLUG_VENDAS_SITE } from "./categorias-padrao";
 function chaveDoPagamento(pagamentoId: string | null, orderId: string): string {
   return pagamentoId ?? `order:${orderId}`;
 }
+
+/**
+ * Reparte o total de uma venda entre as unidades de negócio.
+ *
+ * Um pedido pode misturar peixe e produto seco (o carrinho permite). Jogar tudo
+ * num lado só mentiria no resultado das duas operações, então repartimos pelo
+ * valor dos itens e rateamos o frete na mesma proporção. A sobra de centavo do
+ * arredondamento fica com o maior segmento, para a soma bater com order.total.
+ *
+ * Item sem produto no catálogo (venda avulsa, produto excluído) conta como
+ * peixe: é o que a loja vendeu a vida toda, e é o palpite que erra menos.
+ */
+function repartirPorSegmento(
+  itens: {
+    quantidade: number;
+    precoUnitario: Prisma.Decimal;
+    descontoUnitario: Prisma.Decimal | null;
+    qtdMachos: number | null;
+    product: { tipo: string } | null;
+  }[],
+  total: number,
+): Map<SegmentoFinanceiro, number> {
+  const porSegmento = new Map<SegmentoFinanceiro, number>();
+  let soma = 0;
+
+  for (const it of itens) {
+    const tipo = it.product?.tipo ?? null;
+    const seco = tipo != null && !SEGMENTO_VIVO.has(tipo);
+    // Sem produto no catálogo: se a linha guardou receita de peixe, é peixe.
+    const seg: SegmentoFinanceiro =
+      tipo == null
+        ? it.qtdMachos != null
+          ? "PEIXES_VIVOS"
+          : "PEIXES_VIVOS"
+        : seco
+          ? "PRODUTOS"
+          : "PEIXES_VIVOS";
+    const unit = Number(it.precoUnitario) - Number(it.descontoUnitario ?? 0);
+    const valor = Math.max(0, unit) * it.quantidade;
+    porSegmento.set(seg, (porSegmento.get(seg) ?? 0) + valor);
+    soma += valor;
+  }
+
+  if (porSegmento.size === 0) return new Map([["PEIXES_VIVOS", total]]);
+  if (porSegmento.size === 1) {
+    const [unico] = [...porSegmento.keys()];
+    return new Map([[unico, total]]);
+  }
+
+  // Rateio: cada lado leva sua fatia do total (que já inclui frete e desconto).
+  const entradas = [...porSegmento.entries()].sort((a, b) => b[1] - a[1]);
+  const resultado = new Map<SegmentoFinanceiro, number>();
+  let distribuido = 0;
+  entradas.forEach(([seg, valor], i) => {
+    if (i === entradas.length - 1) {
+      resultado.set(seg, Math.round((total - distribuido) * 100) / 100);
+      return;
+    }
+    const fatia = soma > 0 ? Math.round((total * valor) / soma * 100) / 100 : 0;
+    resultado.set(seg, fatia);
+    distribuido += fatia;
+  });
+  return resultado;
+}
+
+/** Tipos de produto que são carga viva — a estufa. */
+const SEGMENTO_VIVO = new Set(["PEIXE", "CORAL", "PLANTA", "ALIMENTO_VIVO"]);
 
 async function idCategoria(
   tx: Prisma.TransactionClient,
@@ -45,6 +113,15 @@ export async function registrarSugestaoDeVenda(
       numero: true,
       total: true,
       cliente: { select: { nome: true } },
+      items: {
+        select: {
+          quantidade: true,
+          precoUnitario: true,
+          descontoUnitario: true,
+          qtdMachos: true,
+          product: { select: { tipo: true } },
+        },
+      },
       pagamentos: {
         where: { status: "PAGO" },
         orderBy: { criadoEm: "desc" },
@@ -61,27 +138,46 @@ export async function registrarSugestaoDeVenda(
   const chave = chaveDoPagamento(order.pagamentos[0]?.id ?? null, order.id);
   const categoriaId = await idCategoria(tx, SLUG_VENDAS_SITE);
 
+  const fatias = repartirPorSegmento(order.items, total);
+  const misto = fatias.size > 1;
+  const nome = order.cliente?.nome ? ` — ${order.cliente.nome}` : "";
+
   // create + catch do P2002 em vez de upsert: se a linha já existe, ela pode ter
   // sido confirmada ou editada pelo dono, e não queremos sobrescrever isso.
-  try {
-    await tx.lancamento.create({
-      data: {
-        tipo: "ENTRADA",
-        status: "PENDENTE",
-        origem: "PEDIDO",
-        descricao: `Venda ${order.numero}${order.cliente?.nome ? ` — ${order.cliente.nome}` : ""}`,
-        valor: order.total,
-        data: new Date(),
-        categoriaId,
-        orderId: order.id,
-        pagamentoId: chave,
-      },
-    });
-  } catch (e) {
-    const code = (e as { code?: string } | null)?.code;
-    if (code !== "P2002") throw e;
+  for (const [segmento, valor] of fatias) {
+    if (!(valor > 0)) continue;
+    try {
+      await tx.lancamento.create({
+        data: {
+          segmento,
+          tipo: "ENTRADA",
+          status: "PENDENTE",
+          origem: "PEDIDO",
+          descricao: misto
+            ? `Venda ${order.numero}${nome} (${ROTULO_SEGMENTO[segmento]})`
+            : `Venda ${order.numero}${nome}`,
+          valor,
+          data: new Date(),
+          categoriaId,
+          orderId: order.id,
+          // Venda dividida precisa de uma chave por fatia: a trava é
+          // (pagamentoId, origem), então duas linhas com a mesma chave se
+          // atropelariam. Venda de um lado só mantém a chave antiga.
+          pagamentoId: misto ? `${chave}#${segmento}` : chave,
+        },
+      });
+    } catch (e) {
+      const code = (e as { code?: string } | null)?.code;
+      if (code !== "P2002") throw e;
+    }
   }
 }
+
+const ROTULO_SEGMENTO: Record<SegmentoFinanceiro, string> = {
+  GERAL: "geral",
+  PEIXES_VIVOS: "peixes",
+  PRODUTOS: "produtos",
+};
 
 /**
  * Venda desfeita (cancelamento de pedido pago ou estorno no gateway).
@@ -98,7 +194,14 @@ export async function registrarDevolucaoDeVenda(
 ): Promise<void> {
   const entradas = await tx.lancamento.findMany({
     where: { orderId, origem: "PEDIDO", tipo: "ENTRADA" },
-    select: { id: true, status: true, valor: true, pagamentoId: true, categoriaId: true },
+    select: {
+      id: true,
+      status: true,
+      valor: true,
+      pagamentoId: true,
+      categoriaId: true,
+      segmento: true,
+    },
   });
 
   const order = await tx.order.findUnique({
@@ -119,6 +222,8 @@ export async function registrarDevolucaoDeVenda(
     try {
       await tx.lancamento.create({
         data: {
+          // A devolução volta para o mesmo caixa de onde a venda entrou.
+          segmento: entrada.segmento,
           tipo: "SAIDA",
           status: "CONFIRMADO",
           origem: "PEDIDO",

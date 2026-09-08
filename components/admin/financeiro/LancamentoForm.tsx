@@ -1,6 +1,8 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
+import { SEGMENTO_LABEL } from "@/lib/permissoes";
+import type { SegmentoFinanceiro } from "@/lib/generated/prisma/enums";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import Link from "next/link";
@@ -11,9 +13,15 @@ import { LeitorComprovante, type RascunhoLido } from "./LeitorComprovante";
 import { criarLancamento, atualizarLancamento } from "@/actions/financeiro";
 import { CANAIS_VENDA } from "@/lib/validations/financeiro";
 
-type Categoria = { id: string; nome: string; tipo: "ENTRADA" | "SAIDA" | null };
+type Categoria = {
+  id: string;
+  nome: string;
+  tipo: "ENTRADA" | "SAIDA" | null;
+  segmentoPadrao?: SegmentoFinanceiro | null;
+};
 
 type Campos = {
+  segmento: SegmentoFinanceiro;
   tipo: "ENTRADA" | "SAIDA";
   descricao: string;
   valor: string;
@@ -28,6 +36,7 @@ type Campos = {
 
 export type LancamentoInicial = {
   id: string;
+  segmento: SegmentoFinanceiro;
   tipo: "ENTRADA" | "SAIDA";
   descricao: string;
   valor: number;
@@ -49,12 +58,15 @@ export function LancamentoForm({
   campanhas = [],
   initialData,
   hoje,
+  segmentosPermitidos,
 }: {
   categorias: Categoria[];
   /** Campanhas já usadas — viram sugestão no campo (evita grafia solta). */
   campanhas?: string[];
   initialData?: LancamentoInicial;
   hoje: string;
+  /** Segmentos que ESTE membro pode lançar. Vem do servidor, nunca do client. */
+  segmentosPermitidos: SegmentoFinanceiro[];
 }) {
   const [isPending, startTransition] = useTransition();
   const [comprovanteUrl, setComprovanteUrl] = useState<string | null>(
@@ -72,6 +84,7 @@ export function LancamentoForm({
   } = useForm<Campos>({
     defaultValues: initialData
       ? {
+          segmento: initialData.segmento,
           tipo: initialData.tipo,
           descricao: initialData.descricao,
           valor: initialData.valor.toFixed(2).replace(".", ","),
@@ -84,6 +97,9 @@ export function LancamentoForm({
           campanha: initialData.campanha ?? "",
         }
       : {
+          // Abre no primeiro segmento que a pessoa enxerga: quem só cuida da
+          // estufa nunca precisa trocar esse campo.
+          segmento: segmentosPermitidos[0],
           tipo: "SAIDA",
           descricao: "",
           valor: "",
@@ -98,6 +114,19 @@ export function LancamentoForm({
   });
 
   const tipo = watch("tipo");
+  const categoriaSel = watch("categoriaId");
+
+  // A categoria sugere o segmento (energia → Geral, ração → Peixes), mas nunca
+  // manda: quem lança pode trocar, e a troca manual não é desfeita depois.
+  const segmentoTocado = useRef(false);
+  useEffect(() => {
+    if (segmentoTocado.current || !categoriaSel) return;
+    const cat = categorias.find((c) => c.id === categoriaSel);
+    const sugerido = cat?.segmentoPadrao;
+    if (sugerido && segmentosPermitidos.includes(sugerido)) {
+      setValue("segmento", sugerido);
+    }
+  }, [categoriaSel, categorias, segmentosPermitidos, setValue]);
   const aPagar = watch("aPagar");
 
   // Categoria de entrada não faz sentido numa saída (e vice-versa); as sem tipo
@@ -232,6 +261,28 @@ export function LancamentoForm({
             />
           </FormField>
         </div>
+
+        {/* Unidade de negócio. Só aparece para quem enxerga mais de uma — com
+            um segmento só, escolher não faz sentido e o valor vai fixo. */}
+        {segmentosPermitidos.length > 1 && (
+          <FormField
+            label="De qual negócio"
+            name="segmento"
+            hint="Custo que serve os dois lados (luz, internet, aluguel, imposto) vai em Geral."
+          >
+            <select
+              id="segmento"
+              {...register("segmento")}
+              className={inputClass}
+            >
+              {segmentosPermitidos.map((sg) => (
+                <option key={sg} value={sg}>
+                  {SEGMENTO_LABEL[sg]}
+                </option>
+              ))}
+            </select>
+          </FormField>
+        )}
 
         <FormField label="Categoria" name="categoriaId">
           <select id="categoriaId" {...register("categoriaId")} className={inputClass}>

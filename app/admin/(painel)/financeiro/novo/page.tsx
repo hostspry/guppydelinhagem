@@ -5,11 +5,13 @@ import {
   campanhasUsadas,
 } from "@/lib/queries/financeiro";
 import { paraInputDate } from "@/lib/financeiro/periodo";
+import { segmentosPermitidos } from "@/lib/permissoes-server";
 
 export default async function NovoLancamentoPage() {
-  const [categorias, campanhas] = await Promise.all([
+  const [categorias, campanhas, segmentos] = await Promise.all([
     categoriasParaFormulario(),
     campanhasUsadas(),
+    segmentosPermitidos(),
   ]);
 
   return (
@@ -27,6 +29,7 @@ export default async function NovoLancamentoPage() {
         categorias={categorias}
         campanhas={campanhas}
         hoje={paraInputDate(new Date())}
+        segmentosPermitidos={segmentos}
       />
     </div>
   );

@@ -27,6 +27,15 @@ export const membroSchema = z.object({
   limiteDescontoPercent: numeroOpcional(100, "Use um valor entre 0 e 100."),
   podeCancelarPedido: z.coerce.boolean().default(false),
   podeEstornar: z.coerce.boolean().default(false),
+  /**
+   * Segmentos do financeiro que o membro enxerga. Lista vazia = enxerga tudo.
+   *
+   * Ao contrário dos limites acima, isto vale também para SUPER_ADMIN: é uma
+   * divisória entre sócios, não um teto de alçada.
+   */
+  segmentosFinanceiros: z
+    .array(z.enum(["GERAL", "PEIXES_VIVOS", "PRODUTOS"]))
+    .default([]),
   limiteValorFinanceiro: numeroOpcional(
     9_999_999,
     "Valor inválido.",

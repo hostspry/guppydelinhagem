@@ -21,10 +21,18 @@ function gerarSenha(): string {
   return randomBytes(9).toString("base64url");
 }
 
-/** SUPER_ADMIN ignora limites — grava tudo zerado para não exibir número morto. */
+/**
+ * SUPER_ADMIN ignora limites — grava tudo zerado para não exibir número morto.
+ *
+ * `segmentosFinanceiros` fica FORA dessa regra de propósito: não é alçada, é
+ * divisória entre sócios. Um dono que só cuida da estufa continua dono de tudo
+ * o mais e mesmo assim não vê o caixa do outro negócio.
+ */
 function limitesDoPapel(d: MembroInput) {
+  const segmentos = { segmentosFinanceiros: d.segmentosFinanceiros };
   if (d.role === "SUPER_ADMIN") {
     return {
+      ...segmentos,
       limiteDescontoPercent: null,
       podeCancelarPedido: true,
       podeEstornar: true,
@@ -32,6 +40,7 @@ function limitesDoPapel(d: MembroInput) {
     };
   }
   return {
+    ...segmentos,
     limiteDescontoPercent: d.limiteDescontoPercent,
     podeCancelarPedido: d.podeCancelarPedido,
     podeEstornar: d.podeEstornar,

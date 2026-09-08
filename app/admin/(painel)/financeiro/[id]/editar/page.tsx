@@ -7,6 +7,7 @@ import {
   getLancamento,
 } from "@/lib/queries/financeiro";
 import { paraInputDate } from "@/lib/financeiro/periodo";
+import { segmentosPermitidos } from "@/lib/permissoes-server";
 
 export default async function EditarLancamentoPage({
   params,
@@ -14,10 +15,11 @@ export default async function EditarLancamentoPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [lancamento, categorias, campanhas] = await Promise.all([
+  const [lancamento, categorias, campanhas, segmentos] = await Promise.all([
     getLancamento(id),
     categoriasParaFormulario(),
     campanhasUsadas(),
+    segmentosPermitidos(),
   ]);
   if (!lancamento) notFound();
 
@@ -36,8 +38,10 @@ export default async function EditarLancamentoPage({
         categorias={categorias}
         campanhas={campanhas}
         hoje={paraInputDate(new Date())}
+        segmentosPermitidos={segmentos}
         initialData={{
           id: lancamento.id,
+          segmento: lancamento.segmento,
           tipo: lancamento.tipo,
           descricao: lancamento.descricao,
           valor: lancamento.valor,

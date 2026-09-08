@@ -153,6 +153,13 @@ model User {
   podeEstornar          Boolean  @default(false)
   limiteValorFinanceiro Decimal? @db.Decimal(10, 2) // teto R$ p/ cancelar pedido pago ou estornar
 
+  /// Segmentos do financeiro que este membro enxerga. Vazio = enxerga tudo.
+  ///
+  /// Diferente dos limites acima, este NÃO é ignorado pelo SUPER_ADMIN: não é um
+  /// teto de alçada, é uma divisória entre sócios. Quem toca só a estufa não vê
+  /// (nem edita) o caixa da loja de aquarismo, por mais graduado que seja.
+  segmentosFinanceiros SegmentoFinanceiro[] @default([])
+
   // Campos que o Auth.js/PrismaAdapter espera (OAuth). `nome` (obrigatório) segue
   // sendo a fonte de verdade do app; o adapter preenche `name` e, no createUser
   // customizado (lib/auth.ts), copiamos name→nome. `emailVerified`/`image` vêm do
@@ -257,50 +264,50 @@ model Category {
 }
 
 model Product {
-  id              String      @id @default(cuid())
-  slug            String      @unique
+  id              String   @id @default(cuid())
+  slug            String   @unique
   nome            String
   descricao       String
   descricaoCurta  String?
   metaTitle       String?
   metaDescription String?
-  keywords        String[]    @default([])
+  keywords        String[] @default([])
 
   // Atributos específicos do peixe (preenchidos manualmente no admin). São eixos
   // distintos — um peixe pode ser koi + halfmoon + dumbo ao mesmo tempo.
   // (composição saiu para ProductVariant.)
-  padraoCor       String? // eixo principal de busca (koi, full red, tuxedo…) — livre
-  cauda           String? // formato do rabo (halfmoon, delta, roundtail…) — livre
-  caracteristica  String? // extra física (dumbo…) — livre, opcional
-  origem          String? // nacional, americano, asiático… — livre
+  padraoCor      String? // eixo principal de busca (koi, full red, tuxedo…) — livre
+  cauda          String? // formato do rabo (halfmoon, delta, roundtail…) — livre
+  caracteristica String? // extra física (dumbo…) — livre, opcional
+  origem         String? // nacional, americano, asiático… — livre
 
   // Atributos gerais de manejo (preenchidos pela IA, revisáveis).
-  temperatura     String? // ex: "22–28°C"
-  ph              String? // ex: "6.8–7.8"
-  alimentacao     String? // ex: "Onívoro"
-  expectativaVida String? // ex: "2–3 anos"
-  preco           Decimal     @db.Decimal(10, 2)
-  descontoPix     Decimal?    @db.Decimal(5, 2) // % de desconto Pix PRÓPRIO do produto (0–100)
-  usarDescontoPixGlobal Boolean @default(false) // sem desconto próprio → usa o global da loja
-  parcelasMax     Int         @default(3)
-  tipo            ProductType @default(PEIXE)
-  estoque         Int         @default(0) // PEIXE: espelho de machos+femeas; não-PEIXE: real
-  estoqueMachos   Int         @default(0) // só PEIXE (pool real)
-  estoqueFemeas   Int         @default(0) // só PEIXE (pool real)
-  peso            Decimal?    @db.Decimal(8, 3)
-  comprimento     Decimal?    @db.Decimal(8, 2)
-  largura         Decimal?    @db.Decimal(8, 2)
-  altura          Decimal?    @db.Decimal(8, 2)
-  ativo           Boolean     @default(true)
-  destaque        Boolean     @default(false)
+  temperatura           String? // ex: "22–28°C"
+  ph                    String? // ex: "6.8–7.8"
+  alimentacao           String? // ex: "Onívoro"
+  expectativaVida       String? // ex: "2–3 anos"
+  preco                 Decimal     @db.Decimal(10, 2)
+  descontoPix           Decimal?    @db.Decimal(5, 2) // % de desconto Pix PRÓPRIO do produto (0–100)
+  usarDescontoPixGlobal Boolean     @default(false) // sem desconto próprio → usa o global da loja
+  parcelasMax           Int         @default(3)
+  tipo                  ProductType @default(PEIXE)
+  estoque               Int         @default(0) // PEIXE: espelho de machos+femeas; não-PEIXE: real
+  estoqueMachos         Int         @default(0) // só PEIXE (pool real)
+  estoqueFemeas         Int         @default(0) // só PEIXE (pool real)
+  peso                  Decimal?    @db.Decimal(8, 3)
+  comprimento           Decimal?    @db.Decimal(8, 2)
+  largura               Decimal?    @db.Decimal(8, 2)
+  altura                Decimal?    @db.Decimal(8, 2)
+  ativo                 Boolean     @default(true)
+  destaque              Boolean     @default(false)
   // Linha campeã mundial (World Guppy Contest). Liga o selo de tricampeão no
   // card/página do produto. Marcação manual no admin — nunca por nome.
-  linhagemCampea  Boolean     @default(false)
-  categoryId      String
-  criadoEm        DateTime    @default(now())
-  atualizadoEm    DateTime    @updatedAt
+  linhagemCampea        Boolean     @default(false)
+  categoryId            String
+  criadoEm              DateTime    @default(now())
+  atualizadoEm          DateTime    @updatedAt
 
-  category   Category        @relation(fields: [categoryId], references: [id])
+  category   Category         @relation(fields: [categoryId], references: [id])
   imagens    ProductImage[]
   videos     ProductVideo[]
   waitlist   WaitlistEntry[]
@@ -377,16 +384,16 @@ model WaitlistEntry {
 // ─────────────────────────────────────────────
 
 model Order {
-  id              String          @id @default(cuid())
-  numero          String          @unique // "#2026-0001"
-  ano             Int
-  sequencia       Int
+  id        String @id @default(cuid())
+  numero    String @unique // "#2026-0001"
+  ano       Int
+  sequencia Int
 
   // Vínculo: cliente obrigatório (pedido manual); user opcional (checkout futuro).
-  clienteId       String
-  cliente         Cliente         @relation(fields: [clienteId], references: [id])
-  userId          String?
-  user            User?           @relation(fields: [userId], references: [id])
+  clienteId String
+  cliente   Cliente @relation(fields: [clienteId], references: [id])
+  userId    String?
+  user      User?   @relation(fields: [userId], references: [id])
 
   tipo            TipoOrder       @default(PEDIDO) // COBRANCA = cobrança avulsa por link
   status          OrderStatus     @default(RASCUNHO)
@@ -396,23 +403,23 @@ model Order {
   observacoes     String?
   enderecoEntrega Json // SNAPSHOT do destinatário (ver lib/validations/pedido.ts)
 
-  subtotal        Decimal         @default(0) @db.Decimal(10, 2)
-  frete           Decimal         @default(0) @db.Decimal(10, 2)
-  desconto        Decimal         @default(0) @db.Decimal(10, 2)
-  total           Decimal         @default(0) @db.Decimal(10, 2)
+  subtotal Decimal @default(0) @db.Decimal(10, 2)
+  frete    Decimal @default(0) @db.Decimal(10, 2)
+  desconto Decimal @default(0) @db.Decimal(10, 2)
+  total    Decimal @default(0) @db.Decimal(10, 2)
 
-  modalidadeFrete String? // 'TERRESTRE' (Jadlog) | 'AEREO' (Gollog) | 'SECO' (produto não vivo)
+  modalidadeFrete  String? // 'TERRESTRE' (Jadlog) | 'AEREO' (Gollog) | 'SECO' (produto não vivo)
   // Serviço do Melhor Envio escolhido no checkout de produto seco. O enum
   // Transportadora tem 3 valores e não acompanha o catálogo do ME (que muda
   // sozinho), então o id/nome reais ficam aqui e o enum vira OUTRO.
   servicoEnvioId   Int?
   servicoEnvioNome String?
-  tipoEntrega     TipoEntrega @default(ENVIO) // ENVIO (despacha) | RETIRADA (cliente busca)
-  codigoRastreio  String? // AWB (Gollog) ou código da transportadora (Jadlog)
-  selfTracking    String? // código ME…BR (Melhor Rastreio) — o link do cliente
-  etiquetaUrl     String? // PDF da etiqueta gerada no Melhor Envio (print público)
-  rastreioStatus  String? // último status conhecido no ME (posted/delivered/…)
-  enviadoEm       DateTime? // quando virou ENVIADO (etiqueta gerada ou registro manual)
+  tipoEntrega      TipoEntrega @default(ENVIO) // ENVIO (despacha) | RETIRADA (cliente busca)
+  codigoRastreio   String? // AWB (Gollog) ou código da transportadora (Jadlog)
+  selfTracking     String? // código ME…BR (Melhor Rastreio) — o link do cliente
+  etiquetaUrl      String? // PDF da etiqueta gerada no Melhor Envio (print público)
+  rastreioStatus   String? // último status conhecido no ME (posted/delivered/…)
+  enviadoEm        DateTime? // quando virou ENVIADO (etiqueta gerada ou registro manual)
 
   // Cupom aplicado (opcional). cupomCodigo é snapshot (sobrevive à exclusão do cupom).
   cupomId     String?
@@ -434,14 +441,14 @@ model Order {
 
   // Scaffold de checkout/integrações — dormente (reconciliado nas fases
   // Pagamentos/Envio; não usar/não apagar). parcelas: parcelamento de cartão.
-  parcelas        Int?
-  mpPaymentId     String?
-  mpPreferenceId  String?
-  meCalcId        String?
-  meShipmentId    String?
+  parcelas       Int?
+  mpPaymentId    String?
+  mpPreferenceId String?
+  meCalcId       String?
+  meShipmentId   String?
 
-  criadoEm        DateTime        @default(now())
-  atualizadoEm    DateTime        @updatedAt
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
 
   items           OrderItem[]
   pagamentos      Pagamento[]
@@ -495,11 +502,11 @@ model Notificacao {
 }
 
 model OrderItem {
-  id             String   @id @default(cuid())
+  id             String          @id @default(cuid())
   orderId        String
   productId      String? // null = item avulso
   quantidade     Int
-  precoUnitario  Decimal  @db.Decimal(10, 2) // SNAPSHOT
+  precoUnitario  Decimal         @db.Decimal(10, 2) // SNAPSHOT
   nomeProduto    String // SNAPSHOT
   imagemSnapshot String? // SNAPSHOT (opcional)
   composicao     TipoComposicao? // snapshot da composição (null em avulso/não-peixe)
@@ -671,9 +678,9 @@ model EnvioCampanha {
   email String
   nome  String
 
-  enviadoEm DateTime?
-  erro      String?
-  tentativas Int      @default(0)
+  enviadoEm  DateTime?
+  erro       String?
+  tentativas Int       @default(0)
 
   criadoEm DateTime @default(now())
 
@@ -718,12 +725,12 @@ enum SegurancaSmtp {
 /// volta para a tela em momento nenhum — o SMTP precisa dela em texto na hora do
 /// envio, então hash não serve, mas um dump do banco sozinho não a revela.
 model ConfiguracaoEmail {
-  id       String        @id @default("default")
-  ativo    Boolean       @default(false) // desligado = site não tenta enviar nada
-  host     String
-  porta    Int           @default(587)
-  seguranca SegurancaSmtp @default(STARTTLS)
-  usuario  String
+  id                 String        @id @default("default")
+  ativo              Boolean       @default(false) // desligado = site não tenta enviar nada
+  host               String
+  porta              Int           @default(587)
+  seguranca          SegurancaSmtp @default(STARTTLS)
+  usuario            String
   senhaCriptografada String
 
   remetenteNome  String // o que aparece como nome do remetente
@@ -853,17 +860,32 @@ enum OrigemLancamento {
   COMPROVANTE // criado a partir de PDF/imagem/texto lido
 }
 
+/// Unidade de negócio de um lançamento. A estufa (peixes vivos) e a loja de
+/// aquarismo (produtos) têm resultado próprio; GERAL é o custo que serve os dois
+/// e não dá para fatiar honestamente (energia, internet, aluguel, imposto).
+///
+/// É o eixo de PRIVACIDADE do financeiro: quem cuida só da estufa (User.
+/// segmentosFinanceiros) enxerga apenas os segmentos que lhe cabem.
+enum SegmentoFinanceiro {
+  GERAL
+  PEIXES_VIVOS
+  PRODUTOS
+}
+
 // Categorias são editáveis, mas as marcadas com `sistema` são procuradas por slug
 // pelo código (venda do site, taxa, frete) — dá para renomear, não para apagar.
 model CategoriaFinanceira {
-  id       String          @id @default(cuid())
-  nome     String
-  slug     String          @unique
-  tipo     TipoLancamento? // null = serve para entrada e saída
-  sistema  Boolean         @default(false)
-  ordem    Int             @default(0)
-  ativa    Boolean         @default(true)
-  criadoEm DateTime        @default(now())
+  id             String              @id @default(cuid())
+  nome           String
+  slug           String              @unique
+  tipo           TipoLancamento? // null = serve para entrada e saída
+  sistema        Boolean             @default(false)
+  /// Segmento sugerido ao escolher esta categoria no formulário. Só sugestão:
+  /// quem lança pode mudar (uma mesma categoria pode servir os dois negócios).
+  segmentoPadrao SegmentoFinanceiro?
+  ordem          Int                 @default(0)
+  ativa          Boolean             @default(true)
+  criadoEm       DateTime            @default(now())
 
   lancamentos  Lancamento[]
   recorrencias RecorrenciaFinanceira[]
@@ -872,13 +894,17 @@ model CategoriaFinanceira {
 }
 
 model Lancamento {
-  id        String           @id @default(cuid())
-  tipo      TipoLancamento
-  status    StatusLancamento @default(CONFIRMADO)
-  origem    OrigemLancamento @default(MANUAL)
-  descricao String
-  valor     Decimal          @db.Decimal(10, 2) // sempre positivo
-  data      DateTime // quando mexeu no caixa (ou previsão, se pendente)
+  id         String             @id @default(cuid())
+  /// A que negócio este dinheiro pertence. Default PEIXES_VIVOS porque a estufa
+  /// é a operação antiga: se algum caminho novo esquecer de definir, o valor cai
+  /// no lugar onde ele historicamente estaria, não numa gaveta neutra errada.
+  segmento   SegmentoFinanceiro @default(PEIXES_VIVOS)
+  tipo       TipoLancamento
+  status     StatusLancamento   @default(CONFIRMADO)
+  origem     OrigemLancamento   @default(MANUAL)
+  descricao  String
+  valor      Decimal            @db.Decimal(10, 2) // sempre positivo
+  data       DateTime // quando mexeu no caixa (ou previsão, se pendente)
   vencimento DateTime? // contas a pagar/receber
 
   categoriaId String?
@@ -911,6 +937,7 @@ model Lancamento {
   atualizadoEm DateTime @updatedAt
 
   @@unique([pagamentoId, origem])
+  @@index([segmento, status, data])
   @@index([status, data])
   @@index([data])
   @@index([categoriaId])
@@ -923,12 +950,15 @@ model Lancamento {
 // Despesa que se repete todo mês (energia, internet, ração). O cron gera a conta
 // do mês uma única vez — `ultimaCompetencia` ("2026-08") é a trava.
 model RecorrenciaFinanceira {
-  id            String         @id @default(cuid())
-  tipo          TipoLancamento @default(SAIDA)
+  id            String             @id @default(cuid())
+  /// Conta que se repete costuma ser estrutura (energia, internet, aluguel), daí
+  /// o default GERAL — o oposto do Lancamento, que nasce da venda da estufa.
+  segmento      SegmentoFinanceiro @default(GERAL)
+  tipo          TipoLancamento     @default(SAIDA)
   descricao     String
-  valor         Decimal        @db.Decimal(10, 2)
+  valor         Decimal            @db.Decimal(10, 2)
   diaVencimento Int // 1–28, para existir em todo mês
-  ativa         Boolean        @default(true)
+  ativa         Boolean            @default(true)
   observacoes   String?
 
   categoriaId String?
@@ -971,11 +1001,15 @@ model AuditoriaAdmin {
   acao       String // "produto.atualizar", "pedido.cancelar"…
   entidade   String? // "Product", "Order"…
   entidadeId String?
-  /** Frase pronta para leitura humana ("mudou o preço de X de R$ 80 para R$ 90"). */
+  /**
+   * Frase pronta para leitura humana ("mudou o preço de X de R$ 80 para R$ 90").
+   */
   descricao  String
 
-  /** Só os campos que mudaram, para o histórico não virar um dump do banco. */
-  antes Json?
+  /**
+   * Só os campos que mudaram, para o histórico não virar um dump do banco.
+   */
+  antes  Json?
   depois Json?
 
   ip        String?
@@ -1018,7 +1052,9 @@ model SessaoVisita {
   iniciadaEm      DateTime @default(now())
   ultimaAtividade DateTime @default(now())
 
-  /** Mascarado quando `consentimento` é false. */
+  /**
+   * Mascarado quando `consentimento` é false.
+   */
   ip            String?
   consentimento Boolean @default(false)
 
@@ -1027,10 +1063,10 @@ model SessaoVisita {
   navegador   String?
   sistema     String?
 
-  referrer     String?
-  utmSource    String?
-  utmMedium    String?
-  utmCampaign  String?
+  referrer      String?
+  utmSource     String?
+  utmMedium     String?
+  utmCampaign   String?
   paginaEntrada String?
 
   // Geolocalização (só com consentimento; vem do cache GeoIp).
@@ -1046,26 +1082,26 @@ model SessaoVisita {
 }
 
 model EventoVisitante {
-  id          String    @id @default(cuid())
+  id          String       @id @default(cuid())
   visitanteId String
-  visitante   Visitante @relation(fields: [visitanteId], references: [id], onDelete: Cascade)
+  visitante   Visitante    @relation(fields: [visitanteId], references: [id], onDelete: Cascade)
   sessaoId    String
   sessao      SessaoVisita @relation(fields: [sessaoId], references: [id], onDelete: Cascade)
 
   tipo       String // ver lib/rastreio/eventos.ts
   ocorridoEm DateTime @default(now())
 
-  url      String?
-  titulo   String?
+  url    String?
+  titulo String?
 
   // Produto envolvido, com nome em snapshot (o produto pode ser renomeado ou
   // excluído; o histórico não pode mentir sobre o que a pessoa viu).
-  produtoId    String?
-  produtoNome  String?
-  variantId    String?
-  composicao   String?
-  quantidade   Int?
-  valor        Decimal? @db.Decimal(10, 2)
+  produtoId   String?
+  produtoNome String?
+  variantId   String?
+  composicao  String?
+  quantidade  Int?
+  valor       Decimal? @db.Decimal(10, 2)
 
   busca String?
   meta  Json?
@@ -1080,11 +1116,11 @@ model EventoVisitante {
 // Cache de IP → cidade/provedor. Existe para NÃO consultar o serviço externo a
 // cada evento: um IP é resolvido uma vez e reaproveitado.
 model GeoIp {
-  ip          String   @id
-  cidade      String?
-  regiao      String?
-  pais        String?
-  provedor    String?
-  falhou      Boolean  @default(false)
+  ip           String   @id
+  cidade       String?
+  regiao       String?
+  pais         String?
+  provedor     String?
+  falhou       Boolean  @default(false)
   consultadoEm DateTime @default(now())
 }

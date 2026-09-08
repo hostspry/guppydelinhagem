@@ -1,4 +1,6 @@
 import { prisma } from "@/lib/prisma";
+import { filtroSegmento } from "@/lib/permissoes-server";
+import type { SegmentoFinanceiro } from "@/lib/generated/prisma/enums";
 import { intervaloDaCompetencia } from "@/lib/financeiro/periodo";
 
 /**
@@ -9,6 +11,7 @@ import { intervaloDaCompetencia } from "@/lib/financeiro/periodo";
 
 export type LancamentoItem = {
   id: string;
+  segmento: SegmentoFinanceiro;
   tipo: "ENTRADA" | "SAIDA";
   status: "PENDENTE" | "CONFIRMADO" | "DESCARTADO";
   origem: string;
@@ -29,6 +32,7 @@ export type LancamentoItem = {
 
 const SELECT = {
   id: true,
+  segmento: true,
   tipo: true,
   status: true,
   origem: true,
@@ -49,6 +53,7 @@ const SELECT = {
 
 type Row = {
   id: string;
+  segmento: SegmentoFinanceiro;
   tipo: string;
   status: string;
   origem: string;
@@ -70,6 +75,7 @@ type Row = {
 function paraItem(l: Row): LancamentoItem {
   return {
     id: l.id,
+    segmento: l.segmento,
     tipo: l.tipo as LancamentoItem["tipo"],
     status: l.status as LancamentoItem["status"],
     origem: l.origem,
@@ -89,6 +95,23 @@ function paraItem(l: Row): LancamentoItem {
   };
 }
 
+/**
+ * Cruza a aba escolhida na tela com o escopo do membro. Pedir um segmento que
+ * não é seu não amplia nada: devolve um filtro impossível (lista vazia), então a
+ * tela mostra zero em vez de vazar. Sem aba, vale o escopo inteiro.
+ */
+async function escopoComFiltro(
+  segmentoFiltro?: SegmentoFinanceiro | null,
+): Promise<{ segmento?: { in: SegmentoFinanceiro[] } }> {
+  const escopo = await filtroSegmento();
+  if (!segmentoFiltro) return escopo;
+  const permitidos = escopo.segmento?.in;
+  if (permitidos && !permitidos.includes(segmentoFiltro)) {
+    return { segmento: { in: [] } };
+  }
+  return { segmento: { in: [segmentoFiltro] } };
+}
+
 export type ResumoMensal = {
   competencia: string;
   entradas: number;
@@ -106,10 +129,15 @@ export type ResumoMensal = {
 };
 
 /** Soma de confirmados no intervalo, separada por tipo. */
-async function somarPorTipo(inicio: Date, fim?: Date) {
+async function somarPorTipo(
+  inicio: Date,
+  fim: Date | undefined,
+  escopo: { segmento?: { in: SegmentoFinanceiro[] } },
+) {
   const linhas = await prisma.lancamento.groupBy({
     by: ["tipo"],
     where: {
+      ...escopo,
       status: "CONFIRMADO",
       data: fim ? { gte: inicio, lt: fim } : { lt: inicio },
     },
@@ -125,21 +153,31 @@ async function somarPorTipo(inicio: Date, fim?: Date) {
   return { entradas, saidas };
 }
 
-export async function resumoMensal(competencia: string): Promise<ResumoMensal> {
+export async function resumoMensal(
+  competencia: string,
+  /** Aba escolhida na tela. Sempre cruzada com o escopo — pedir um segmento que
+   *  não é seu não amplia nada, só devolve vazio. */
+  segmentoFiltro?: SegmentoFinanceiro | null,
+): Promise<ResumoMensal> {
   const { inicio, fim } = intervaloDaCompetencia(competencia);
+  const escopo = await escopoComFiltro(segmentoFiltro);
 
   const [doMes, ateOFim, lancamentos, agrupado, categorias] = await Promise.all([
-    somarPorTipo(inicio, fim),
+    somarPorTipo(inicio, fim, escopo),
     // Acumulado: tudo que foi confirmado até o fim deste mês (inclusive).
-    somarPorTipo(fim),
+    somarPorTipo(fim, undefined, escopo),
     prisma.lancamento.findMany({
-      where: { status: { not: "DESCARTADO" }, data: { gte: inicio, lt: fim } },
+      where: {
+        ...escopo,
+        status: { not: "DESCARTADO" },
+        data: { gte: inicio, lt: fim },
+      },
       select: SELECT,
       orderBy: [{ data: "desc" }, { criadoEm: "desc" }],
     }),
     prisma.lancamento.groupBy({
       by: ["categoriaId", "tipo"],
-      where: { status: "CONFIRMADO", data: { gte: inicio, lt: fim } },
+      where: { ...escopo, status: "CONFIRMADO", data: { gte: inicio, lt: fim } },
       _sum: { valor: true },
     }),
     prisma.categoriaFinanceira.findMany({ select: { id: true, nome: true } }),
@@ -170,7 +208,7 @@ export async function resumoMensal(competencia: string): Promise<ResumoMensal> {
 /** Vendas do site esperando conferência (as sugestões automáticas). */
 export async function listarSugestoesDeVenda(): Promise<LancamentoItem[]> {
   const linhas = await prisma.lancamento.findMany({
-    where: { status: "PENDENTE", origem: "PEDIDO" },
+    where: { ...(await filtroSegmento()), status: "PENDENTE", origem: "PEDIDO" },
     select: SELECT,
     orderBy: { data: "desc" },
   });
@@ -180,7 +218,11 @@ export async function listarSugestoesDeVenda(): Promise<LancamentoItem[]> {
 /** Contas a pagar/receber ainda não quitadas, da mais vencida para a mais longe. */
 export async function listarContasEmAberto(): Promise<LancamentoItem[]> {
   const linhas = await prisma.lancamento.findMany({
-    where: { status: "PENDENTE", origem: { not: "PEDIDO" } },
+    where: {
+      ...(await filtroSegmento()),
+      status: "PENDENTE",
+      origem: { not: "PEDIDO" },
+    },
     select: SELECT,
     orderBy: [{ vencimento: "asc" }, { data: "asc" }],
   });
@@ -198,14 +240,18 @@ export type ContadoresPendencia = {
 export async function contadoresPendencia(): Promise<ContadoresPendencia> {
   const hoje = new Date();
   const em7 = new Date(hoje.getTime() + 7 * 24 * 60 * 60 * 1000);
+  const escopo = await filtroSegmento();
 
   const [sugestoes, contasAbertas, vencidas, venceEm7Dias] = await Promise.all([
-    prisma.lancamento.count({ where: { status: "PENDENTE", origem: "PEDIDO" } }),
     prisma.lancamento.count({
-      where: { status: "PENDENTE", origem: { not: "PEDIDO" } },
+      where: { ...escopo, status: "PENDENTE", origem: "PEDIDO" },
+    }),
+    prisma.lancamento.count({
+      where: { ...escopo, status: "PENDENTE", origem: { not: "PEDIDO" } },
     }),
     prisma.lancamento.count({
       where: {
+        ...escopo,
         status: "PENDENTE",
         origem: { not: "PEDIDO" },
         vencimento: { lt: hoje },
@@ -213,6 +259,7 @@ export async function contadoresPendencia(): Promise<ContadoresPendencia> {
     }),
     prisma.lancamento.count({
       where: {
+        ...escopo,
         status: "PENDENTE",
         origem: { not: "PEDIDO" },
         vencimento: { gte: hoje, lte: em7 },
@@ -224,7 +271,12 @@ export async function contadoresPendencia(): Promise<ContadoresPendencia> {
 }
 
 export async function getLancamento(id: string): Promise<LancamentoItem | null> {
-  const l = await prisma.lancamento.findUnique({ where: { id }, select: SELECT });
+  // findFirst (e não findUnique) de propósito: o escopo entra no where, então um
+  // id de outro segmento devolve null em vez de vazar a linha.
+  const l = await prisma.lancamento.findFirst({
+    where: { id, ...(await filtroSegmento()) },
+    select: SELECT,
+  });
   return l ? paraItem(l as Row) : null;
 }
 
@@ -264,18 +316,25 @@ export async function listarCategorias(): Promise<CategoriaItem[]> {
 
 /** Só as ativas, para os <select> dos formulários. */
 export async function categoriasParaFormulario(): Promise<
-  { id: string; nome: string; tipo: "ENTRADA" | "SAIDA" | null; slug: string }[]
+  {
+    id: string;
+    nome: string;
+    tipo: "ENTRADA" | "SAIDA" | null;
+    slug: string;
+    segmentoPadrao: SegmentoFinanceiro | null;
+  }[]
 > {
   const cats = await prisma.categoriaFinanceira.findMany({
     where: { ativa: true },
     orderBy: [{ ordem: "asc" }, { nome: "asc" }],
-    select: { id: true, nome: true, tipo: true, slug: true },
+    select: { id: true, nome: true, tipo: true, slug: true, segmentoPadrao: true },
   });
   return cats.map((c) => ({
     id: c.id,
     nome: c.nome,
     tipo: c.tipo as "ENTRADA" | "SAIDA" | null,
     slug: c.slug,
+    segmentoPadrao: c.segmentoPadrao,
   }));
 }
 
@@ -286,7 +345,7 @@ export async function categoriasParaFormulario(): Promise<
  */
 export async function campanhasUsadas(): Promise<string[]> {
   const linhas = await prisma.lancamento.findMany({
-    where: { campanha: { not: null } },
+    where: { ...(await filtroSegmento()), campanha: { not: null } },
     distinct: ["campanha"],
     orderBy: { data: "desc" },
     take: 40,
@@ -392,6 +451,10 @@ export async function serieDoCaixa(
   const fim = inicioDoBalde(new Date(), granularidade);
   const inicio = passoAtras(fim, granularidade, quantos - 1);
 
+  // SQL cru precisa aplicar o escopo na mão: o filtro do Prisma não alcança aqui,
+  // e sem isso o gráfico somaria o caixa do outro sócio.
+  const escopo = await filtroSegmento();
+  const permitidos = escopo.segmento?.in ?? null;
   const linhas = await prisma.$queryRawUnsafe<
     { bucket: Date; entradas: unknown; saidas: unknown }[]
   >(
@@ -400,9 +463,10 @@ export async function serieDoCaixa(
             SUM(CASE WHEN "tipo" = 'SAIDA'   THEN "valor" ELSE 0 END) AS saidas
        FROM "Lancamento"
       WHERE "status" = 'CONFIRMADO' AND "data" >= $1
+      ${permitidos ? `AND "segmento" = ANY($2::"SegmentoFinanceiro"[])` : ""}
       GROUP BY 1
       ORDER BY 1`,
-    inicio,
+    ...(permitidos ? [inicio, permitidos] : [inicio]),
   );
 
   const porChave = new Map<string, { entradas: number; saidas: number }>();
@@ -435,6 +499,7 @@ export async function serieDoCaixa(
 
 export type RecorrenciaItem = {
   id: string;
+  segmento: SegmentoFinanceiro;
   tipo: "ENTRADA" | "SAIDA";
   descricao: string;
   valor: number;
@@ -448,9 +513,11 @@ export type RecorrenciaItem = {
 
 export async function listarRecorrencias(): Promise<RecorrenciaItem[]> {
   const rs = await prisma.recorrenciaFinanceira.findMany({
+    where: await filtroSegmento(),
     orderBy: [{ ativa: "desc" }, { diaVencimento: "asc" }],
     select: {
       id: true,
+      segmento: true,
       tipo: true,
       descricao: true,
       valor: true,
@@ -464,6 +531,7 @@ export async function listarRecorrencias(): Promise<RecorrenciaItem[]> {
   });
   return rs.map((r) => ({
     id: r.id,
+    segmento: r.segmento,
     tipo: r.tipo as "ENTRADA" | "SAIDA",
     descricao: r.descricao,
     valor: Number(r.valor),
@@ -542,6 +610,7 @@ export async function procurarMesmoPagamento(args: {
 
   const linhas = await prisma.lancamento.findMany({
     where: {
+      ...(await filtroSegmento()),
       tipo,
       valor,
       status: { not: "DESCARTADO" },
@@ -600,6 +669,7 @@ export async function procurarOrigemDoRepasse(args: {
 
   const linhas = await prisma.lancamento.findMany({
     where: {
+      ...(await filtroSegmento()),
       tipo: "ENTRADA",
       valor: args.valor,
       status: { not: "DESCARTADO" },
