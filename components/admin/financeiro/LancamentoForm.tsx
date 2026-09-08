@@ -116,7 +116,7 @@ export function LancamentoForm({
   const tipo = watch("tipo");
   const categoriaSel = watch("categoriaId");
 
-  // A categoria sugere o segmento (energia → Geral, ração → Peixes), mas nunca
+  // A categoria sugere o segmento (energia → Peixes, filtro → Produtos), mas nunca
   // manda: quem lança pode trocar, e a troca manual não é desfeita depois.
   const segmentoTocado = useRef(false);
   useEffect(() => {
@@ -268,7 +268,7 @@ export function LancamentoForm({
           <FormField
             label="De qual negócio"
             name="segmento"
-            hint="Custo que serve os dois lados (luz, internet, aluguel, imposto) vai em Geral."
+            hint="A estufa é sociedade e carrega o próprio custo (luz, água, aluguel, imposto dela). Conta que serve os dois lados: lance duas linhas, uma de cada lado."
           >
             <select
               id="segmento"

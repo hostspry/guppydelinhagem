@@ -60,7 +60,7 @@ export const CANAIS_VENDA = [
 const canaisValores = CANAIS_VENDA.map((c) => c.valor);
 
 /** Unidade de negócio do lançamento (ver enum SegmentoFinanceiro no schema). */
-export const segmentoEnum = z.enum(["GERAL", "PEIXES_VIVOS", "PRODUTOS"]);
+export const segmentoEnum = z.enum(["PEIXES_VIVOS", "PRODUTOS"]);
 
 export const lancamentoSchema = z.object({
   segmento: segmentoEnum,

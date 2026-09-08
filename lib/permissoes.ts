@@ -130,21 +130,20 @@ export type MembroAtual = {
 // ─────────────────────────────────────────────
 
 export const SEGMENTOS: readonly SegmentoFinanceiro[] = [
-  "GERAL",
   "PEIXES_VIVOS",
   "PRODUTOS",
 ] as const;
 
 export const SEGMENTO_LABEL: Record<SegmentoFinanceiro, string> = {
-  GERAL: "Geral",
   PEIXES_VIVOS: "Peixes vivos",
   PRODUTOS: "Produtos",
 };
 
 export const SEGMENTO_DESCRICAO: Record<SegmentoFinanceiro, string> = {
-  GERAL: "Custo que serve os dois negócios: energia, água, internet, aluguel, imposto.",
-  PEIXES_VIVOS: "A estufa: venda de peixe, ração, medicamento, matriz, caixa de isopor.",
-  PRODUTOS: "A loja de aquarismo: venda e compra de criadeira, filtro, aquário, acessório.",
+  PEIXES_VIVOS:
+    "A estufa, que é sociedade: venda de peixe, ração, remédio, matriz, e o custo de manter a estufa (luz, água, internet, aluguel, imposto da estufa).",
+  PRODUTOS:
+    "A loja de aquarismo: criadeira, filtro, aquário, acessório, e o imposto e o anúncio dessa parte.",
 };
 
 /** Normaliza o que veio do banco: lista vazia significa "vê tudo". */

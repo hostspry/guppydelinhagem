@@ -174,7 +174,6 @@ export async function registrarSugestaoDeVenda(
 }
 
 const ROTULO_SEGMENTO: Record<SegmentoFinanceiro, string> = {
-  GERAL: "geral",
   PEIXES_VIVOS: "peixes",
   PRODUTOS: "produtos",
 };

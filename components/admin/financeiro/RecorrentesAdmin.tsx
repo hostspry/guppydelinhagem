@@ -20,8 +20,8 @@ const inputClass =
 
 const VAZIO = {
   id: null as string | null,
-  // Conta que se repete costuma ser estrutura (luz, internet, aluguel).
-  segmento: "GERAL" as SegmentoFinanceiro,
+  // Conta que se repete costuma ser estrutura da estufa (luz, internet, aluguel).
+  segmento: "PEIXES_VIVOS" as SegmentoFinanceiro,
   tipo: "SAIDA" as "ENTRADA" | "SAIDA",
   descricao: "",
   valor: "",

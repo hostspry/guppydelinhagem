@@ -34,7 +34,7 @@ export const membroSchema = z.object({
    * divisória entre sócios, não um teto de alçada.
    */
   segmentosFinanceiros: z
-    .array(z.enum(["GERAL", "PEIXES_VIVOS", "PRODUTOS"]))
+    .array(z.enum(["PEIXES_VIVOS", "PRODUTOS"]))
     .default([]),
   limiteValorFinanceiro: numeroOpcional(
     9_999_999,

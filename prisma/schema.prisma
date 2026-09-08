@@ -860,14 +860,21 @@ enum OrigemLancamento {
   COMPROVANTE // criado a partir de PDF/imagem/texto lido
 }
 
-/// Unidade de negócio de um lançamento. A estufa (peixes vivos) e a loja de
-/// aquarismo (produtos) têm resultado próprio; GERAL é o custo que serve os dois
-/// e não dá para fatiar honestamente (energia, internet, aluguel, imposto).
+/// Unidade de negócio de um lançamento, e quem é dono dela.
 ///
-/// É o eixo de PRIVACIDADE do financeiro: quem cuida só da estufa (User.
-/// segmentosFinanceiros) enxerga apenas os segmentos que lhe cabem.
+/// PEIXES_VIVOS é a estufa, uma SOCIEDADE: as vendas de peixe e todo o custo de
+/// manter a estufa em pé (ração, remédio, matriz, luz, água, internet, aluguel,
+/// imposto da estufa) entram aqui, porque é este resultado que os sócios
+/// dividem. PRODUTOS é a loja de aquarismo, projeto de um sócio só.
+///
+/// Não existe gaveta de "custo compartilhado" de propósito: ela deixaria o
+/// resultado da sociedade incompleto, e é justamente esse número que precisa
+/// fechar sozinho. Despesa que serve os dois (um imposto, um anúncio) é lançada
+/// em duas linhas, cada uma no seu lado.
+///
+/// É também o eixo de PRIVACIDADE do financeiro: User.segmentosFinanceiros diz
+/// quais destes o membro enxerga.
 enum SegmentoFinanceiro {
-  GERAL
   PEIXES_VIVOS
   PRODUTOS
 }
@@ -951,9 +958,9 @@ model Lancamento {
 // do mês uma única vez — `ultimaCompetencia` ("2026-08") é a trava.
 model RecorrenciaFinanceira {
   id            String             @id @default(cuid())
-  /// Conta que se repete costuma ser estrutura (energia, internet, aluguel), daí
-  /// o default GERAL — o oposto do Lancamento, que nasce da venda da estufa.
-  segmento      SegmentoFinanceiro @default(GERAL)
+  /// Conta que se repete costuma ser estrutura da estufa (energia, internet,
+  /// aluguel), que é custo da sociedade.
+  segmento      SegmentoFinanceiro @default(PEIXES_VIVOS)
   tipo          TipoLancamento     @default(SAIDA)
   descricao     String
   valor         Decimal            @db.Decimal(10, 2)
