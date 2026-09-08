@@ -206,7 +206,11 @@ export default function LojaListing({
             )}
           </p>
 
-          <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
+          {/* items-start: cada card tem a altura do próprio conteúdo. Sem isto, a
+              linha estica todos até a altura do mais alto, e um card de produto
+              (foto 4:5) ao lado de um de peixe (vídeo 9:16) abre um vão branco
+              entre o nome e o preço, porque o preço é ancorado no rodapé. */}
+          <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6 items-start">
             {items.map((p) => (
               <ProductCardSimple key={p.id} product={p} />
             ))}
