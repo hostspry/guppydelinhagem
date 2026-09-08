@@ -3,6 +3,7 @@ import { PageHeader } from "@/components/admin/PageHeader";
 import { MembroForm } from "@/components/admin/MembroForm";
 import { getMembro } from "@/lib/queries/equipe";
 import { membroAtual } from "@/lib/permissoes-server";
+import { cargosParaFormulario } from "@/lib/queries/cargos";
 
 export default async function EditarMembroPage({
   params,
@@ -10,7 +11,11 @@ export default async function EditarMembroPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [membro, eu] = await Promise.all([getMembro(id), membroAtual()]);
+  const [membro, eu, cargos] = await Promise.all([
+    getMembro(id),
+    membroAtual(),
+    cargosParaFormulario(),
+  ]);
   if (!membro) notFound();
 
   return (
@@ -34,8 +39,9 @@ export default async function EditarMembroPage({
           podeCancelarPedido: membro.podeCancelarPedido,
           podeEstornar: membro.podeEstornar,
           limiteValorFinanceiro: membro.limiteValorFinanceiro,
-          segmentosFinanceiros: membro.segmentosFinanceiros,
+          cargoId: membro.cargoId,
         }}
+        cargos={cargos}
         souEu={membro.id === eu.id}
       />
     </div>

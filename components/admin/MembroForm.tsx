@@ -14,12 +14,8 @@ import {
   PAPEIS_EQUIPE,
   PAPEL_DESCRICAO,
   PAPEL_LABEL,
-  SEGMENTO_DESCRICAO,
-  SEGMENTO_LABEL,
-  SEGMENTOS,
   type PapelEquipe,
 } from "@/lib/permissoes";
-import type { SegmentoFinanceiro } from "@/lib/generated/prisma/enums";
 import { criarMembro, atualizarMembro } from "@/actions/equipe";
 
 type MembroInitial = {
@@ -31,7 +27,7 @@ type MembroInitial = {
   podeCancelarPedido: boolean;
   podeEstornar: boolean;
   limiteValorFinanceiro: number | null;
-  segmentosFinanceiros: SegmentoFinanceiro[];
+  cargoId: string | null;
 };
 
 const inputClass =
@@ -40,9 +36,12 @@ const inputClass =
 export function MembroForm({
   initialData,
   souEu,
+  cargos,
 }: {
   initialData?: MembroInitial;
   souEu?: boolean;
+  /** Cargos disponíveis — montados pelo dono em /admin/cargos. */
+  cargos: { id: string; nome: string; descricao: string | null }[];
 }) {
   const [isPending, startTransition] = useTransition();
   const [criado, setCriado] = useState<{ nome: string; email: string; senha: string } | null>(null);
@@ -64,7 +63,7 @@ export function MembroForm({
           limiteDescontoPercent: initialData.limiteDescontoPercent ?? "",
           podeCancelarPedido: initialData.podeCancelarPedido,
           podeEstornar: initialData.podeEstornar,
-          segmentosFinanceiros: initialData.segmentosFinanceiros,
+          cargoId: initialData.cargoId ?? "",
           limiteValorFinanceiro: initialData.limiteValorFinanceiro ?? "",
         }
       : {
@@ -74,13 +73,15 @@ export function MembroForm({
           limiteDescontoPercent: "",
           podeCancelarPedido: false,
           podeEstornar: false,
-          segmentosFinanceiros: [],
+          cargoId: cargos[0]?.id ?? "",
           limiteValorFinanceiro: "",
         },
   });
 
   const papel = watch("role") as PapelEquipe;
   const ehDono = papel === "SUPER_ADMIN";
+  const cargoSel = watch("cargoId");
+  const cargoEscolhido = cargos.find((c) => c.id === cargoSel);
   const vePedidos = papel === "ADMIN" || papel === "SUPER_ADMIN";
 
   const onSubmit = handleSubmit((data) => {
@@ -194,36 +195,39 @@ export function MembroForm({
         </p>
       )}
 
-      {/* Divisória do financeiro. Aparece para TODOS os papéis, inclusive dono:
-          não é alçada, é separar o caixa de dois negócios entre dois sócios. */}
-      <h2 className="text-xs font-semibold text-[#07366A] uppercase tracking-wide mb-1 mt-4">
-        Financeiro que esta pessoa enxerga
-      </h2>
-      <p className="text-xs text-gray-500 mb-3">
-        Sem nenhum marcado, ela vê o caixa inteiro. Marcando, ela só enxerga (e
-        só lança em) o que estiver marcado — vale até para o dono.
-      </p>
-      <div className="space-y-2 mb-5">
-        {SEGMENTOS.map((sg) => (
-          <label
-            key={sg}
-            className="flex items-start gap-2 text-sm text-gray-700"
-          >
-            <input
-              type="checkbox"
-              value={sg}
-              {...register("segmentosFinanceiros")}
-              className="mt-0.5 accent-[#FF035C]"
-            />
-            <span>
-              {SEGMENTO_LABEL[sg]}
-              <span className="block text-xs text-gray-400">
-                {SEGMENTO_DESCRICAO[sg]}
-              </span>
-            </span>
-          </label>
-        ))}
-      </div>
+      {/* O cargo é quem define o que a pessoa pode fazer e qual caixa ela vê.
+          Editar o próprio cargo fica bloqueado: ninguém se rebaixa por engano
+          nem se promove sozinho. */}
+      <FormField
+        label="Cargo"
+        name="cargoId"
+        required
+        error={errors.cargoId?.message}
+        hint={
+          souEu
+            ? "Você não pode mudar o próprio cargo."
+            : "As permissões vêm daqui. Monte os cargos em Cargos."
+        }
+      >
+        <select
+          id="cargoId"
+          {...register("cargoId")}
+          disabled={souEu}
+          className={`${inputClass} disabled:bg-gray-100 disabled:text-gray-500`}
+        >
+          {cargos.length === 0 && <option value="">Nenhum cargo criado</option>}
+          {cargos.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.nome}
+            </option>
+          ))}
+        </select>
+      </FormField>
+      {cargoEscolhido?.descricao && (
+        <p className="text-xs text-gray-500 -mt-2 mb-4">
+          {cargoEscolhido.descricao}
+        </p>
+      )}
 
       {/* Limites só existem para quem não é dono. */}
       {ehDono ? (

@@ -1,7 +1,10 @@
 import { PageHeader } from "@/components/admin/PageHeader";
 import { MembroForm } from "@/components/admin/MembroForm";
+import { cargosParaFormulario } from "@/lib/queries/cargos";
 
-export default function NovoMembroPage() {
+export default async function NovoMembroPage() {
+  const cargos = await cargosParaFormulario();
+
   return (
     <div>
       <PageHeader
@@ -13,7 +16,7 @@ export default function NovoMembroPage() {
           { label: "Novo" },
         ]}
       />
-      <MembroForm />
+      <MembroForm cargos={cargos} />
     </div>
   );
 }

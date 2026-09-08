@@ -153,12 +153,11 @@ model User {
   podeEstornar          Boolean  @default(false)
   limiteValorFinanceiro Decimal? @db.Decimal(10, 2) // teto R$ p/ cancelar pedido pago ou estornar
 
-  /// Segmentos do financeiro que este membro enxerga. Vazio = enxerga tudo.
-  ///
-  /// Diferente dos limites acima, este NÃO é ignorado pelo SUPER_ADMIN: não é um
-  /// teto de alçada, é uma divisória entre sócios. Quem toca só a estufa não vê
-  /// (nem edita) o caixa da loja de aquarismo, por mais graduado que seja.
-  segmentosFinanceiros SegmentoFinanceiro[] @default([])
+  /// Cargo do membro — de onde saem as permissões e as caixas que ele enxerga.
+  /// Nulo em cliente (que não entra no painel) e em membro antigo ainda não
+  /// migrado, que cai na lista fixa do papel por compatibilidade.
+  cargoId String?
+  cargo   Cargo?  @relation(fields: [cargoId], references: [id], onDelete: SetNull)
 
   // Campos que o Auth.js/PrismaAdapter espera (OAuth). `nome` (obrigatório) segue
   // sendo a fonte de verdade do app; o adapter preenche `name` e, no createUser
@@ -178,6 +177,38 @@ model User {
   lancamentos  Lancamento[]
   auditorias   AuditoriaAdmin[]
   visitas      Visitante[]
+}
+
+/// Cargo: o conjunto de permissões que o dono monta no painel.
+///
+/// Antes as permissões eram três listas fixas no código, o que obrigava um
+/// deploy para cada arranjo novo ("admin da estufa", "admin de produtos"). Agora
+/// o dono cria o cargo, marca o que ele pode e a que caixa ele tem acesso, e
+/// depois só escolhe o cargo ao cadastrar a pessoa.
+///
+/// `protegido` marca o cargo de dono: ele tem tudo por definição e não pode ser
+/// apagado nem ter permissão removida. É a trava contra o painel ficar sem
+/// ninguém capaz de gerenciar equipe — um clique errado não tranca todo mundo
+/// para fora.
+model Cargo {
+  id                   String               @id @default(cuid())
+  nome                 String               @unique
+  descricao            String?
+  /// Lista de Permissao (lib/permissoes.ts). Texto e não enum: a lista de
+  /// permissões muda a cada funcionalidade nova do painel, e migrar enum a cada
+  /// deploy sairia caro sem ganho — o código valida contra PERMISSOES_TODAS.
+  permissoes           String[]             @default([])
+  /// Caixas que este cargo enxerga. Vazio = todos.
+  segmentosFinanceiros SegmentoFinanceiro[] @default([])
+  protegido            Boolean              @default(false)
+  ordem                Int                  @default(0)
+
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  usuarios User[]
+
+  @@index([ordem])
 }
 
 // Vínculo de conta OAuth (Google/Facebook) ao User — model padrão do Auth.js.

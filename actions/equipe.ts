@@ -24,15 +24,14 @@ function gerarSenha(): string {
 /**
  * SUPER_ADMIN ignora limites — grava tudo zerado para não exibir número morto.
  *
- * `segmentosFinanceiros` fica FORA dessa regra de propósito: não é alçada, é
- * divisória entre sócios. Um dono que só cuida da estufa continua dono de tudo
- * o mais e mesmo assim não vê o caixa do outro negócio.
+ * O que a pessoa PODE fazer não está aqui: vem do cargo. Estes campos são só
+ * tetos de valor (desconto, estorno), que continuam por pessoa.
  */
 function limitesDoPapel(d: MembroInput) {
-  const segmentos = { segmentosFinanceiros: d.segmentosFinanceiros };
+  const cargo = { cargoId: d.cargoId };
   if (d.role === "SUPER_ADMIN") {
     return {
-      ...segmentos,
+      ...cargo,
       limiteDescontoPercent: null,
       podeCancelarPedido: true,
       podeEstornar: true,
@@ -40,7 +39,7 @@ function limitesDoPapel(d: MembroInput) {
     };
   }
   return {
-    ...segmentos,
+    ...cargo,
     limiteDescontoPercent: d.limiteDescontoPercent,
     podeCancelarPedido: d.podeCancelarPedido,
     podeEstornar: d.podeEstornar,
@@ -65,6 +64,27 @@ function validar(input: unknown) {
 /** Quantos donos existem — usado para não deixar a loja sem nenhum. */
 async function contarSuperAdmins(): Promise<number> {
   return prisma.user.count({ where: { role: "SUPER_ADMIN" } });
+}
+
+/**
+ * Esta pessoa é a única que hoje consegue gerenciar a equipe?
+ *
+ * Com cargo editável, dá para tirar `equipe.gerenciar` de todo mundo sem
+ * perceber, e aí ninguém consegue devolver a permissão a ninguém: o painel fica
+ * trancado sem chave por dentro. Esta pergunta é feita antes de cada mudança
+ * que tira essa capacidade de alguém.
+ */
+async function ehUltimoGestor(idAlvo: string): Promise<boolean> {
+  const outros = await prisma.user.count({
+    where: {
+      id: { not: idAlvo },
+      role: { not: "CUSTOMER" },
+      cargo: {
+        OR: [{ protegido: true }, { permissoes: { has: "equipe.gerenciar" } }],
+      },
+    },
+  });
+  return outros === 0;
 }
 
 export async function criarMembro(input: unknown): Promise<MembroResult> {
@@ -145,7 +165,7 @@ export async function atualizarMembro(
 
   const alvo = await prisma.user.findUnique({
     where: { id },
-    select: { id: true, role: true, email: true },
+    select: { id: true, role: true, email: true, cargoId: true },
   });
   if (!alvo) return { success: false, error: "Membro não encontrado." };
   if (alvo.role === "CUSTOMER") {
@@ -158,6 +178,40 @@ export async function atualizarMembro(
     return {
       success: false,
       error: "Você não pode mudar o seu próprio papel. Peça a outro dono.",
+    };
+  }
+  // Mesma ideia para o cargo, que hoje é quem carrega as permissões. O select
+  // já vem travado na tela; aqui é o servidor dizendo o mesmo, porque a tela
+  // pode ser contornada e a trava precisa valer de verdade.
+  if (alvo.id === eu.id && d.cargoId !== alvo.cargoId) {
+    return {
+      success: false,
+      error: "Você não pode mudar o seu próprio cargo. Peça a outro dono.",
+    };
+  }
+
+  const cargoNovo = await prisma.cargo.findUnique({
+    where: { id: d.cargoId },
+    select: { id: true, protegido: true, permissoes: true },
+  });
+  if (!cargoNovo) {
+    return {
+      success: false,
+      error: "Cargo não encontrado.",
+      fieldErrors: { cargoId: ["Escolha um cargo que exista."] },
+    };
+  }
+
+  // Trava do "último gestor": se esta pessoa é a única que hoje pode gerenciar
+  // a equipe, tirar isso dela deixaria a loja sem ninguém capaz de arrumar
+  // depois — nem para desfazer este próprio clique.
+  const perdeGestao =
+    !cargoNovo.protegido && !cargoNovo.permissoes.includes("equipe.gerenciar");
+  if (perdeGestao && (await ehUltimoGestor(alvo.id))) {
+    return {
+      success: false,
+      error:
+        "Esta é a única pessoa que consegue gerenciar a equipe. Dê esse acesso a outra antes de tirar dela.",
     };
   }
 
@@ -265,6 +319,14 @@ export async function removerAcesso(id: string): Promise<MembroResult> {
     return {
       success: false,
       error: "Este é o único dono da loja. Promova outra pessoa antes.",
+    };
+  }
+
+  if (await ehUltimoGestor(alvo.id)) {
+    return {
+      success: false,
+      error:
+        "Esta é a única pessoa que consegue gerenciar a equipe. Dê esse acesso a outra antes de remover esta.",
     };
   }
 

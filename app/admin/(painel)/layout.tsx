@@ -5,7 +5,6 @@ import { AdminHeader } from "@/components/admin/AdminHeader";
 import { membroAtual } from "@/lib/permissoes-server";
 import {
   PAPEL_LABEL,
-  PERMISSOES_POR_PAPEL,
   SemPermissaoError,
 } from "@/lib/permissoes";
 
@@ -31,7 +30,8 @@ export default async function PainelLayout({
   // A página da troca fica fora deste layout, senão o redirect entra em laço.
   if (membro.senhaPrecisaTroca) redirect("/admin/trocar-senha");
 
-  const permissoes = PERMISSOES_POR_PAPEL[membro.role];
+  // Permissões já resolvidas do cargo — a sidebar esconde o que a pessoa não tem.
+  const permissoes = membro.permissoes;
 
   return (
     <div className="min-h-screen flex bg-gray-50">

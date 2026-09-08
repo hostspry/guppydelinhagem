@@ -36,6 +36,91 @@ export type Permissao =
   | "config.editar"
   | "equipe.gerenciar";
 
+/**
+ * Toda permissão que existe, na ordem em que aparece na tela de cargos.
+ *
+ * É a lista que valida o que vem do formulário: `Cargo.permissoes` é texto no
+ * banco (a lista muda a cada funcionalidade nova, e migrar enum toda vez sairia
+ * caro), então a validação acontece aqui.
+ */
+export const PERMISSOES_TODAS: readonly Permissao[] = [
+  "catalogo.ver",
+  "catalogo.editar",
+  "catalogo.excluir",
+  "pedidos.ver",
+  "pedidos.editar",
+  "pedidos.status",
+  "pedidos.envio",
+  "pedidos.excluir",
+  "clientes.ver",
+  "clientes.editar",
+  "clientes.excluir",
+  "financeiro.gerenciar",
+  "auditoria.ver",
+  "config.editar",
+  "equipe.gerenciar",
+] as const;
+
+export function ehPermissao(v: string): v is Permissao {
+  return (PERMISSOES_TODAS as readonly string[]).includes(v);
+}
+
+/** Rótulo curto de cada permissão, para as caixinhas da tela de cargos. */
+export const PERMISSAO_LABEL: Record<Permissao, string> = {
+  "catalogo.ver": "Ver o catálogo",
+  "catalogo.editar": "Cadastrar e editar produtos",
+  "catalogo.excluir": "Excluir produtos e cupons",
+  "pedidos.ver": "Ver pedidos",
+  "pedidos.editar": "Editar pedidos",
+  "pedidos.status": "Mudar o status do pedido",
+  "pedidos.envio": "Cuidar do envio e do rastreio",
+  "pedidos.excluir": "Excluir pedidos",
+  "clientes.ver": "Ver clientes",
+  "clientes.editar": "Editar clientes",
+  "clientes.excluir": "Excluir clientes",
+  "financeiro.gerenciar": "Mexer no caixa",
+  "auditoria.ver": "Ver o histórico da equipe",
+  "config.editar": "Mudar as configurações da loja",
+  "equipe.gerenciar": "Gerenciar a equipe e os cargos",
+};
+
+/** Grupos só para organizar a tela — não têm efeito nenhum na regra. */
+export const GRUPOS_PERMISSAO: { titulo: string; itens: Permissao[] }[] = [
+  {
+    titulo: "Catálogo",
+    itens: ["catalogo.ver", "catalogo.editar", "catalogo.excluir"],
+  },
+  {
+    titulo: "Vendas",
+    itens: [
+      "pedidos.ver",
+      "pedidos.editar",
+      "pedidos.status",
+      "pedidos.envio",
+      "pedidos.excluir",
+      "clientes.ver",
+      "clientes.editar",
+      "clientes.excluir",
+    ],
+  },
+  { titulo: "Dinheiro", itens: ["financeiro.gerenciar"] },
+  {
+    titulo: "Sistema",
+    itens: ["auditoria.ver", "config.editar", "equipe.gerenciar"],
+  },
+];
+
+/**
+ * Permissões que dão poder sobre o próprio controle de acesso. A tela avisa ao
+ * marcá-las: quem tem `equipe.gerenciar` pode se promover sozinho depois.
+ */
+export const PERMISSOES_SENSIVEIS: readonly Permissao[] = [
+  "equipe.gerenciar",
+  "config.editar",
+  "pedidos.excluir",
+  "clientes.excluir",
+];
+
 /** Papéis que entram no painel (CUSTOMER não é membro da equipe). */
 export type PapelEquipe = "EDITOR" | "ADMIN" | "SUPER_ADMIN";
 
@@ -119,11 +204,17 @@ export type MembroAtual = {
   /**
    * Segmentos do financeiro que este membro enxerga. `null` = todos.
    *
-   * NÃO é um teto de alçada, é uma divisória entre sócios — por isso o
-   * SUPER_ADMIN também respeita (ao contrário de `semLimites`).
+   * NÃO é um teto de alçada, é uma divisória entre sócios — por isso mesmo um
+   * cargo de dono respeita, se for configurado com uma caixa só.
    */
-  segmentosFinanceiros: SegmentoFinanceiro[] | null;
+  segmentosFinanceiros: SegmentoVisivel;
+  /** Cargo do membro. Nulo em membro antigo ainda sem cargo. */
+  cargo: { id: string; nome: string; protegido: boolean } | null;
+  /** Permissões já resolvidas: do cargo, ou da lista fixa do papel. */
+  permissoes: readonly Permissao[];
 };
+
+type SegmentoVisivel = SegmentoFinanceiro[] | null;
 
 // ─────────────────────────────────────────────
 // Segmentos do financeiro

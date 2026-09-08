@@ -18,6 +18,7 @@ import {
   Fish,
   Receipt,
   Megaphone,
+  ShieldCheck,
 } from "lucide-react";
 import type { Permissao } from "@/lib/permissoes";
 
@@ -125,6 +126,12 @@ const NAV_SECTIONS: NavSection[] = [
         href: "/admin/equipe",
         label: "Equipe",
         icon: UserCog,
+        permissao: "equipe.gerenciar",
+      },
+      {
+        href: "/admin/cargos",
+        label: "Cargos",
+        icon: ShieldCheck,
         permissao: "equipe.gerenciar",
       },
       {

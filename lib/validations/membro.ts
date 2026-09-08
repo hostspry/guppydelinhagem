@@ -28,14 +28,11 @@ export const membroSchema = z.object({
   podeCancelarPedido: z.coerce.boolean().default(false),
   podeEstornar: z.coerce.boolean().default(false),
   /**
-   * Segmentos do financeiro que o membro enxerga. Lista vazia = enxerga tudo.
-   *
-   * Ao contrário dos limites acima, isto vale também para SUPER_ADMIN: é uma
-   * divisória entre sócios, não um teto de alçada.
+   * Cargo do membro: é dele que saem as permissões e as caixas do financeiro
+   * que a pessoa enxerga. Obrigatório — membro sem cargo não teria permissão
+   * nenhuma e ficaria olhando um painel vazio.
    */
-  segmentosFinanceiros: z
-    .array(z.enum(["PEIXES_VIVOS", "PRODUTOS"]))
-    .default([]),
+  cargoId: z.string().min(1, "Escolha um cargo"),
   limiteValorFinanceiro: numeroOpcional(
     9_999_999,
     "Valor inválido.",

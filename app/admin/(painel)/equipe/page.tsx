@@ -83,7 +83,7 @@ export default async function EquipePage() {
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr className="text-left text-xs font-medium text-gray-500 uppercase tracking-wide">
               <th className="px-4 py-3">Nome</th>
-              <th className="px-4 py-3">Papel</th>
+              <th className="px-4 py-3">Cargo</th>
               <th className="px-4 py-3">Limites</th>
               <th className="px-4 py-3">Acesso</th>
               <th className="px-4 py-3 text-right w-24">Ações</th>
@@ -105,7 +105,7 @@ export default async function EquipePage() {
                   <span
                     className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${PAPEL_CLASSES[m.role]}`}
                   >
-                    {PAPEL_LABEL[m.role]}
+                    {m.cargoNome ?? PAPEL_LABEL[m.role]}
                   </span>
                 </td>
                 <td className="px-4 py-3 text-gray-600">{resumoLimites(m)}</td>

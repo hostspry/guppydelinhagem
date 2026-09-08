@@ -4,14 +4,17 @@ import { prisma } from "./prisma";
 import { auth } from "./auth";
 import {
   ehPapelEquipe,
+  ehPermissao,
   escopoDeSegmentos,
-  SEGMENTOS,
   PAPEL_LABEL,
   PERMISSOES_POR_PAPEL,
+  PERMISSOES_TODAS,
   podeNoSegmento,
   SEGMENTO_LABEL,
+  SEGMENTOS,
   SemPermissaoError,
   type MembroAtual,
+  type PapelEquipe,
   type Permissao,
 } from "./permissoes";
 import type { SegmentoFinanceiro } from "@/lib/generated/prisma/enums";
@@ -40,7 +43,15 @@ export async function membroAtual(): Promise<MembroAtual> {
       podeEstornar: true,
       limiteValorFinanceiro: true,
       senhaPrecisaTroca: true,
-      segmentosFinanceiros: true,
+      cargo: {
+        select: {
+          id: true,
+          nome: true,
+          protegido: true,
+          permissoes: true,
+          segmentosFinanceiros: true,
+        },
+      },
     },
   });
 
@@ -60,8 +71,30 @@ export async function membroAtual(): Promise<MembroAtual> {
       u.limiteValorFinanceiro == null ? null : Number(u.limiteValorFinanceiro),
     senhaPrecisaTroca: u.senhaPrecisaTroca,
     semLimites: u.role === "SUPER_ADMIN",
-    segmentosFinanceiros: escopoDeSegmentos(u.segmentosFinanceiros),
+    segmentosFinanceiros: escopoDeSegmentos(u.cargo?.segmentosFinanceiros),
+    cargo: u.cargo
+      ? { id: u.cargo.id, nome: u.cargo.nome, protegido: u.cargo.protegido }
+      : null,
+    permissoes: permissoesDo(u.role, u.cargo),
   };
+}
+
+/**
+ * Resolve as permissões efetivas.
+ *
+ * Cargo protegido (o dono) tem tudo por definição, sem consultar a lista: é a
+ * trava que impede desmarcar uma caixinha e deixar o painel sem ninguém capaz de
+ * gerenciar a equipe. Membro sem cargo cai na lista fixa do papel — só acontece
+ * com conta antiga que a migração não pegou, e é melhor manter o acesso que
+ * tinha do que trancar a pessoa para fora.
+ */
+function permissoesDo(
+  role: PapelEquipe,
+  cargo: { protegido: boolean; permissoes: string[] } | null,
+): readonly Permissao[] {
+  if (!cargo) return PERMISSOES_POR_PAPEL[role];
+  if (cargo.protegido) return PERMISSOES_TODAS;
+  return cargo.permissoes.filter(ehPermissao);
 }
 
 /**
@@ -110,10 +143,9 @@ export async function assertPermissao(
   permissao: Permissao,
 ): Promise<MembroAtual> {
   const membro = await membroAtual();
-  if (!PERMISSOES_POR_PAPEL[membro.role].includes(permissao)) {
-    throw new SemPermissaoError(
-      `Seu perfil (${PAPEL_LABEL[membro.role]}) não permite esta ação.`,
-    );
+  if (!membro.permissoes.includes(permissao)) {
+    const quem = membro.cargo?.nome ?? PAPEL_LABEL[membro.role];
+    throw new SemPermissaoError(`Seu cargo (${quem}) não permite esta ação.`);
   }
   return membro;
 }
@@ -122,7 +154,7 @@ export async function assertPermissao(
 export async function podeAtual(permissao: Permissao): Promise<boolean> {
   try {
     const membro = await membroAtual();
-    return PERMISSOES_POR_PAPEL[membro.role].includes(permissao);
+    return membro.permissoes.includes(permissao);
   } catch {
     return false;
   }

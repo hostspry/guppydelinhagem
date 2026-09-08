@@ -11,7 +11,8 @@ export type MembroListItem = {
   podeCancelarPedido: boolean;
   podeEstornar: boolean;
   limiteValorFinanceiro: number | null;
-  segmentosFinanceiros: SegmentoFinanceiro[];
+  cargoId: string | null;
+  cargoNome: string | null;
   senhaPrecisaTroca: boolean;
   temSenha: boolean;
   ultimoLogin: Date | null;
@@ -27,7 +28,8 @@ const SELECT = {
   podeCancelarPedido: true,
   podeEstornar: true,
   limiteValorFinanceiro: true,
-  segmentosFinanceiros: true,
+  cargoId: true,
+  cargo: { select: { nome: true } },
   senhaPrecisaTroca: true,
   senhaHash: true,
   ultimoLogin: true,
@@ -43,7 +45,8 @@ type Row = {
   podeCancelarPedido: boolean;
   podeEstornar: boolean;
   limiteValorFinanceiro: unknown;
-  segmentosFinanceiros: SegmentoFinanceiro[];
+  cargoId: string | null;
+  cargo: { nome: string } | null;
   senhaPrecisaTroca: boolean;
   senhaHash: string | null;
   ultimoLogin: Date | null;
@@ -62,7 +65,8 @@ function paraItem(u: Row): MembroListItem | null {
     podeEstornar: u.podeEstornar,
     limiteValorFinanceiro:
       u.limiteValorFinanceiro == null ? null : Number(u.limiteValorFinanceiro),
-    segmentosFinanceiros: u.segmentosFinanceiros,
+    cargoId: u.cargoId,
+    cargoNome: u.cargo?.nome ?? null,
     senhaPrecisaTroca: u.senhaPrecisaTroca,
     // O hash nunca sai daqui — a lista só precisa saber se existe senha.
     temSenha: u.senhaHash != null,
