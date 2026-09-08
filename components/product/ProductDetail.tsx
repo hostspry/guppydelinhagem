@@ -317,7 +317,12 @@ export default function ProductDetail({
       <div className="grid grid-cols-1 lg:grid-cols-[300px_minmax(0,1fr)] gap-8 items-start">
         {/* Vídeo */}
         <div className="space-y-3">
-          <div className="relative aspect-[9/16] rounded-xl overflow-hidden bg-muted">
+          {/* Mesma régua do card: player em 9:16, galeria de fotos em 4:5. */}
+          <div
+            className={`relative rounded-xl overflow-hidden bg-muted ${
+              semVideo ? "aspect-[4/5]" : "aspect-[9/16]"
+            }`}
+          >
             {playing && embedSrc ? (
               <>
                 <iframe

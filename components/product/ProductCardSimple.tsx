@@ -40,8 +40,14 @@ export default function ProductCardSimple({
       href={`/loja/${product.slug}`}
       className="group flex flex-col bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow overflow-hidden border border-border"
     >
-      {/* Capa 9:16 — só thumbnail (leve e escaneável) */}
-      <div className="relative aspect-[9/16] overflow-hidden bg-muted">
+      {/* Capa. 9:16 quando é vídeo, que é o formato do Short e a cara do
+          peixe; 4:5 quando é foto de produto, que numa moldura tão alta
+          apareceria cortada nas laterais. */}
+      <div
+        className={`relative overflow-hidden bg-muted ${
+          product.video ? "aspect-[9/16]" : "aspect-[4/5]"
+        }`}
+      >
         {/* Vídeo manda na capa quando existe (é como o peixe se vende); sem
             vídeo, entra a foto do produto. */}
         {product.video?.thumbnailUrl ? (
