@@ -11,6 +11,7 @@ import {
 } from "@/lib/validations/pedido";
 import { TRANSICOES_PEDIDO, podeEditarItens } from "@/lib/pedido-status";
 import { transicionarParaPago, ajustarPoolEstoque } from "@/lib/pedido-baixa";
+import { empurrarEstoqueDoPedido } from "@/lib/shopee/estoque";
 import { gravarEnvioTx } from "@/lib/pedido-envio";
 import { aplicarEstornoPedido } from "@/lib/pagamento-estorno";
 import { registrarDevolucaoDeVenda } from "@/lib/financeiro/venda-no-caixa";
@@ -407,6 +408,12 @@ export async function atualizarStatusPedido(
   } catch (e) {
     console.error(e);
     return { success: false, error: "Erro ao atualizar o status." };
+  }
+
+  // Estoque mexeu (baixa no PAGO, devolução no CANCELADO): reflete na Shopee.
+  // Fora da transação e sem await — o painel não espera marketplace.
+  if (novoStatus === "PAGO" || novoStatus === "CANCELADO") {
+    void empurrarEstoqueDoPedido(id);
   }
 
   // Notificações (após a transição persistir; helpers nunca lançam). PAGO não

@@ -59,6 +59,14 @@ enum TipoOrder {
   COBRANCA
 }
 
+/// De onde a venda veio. Um pedido do marketplace tem ciclo próprio: quem cobra,
+/// quem despacha e quem fala com o cliente é o marketplace, não a gente.
+enum OrigemVenda {
+  SITE
+  WHATSAPP
+  SHOPEE
+}
+
 enum ProviderPagamento {
   MERCADO_PAGO
   PICPAY
@@ -351,6 +359,7 @@ model Product {
   orderItems OrderItem[]
   variantes  ProductVariant[]
   cupons     CupomDesconto[]  @relation("CupomProdutos")
+  shopee     ShopeeAnuncio[]
 }
 
 // Composição de venda (trio/casal/macho/fêmea/lote). Só produtos PEIXE têm
@@ -433,6 +442,15 @@ model Order {
   user      User?   @relation(fields: [userId], references: [id])
 
   tipo            TipoOrder       @default(PEDIDO) // COBRANCA = cobrança avulsa por link
+  /// De onde veio a venda. SITE é o checkout; WHATSAPP é a venda lançada no
+  /// painel; SHOPEE (e o que vier depois) é pedido importado do marketplace.
+  /// Governa o que o painel oferece: pedido de marketplace não cobra pagamento
+  /// nosso nem compra etiqueta no Melhor Envio, porque quem faz isso é a Shopee.
+  origem          OrigemVenda     @default(SITE)
+  /// Número do pedido no marketplace (order_sn na Shopee). Único por origem —
+  /// é a trava que impede o mesmo pedido de entrar duas vezes quando o webhook
+  /// repete ou quando a varredura roda junto.
+  origemPedidoId  String?
   status          OrderStatus     @default(RASCUNHO)
   estoqueBaixado  Boolean         @default(false) // baixa de pool já aplicada (evita dupla)
   formaPagamento  FormaPagamento?
@@ -504,10 +522,12 @@ model Order {
   lancamentos     Lancamento[]
 
   @@unique([ano, sequencia])
+  @@unique([origem, origemPedidoId])
   @@index([clienteId])
   @@index([status])
   @@index([tipo])
   @@index([semanaEnvio])
+  @@index([origem, status])
 }
 
 // Histórico de rastreio de um pedido (uma linha por ocorrência do Melhor Envio).
@@ -1193,4 +1213,86 @@ model GeoIp {
   provedor     String?
   falhou       Boolean  @default(false)
   consultadoEm DateTime @default(now())
+}
+
+// ─────────────────────────────────────────────
+// Shopee (marketplace)
+// ─────────────────────────────────────────────
+
+/// Ambiente da Open Platform. O sandbox tem host e credenciais próprios: a
+/// mesma chave não vale nos dois.
+enum AmbienteShopee {
+  SANDBOX
+  PRODUCAO
+}
+
+/// Ligação da loja com a Shopee. Singleton, como as outras configurações.
+///
+/// As chaves ficam no banco e não em variável de ambiente pelo mesmo motivo da
+/// conta de e-mail: quem cria o app na Open Platform e cola as chaves é o dono,
+/// e ele não mexe no Coolify. partner_key e os tokens são CRIPTOGRAFADOS
+/// (AES-256-GCM, lib/cripto) — com eles dá para agir na loja em nome do dono,
+/// então um dump do banco sozinho não pode entregá-los.
+///
+/// O access_token da Shopee dura 4 horas e o refresh_token 30 dias. Isso tem uma
+/// consequência dura: se a loja passar 30 dias sem nenhuma chamada, a autorização
+/// morre e o dono precisa autorizar de novo pelo painel. Por isso a renovação
+/// roda no cron, não só quando alguém abre a tela.
+model IntegracaoShopee {
+  id    String  @id @default("default")
+  ativo Boolean @default(false)
+
+  ambiente                AmbienteShopee @default(SANDBOX)
+  partnerId               String? // numérico na Shopee, guardado como texto
+  partnerKeyCriptografada String?
+
+  /// Loja autorizada. Só aparece depois que o dono passa pela tela de
+  /// autorização da Shopee e volta para o nosso callback.
+  shopId String?
+
+  accessTokenCriptografado  String?
+  refreshTokenCriptografado String?
+  /// Quando o access_token expira (4 h). A renovação acontece antes disso.
+  tokenExpiraEm             DateTime?
+  /// Quando o refresh_token foi emitido. Passados 30 dias sem uso, a Shopee
+  /// derruba a autorização — este campo é o que deixa o painel avisar antes.
+  refreshEmitidoEm          DateTime?
+
+  /// Última varredura de pedidos que terminou bem, e até onde ela leu. A Shopee
+  /// pagina por janela de tempo, então a próxima começa daqui.
+  ultimaSincronizacaoEm DateTime?
+  ultimoErro            String?
+
+  atualizadoEm DateTime @updatedAt
+}
+
+/// Produto do site ligado a um anúncio da Shopee.
+///
+/// A ligação é explícita, feita no painel, em vez de casar por nome: nome de
+/// anúncio em marketplace é escrito para busca ("Criadeira Berçário Peixe
+/// Aquário 6L Profissional"), e casar por semelhança acabaria sincronizando o
+/// estoque do produto errado. Errar aqui é vender o que não existe.
+model ShopeeAnuncio {
+  id        String  @id @default(cuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  /// item_id do anúncio na Shopee (inteiro grande — texto para não perder
+  /// precisão no JavaScript).
+  itemId  String
+  /// model_id da variação, quando o anúncio tem variação. Nulo = anúncio simples.
+  modelId String?
+  /// Título do anúncio na Shopee, para o painel mostrar o que foi ligado.
+  titulo  String?
+
+  /// Último estoque que conseguimos escrever lá. Serve para não repetir chamada
+  /// à toa e para o painel mostrar se os dois lados batem.
+  estoqueEnviado Int?
+  sincronizadoEm DateTime?
+  ultimoErro     String?
+
+  criadoEm DateTime @default(now())
+
+  @@unique([itemId, modelId])
+  @@index([productId])
 }

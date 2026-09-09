@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { getPaymentProvider } from "@/lib/payments/registry";
 import { transicionarParaPago } from "@/lib/pedido-baixa";
+import { empurrarEstoqueDoPedido } from "@/lib/shopee/estoque";
 import { aplicarEstornoPedido } from "@/lib/pagamento-estorno";
 import {
   notificarPedidoPago,
@@ -209,6 +210,8 @@ export async function POST(request: Request) {
   if (mudouEstoque) {
     revalidatePath("/admin/produtos");
     revalidatePath("/admin/pedidos");
+    // Derruba o estoque na Shopee também (fora da transação, sem await).
+    void empurrarEstoqueDoPedido(orderId as string);
   }
 
   // Notificações (fora da transação; helpers nunca lançam).

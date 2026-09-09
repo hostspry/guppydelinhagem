@@ -83,6 +83,7 @@ export async function listPedidos({
       numero: true,
       status: true,
       tipoEntrega: true,
+      origem: true,
       transportadora: true,
       modalidadeFrete: true,
       codigoRastreio: true,
@@ -101,6 +102,7 @@ export async function listPedidos({
     numero: r.numero,
     status: r.status,
     tipoEntrega: r.tipoEntrega,
+    origem: r.origem,
     // Transportadora efetiva para exibir/filtrar na lista (null = ainda indefinida).
     transporte:
       r.transportadora === "GOLLOG" || r.modalidadeFrete === "AEREO"
@@ -238,6 +240,8 @@ export async function getPedidoById(id: string) {
     sequencia: p.sequencia,
     status: p.status,
     tipoEntrega: p.tipoEntrega,
+    origem: p.origem,
+    origemPedidoId: p.origemPedidoId,
     formaPagamento: p.formaPagamento,
     transportadora: p.transportadora,
     codigoRastreio: p.codigoRastreio,

@@ -51,8 +51,10 @@ export default function PedidosTabela({
   const [enviando, setEnviando] = useState(false);
   const [resultados, setResultados] = useState<Record<string, EnvioResultado>>({});
 
+  // Pedido da Shopee fica de fora: quem despacha e informa rastreio é ela, e
+  // marcar como enviado aqui só criaria um código nosso que ninguém rastreia.
   const enviaveis = useMemo(
-    () => pedidos.filter((p) => p.status === "PAGO"),
+    () => pedidos.filter((p) => p.status === "PAGO" && p.origem !== "SHOPEE"),
     [pedidos],
   );
   const todosSel = enviaveis.length > 0 && enviaveis.every((p) => sel.has(p.id));
@@ -191,7 +193,7 @@ export default function PedidosTabela({
           </thead>
           <tbody className="divide-y divide-gray-100">
             {pedidos.map((p) => {
-              const pode = p.status === "PAGO";
+              const pode = p.status === "PAGO" && p.origem !== "SHOPEE";
               return (
                 <tr key={p.id} className="hover:bg-gray-50">
                   <td className="px-3 py-3">
@@ -209,7 +211,17 @@ export default function PedidosTabela({
                       {p.numero}
                     </Link>
                   </td>
-                  <td className="px-4 py-3 text-gray-700">{p.clienteNome}</td>
+                  <td className="px-4 py-3 text-gray-700">
+                    {p.clienteNome}
+                    {p.origem === "SHOPEE" && (
+                      <span
+                        className="ml-1.5 inline-flex items-center rounded-full bg-orange-50 px-2 py-0.5 text-[11px] font-medium text-orange-700"
+                        title="Pedido importado da Shopee. Etiqueta e entrega são pela Shopee."
+                      >
+                        Shopee
+                      </span>
+                    )}
+                  </td>
                   <td className="px-4 py-3">
                     <span
                       className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_PEDIDO[p.status].badge}`}
@@ -296,7 +308,8 @@ export default function PedidosTabela({
                         />
                       ) : (
                         p.status === "PAGO" &&
-                        p.tipoEntrega === "ENVIO" && (
+                        p.tipoEntrega === "ENVIO" &&
+                        p.origem !== "SHOPEE" && (
                           <Link
                             href={`/admin/pedidos/${p.id}#envio`}
                             title="Gerar etiqueta"

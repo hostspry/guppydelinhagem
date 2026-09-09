@@ -33,6 +33,8 @@ type Props = {
   etiquetaUrl: string | null;
   clienteNome: string;
   clienteTelefone: string | null;
+  /** Pedido de marketplace: quem despacha, etiqueta e rastreia é ele. */
+  daShopee?: boolean;
 };
 
 const inputCls =
@@ -48,6 +50,7 @@ export function EnvioCard({
   etiquetaUrl,
   clienteNome,
   clienteTelefone,
+  daShopee = false,
 }: Props) {
   const [pending, startTransition] = useTransition();
   const [modalAberto, setModalAberto] = useState(false);
@@ -220,6 +223,14 @@ export function EnvioCard({
             </button>
           </div>
         </>
+      ) : daShopee ? (
+        // Marketplace cuida do envio inteiro. Oferecer etiqueta do Melhor Envio
+        // aqui seria pagar duas vezes pelo mesmo frete.
+        <p className="text-gray-500 text-xs leading-snug">
+          A etiqueta deste pedido sai no painel da Shopee, e o rastreio quem
+          manda para o comprador é ela. Aqui o pedido serve para o estoque e para
+          o caixa.
+        </p>
       ) : podeRegistrar ? (
         <div className="space-y-3">
           {/* Compra da etiqueta pelo painel, em dois passos (cotar → comprar). */}
