@@ -20,6 +20,7 @@ import {
   cotarFrete,
 } from "@/lib/shipping";
 import { getConfiguracaoLoja } from "@/lib/queries/config";
+import { emailPedidoEnviado } from "@/lib/emails/pedido";
 import { Transportadora } from "@/lib/generated/prisma/enums";
 
 export type OpcaoEtiqueta = {
@@ -470,6 +471,14 @@ export async function comprarEtiquetaDoPedido(
     },
   });
 
+  // Avisa o cliente com o código de rastreio. Fora do caminho crítico de
+  // propósito: a etiqueta já foi paga e gerada, e falha de e-mail (caixa cheia,
+  // SMTP fora) não pode fazer a ação inteira parecer que deu errado. Se falhar,
+  // o dono reenvia pelo botão no card de envio.
+  void emailPedidoEnviado(orderId).catch((e) =>
+    console.error("[etiqueta] e-mail de rastreio", e),
+  );
+
   await auditar(membro, {
     acao: "pedido.envio",
     entidade: "Order",
@@ -559,4 +568,59 @@ export async function salvarPacoteDoPedido(
 
   revalidatePath(`/admin/pedidos/${orderId}`);
   return { success: true };
+}
+
+export type ReenvioResult = { success: true; para: string } | { success: false; error: string };
+
+/**
+ * Reenvia o e-mail com o código de rastreio.
+ *
+ * Existe porque e-mail some: cai no spam, o cliente apaga sem ler, a caixa
+ * estava cheia no dia. Reenviar é barato e resolve a pergunta "cadê meu
+ * pedido?" sem o dono ter que copiar código na mão.
+ */
+export async function reenviarRastreio(orderId: string): Promise<ReenvioResult> {
+  const membro = await assertPermissao("pedidos.envio");
+
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    select: {
+      numero: true,
+      selfTracking: true,
+      codigoRastreio: true,
+      cliente: { select: { email: true } },
+    },
+  });
+  if (!order) return { success: false, error: "Pedido não encontrado." };
+
+  const para = order.cliente?.email;
+  if (!para) {
+    return {
+      success: false,
+      error: "Este cliente não tem e-mail no cadastro. Mande o código pelo WhatsApp.",
+    };
+  }
+  if (!order.selfTracking && !order.codigoRastreio) {
+    return {
+      success: false,
+      error: "Este pedido ainda não tem código de rastreio.",
+    };
+  }
+
+  const enviou = await emailPedidoEnviado(orderId);
+  if (!enviou) {
+    return {
+      success: false,
+      error: "Não consegui enviar agora. Confira as configurações de e-mail.",
+    };
+  }
+
+  await auditar(membro, {
+    acao: "pedido.envio",
+    entidade: "Order",
+    entidadeId: orderId,
+    descricao: `Reenviou o rastreio do pedido ${order.numero} para ${para}`,
+  });
+
+  return { success: true, para };
 }

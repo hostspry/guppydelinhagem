@@ -3,11 +3,12 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { AlertTriangle, FileText, Loader2, Package, Tag } from "lucide-react";
+import { AlertTriangle, FileText, Loader2, Mail, Package, Tag } from "lucide-react";
 import {
   cotarEtiquetaDoPedido,
   comprarEtiquetaDoPedido,
   salvarPacoteDoPedido,
+  reenviarRastreio,
   type OpcaoEtiqueta,
   type PacoteCotado,
 } from "@/actions/etiqueta";
@@ -60,16 +61,35 @@ export function EtiquetaBotao({
   });
 
   if (etiquetaUrl) {
+    // Comprada. O e-mail com o rastreio já saiu sozinho aqui; o botão existe
+    // porque e-mail some (spam, caixa cheia, cliente apagou sem ler).
     return (
-      <a
-        href={etiquetaUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="inline-flex items-center gap-1.5 border border-gray-300 text-sm font-medium text-gray-700 px-4 py-2 rounded-md hover:border-[#07366A] transition-all"
-      >
-        <FileText className="w-4 h-4" aria-hidden="true" />
-        Ver etiqueta (PDF)
-      </a>
+      <div className="flex flex-wrap gap-2">
+        <a
+          href={etiquetaUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1.5 border border-gray-300 text-sm font-medium text-gray-700 px-4 py-2 rounded-md hover:border-[#07366A] transition-all"
+        >
+          <FileText className="w-4 h-4" aria-hidden="true" />
+          Ver etiqueta (PDF)
+        </a>
+        <button
+          type="button"
+          onClick={() =>
+            startTransition(async () => {
+              const r = await reenviarRastreio(orderId);
+              if (!r.success) toast.error(r.error);
+              else toast.success(`Rastreio reenviado para ${r.para}.`);
+            })
+          }
+          disabled={isPending}
+          className="inline-flex items-center gap-1.5 border border-gray-300 text-sm font-medium text-gray-700 px-4 py-2 rounded-md hover:border-[#07366A] transition-all disabled:opacity-60"
+        >
+          <Mail className="w-4 h-4" aria-hidden="true" />
+          Reenviar rastreio
+        </button>
+      </div>
     );
   }
 

@@ -9,6 +9,7 @@ import {
   Pencil,
   Printer,
   Truck,
+  Mail,
 } from "lucide-react";
 import { WhatsAppIcon } from "@/components/icons/WhatsAppIcon";
 import { registrarEnvioManual, atualizarRastreio } from "@/actions/pedidos";
@@ -20,6 +21,7 @@ import {
 } from "@/lib/tracking";
 import type { OrderStatus, Transportadora } from "@/lib/generated/prisma/client";
 import { EtiquetaBotao } from "./EtiquetaBotao";
+import { reenviarRastreio } from "@/actions/etiqueta";
 
 type Props = {
   id: string;
@@ -50,6 +52,20 @@ export function EnvioCard({
   const [pending, startTransition] = useTransition();
   const [modalAberto, setModalAberto] = useState(false);
   const [copiado, setCopiado] = useState(false);
+  const [reenviando, setReenviando] = useState(false);
+
+  function reenviar() {
+    setReenviando(true);
+    startTransition(async () => {
+      const r = await reenviarRastreio(id);
+      setReenviando(false);
+      if (!r.success) {
+        toast.error(r.error);
+        return;
+      }
+      toast.success(`Rastreio reenviado para ${r.para}.`);
+    });
+  }
   // Estado do formulário (registro/edição).
   const [transp, setTransp] = useState<string>(transportadora ?? "JADLOG");
   const [codigo, setCodigo] = useState(codigoRastreio ?? "");
@@ -185,6 +201,18 @@ export function EnvioCard({
                 Imprimir etiqueta (PDF)
               </a>
             )}
+
+            {/* E-mail some: cai no spam, o cliente apaga sem ler. Reenviar é
+                barato e evita ter que copiar código na mão. */}
+            <button
+              type="button"
+              onClick={reenviar}
+              disabled={reenviando}
+              className="inline-flex items-center justify-center gap-1.5 min-h-10 rounded-md border border-gray-300 text-[#07366A] text-xs font-medium hover:border-[#07366A] transition-all disabled:opacity-60"
+            >
+              <Mail className="w-3.5 h-3.5" aria-hidden="true" />
+              {reenviando ? "Enviando..." : "Reenviar rastreio por e-mail"}
+            </button>
           </div>
         </>
       ) : podeRegistrar ? (
