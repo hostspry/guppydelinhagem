@@ -192,7 +192,7 @@ export default async function ProdutoPage({ params }: Props) {
       <JsonLd data={produtoLd} />
       <JsonLd data={breadcrumbLd} />
       {/* Mobile: deep link abre o feed neste produto (desktop ignora). */}
-      <FeedAutoOpen slug={prod.slug} />
+      <FeedAutoOpen slug={prod.slug} temVideo={prod.videos.length > 0} />
       {preview && (
         <div className="bg-amber-50 border-b border-amber-200 text-amber-800 text-sm text-center py-2 px-4">
           Pré-visualização: produto <strong>inativo</strong> (não visível na
