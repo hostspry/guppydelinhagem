@@ -269,30 +269,50 @@ export function carrinhoCobraFrete(itens: { tipo: ProductType }[]): boolean {
 }
 
 /**
- * Um volume por unidade comprada. Não tentamos "encaixotar" nada: o ME aceita
- * vários volumes e cada transportadora aplica a própria cubagem, o que dá um
- * preço mais honesto do que chutar uma caixa única.
+ * UMA caixa com tudo dentro, empilhando os itens.
+ *
+ * A versão anterior mandava um volume por unidade, e isso custava caro de
+ * verdade: duas criadeiras de 160 g para Bebedouro davam R$ 24,98 como dois
+ * pacotes e R$ 16,90 numa caixa só. Pior, transportadora que não cota
+ * fracionado (Loggi, JeT) simplesmente sumia da lista, então a opção mais
+ * barata nem chegava a ser oferecida.
+ *
+ * O empilhamento é deliberadamente simples e conservador: soma as alturas,
+ * mantém a maior largura e o maior comprimento. Não é encaixotamento 3D — dois
+ * itens finos lado a lado caberiam numa caixa mais baixa —, mas errar para uma
+ * caixa um pouco maior é seguro: a transportadora cobra pelo que foi declarado,
+ * e declarar menos do que se posta dá diferença na hora do despacho.
  */
 export function volumesDoCarrinhoSeco(itens: ItemFreteSeco[]): MeVolumeCalc[] {
-  const volumes: MeVolumeCalc[] = [];
+  let altura = 0;
+  let largura = 0;
+  let comprimento = 0;
+  let pesoKg = 0;
+
   for (const it of itens) {
     if (!FRETE_POR_TIPO[it.tipo].calculaFrete) continue; // DIGITAL não despacha
-    const vol = {
-      height: Math.max(it.altura ?? PACOTE_SECO_PADRAO.altura, MIN_CM.altura),
-      width: Math.max(it.largura ?? PACOTE_SECO_PADRAO.largura, MIN_CM.largura),
-      length: Math.max(
-        it.comprimento ?? PACOTE_SECO_PADRAO.comprimento,
-        MIN_CM.comprimento,
-      ),
-      weight: Math.max(
-        (it.pesoGramas ?? PACOTE_SECO_PADRAO.pesoGramas) / 1000,
-        MIN_PESO_KG,
-      ),
-      insurance_value: 0,
-    };
-    for (let i = 0; i < it.quantidade; i++) volumes.push({ ...vol });
+    const a = it.altura ?? PACOTE_SECO_PADRAO.altura;
+    const l = it.largura ?? PACOTE_SECO_PADRAO.largura;
+    const c = it.comprimento ?? PACOTE_SECO_PADRAO.comprimento;
+    const p = (it.pesoGramas ?? PACOTE_SECO_PADRAO.pesoGramas) / 1000;
+
+    altura += a * it.quantidade;
+    largura = Math.max(largura, l);
+    comprimento = Math.max(comprimento, c);
+    pesoKg += p * it.quantidade;
   }
-  return volumes;
+
+  if (pesoKg === 0 && altura === 0) return [];
+
+  return [
+    {
+      height: Math.max(altura, MIN_CM.altura),
+      width: Math.max(largura, MIN_CM.largura),
+      length: Math.max(comprimento, MIN_CM.comprimento),
+      weight: Math.max(pesoKg, MIN_PESO_KG),
+      insurance_value: 0,
+    },
+  ];
 }
 
 export type OpcaoFreteSeco = {
