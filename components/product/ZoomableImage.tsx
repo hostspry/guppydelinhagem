@@ -66,7 +66,10 @@ export function ZoomableImage({
     <>
       <div
         ref={caixaRef}
-        className={`relative overflow-hidden bg-muted ${className ?? ""}`}
+        // O posicionamento vem de quem chama quando ele manda um: fixar
+        // `relative` aqui junto de um `absolute inset-0` de fora faz as duas
+        // classes brigarem, o container colapsa pra altura zero e a foto some.
+        className={`overflow-hidden bg-muted ${className ?? "relative"}`}
         onMouseEnter={() => temMouse && setComLupa(true)}
         onMouseLeave={() => setComLupa(false)}
         onMouseMove={moverLupa}
