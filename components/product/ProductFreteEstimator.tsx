@@ -25,62 +25,105 @@ type FreteResponse = {
   gollog: { min: number; max: number };
   maxPeixesPorCaixa: number;
 };
+/** Resposta de /api/frete/seco: transportadora mais barata e mais rápida. */
+type OpcaoSeco = {
+  servicoId: number;
+  label: string;
+  preco: number;
+  prazoDias: number;
+};
+type FreteSecoResponse = {
+  endereco: Endereco | null;
+  opcoes: OpcaoSeco[];
+};
 
 function formatCep(raw: string): string {
   const d = raw.replace(/\D/g, "").slice(0, 8);
   return d.length > 5 ? `${d.slice(0, 5)}-${d.slice(5)}` : d;
 }
 
-export default function ProductFreteEstimator({ qtd }: { qtd: number }) {
+export default function ProductFreteEstimator({
+  qtd,
+  produtoId,
+  cargaViva,
+  unidades,
+}: {
+  /** Peixes na estimativa (só carga viva). */
+  qtd: number;
+  produtoId: string;
+  /** Peixe, planta, coral: caixa de isopor e Jadlog/aéreo. */
+  cargaViva: boolean;
+  /** Unidades escolhidas — é o que importa no produto seco. */
+  unidades: number;
+}) {
   const [cep, setCep] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<FreteResponse | null>(null);
+  const [seco, setSeco] = useState<FreteSecoResponse | null>(null);
 
   const cepDigits = cep.replace(/\D/g, "");
   const cepValido = /^\d{8}$/.test(cepDigits);
   // Limite vem da resposta da API (config da loja); antes da 1ª cotação, sem aviso.
   const excedeCaixa = result != null && qtd > result.maxPeixesPorCaixa;
+  // Produto seco cota por unidade; peixe, por quantidade de peixes na caixa.
+  const chaveQtd = cargaViva ? qtd : unidades;
   // Evita recalcular o mesmo (cep, qtd) — o cálculo automático dispara só quando
   // o par muda. O botão força via "" no ref.
   const ultimaChave = useRef("");
 
   const calcular = useCallback(async () => {
     if (!cepValido || loading) return;
-    ultimaChave.current = `${cepDigits}|${qtd}`;
+    ultimaChave.current = `${cepDigits}|${chaveQtd}`;
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/frete", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cepDestino: cepDigits, qtd }),
-      });
+      // Carga viva vai na caixa de isopor pela Jadlog/aéreo; o resto cota o
+      // catálogo inteiro do Melhor Envio com o peso real do produto.
+      const res = cargaViva
+        ? await fetch("/api/frete", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ cepDestino: cepDigits, qtd }),
+          })
+        : await fetch("/api/frete/seco", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              cepDestino: cepDigits,
+              itens: [{ produtoId, quantidade: unidades }],
+            }),
+          });
       const data = await res.json();
       if (!res.ok) {
         setError(data?.error ?? "Erro ao calcular frete.");
         setResult(null);
-      } else {
+        setSeco(null);
+      } else if (cargaViva) {
         setResult(data);
+      } else {
+        setSeco(data);
       }
     } catch {
       setError("Falha de rede. Tente novamente.");
       setResult(null);
+      setSeco(null);
     } finally {
       setLoading(false);
     }
-  }, [cepDigits, qtd, cepValido, loading]);
+  }, [cepDigits, qtd, unidades, produtoId, cargaViva, chaveQtd, cepValido, loading]);
 
   // Cálculo automático ao completar o CEP (8 dígitos) e quando a qtd muda.
   useEffect(() => {
     if (!cepValido) return;
-    if (ultimaChave.current === `${cepDigits}|${qtd}`) return;
+    if (ultimaChave.current === `${cepDigits}|${chaveQtd}`) return;
     calcular();
-  }, [cepValido, cepDigits, qtd, calcular]);
+  }, [cepValido, cepDigits, chaveQtd, calcular]);
 
+  const endereco = result?.endereco ?? seco?.endereco ?? null;
   const cidadeUf =
-    result?.endereco && (result.endereco.cidade || result.endereco.uf)
-      ? [result.endereco.cidade, result.endereco.uf].filter(Boolean).join(" - ")
+    endereco && (endereco.cidade || endereco.uf)
+      ? [endereco.cidade, endereco.uf].filter(Boolean).join(" - ")
       : null;
 
   return (
@@ -123,6 +166,41 @@ export default function ProductFreteEstimator({ qtd }: { qtd: number }) {
           <p role="alert" className="text-xs text-red-700">
             {error}
           </p>
+        )}
+
+        {/* Produto seco: transportadora mais barata e mais rápida, com o peso
+            real do produto. Sem caixa de isopor e sem Jadlog obrigatória. */}
+        {seco && (
+          <div className="rounded-lg border border-border p-3 space-y-2 text-sm">
+            {cidadeUf && (
+              <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <MapPin size={13} className="text-primary shrink-0" aria-hidden="true" />
+                Frete para {cidadeUf}
+              </p>
+            )}
+
+            {seco.opcoes.map((o, i) => (
+              <div key={o.servicoId} className="flex items-center justify-between gap-3">
+                <span className="flex items-center gap-1.5 text-primary">
+                  <Clock size={14} aria-hidden="true" />
+                  {o.label} · {o.prazoDias} dias úteis
+                  {seco.opcoes.length > 1 && (
+                    <span className="text-xs text-muted-foreground">
+                      {i === 0 ? "(mais barato)" : "(mais rápido)"}
+                    </span>
+                  )}
+                </span>
+                <span className="font-bold text-primary shrink-0">
+                  {formatBRL(o.preco)}
+                </span>
+              </div>
+            ))}
+
+            <p className="text-[11px] text-muted-foreground leading-snug">
+              Estimativa para {unidades} unidade{unidades > 1 ? "s" : ""}. Comprando
+              mais de um item, o frete do pedido inteiro sai no checkout.
+            </p>
+          </div>
         )}
 
         {result && (

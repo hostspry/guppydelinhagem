@@ -29,6 +29,7 @@ import ProductCardSimple from "@/components/product/ProductCardSimple";
 import { WhatsAppIcon } from "@/components/icons/WhatsAppIcon";
 import { TricampeaoBadge } from "@/components/site/TricampeaoBadge";
 import ProductFreteEstimator from "./ProductFreteEstimator";
+import { ehCargaViva } from "@/lib/frete-tipos";
 import ProductFaq from "./ProductFaq";
 import ProductShare from "./ProductShare";
 import WaitlistForm from "./WaitlistForm";
@@ -603,7 +604,12 @@ export default function ProductDetail({
 
           {/* Frete — logo abaixo do preço */}
           <div className="max-w-md">
-            <ProductFreteEstimator qtd={qtdPeixesUnit * qtd} />
+            <ProductFreteEstimator
+              qtd={qtdPeixesUnit * qtd}
+              produtoId={product.id}
+              cargaViva={ehCargaViva(product.tipo)}
+              unidades={qtd}
+            />
           </div>
 
           {/* Estoque + compra / lista de espera */}
