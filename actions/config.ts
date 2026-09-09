@@ -61,6 +61,20 @@ export async function salvarConfiguracaoLoja(
   const taxaEmbalagemSeco =
     Number.isFinite(taxaRaw) && taxaRaw >= 0 ? Math.round(taxaRaw * 100) / 100 : 5;
 
+  // Remetente da etiqueta. Guardado como veio (só o essencial normalizado):
+  // é dado de endereço, não número de conta.
+  const remetenteNome = String(formData.get("remetenteNome") ?? "").trim() || null;
+  const remetenteDocumento = String(formData.get("remetenteDocumento") ?? "").trim() || null;
+  const remetenteEmail = String(formData.get("remetenteEmail") ?? "").trim() || null;
+  const remetenteTelefone = String(formData.get("remetenteTelefone") ?? "").trim() || null;
+  const remetenteCep = String(formData.get("remetenteCep") ?? "").trim() || null;
+  const remetenteLogradouro = String(formData.get("remetenteLogradouro") ?? "").trim() || null;
+  const remetenteNumero = String(formData.get("remetenteNumero") ?? "").trim() || null;
+  const remetenteComplemento = String(formData.get("remetenteComplemento") ?? "").trim() || null;
+  const remetenteBairro = String(formData.get("remetenteBairro") ?? "").trim() || null;
+  const remetenteCidade = String(formData.get("remetenteCidade") ?? "").trim() || null;
+  const remetenteUf = String(formData.get("remetenteUf") ?? "").trim() || null;
+
   // Retirada local: toggle + texto livre das instruções (vazio → null).
   const retiradaLocalAtiva = formData.get("retiradaLocalAtiva") === "on";
   const retiradaInstrucoesRaw = String(
@@ -86,6 +100,17 @@ export async function salvarConfiguracaoLoja(
         freteGratisAcimaDe,
         maxPeixesFreteAuto,
         taxaEmbalagemSeco,
+        remetenteNome,
+        remetenteDocumento,
+        remetenteEmail,
+        remetenteTelefone,
+        remetenteCep,
+        remetenteLogradouro,
+        remetenteNumero,
+        remetenteComplemento,
+        remetenteBairro,
+        remetenteCidade,
+        remetenteUf,
         retiradaLocalAtiva,
         retiradaInstrucoes,
       }

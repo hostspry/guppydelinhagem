@@ -14,6 +14,17 @@ export function ConfigEntregaForm({ inicial }: { inicial: {
     freteGratisAcimaDe: number | null;
     maxPeixesFreteAuto: number;
     taxaEmbalagemSeco: number;
+    remetenteNome: string | null;
+    remetenteDocumento: string | null;
+    remetenteEmail: string | null;
+    remetenteTelefone: string | null;
+    remetenteCep: string | null;
+    remetenteLogradouro: string | null;
+    remetenteNumero: string | null;
+    remetenteComplemento: string | null;
+    remetenteBairro: string | null;
+    remetenteCidade: string | null;
+    remetenteUf: string | null;
     retiradaLocalAtiva: boolean;
     retiradaInstrucoes: string | null;
   } }) {
@@ -27,6 +38,20 @@ export function ConfigEntregaForm({ inicial }: { inicial: {
   const [taxaEmbalagem, setTaxaEmbalagem] = useState(
     String(inicial.taxaEmbalagemSeco),
   );
+  // Remetente da etiqueta: um objeto só, porque são 11 campos do mesmo assunto.
+  const [remetente, setRemetente] = useState<Record<string, string>>({
+    remetenteNome: inicial.remetenteNome ?? "",
+    remetenteDocumento: inicial.remetenteDocumento ?? "",
+    remetenteEmail: inicial.remetenteEmail ?? "",
+    remetenteTelefone: inicial.remetenteTelefone ?? "",
+    remetenteCep: inicial.remetenteCep ?? "",
+    remetenteLogradouro: inicial.remetenteLogradouro ?? "",
+    remetenteNumero: inicial.remetenteNumero ?? "",
+    remetenteComplemento: inicial.remetenteComplemento ?? "",
+    remetenteBairro: inicial.remetenteBairro ?? "",
+    remetenteCidade: inicial.remetenteCidade ?? "",
+    remetenteUf: inicial.remetenteUf ?? "",
+  });
   const [retiradaAtiva, setRetiradaAtiva] = useState(inicial.retiradaLocalAtiva);
   const [retiradaInstrucoes, setRetiradaInstrucoes] = useState(
     inicial.retiradaInstrucoes ?? "",
@@ -42,6 +67,7 @@ export function ConfigEntregaForm({ inicial }: { inicial: {
     fd.set("freteGratisAcimaDe", freteGratisAcimaDe);
     fd.set("maxPeixesFreteAuto", maxPeixes);
     fd.set("taxaEmbalagemSeco", taxaEmbalagem);
+    for (const [k, v] of Object.entries(remetente)) fd.set(k, v);
     if (retiradaAtiva) fd.set("retiradaLocalAtiva", "on");
     fd.set("retiradaInstrucoes", retiradaInstrucoes);
     startTransition(async () => {
@@ -160,6 +186,145 @@ export function ConfigEntregaForm({ inicial }: { inicial: {
           nenhum bicho vivo — com peixe, continua valendo a caixa de isopor e a
           Jadlog/aéreo.
         </p>
+      </div>
+
+      {/* ── Remetente da etiqueta ── */}
+      <div className="border-t border-gray-100 pt-6">
+        <h2 className="text-xs font-semibold text-[#07366A] uppercase tracking-wide mb-1">
+          Remetente da etiqueta
+        </h2>
+        <p className="text-xs text-gray-500 mb-3 leading-snug max-w-md">
+          É o endereço que sai impresso na etiqueta e para onde a transportadora
+          volta se não conseguir entregar. O Melhor Envio recusa a compra sem
+          rua, número, bairro, documento e telefone, então{" "}
+          <strong className="text-[#07366A]">
+            sem preencher isto o botão de gerar etiqueta não funciona
+          </strong>
+          .
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-2xl">
+          <label className="block" key="remetenteNome">
+            <span className="block text-sm text-gray-700 mb-1">Nome de quem envia</span>
+            <input
+              value={remetente.remetenteNome}
+              onChange={(e) =>
+                setRemetente((r) => ({ ...r, remetenteNome: e.target.value }))
+              }
+              placeholder="Marchezi Guppy Farm"
+              className={inputClass}
+            />
+          </label>
+          <label className="block" key="remetenteDocumento">
+            <span className="block text-sm text-gray-700 mb-1">CPF ou CNPJ</span>
+            <input
+              value={remetente.remetenteDocumento}
+              onChange={(e) =>
+                setRemetente((r) => ({ ...r, remetenteDocumento: e.target.value }))
+              }
+              placeholder="só números"
+              className={inputClass}
+            />
+          </label>
+          <label className="block" key="remetenteEmail">
+            <span className="block text-sm text-gray-700 mb-1">E-mail</span>
+            <input
+              value={remetente.remetenteEmail}
+              onChange={(e) =>
+                setRemetente((r) => ({ ...r, remetenteEmail: e.target.value }))
+              }
+              placeholder="contato@guppydelinhagem.com.br"
+              className={inputClass}
+            />
+          </label>
+          <label className="block" key="remetenteTelefone">
+            <span className="block text-sm text-gray-700 mb-1">Telefone com DDD</span>
+            <input
+              value={remetente.remetenteTelefone}
+              onChange={(e) =>
+                setRemetente((r) => ({ ...r, remetenteTelefone: e.target.value }))
+              }
+              placeholder="27999999999"
+              className={inputClass}
+            />
+          </label>
+          <label className="block" key="remetenteCep">
+            <span className="block text-sm text-gray-700 mb-1">CEP</span>
+            <input
+              value={remetente.remetenteCep}
+              onChange={(e) =>
+                setRemetente((r) => ({ ...r, remetenteCep: e.target.value }))
+              }
+              placeholder="29201010"
+              className={inputClass}
+            />
+          </label>
+          <label className="block" key="remetenteLogradouro">
+            <span className="block text-sm text-gray-700 mb-1">Rua</span>
+            <input
+              value={remetente.remetenteLogradouro}
+              onChange={(e) =>
+                setRemetente((r) => ({ ...r, remetenteLogradouro: e.target.value }))
+              }
+              placeholder="Rua ..."
+              className={inputClass}
+            />
+          </label>
+          <label className="block" key="remetenteNumero">
+            <span className="block text-sm text-gray-700 mb-1">Número</span>
+            <input
+              value={remetente.remetenteNumero}
+              onChange={(e) =>
+                setRemetente((r) => ({ ...r, remetenteNumero: e.target.value }))
+              }
+              placeholder="123"
+              className={inputClass}
+            />
+          </label>
+          <label className="block" key="remetenteComplemento">
+            <span className="block text-sm text-gray-700 mb-1">Complemento</span>
+            <input
+              value={remetente.remetenteComplemento}
+              onChange={(e) =>
+                setRemetente((r) => ({ ...r, remetenteComplemento: e.target.value }))
+              }
+              placeholder="opcional"
+              className={inputClass}
+            />
+          </label>
+          <label className="block" key="remetenteBairro">
+            <span className="block text-sm text-gray-700 mb-1">Bairro</span>
+            <input
+              value={remetente.remetenteBairro}
+              onChange={(e) =>
+                setRemetente((r) => ({ ...r, remetenteBairro: e.target.value }))
+              }
+              placeholder="..."
+              className={inputClass}
+            />
+          </label>
+          <label className="block" key="remetenteCidade">
+            <span className="block text-sm text-gray-700 mb-1">Cidade</span>
+            <input
+              value={remetente.remetenteCidade}
+              onChange={(e) =>
+                setRemetente((r) => ({ ...r, remetenteCidade: e.target.value }))
+              }
+              placeholder="Guarapari"
+              className={inputClass}
+            />
+          </label>
+          <label className="block" key="remetenteUf">
+            <span className="block text-sm text-gray-700 mb-1">UF</span>
+            <input
+              value={remetente.remetenteUf}
+              onChange={(e) =>
+                setRemetente((r) => ({ ...r, remetenteUf: e.target.value }))
+              }
+              placeholder="ES"
+              className={inputClass}
+            />
+          </label>
+        </div>
       </div>
 
       {/* ── Retirada local ── */}

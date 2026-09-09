@@ -19,6 +19,7 @@ import {
   transportadoraLabel,
 } from "@/lib/tracking";
 import type { OrderStatus, Transportadora } from "@/lib/generated/prisma/client";
+import { EtiquetaBotao } from "./EtiquetaBotao";
 
 type Props = {
   id: string;
@@ -187,10 +188,18 @@ export function EnvioCard({
           </div>
         </>
       ) : podeRegistrar ? (
-        <div className="space-y-2">
-          <p className="text-gray-500 text-xs leading-snug">
-            Comprou a etiqueta no painel do Melhor Envio ou vai enviar pela Gollog?
-            Registre o código aqui para marcar como enviado e avisar o cliente.
+        <div className="space-y-3">
+          {/* Compra da etiqueta pelo painel, em dois passos (cotar → comprar). */}
+          <EtiquetaBotao
+            orderId={id}
+            etiquetaUrl={etiquetaUrl}
+            podeComprar
+          />
+
+          <p className="text-gray-500 text-xs leading-snug border-t border-gray-100 pt-3">
+            Ou, se comprou a etiqueta no site do Melhor Envio ou vai enviar pela
+            Gollog, registre o código aqui para marcar como enviado e avisar o
+            cliente.
           </p>
           <button
             type="button"

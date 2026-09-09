@@ -790,7 +790,23 @@ model ConfiguracaoLoja {
   // Produto seco (não é carga viva): o cliente paga a cotação do Melhor Envio
   // mais esta taxa fixa de embalagem. O isopor de R$ 20 é só do peixe.
   taxaEmbalagemSeco        Decimal  @default(5) @db.Decimal(10, 2)
-  atualizadoEm             DateTime @updatedAt
+
+  /// Remetente da etiqueta. O Melhor Envio recusa a compra sem rua, número,
+  /// bairro, documento e telefone de quem envia — dado que o sistema não tinha
+  /// em lugar nenhum (só havia CEP/cidade/UF, e um "logradouro" que era o nome
+  /// da fazenda). Fica aqui, editável, em vez de constante no código.
+  remetenteNome        String?
+  remetenteDocumento   String? // CPF ou CNPJ, só dígitos
+  remetenteEmail       String?
+  remetenteTelefone    String? // só dígitos
+  remetenteCep         String?
+  remetenteLogradouro  String?
+  remetenteNumero      String?
+  remetenteComplemento String?
+  remetenteBairro      String?
+  remetenteCidade      String?
+  remetenteUf          String?  @db.VarChar(2)
+  atualizadoEm         DateTime @updatedAt
 }
 
 // ─────────────────────────────────────────────

@@ -20,6 +20,17 @@ export type ConfiguracaoLojaData = {
   tarjaTexto: string | null;
   pagbankAtivo: boolean;
   taxaEmbalagemSeco: number;
+  remetenteNome: string | null;
+  remetenteDocumento: string | null;
+  remetenteEmail: string | null;
+  remetenteTelefone: string | null;
+  remetenteCep: string | null;
+  remetenteLogradouro: string | null;
+  remetenteNumero: string | null;
+  remetenteComplemento: string | null;
+  remetenteBairro: string | null;
+  remetenteCidade: string | null;
+  remetenteUf: string | null;
 };
 
 /**
@@ -45,6 +56,17 @@ export const getConfiguracaoLoja = cache(
         tarjaTexto: true,
         pagbankAtivo: true,
         taxaEmbalagemSeco: true,
+        remetenteNome: true,
+        remetenteDocumento: true,
+        remetenteEmail: true,
+        remetenteTelefone: true,
+        remetenteCep: true,
+        remetenteLogradouro: true,
+        remetenteNumero: true,
+        remetenteComplemento: true,
+        remetenteBairro: true,
+        remetenteCidade: true,
+        remetenteUf: true,
       },
     });
     return {
@@ -60,6 +82,17 @@ export const getConfiguracaoLoja = cache(
       pagbankAtivo: c?.pagbankAtivo ?? false,
       taxaEmbalagemSeco:
         c?.taxaEmbalagemSeco == null ? 5 : Number(c.taxaEmbalagemSeco),
+      remetenteNome: c?.remetenteNome ?? null,
+      remetenteDocumento: c?.remetenteDocumento ?? null,
+      remetenteEmail: c?.remetenteEmail ?? null,
+      remetenteTelefone: c?.remetenteTelefone ?? null,
+      remetenteCep: c?.remetenteCep ?? null,
+      remetenteLogradouro: c?.remetenteLogradouro ?? null,
+      remetenteNumero: c?.remetenteNumero ?? null,
+      remetenteComplemento: c?.remetenteComplemento ?? null,
+      remetenteBairro: c?.remetenteBairro ?? null,
+      remetenteCidade: c?.remetenteCidade ?? null,
+      remetenteUf: c?.remetenteUf ?? null,
     };
   },
 );
