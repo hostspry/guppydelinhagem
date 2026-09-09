@@ -37,8 +37,9 @@ const VAR_NUMERO: VariavelTemplate = {
 export const TEMPLATES: TemplateDef[] = [
   {
     chave: "pedido-pago",
-    rotulo: "Pagamento confirmado",
-    quando: "Sai quando o pagamento do pedido é confirmado.",
+    rotulo: "Pagamento confirmado (bicho vivo)",
+    quando:
+      "Sai quando o pagamento é confirmado e o pedido tem peixe, planta ou coral.",
     variaveis: [
       VAR_NOME,
       VAR_NUMERO,
@@ -69,9 +70,52 @@ export const TEMPLATES: TemplateDef[] = [
     ],
   },
   {
+    chave: "pedido-pago-seco",
+    rotulo: "Pagamento confirmado (sem bicho vivo)",
+    quando:
+      "Mesma hora do “Pagamento confirmado”, quando o pedido não tem peixe, planta nem coral — só criadeira, ração, acessório.",
+    variaveis: [
+      VAR_NOME,
+      VAR_NUMERO,
+      { nome: "total", descricao: "Valor total do pedido" },
+      { nome: "itens", descricao: "Lista dos itens comprados", bloco: true },
+      {
+        nome: "botao_acompanhar",
+        descricao: "Botão “Acompanhar meu pedido”",
+        bloco: true,
+      },
+    ],
+  },
+  {
     chave: "pedido-enviado",
-    rotulo: "Pedido enviado",
-    quando: "Sai quando o pedido é marcado como enviado no painel.",
+    rotulo: "Pedido enviado (bicho vivo)",
+    quando:
+      "Sai quando o pedido com bicho vivo é despachado. Contém a instrução de aclimatar o saquinho.",
+    variaveis: [
+      VAR_NOME,
+      VAR_NUMERO,
+      {
+        nome: "transportadora",
+        descricao: "Nome da transportadora (vazio se não houver)",
+      },
+      { nome: "rastreio", descricao: "Código de rastreio (texto)" },
+      {
+        nome: "caixa_rastreio",
+        descricao: "Caixa destacada com o código",
+        bloco: true,
+      },
+      {
+        nome: "botao_rastrear",
+        descricao: "Botão “Rastrear entrega”",
+        bloco: true,
+      },
+    ],
+  },
+  {
+    chave: "pedido-enviado-seco",
+    rotulo: "Pedido enviado (sem bicho vivo)",
+    quando:
+      "Mesma hora do “Pedido enviado”, quando não vai bicho vivo na caixa — sem a instrução de aclimatar o saquinho.",
     variaveis: [
       VAR_NOME,
       VAR_NUMERO,

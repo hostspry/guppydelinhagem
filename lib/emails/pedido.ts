@@ -8,6 +8,7 @@ import {
 } from "@/lib/tracking";
 import type { Transportadora } from "@/lib/generated/prisma/enums";
 import type { EnderecoEntrega } from "@/lib/validations/pedido";
+import { ehCargaViva } from "@/lib/frete-tipos";
 import { botao, destaque, listaItens, moeda } from "./layout";
 import { montarEmail } from "./render";
 
@@ -30,6 +31,8 @@ type DadosPedido = {
   email: string | null;
   total: number;
   ehCobranca: boolean;
+  /** Tem peixe, planta ou coral na caixa? Decide qual texto o cliente recebe. */
+  temBichoVivo: boolean;
   itens: { nome: string; qtd: number }[];
   endereco: Partial<EnderecoEntrega>;
   tipoEntrega: string;
@@ -54,7 +57,15 @@ async function carregar(orderId: string): Promise<DadosPedido | null> {
         selfTracking: true,
         enderecoEntrega: true,
         cliente: { select: { nome: true, email: true } },
-        items: { select: { nomeProduto: true, quantidade: true } },
+        items: {
+          select: {
+            nomeProduto: true,
+            quantidade: true,
+            qtdMachos: true,
+            qtdFemeas: true,
+            product: { select: { tipo: true } },
+          },
+        },
       },
     });
     if (!o) return null;
@@ -67,6 +78,13 @@ async function carregar(orderId: string): Promise<DadosPedido | null> {
       email: o.cliente.email ?? end.email ?? null,
       total: Number(o.total),
       ehCobranca: o.tipo === "COBRANCA",
+      // Item avulso (sem produto no catálogo) com receita de peixe conta como
+      // vivo; sem receita, como acessório. Mesmo palpite que a etiqueta usa.
+      temBichoVivo: o.items.some((i) =>
+        i.product?.tipo
+          ? ehCargaViva(i.product.tipo)
+          : (i.qtdMachos ?? 0) + (i.qtdFemeas ?? 0) > 0,
+      ),
       itens: o.items.map((i) => ({ nome: i.nomeProduto, qtd: i.quantidade })),
       endereco: end,
       tipoEntrega: o.tipoEntrega,
@@ -88,11 +106,15 @@ export async function emailPedidoPago(orderId: string): Promise<boolean> {
   const d = await carregar(orderId);
   if (!d?.email) return false;
 
+  // Retirada primeiro: quem busca em casa não precisa de texto de envio, tendo
+  // bicho vivo ou não. Depois separa vivo de seco.
   const chave = d.ehCobranca
     ? "cobranca-paga"
     : d.tipoEntrega === "RETIRADA"
       ? "pedido-pago-retirada"
-      : "pedido-pago";
+      : d.temBichoVivo
+        ? "pedido-pago"
+        : "pedido-pago-seco";
 
   const email = await montarEmail(
     chave,
@@ -130,8 +152,9 @@ export async function emailPedidoEnviado(orderId: string): Promise<boolean> {
       ? transportadoraLabel(d.transportadora)
       : (d.servicoEnvioNome ?? null);
 
+  // Criadeira não boia em saquinho: pedido sem bicho vivo recebe o texto seco.
   const email = await montarEmail(
-    "pedido-enviado",
+    d.temBichoVivo ? "pedido-enviado" : "pedido-enviado-seco",
     {
       nome: primeiroNome(d.nome),
       numero: d.numero,
