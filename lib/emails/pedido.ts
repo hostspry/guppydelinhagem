@@ -1,7 +1,11 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import { enviarEmail } from "@/lib/email";
-import { buildTrackingUrl, transportadoraLabel } from "@/lib/tracking";
+import {
+  buildTrackingUrl,
+  codigoRastreavel,
+  transportadoraLabel,
+} from "@/lib/tracking";
 import type { Transportadora } from "@/lib/generated/prisma/enums";
 import type { EnderecoEntrega } from "@/lib/validations/pedido";
 import { botao, destaque, listaItens, moeda } from "./layout";
@@ -30,6 +34,7 @@ type DadosPedido = {
   endereco: Partial<EnderecoEntrega>;
   tipoEntrega: string;
   transportadora: Transportadora | null;
+  servicoEnvioNome: string | null;
   codigoRastreio: string | null;
   selfTracking: string | null;
 };
@@ -44,6 +49,7 @@ async function carregar(orderId: string): Promise<DadosPedido | null> {
         total: true,
         tipoEntrega: true,
         transportadora: true,
+        servicoEnvioNome: true,
         codigoRastreio: true,
         selfTracking: true,
         enderecoEntrega: true,
@@ -65,6 +71,7 @@ async function carregar(orderId: string): Promise<DadosPedido | null> {
       endereco: end,
       tipoEntrega: o.tipoEntrega,
       transportadora: o.transportadora,
+      servicoEnvioNome: o.servicoEnvioNome,
       codigoRastreio: o.codigoRastreio,
       selfTracking: o.selfTracking,
     };
@@ -110,9 +117,18 @@ export async function emailPedidoEnviado(orderId: string): Promise<boolean> {
   const d = await carregar(orderId);
   if (!d?.email || d.ehCobranca) return false;
 
-  const codigo = d.selfTracking || d.codigoRastreio;
+  // O ME…BR na frente, que é o que o Melhor Rastreio entende melhor. A guarda
+  // pula o id interno do Melhor Envio, que já foi gravado aqui por engano: sem
+  // ela, um reenvio repetiria o código que ninguém consegue rastrear.
+  const codigo = [d.selfTracking, d.codigoRastreio].find(codigoRastreavel) ?? null;
   const url = buildTrackingUrl(d.selfTracking, d.codigoRastreio);
-  const transp = d.transportadora ? transportadoraLabel(d.transportadora) : null;
+  // "pela Jadlog", "pela Loggi Express". Transportadora fora do enum tem o nome
+  // real em servicoEnvioNome; sem nenhum dos dois a frase omite o trecho, em vez
+  // de dizer "despachado pela transportadora".
+  const transp =
+    d.transportadora && d.transportadora !== "OUTRO"
+      ? transportadoraLabel(d.transportadora)
+      : (d.servicoEnvioNome ?? null);
 
   const email = await montarEmail(
     "pedido-enviado",
