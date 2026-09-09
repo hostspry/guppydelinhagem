@@ -55,7 +55,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     produto.metaDescription || produto.descricaoCurta || fallbackDesc;
   // Imagem da prévia = thumb do vídeo principal (videos já vêm principal-primeiro,
   // só ativos). YouTube/upload já são URLs absolutas; fallback no selo da marca.
-  const imagem = produto.videos[0]?.thumbnailUrl || "/images/selo.webp";
+  // Prévia do link: vídeo primeiro, depois a foto do produto. Sem os dois, o
+  // selo da marca — mas um produto com foto nunca deve cair no genérico.
+  const imagem =
+    produto.videos[0]?.thumbnailUrl ||
+    produto.fotos?.[0]?.url ||
+    "/images/selo.webp";
   const url = `/loja/${slug}`;
 
   return {
@@ -160,7 +165,8 @@ export default async function ProdutoPage({ params }: Props) {
       : pc.precoPix;
   });
 
-  const imagemRaw = prod.videos[0]?.thumbnailUrl || "/images/selo.webp";
+  const imagemRaw =
+    prod.videos[0]?.thumbnailUrl || prod.fotos?.[0]?.url || "/images/selo.webp";
   const descricaoSchema =
     stripMarcheziSignature(prod.descricao)
       .replace(/<[^>]*>/g, " ")

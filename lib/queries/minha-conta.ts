@@ -169,6 +169,7 @@ export async function listEsperasDoUsuario(
             take: 1,
             select: { thumbnailUrl: true },
           },
+          imagens: { orderBy: { ordem: "asc" }, take: 1, select: { url: true } },
         },
       },
     },
@@ -179,7 +180,8 @@ export async function listEsperasDoUsuario(
     produtoNome: r.product.nome,
     produtoSlug: r.product.slug,
     produtoAtivo: r.product.ativo,
-    thumb: r.product.videos[0]?.thumbnailUrl ?? null,
+    thumb:
+      r.product.videos[0]?.thumbnailUrl ?? r.product.imagens[0]?.url ?? null,
   }));
 }
 

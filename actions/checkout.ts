@@ -285,6 +285,9 @@ async function precificarItens(
           take: 1,
           select: { thumbnailUrl: true },
         },
+        // Produto sem vídeo (ração, criadeira) tem a foto como capa: sem isto o
+        // item ficaria sem imagem no pedido, no painel e no e-mail do cliente.
+        imagens: { orderBy: { ordem: "asc" }, take: 1, select: { url: true } },
         variantes: {
           where: { ativo: true },
           select: {
@@ -343,7 +346,7 @@ async function precificarItens(
         precoPix: calc.precoPix,
         descontoPixPercent: calc.descontoPixPercent,
         quantidade: item.quantidade,
-        imagemSnapshot: prod.videos[0]?.thumbnailUrl ?? null,
+        imagemSnapshot: prod.videos[0]?.thumbnailUrl ?? prod.imagens[0]?.url ?? null,
         composicao: item.composicao,
         qtdMachos: variante.qtdMachos,
         qtdFemeas: variante.qtdFemeas,
@@ -373,7 +376,7 @@ async function precificarItens(
         precoPix: calc.precoPix,
         descontoPixPercent: calc.descontoPixPercent,
         quantidade: item.quantidade,
-        imagemSnapshot: prod.videos[0]?.thumbnailUrl ?? null,
+        imagemSnapshot: prod.videos[0]?.thumbnailUrl ?? prod.imagens[0]?.url ?? null,
         composicao: null,
         qtdMachos: null,
         qtdFemeas: null,

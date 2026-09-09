@@ -77,6 +77,7 @@ export async function comprarNovamente(
           take: 1,
           select: { thumbnailUrl: true },
         },
+        imagens: { orderBy: { ordem: "asc" }, take: 1, select: { url: true } },
       },
     });
     if (!prod) {
@@ -130,7 +131,7 @@ export async function comprarNovamente(
       precoPix: precos.precoPix,
       precoCheio: precos.precoCartao,
       qtdPeixes,
-      thumbnail: prod.videos[0]?.thumbnailUrl ?? null,
+      thumbnail: prod.videos[0]?.thumbnailUrl ?? prod.imagens[0]?.url ?? null,
       estoque: estoqueUnid,
       quantidade: Math.min(it.quantidade, estoqueUnid),
     });

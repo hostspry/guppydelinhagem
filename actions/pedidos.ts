@@ -103,6 +103,7 @@ async function buildItens(itens: ItemPedidoInput[]) {
             take: 1,
             select: { thumbnailUrl: true },
           },
+          imagens: { orderBy: { ordem: "asc" }, take: 1, select: { url: true } },
           variantes: {
             where: { ativo: true },
             select: { composicao: true, qtdMachos: true, qtdFemeas: true },
@@ -127,7 +128,7 @@ async function buildItens(itens: ItemPedidoInput[]) {
         : nomeBase,
       precoUnitario: i.precoUnitario,
       quantidade: i.quantidade,
-      imagemSnapshot: prod?.videos[0]?.thumbnailUrl ?? null,
+      imagemSnapshot: prod?.videos[0]?.thumbnailUrl ?? prod?.imagens[0]?.url ?? null,
       composicao: variante ? variante.composicao : null,
       qtdMachos: variante ? variante.qtdMachos : null,
       qtdFemeas: variante ? variante.qtdFemeas : null,
