@@ -3,12 +3,21 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { AlertTriangle, FileText, Loader2, Tag } from "lucide-react";
+import { AlertTriangle, FileText, Loader2, Package, Tag } from "lucide-react";
 import {
   cotarEtiquetaDoPedido,
   comprarEtiquetaDoPedido,
+  salvarPacoteDoPedido,
   type OpcaoEtiqueta,
+  type PacoteCotado,
 } from "@/actions/etiqueta";
+
+/** Embalagens que a loja usa no dia a dia, para não digitar sempre. */
+const PRESETS = [
+  { nome: "Envelope", comprimento: 30, largura: 20, altura: 2 },
+  { nome: "Caixa P", comprimento: 20, largura: 15, altura: 10 },
+  { nome: "Caixa M", comprimento: 30, largura: 20, altura: 15 },
+];
 
 const brl = new Intl.NumberFormat("pt-BR", {
   style: "currency",
@@ -41,6 +50,14 @@ export function EtiquetaBotao({
   const [aviso, setAviso] = useState<string | null>(null);
   const [escolhido, setEscolhido] = useState<number | null>(null);
   const [comprando, setComprando] = useState(false);
+  const [pacote, setPacote] = useState<PacoteCotado | null>(null);
+  const [editandoCaixa, setEditandoCaixa] = useState(false);
+  const [caixa, setCaixa] = useState({
+    comprimento: "",
+    largura: "",
+    altura: "",
+    pesoGramas: "",
+  });
 
   if (etiquetaUrl) {
     return (
@@ -75,6 +92,15 @@ export function EtiquetaBotao({
       setOpcoes(r.opcoes);
       setAviso(r.aviso ?? null);
       setEscolhido(r.opcoes[0]?.servicoId ?? null);
+      setPacote(r.pacote);
+      if (r.pacote) {
+        setCaixa({
+          comprimento: String(r.pacote.comprimento),
+          largura: String(r.pacote.largura),
+          altura: String(r.pacote.altura),
+          pesoGramas: String(r.pacote.pesoGramas),
+        });
+      }
     });
   }
 
@@ -90,6 +116,35 @@ export function EtiquetaBotao({
       }
       toast.success("Etiqueta comprada.");
       router.refresh();
+    });
+  }
+
+  /** Salva a embalagem informada e cota de novo com ela. */
+  function aplicarCaixa(limpar = false) {
+    startTransition(async () => {
+      const dados = limpar
+        ? null
+        : {
+            comprimento: Number(caixa.comprimento.replace(",", ".")),
+            largura: Number(caixa.largura.replace(",", ".")),
+            altura: Number(caixa.altura.replace(",", ".")),
+            pesoGramas: Math.round(Number(caixa.pesoGramas.replace(",", "."))),
+          };
+      const r = await salvarPacoteDoPedido(orderId, dados);
+      if (!r.success) {
+        toast.error(r.error);
+        return;
+      }
+      setEditandoCaixa(false);
+      const nova = await cotarEtiquetaDoPedido(orderId);
+      if (!nova.success) {
+        toast.error(nova.error);
+        return;
+      }
+      setOpcoes(nova.opcoes);
+      setPacote(nova.pacote);
+      setEscolhido(nova.opcoes[0]?.servicoId ?? null);
+      toast.success(limpar ? "Voltou ao cálculo automático." : "Cotado com a sua embalagem.");
     });
   }
 
@@ -120,6 +175,107 @@ export function EtiquetaBotao({
           </p>
 
           {aviso && <p className="text-xs text-gray-500">{aviso}</p>}
+
+          {/* A caixa que foi cotada. O cálculo empilha as medidas dos produtos,
+              o que não sabe que a criadeira desmonta e cabe num envelope. */}
+          {pacote && !editandoCaixa && (
+            <div className="rounded bg-gray-50 border border-gray-200 px-2.5 py-2">
+              <p className="text-xs text-gray-600">
+                Cotado numa caixa de{" "}
+                <strong className="text-[#07366A]">
+                  {pacote.comprimento}×{pacote.largura}×{pacote.altura} cm,{" "}
+                  {pacote.pesoGramas} g
+                </strong>{" "}
+                {pacote.manual ? "(medidas suas)" : "(calculado pelos produtos)"}
+              </p>
+              <button
+                type="button"
+                onClick={() => setEditandoCaixa(true)}
+                className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-[#07366A] underline hover:text-[#FF035C]"
+              >
+                <Package size={12} aria-hidden="true" />
+                Vou embalar diferente
+              </button>
+            </div>
+          )}
+
+          {editandoCaixa && (
+            <div className="rounded border border-gray-200 p-2.5 space-y-2">
+              <p className="text-xs text-gray-600">
+                Meça a embalagem pronta, com o produto dentro.
+              </p>
+              <div className="flex flex-wrap gap-1">
+                {PRESETS.map((pre) => (
+                  <button
+                    key={pre.nome}
+                    type="button"
+                    onClick={() =>
+                      setCaixa((c) => ({
+                        ...c,
+                        comprimento: String(pre.comprimento),
+                        largura: String(pre.largura),
+                        altura: String(pre.altura),
+                      }))
+                    }
+                    className="text-[11px] border border-gray-300 rounded-full px-2 py-0.5 text-gray-600 hover:border-[#07366A]"
+                  >
+                    {pre.nome} {pre.comprimento}×{pre.largura}×{pre.altura}
+                  </button>
+                ))}
+              </div>
+              <div className="grid grid-cols-4 gap-1.5">
+                {(
+                  [
+                    ["comprimento", "Compr."],
+                    ["largura", "Larg."],
+                    ["altura", "Alt."],
+                    ["pesoGramas", "Peso (g)"],
+                  ] as const
+                ).map(([campo, rotulo]) => (
+                  <label key={campo} className="block">
+                    <span className="block text-[10px] text-gray-500 mb-0.5">
+                      {rotulo}
+                    </span>
+                    <input
+                      value={caixa[campo]}
+                      onChange={(e) =>
+                        setCaixa((c) => ({ ...c, [campo]: e.target.value }))
+                      }
+                      inputMode="decimal"
+                      className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                    />
+                  </label>
+                ))}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => aplicarCaixa(false)}
+                  disabled={isPending}
+                  className="text-xs font-medium bg-[#07366A] text-white px-3 py-1.5 rounded-md hover:brightness-125 disabled:opacity-60"
+                >
+                  Cotar com estas medidas
+                </button>
+                {pacote?.manual && (
+                  <button
+                    type="button"
+                    onClick={() => aplicarCaixa(true)}
+                    disabled={isPending}
+                    className="text-xs font-medium border border-gray-300 text-gray-700 px-3 py-1.5 rounded-md hover:border-gray-400"
+                  >
+                    Voltar ao automático
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setEditandoCaixa(false)}
+                  className="text-xs font-medium text-gray-500 px-2 py-1.5"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          )}
 
           {opcoes.length === 0 && (
             <p className="text-xs text-gray-500">

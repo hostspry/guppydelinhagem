@@ -439,6 +439,16 @@ model Order {
   desconto Decimal @default(0) @db.Decimal(10, 2)
   total    Decimal @default(0) @db.Decimal(10, 2)
 
+  /// Embalagem REAL deste pedido, quando o operador informa.
+  ///
+  /// O cálculo automático empilha as medidas dos produtos, o que é um chute
+  /// conservador: ele não sabe que a criadeira desmonta e cabe num envelope,
+  /// nem que dois itens finos vão lado a lado. Nulo = usa o automático.
+  pacoteAltura      Decimal? @db.Decimal(8, 2) // cm
+  pacoteLargura     Decimal? @db.Decimal(8, 2)
+  pacoteComprimento Decimal? @db.Decimal(8, 2)
+  pacotePesoGramas  Int?
+
   modalidadeFrete  String? // 'TERRESTRE' (Jadlog) | 'AEREO' (Gollog) | 'SECO' (produto não vivo)
   // Serviço do Melhor Envio escolhido no checkout de produto seco. O enum
   // Transportadora tem 3 valores e não acompanha o catálogo do ME (que muda

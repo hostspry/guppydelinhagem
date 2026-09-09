@@ -29,8 +29,23 @@ export type OpcaoEtiqueta = {
   prazoDias: number;
 };
 
+/** A caixa que foi cotada, para a tela mostrar e deixar corrigir. */
+export type PacoteCotado = {
+  altura: number;
+  largura: number;
+  comprimento: number;
+  pesoGramas: number;
+  /** true = medidas que o operador informou; false = empilhamento automático. */
+  manual: boolean;
+};
+
 export type CotacaoResult =
-  | { success: true; opcoes: OpcaoEtiqueta[]; aviso?: string }
+  | {
+      success: true;
+      opcoes: OpcaoEtiqueta[];
+      pacote: PacoteCotado | null;
+      aviso?: string;
+    }
   | { success: false; error: string };
 
 export type CompraResult =
@@ -71,6 +86,10 @@ async function carregarPedido(orderId: string) {
       etiquetaUrl: true,
       meShipmentId: true,
       servicoEnvioId: true,
+      pacoteAltura: true,
+      pacoteLargura: true,
+      pacoteComprimento: true,
+      pacotePesoGramas: true,
       items: {
         select: {
           nomeProduto: true,
@@ -114,6 +133,33 @@ function itensParaFrete(
     largura: it.product?.largura == null ? null : Number(it.product.largura),
     altura: it.product?.altura == null ? null : Number(it.product.altura),
   }));
+}
+
+type Pedido = NonNullable<Awaited<ReturnType<typeof carregarPedido>>>;
+
+/**
+ * Volumes do pedido: a embalagem que o operador informou, quando informou.
+ *
+ * Quem embala sabe o que o cálculo não sabe — que a criadeira desmonta e cabe
+ * num envelope, que dois itens finos vão lado a lado. Informado, manda; vazio,
+ * cai no empilhamento automático das medidas dos produtos.
+ */
+function volumesDoPedido(order: Pedido) {
+  const alt = order.pacoteAltura == null ? null : Number(order.pacoteAltura);
+  const lar = order.pacoteLargura == null ? null : Number(order.pacoteLargura);
+  const comp =
+    order.pacoteComprimento == null ? null : Number(order.pacoteComprimento);
+  const peso = order.pacotePesoGramas;
+
+  if (alt && lar && comp && peso) {
+    return {
+      manual: true,
+      volumes: [
+        { height: alt, width: lar, length: comp, weight: peso / 1000, insurance_value: 0 },
+      ],
+    };
+  }
+  return { manual: false, volumes: volumesDoCarrinhoSeco(itensParaFrete(order.items)) };
 }
 
 /**
@@ -169,16 +215,24 @@ export async function cotarEtiquetaDoPedido(
           prazoDias: jad.deliveryTime,
         },
       ],
+      // Peixe vai na caixa de isopor padrão: não faz sentido editar.
+      pacote: {
+        altura: caixa.altura,
+        largura: caixa.largura,
+        comprimento: caixa.comprimento,
+        pesoGramas,
+        manual: false,
+      },
       aviso:
         "Pedido com bicho vivo: só a Jadlog aparece aqui. O preço já inclui a caixa de isopor.",
     };
   }
 
-  const volumes = volumesDoCarrinhoSeco(itens);
+  const pacote = volumesDoPedido(order);
   const cfg = await getConfiguracaoLoja();
   const cot = await cotarFreteSeco({
     cepDestino: cep,
-    volumes,
+    volumes: pacote.volumes,
     valorSegurado,
     // Aqui o número é o CUSTO da etiqueta, não o preço ao cliente: a taxa de
     // embalagem não entra, senão o painel mostraria um valor que o Melhor
@@ -188,6 +242,7 @@ export async function cotarEtiquetaDoPedido(
   void cfg;
   if (!cot.ok) return { success: false, error: cot.error };
 
+  const v = pacote.volumes[0];
   return {
     success: true,
     opcoes: cot.data.opcoes.map((o) => ({
@@ -196,6 +251,15 @@ export async function cotarEtiquetaDoPedido(
       preco: o.preco,
       prazoDias: o.prazoDias,
     })),
+    pacote: v
+      ? {
+          altura: v.height,
+          largura: v.width,
+          comprimento: v.length,
+          pesoGramas: Math.round(v.weight * 1000),
+          manual: pacote.manual,
+        }
+      : null,
   };
 }
 
@@ -325,7 +389,7 @@ export async function comprarEtiquetaDoPedido(
           },
         ];
       })()
-    : volumesDoCarrinhoSeco(itens).map((v) => ({
+    : volumesDoPedido(order).volumes.map((v) => ({
         height: v.height,
         width: v.width,
         length: v.length,
@@ -422,4 +486,77 @@ export async function comprarEtiquetaDoPedido(
     etiquetaUrl,
     rastreio: rastreio ? melhorRastreioUrl(rastreio) : null,
   };
+}
+
+export type PacoteResult = { success: true } | { success: false; error: string };
+
+/**
+ * Guarda (ou limpa) a embalagem informada para este pedido.
+ *
+ * Zerar os quatro campos devolve o cálculo automático, que é o comportamento
+ * certo quando o operador percebe que chutou pior do que o sistema.
+ */
+export async function salvarPacoteDoPedido(
+  orderId: string,
+  pacote: {
+    altura: number;
+    largura: number;
+    comprimento: number;
+    pesoGramas: number;
+  } | null,
+): Promise<PacoteResult> {
+  const membro = await assertPermissao("pedidos.envio");
+
+  if (pacote) {
+    const { altura, largura, comprimento, pesoGramas } = pacote;
+    const positivos = [altura, largura, comprimento, pesoGramas].every(
+      (v) => Number.isFinite(v) && v > 0,
+    );
+    if (!positivos) {
+      return { success: false, error: "Medidas e peso precisam ser maiores que zero." };
+    }
+    // Teto de sanidade: 2 m e 30 kg cobrem qualquer coisa que a loja despacha, e
+    // barram o dedo escorregado que digita 1000 no lugar de 100.
+    if (altura > 200 || largura > 200 || comprimento > 200) {
+      return { success: false, error: "Alguma medida passou de 200 cm. Confira." };
+    }
+    if (pesoGramas > 30000) {
+      return { success: false, error: "Peso acima de 30 kg. Confira." };
+    }
+  }
+
+  const alvo = await prisma.order.findUnique({
+    where: { id: orderId },
+    select: { numero: true, etiquetaUrl: true, meShipmentId: true },
+  });
+  if (!alvo) return { success: false, error: "Pedido não encontrado." };
+  if (alvo.etiquetaUrl || alvo.meShipmentId) {
+    return {
+      success: false,
+      error: "A etiqueta já foi comprada: mudar a embalagem agora não muda o que foi pago.",
+    };
+  }
+
+  await prisma.order.update({
+    where: { id: orderId },
+    data: {
+      pacoteAltura: pacote?.altura ?? null,
+      pacoteLargura: pacote?.largura ?? null,
+      pacoteComprimento: pacote?.comprimento ?? null,
+      pacotePesoGramas: pacote?.pesoGramas ?? null,
+    },
+  });
+
+  await auditar(membro, {
+    acao: "pedido.editar",
+    entidade: "Order",
+    entidadeId: orderId,
+    descricao: pacote
+      ? `Informou a embalagem do pedido ${alvo.numero}: ${pacote.comprimento}x${pacote.largura}x${pacote.altura} cm, ${pacote.pesoGramas} g`
+      : `Voltou a embalagem do pedido ${alvo.numero} para o cálculo automático`,
+    depois: pacote ?? undefined,
+  });
+
+  revalidatePath(`/admin/pedidos/${orderId}`);
+  return { success: true };
 }
