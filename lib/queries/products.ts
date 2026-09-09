@@ -576,6 +576,13 @@ export async function listProducts(
         take: 1,
         select: { thumbnailUrl: true, platform: true },
       },
+      // Foto de capa: é a miniatura de quem não tem vídeo (ração, criadeira,
+      // filtro). Sem isto a linha da listagem fica com um quadrado cinza.
+      imagens: {
+        orderBy: { ordem: "asc" },
+        take: 1,
+        select: { url: true },
+      },
       // Chips de composição: variantes ativas (padrão primeiro).
       variantes: {
         where: { ativo: true },

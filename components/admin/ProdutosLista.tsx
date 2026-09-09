@@ -282,12 +282,15 @@ export function ProdutosLista({
                     <td className="px-4 py-2.5">
                       <div className="flex gap-3">
                         <div className="produto-thumb relative shrink-0 rounded bg-gray-100 overflow-hidden">
+                          {/* Vídeo manda quando existe; sem vídeo, a foto. */}
                           {p.videos[0]?.thumbnailUrl ? (
                             <VideoThumb
                               src={p.videos[0].thumbnailUrl}
                               alt=""
                               sizes="200px"
                             />
+                          ) : p.imagens[0]?.url ? (
+                            <VideoThumb src={p.imagens[0].url} alt="" sizes="200px" />
                           ) : null}
                         </div>
                         <div className="min-w-0">
