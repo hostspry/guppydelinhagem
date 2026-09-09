@@ -11,10 +11,21 @@ import { registrarSugestaoDeVenda } from "@/lib/financeiro/venda-no-caixa";
 // banco). É chamado SEMPRE dentro de um prisma.$transaction (recebe o `tx`).
 
 /**
- * Ajusta o pool de machos/fêmeas dos produtos de cada item do pedido.
+ * Ajusta o estoque dos produtos de cada item do pedido.
  * `sinal = -1` baixa (venda confirmada); `+1` estorna (cancelamento de pedido já
- * baixado). Re-sincroniza o espelho `Product.estoque`. Permite pool negativo —
- * a regra do projeto é NÃO bloquear venda por estoque (o admin sinaliza).
+ * baixado). Permite estoque negativo — a regra do projeto é NÃO bloquear venda
+ * por estoque (o admin sinaliza).
+ *
+ * Dois estoques diferentes, porque são dois negócios na mesma tabela:
+ *
+ *   PEIXE tem pool de machos/fêmeas e uma receita por composição (trio consome
+ *   1 macho e 2 fêmeas). `Product.estoque` é só o espelho da soma.
+ *
+ *   O resto (criadeira, ração, acessório) tem uma unidade só, em
+ *   `Product.estoque`. Ficava de fora daqui: a venda no site nunca baixava, e o
+ *   número só mudava quando alguém editava o produto à mão. Passa a baixar
+ *   junto — sem isso, sincronizar estoque com marketplace seria sincronizar um
+ *   número que não quer dizer nada.
  */
 export async function ajustarPoolEstoque(
   tx: Prisma.TransactionClient,
@@ -22,32 +33,44 @@ export async function ajustarPoolEstoque(
   sinal: 1 | -1,
 ): Promise<void> {
   const itens = await tx.orderItem.findMany({
-    where: { orderId, productId: { not: null }, composicao: { not: null } },
+    where: { orderId, productId: { not: null } },
     select: {
       productId: true,
+      composicao: true,
       qtdMachos: true,
       qtdFemeas: true,
       quantidade: true,
     },
   });
   for (const it of itens) {
-    if (it.productId == null || it.qtdMachos == null || it.qtdFemeas == null) {
-      continue;
-    }
+    if (it.productId == null) continue;
     const prod = await tx.product.findUnique({
       where: { id: it.productId },
-      select: { estoqueMachos: true, estoqueFemeas: true },
+      select: { tipo: true, estoque: true, estoqueMachos: true, estoqueFemeas: true },
     });
     if (!prod) continue;
-    const machos = prod.estoqueMachos + sinal * it.qtdMachos * it.quantidade;
-    const femeas = prod.estoqueFemeas + sinal * it.qtdFemeas * it.quantidade;
+
+    // Receita de peixe: mexe no pool e o espelho vira a soma.
+    if (it.composicao != null && it.qtdMachos != null && it.qtdFemeas != null) {
+      const machos = prod.estoqueMachos + sinal * it.qtdMachos * it.quantidade;
+      const femeas = prod.estoqueFemeas + sinal * it.qtdFemeas * it.quantidade;
+      await tx.product.update({
+        where: { id: it.productId },
+        data: {
+          estoqueMachos: machos,
+          estoqueFemeas: femeas,
+          estoque: machos + femeas, // re-sincroniza o espelho
+        },
+      });
+      continue;
+    }
+
+    // Produto de unidade. PEIXE sem receita fica de fora: mexer no espelho sem
+    // mexer no pool deixaria os dois números brigando, e o pool é a verdade.
+    if (prod.tipo === "PEIXE") continue;
     await tx.product.update({
       where: { id: it.productId },
-      data: {
-        estoqueMachos: machos,
-        estoqueFemeas: femeas,
-        estoque: machos + femeas, // re-sincroniza o espelho
-      },
+      data: { estoque: prod.estoque + sinal * it.quantidade },
     });
   }
 }
