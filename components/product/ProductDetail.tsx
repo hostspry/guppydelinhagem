@@ -29,6 +29,7 @@ import ProductCardSimple from "@/components/product/ProductCardSimple";
 import { WhatsAppIcon } from "@/components/icons/WhatsAppIcon";
 import { TricampeaoBadge } from "@/components/site/TricampeaoBadge";
 import ProductFreteEstimator from "./ProductFreteEstimator";
+import { ZoomableImage } from "./ZoomableImage";
 import { ehCargaViva } from "@/lib/frete-tipos";
 import ProductFaq from "./ProductFaq";
 import ProductShare from "./ProductShare";
@@ -133,7 +134,13 @@ export default function ProductDetail({
   const [fotoIdx, setFotoIdx] = useState(0);
   const semVideo = product.videos.length === 0;
   const fotos = product.fotos ?? [];
+  // `mostrandoFoto` decide quem ocupa o palco. Sem vídeo, a foto entra sozinha;
+  // com vídeo, ela entra quando a pessoa clica numa miniatura de foto — antes
+  // disso as fotos do peixe não apareciam em lugar nenhum, embora o admin
+  // prometesse que apareceriam.
+  const [mostrandoFoto, setMostrandoFoto] = useState(semVideo);
   const fotoAtual = fotos[fotoIdx] ?? fotos[0] ?? null;
+  const palcoDaFoto = mostrandoFoto && fotoAtual != null;
   const [descExpandida, setDescExpandida] = useState(false);
   const [barFill, setBarFill] = useState(0); // anima o preenchimento ao montar
   const addItem = useCart((s) => s.addItem);
@@ -248,6 +255,8 @@ export default function ProductDetail({
   function selectVideo(id: string) {
     setSelectedId(id);
     setPlaying(false);
+    // Clicar numa miniatura de vídeo devolve o palco ao vídeo.
+    setMostrandoFoto(false);
   }
   function handlePlay() {
     // No mobile (<lg), o vídeo abre o feed tela cheia neste produto; no desktop
@@ -318,13 +327,21 @@ export default function ProductDetail({
       <div className="grid grid-cols-1 lg:grid-cols-[300px_minmax(0,1fr)] gap-8 items-start">
         {/* Vídeo */}
         <div className="space-y-3">
-          {/* Mesma régua do card: player em 9:16, galeria de fotos em 4:5. */}
+          {/* Mesma régua do card: player em 9:16, foto em 4:5. */}
           <div
             className={`relative rounded-xl overflow-hidden bg-muted ${
-              semVideo ? "aspect-[4/5]" : "aspect-[9/16]"
+              palcoDaFoto ? "aspect-[4/5]" : "aspect-[9/16]"
             }`}
           >
-            {playing && embedSrc ? (
+            {palcoDaFoto ? (
+              <ZoomableImage
+                fotos={fotos}
+                indice={fotoIdx}
+                onIndice={setFotoIdx}
+                nome={product.nome}
+                className="absolute inset-0"
+              />
+            ) : playing && embedSrc ? (
               <>
                 <iframe
                   src={embedSrc}
@@ -371,15 +388,6 @@ export default function ProductDetail({
                   <Play className="w-7 h-7 text-white fill-white" aria-hidden="true" />
                 </button>
               </>
-            ) : fotoAtual ? (
-              <Image
-                src={fotoAtual.url}
-                alt={fotoAtual.alt || product.nome}
-                fill
-                sizes="(max-width: 1024px) 100vw, 40vw"
-                className="object-cover"
-                priority
-              />
             ) : (
               <div className="w-full h-full flex items-center justify-center text-sm text-muted-foreground">
                 sem mídia
@@ -387,17 +395,22 @@ export default function ProductDetail({
             )}
           </div>
 
-          {/* Miniaturas das fotos — só quando a galeria é a mídia principal. */}
-          {semVideo && fotos.length > 1 && (
+          {/* Miniaturas das fotos. Aparecem mesmo havendo vídeo: clicar numa
+              troca o palco para a foto, e a miniatura do vídeo traz de volta. */}
+          {fotos.length > 0 && (semVideo ? fotos.length > 1 : true) && (
             <div className="flex flex-wrap gap-2">
               {fotos.map((f, i) => (
                 <button
                   type="button"
                   key={f.url}
-                  onClick={() => setFotoIdx(i)}
+                  onClick={() => {
+                    setFotoIdx(i);
+                    setMostrandoFoto(true);
+                    setPlaying(false);
+                  }}
                   aria-label={`Ver foto ${i + 1}`}
                   className={`relative w-14 aspect-square rounded-lg overflow-hidden border-2 transition-colors ${
-                    i === fotoIdx
+                    palcoDaFoto && i === fotoIdx
                       ? "border-secondary"
                       : "border-transparent hover:border-border"
                   }`}
