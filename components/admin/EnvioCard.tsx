@@ -109,7 +109,12 @@ export function EnvioCard({
   }
 
   return (
-    <div className="bg-white border border-gray-200 rounded-lg p-5 text-sm space-y-3">
+    // O id ancora o link "gerar etiqueta" da lista de pedidos: quem clica lá
+    // cai direto neste card, e não no topo da página.
+    <div
+      id="envio"
+      className="bg-white border border-gray-200 rounded-lg p-5 text-sm space-y-3 scroll-mt-24"
+    >
       <h2 className="text-xs font-semibold text-[#07366A] uppercase tracking-wide flex items-center gap-1.5">
         <Truck className="w-3.5 h-3.5" aria-hidden="true" />
         Envio &amp; rastreio

@@ -624,3 +624,56 @@ export async function reenviarRastreio(orderId: string): Promise<ReenvioResult> 
 
   return { success: true, para };
 }
+
+export type ImpressaoResult =
+  | { success: true; url: string }
+  | { success: false; error: string };
+
+/**
+ * Devolve o PDF da etiqueta para imprimir, com link novo em folha.
+ *
+ * Por que não usar direto o `etiquetaUrl` guardado: o link público do Melhor
+ * Envio é temporário. Quem compra a etiqueta na segunda e vai postar na quinta
+ * clica num link morto — e aí não tem etiqueta, tem suporte. Pedir de novo ao
+ * ME custa uma requisição e devolve um link válido agora.
+ *
+ * Não gasta saldo: `print` só formata o que já foi comprado. Por isso exige
+ * `pedidos.envio` e não a permissão de comprar — quem embala precisa imprimir
+ * sem depender do dono.
+ */
+export async function imprimirEtiquetaDoPedido(
+  orderId: string,
+): Promise<ImpressaoResult> {
+  await assertPermissao("pedidos.envio");
+
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    select: { numero: true, meShipmentId: true, etiquetaUrl: true },
+  });
+  if (!order) return { success: false, error: "Pedido não encontrado." };
+
+  if (!order.meShipmentId) {
+    // Etiqueta de fora do Melhor Envio (ou nenhuma): só o que estiver salvo.
+    if (order.etiquetaUrl) return { success: true, url: order.etiquetaUrl };
+    return {
+      success: false,
+      error: `O pedido ${order.numero} ainda não tem etiqueta. Gere a etiqueta primeiro.`,
+    };
+  }
+
+  const impresso = await imprimirEtiquetas([order.meShipmentId]);
+  if (!impresso.ok) {
+    // ME fora do ar não pode impedir a impressão se o link antigo ainda serve.
+    if (order.etiquetaUrl) return { success: true, url: order.etiquetaUrl };
+    return { success: false, error: `Melhor Envio: ${impresso.error}` };
+  }
+
+  const url = impresso.data.url;
+  if (url !== order.etiquetaUrl) {
+    await prisma.order
+      .update({ where: { id: orderId }, data: { etiquetaUrl: url } })
+      .catch(() => {}); // guardar é conveniência; imprimir é o que importa
+  }
+
+  return { success: true, url };
+}

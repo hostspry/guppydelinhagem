@@ -4,8 +4,9 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Truck, Eye, Pencil, Loader2, Check, X } from "lucide-react";
+import { Truck, Eye, Pencil, Loader2, Check, X, Tag } from "lucide-react";
 import { DeletePedidoButton } from "@/components/admin/DeletePedidoButton";
+import { ImprimirEtiqueta } from "@/components/admin/ImprimirEtiqueta";
 import { STATUS_PEDIDO } from "@/lib/pedido-status";
 import { formatBRL } from "@/lib/utils/format";
 import {
@@ -263,6 +264,25 @@ export default function PedidosTabela({
                         >
                           <Truck className="w-4 h-4" aria-hidden="true" />
                         </button>
+                      )}
+                      {p.temEtiqueta ? (
+                        <ImprimirEtiqueta
+                          orderId={p.id}
+                          rotulo=""
+                          className="text-gray-400 hover:text-[#07366A] p-1 disabled:opacity-60"
+                        />
+                      ) : (
+                        p.status === "PAGO" &&
+                        p.tipoEntrega === "ENVIO" && (
+                          <Link
+                            href={`/admin/pedidos/${p.id}#envio`}
+                            title="Gerar etiqueta"
+                            aria-label={`Gerar etiqueta do ${p.numero}`}
+                            className="text-gray-400 hover:text-[#FF035C] p-1"
+                          >
+                            <Tag className="w-4 h-4" aria-hidden="true" />
+                          </Link>
+                        )
                       )}
                       <Link
                         href={`/admin/pedidos/${p.id}`}

@@ -12,6 +12,7 @@ import {
   type OpcaoEtiqueta,
   type PacoteCotado,
 } from "@/actions/etiqueta";
+import { ImprimirEtiqueta } from "@/components/admin/ImprimirEtiqueta";
 
 /** Embalagens que a loja usa no dia a dia, para não digitar sempre. */
 const PRESETS = [
@@ -65,6 +66,7 @@ export function EtiquetaBotao({
     // porque e-mail some (spam, caixa cheia, cliente apagou sem ler).
     return (
       <div className="flex flex-wrap gap-2">
+        <ImprimirEtiqueta orderId={orderId} />
         <a
           href={etiquetaUrl}
           target="_blank"
