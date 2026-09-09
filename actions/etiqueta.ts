@@ -9,15 +9,17 @@ import {
   gerarEtiquetas,
   imprimirEtiquetas,
   inserirNoCarrinho,
-  melhorRastreioUrl,
+  rastrearEnvios,
   type MeEndereco,
 } from "@/lib/melhorenvio";
+import { buildTrackingUrl } from "@/lib/tracking";
 import {
   cotarFreteSeco,
   volumesDoCarrinhoSeco,
   carrinhoTemCargaViva,
   calcularPesoECaixa,
   cotarFrete,
+  transportadoraDaEmpresa,
 } from "@/lib/shipping";
 import { getConfiguracaoLoja } from "@/lib/queries/config";
 import { emailPedidoEnviado } from "@/lib/emails/pedido";
@@ -25,6 +27,8 @@ import { Transportadora } from "@/lib/generated/prisma/enums";
 
 export type OpcaoEtiqueta = {
   servicoId: number;
+  /** Transportadora de verdade ("Jadlog", "Correios"), para gravar no pedido. */
+  empresa: string;
   label: string;
   preco: number;
   prazoDias: number;
@@ -211,6 +215,7 @@ export async function cotarEtiquetaDoPedido(
       opcoes: [
         {
           servicoId: jad.id,
+          empresa: "Jadlog",
           label: "Jadlog .Com (carga viva)",
           preco: jad.price,
           prazoDias: jad.deliveryTime,
@@ -248,6 +253,7 @@ export async function cotarEtiquetaDoPedido(
     success: true,
     opcoes: cot.data.opcoes.map((o) => ({
       servicoId: o.servicoId,
+      empresa: o.empresa,
       label: o.label,
       preco: o.preco,
       prazoDias: o.prazoDias,
@@ -322,6 +328,13 @@ function montarRemetente(cfg: {
 export async function comprarEtiquetaDoPedido(
   orderId: string,
   servicoId: number,
+  /**
+   * Transportadora e nome do servico da opcao escolhida, como saiu da cotacao.
+   * So rotulo: o que compra e o servicoId. Vem do client porque a cotacao
+   * acontece la; em pedido de peixe o servidor ignora e usa Jadlog, que e a
+   * unica que leva carga viva.
+   */
+  servico?: { empresa?: string; label?: string },
 ): Promise<CompraResult> {
   const membro = await assertPermissao("pedidos.envio");
 
@@ -459,15 +472,33 @@ export async function comprarEtiquetaDoPedido(
       ? ((impresso.data as { url?: string })?.url ?? null)
       : null;
 
-  // O código de rastreio vem do próprio ME (padrão ME…BR do Melhor Rastreio).
-  const rastreio = meId;
+  // Códigos DE VERDADE do envio. `meId` é o id do carrinho no ME, interno: usá-lo
+  // como rastreio montava um link do Melhor Rastreio que não abre, e deixava a
+  // lista de pedidos sem código nenhum. O ME só emite o ME…BR depois de gerar,
+  // por isso a consulta vem aqui (leitura, não gasta saldo).
+  const info = await rastrearEnvios([meId]);
+  const doMe = info.ok
+    ? (info.data.find((e) => e.meShipmentId === meId) ?? info.data[0] ?? null)
+    : null;
+  const selfTracking = doMe?.selfTracking ?? null;
+  const codigoRastreio = doMe?.tracking ?? null;
+
+  // Peixe vivo só vai de Jadlog — o servidor sabe disso e não depende do rótulo
+  // que veio da tela. Nos outros, usa o que a cotação devolveu.
+  const empresa = vivo ? "Jadlog" : (servico?.empresa ?? "").trim();
+  const servicoNome = vivo
+    ? "Jadlog .Com"
+    : (servico?.label ?? "").trim().slice(0, 60) || null;
 
   await prisma.order.update({
     where: { id: orderId },
     data: {
       etiquetaUrl,
-      selfTracking: rastreio,
-      transportadora: Transportadora.OUTRO,
+      // Só grava código quando o ME devolveu: null é honesto, id de carrinho não.
+      ...(selfTracking ? { selfTracking } : {}),
+      ...(codigoRastreio ? { codigoRastreio } : {}),
+      transportadora: Transportadora[transportadoraDaEmpresa(empresa)],
+      ...(servicoNome ? { servicoEnvioNome: servicoNome } : {}),
     },
   });
 
@@ -483,8 +514,8 @@ export async function comprarEtiquetaDoPedido(
     acao: "pedido.envio",
     entidade: "Order",
     entidadeId: orderId,
-    descricao: `Comprou etiqueta do pedido ${order.numero} (serviço ${servicoId})`,
-    depois: { meShipmentId: meId, etiquetaUrl },
+    descricao: `Comprou etiqueta do pedido ${order.numero} (${servicoNome ?? `serviço ${servicoId}`})`,
+    depois: { meShipmentId: meId, etiquetaUrl, selfTracking, codigoRastreio },
   });
 
   revalidatePath(`/admin/pedidos/${orderId}`);
@@ -493,7 +524,7 @@ export async function comprarEtiquetaDoPedido(
   return {
     success: true,
     etiquetaUrl,
-    rastreio: rastreio ? melhorRastreioUrl(rastreio) : null,
+    rastreio: buildTrackingUrl(selfTracking, codigoRastreio),
   };
 }
 
@@ -676,4 +707,71 @@ export async function imprimirEtiquetaDoPedido(
   }
 
   return { success: true, url };
+}
+
+export type RastreioResult =
+  | { success: true; codigo: string | null; url: string | null; status: string | null }
+  | { success: false; error: string };
+
+/**
+ * Puxa do Melhor Envio o rastreio deste pedido, agora.
+ *
+ * O cron já faz isso de hora em hora, mas quem está com a caixa na mão não vai
+ * esperar o cron. Serve também de conserto: pedido que guardou o id do envio no
+ * lugar do código ME…BR volta ao normal no primeiro clique.
+ *
+ * Leitura pura no ME — não gasta saldo. Não mexe no status do pedido: quem
+ * decide que saiu de casa é a postagem, não este botão.
+ */
+export async function atualizarRastreioDoPedido(
+  orderId: string,
+): Promise<RastreioResult> {
+  await assertPermissao("pedidos.envio");
+
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    select: {
+      numero: true,
+      meShipmentId: true,
+      selfTracking: true,
+      codigoRastreio: true,
+    },
+  });
+  if (!order) return { success: false, error: "Pedido não encontrado." };
+  if (!order.meShipmentId) {
+    return {
+      success: false,
+      error: `O pedido ${order.numero} não tem envio no Melhor Envio. O código aqui é o que for digitado à mão.`,
+    };
+  }
+
+  const r = await rastrearEnvios([order.meShipmentId]);
+  if (!r.ok) return { success: false, error: `Melhor Envio: ${r.error}` };
+
+  const dados = r.data[0] ?? null;
+  if (!dados) {
+    return { success: false, error: "O Melhor Envio não devolveu nada para este envio." };
+  }
+
+  // selfTracking vem só do ME, então o de lá manda. O código da transportadora
+  // só entra se ainda não houver um: pode ter sido digitado à mão pelo operador.
+  const codigo = order.codigoRastreio ?? dados.tracking ?? null;
+  await prisma.order.update({
+    where: { id: orderId },
+    data: {
+      ...(dados.selfTracking ? { selfTracking: dados.selfTracking } : {}),
+      ...(codigo ? { codigoRastreio: codigo } : {}),
+      ...(dados.status ? { rastreioStatus: dados.status } : {}),
+    },
+  });
+
+  revalidatePath(`/admin/pedidos/${orderId}`);
+  revalidatePath("/admin/pedidos");
+
+  return {
+    success: true,
+    codigo: codigo ?? dados.selfTracking,
+    url: buildTrackingUrl(dados.selfTracking ?? order.selfTracking, codigo),
+    status: dados.status,
+  };
 }

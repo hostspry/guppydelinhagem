@@ -5,6 +5,7 @@ import type {
   TipoEntrega,
 } from "../generated/prisma/client";
 import type { EnderecoEntrega } from "../validations/pedido";
+import { buildTrackingUrl, codigoRastreavel } from "../tracking";
 
 // 48h e não 24h: o QR do Pix vale 24h (PIX_EXPIRACAO_MIN), e cancelar no mesmo
 // prazo criaria a corrida "cliente paga no fim da janela e o pedido já foi
@@ -85,6 +86,8 @@ export async function listPedidos({
       transportadora: true,
       modalidadeFrete: true,
       codigoRastreio: true,
+      selfTracking: true,
+      servicoEnvioNome: true,
       etiquetaUrl: true,
       meShipmentId: true,
       total: true,
@@ -106,6 +109,14 @@ export async function listPedidos({
           ? ("JADLOG" as const)
           : null,
     codigoRastreio: r.codigoRastreio,
+    // Código que o cliente usa. Prefere o da transportadora; o ME…BR serve
+    // enquanto ela não emitiu o dela.
+    rastreio:
+      r.codigoRastreio ?? (codigoRastreavel(r.selfTracking) ? r.selfTracking : null),
+    rastreioUrl: buildTrackingUrl(r.selfTracking, r.codigoRastreio),
+    // Nome real do serviço quando o enum não dá conta ("Correios PAC"). O enum
+    // tem 3 valores e o catálogo do Melhor Envio muda sozinho.
+    servicoEnvioNome: r.servicoEnvioNome,
     // Etiqueta já comprada: a lista mostra "imprimir" em vez de "gerar". O id do
     // Melhor Envio conta junto porque o PDF salvo pode ter expirado.
     temEtiqueta: !!(r.etiquetaUrl || r.meShipmentId),

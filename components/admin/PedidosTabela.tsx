@@ -227,23 +227,46 @@ export default function PedidosTabela({
                   <td className="px-4 py-3">
                     {p.tipoEntrega === "RETIRADA" ? (
                       <span className="text-xs text-gray-400">—</span>
-                    ) : p.transporte ? (
+                    ) : (
                       <div className="flex flex-col gap-0.5">
-                        <span
-                          className={`inline-flex w-fit items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${TRANSPORTE_BADGE[p.transporte].badge}`}
-                        >
-                          {TRANSPORTE_BADGE[p.transporte].label}
-                        </span>
-                        {p.codigoRastreio && (
-                          <span className="font-mono text-[11px] text-gray-400">
-                            {p.codigoRastreio}
+                        {p.transporte ? (
+                          <span
+                            className={`inline-flex w-fit items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${TRANSPORTE_BADGE[p.transporte].badge}`}
+                          >
+                            {TRANSPORTE_BADGE[p.transporte].label}
+                          </span>
+                        ) : p.servicoEnvioNome ? (
+                          // Transportadora fora do enum (Correios, Azul…): o nome
+                          // real do serviço diz mais que "OUTRO".
+                          <span className="inline-flex w-fit items-center rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700">
+                            {p.servicoEnvioNome}
+                          </span>
+                        ) : p.temEtiqueta ? (
+                          <span className="inline-flex w-fit items-center rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700">
+                            Melhor Envio
+                          </span>
+                        ) : (
+                          <span className="inline-flex w-fit items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-500">
+                            a definir
                           </span>
                         )}
+                        {p.rastreio &&
+                          (p.rastreioUrl ? (
+                            <a
+                              href={p.rastreioUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              title="Acompanhar no Melhor Rastreio"
+                              className="font-mono text-[11px] text-gray-500 hover:text-[#FF035C] hover:underline"
+                            >
+                              {p.rastreio}
+                            </a>
+                          ) : (
+                            <span className="font-mono text-[11px] text-gray-400">
+                              {p.rastreio}
+                            </span>
+                          ))}
                       </div>
-                    ) : (
-                      <span className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-500">
-                        a definir
-                      </span>
                     )}
                   </td>
                   <td className="px-4 py-3 text-right font-medium text-[#07366A]">

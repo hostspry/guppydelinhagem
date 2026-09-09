@@ -315,6 +315,22 @@ export function volumesDoCarrinhoSeco(itens: ItemFreteSeco[]): MeVolumeCalc[] {
   ];
 }
 
+/**
+ * Empresa do Melhor Envio -> enum Transportadora. O enum tem 3 valores e o
+ * catalogo do ME muda sozinho, entao so Jadlog e Gollog tem correspondencia
+ * direta; o resto vira OUTRO e o nome real fica em Order.servicoEnvioNome.
+ *
+ * Devolve string e nao o enum para este modulo nao arrastar o client do Prisma
+ * para quem so precisa do rotulo.
+ */
+export function transportadoraDaEmpresa(
+  empresa: string,
+): "JADLOG" | "GOLLOG" | "OUTRO" {
+  if (/jadlog/i.test(empresa)) return "JADLOG";
+  if (/gollog/i.test(empresa)) return "GOLLOG";
+  return "OUTRO";
+}
+
 export type OpcaoFreteSeco = {
   servicoId: number;
   empresa: string;

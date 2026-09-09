@@ -16,6 +16,21 @@ export function transportadoraLabel(t: Transportadora | null): string {
   }
 }
 
+// O id de um envio no Melhor Envio é um UUID, e por um tempo ele foi gravado em
+// selfTracking como se fosse rastreio. Não é código de nada: não abre no Melhor
+// Rastreio e não serve para o cliente. Fica esta guarda para os pedidos que já
+// nasceram assim não mostrarem um código que ninguém consegue usar.
+const UUID =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** É um código que dá para rastrear (ou pelo menos mostrar ao cliente)? */
+export function codigoRastreavel(
+  codigo: string | null | undefined,
+): codigo is string {
+  const c = (codigo ?? "").trim();
+  return c.length > 0 && !UUID.test(c);
+}
+
 /**
  * Link de rastreio do CLIENTE = Melhor Rastreio (um clique, sem CPF/captcha).
  * Prefere o `selfTracking` (código ME…BR) — é o que o Melhor Rastreio entende
@@ -26,9 +41,9 @@ export function buildTrackingUrl(
   selfTracking: string | null | undefined,
   codigo: string | null | undefined,
 ): string | null {
-  const cod = (selfTracking || codigo || "").trim();
+  const cod = [selfTracking, codigo].find(codigoRastreavel);
   if (!cod) return null;
-  return `https://www.melhorrastreio.com.br/rastreio/${encodeURIComponent(cod)}`;
+  return `https://www.melhorrastreio.com.br/rastreio/${encodeURIComponent(cod.trim())}`;
 }
 
 /** Primeira palavra do nome (saudação). */

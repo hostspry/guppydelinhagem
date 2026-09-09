@@ -3,12 +3,21 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { AlertTriangle, FileText, Loader2, Mail, Package, Tag } from "lucide-react";
+import {
+  AlertTriangle,
+  FileText,
+  Loader2,
+  Mail,
+  Package,
+  RefreshCw,
+  Tag,
+} from "lucide-react";
 import {
   cotarEtiquetaDoPedido,
   comprarEtiquetaDoPedido,
   salvarPacoteDoPedido,
   reenviarRastreio,
+  atualizarRastreioDoPedido,
   type OpcaoEtiqueta,
   type PacoteCotado,
 } from "@/actions/etiqueta";
@@ -91,6 +100,31 @@ export function EtiquetaBotao({
           <Mail className="w-4 h-4" aria-hidden="true" />
           Reenviar rastreio
         </button>
+        {/* O cron já busca sozinho; o botão é para quem está com a caixa na
+            mão e não vai esperar a próxima rodada. */}
+        <button
+          type="button"
+          onClick={() =>
+            startTransition(async () => {
+              const r = await atualizarRastreioDoPedido(orderId);
+              if (!r.success) {
+                toast.error(r.error);
+                return;
+              }
+              toast.success(
+                r.codigo
+                  ? `Rastreio: ${r.codigo}${r.status ? ` (${r.status})` : ""}`
+                  : "O Melhor Envio ainda não emitiu o código. Tente daqui a pouco.",
+              );
+              router.refresh();
+            })
+          }
+          disabled={isPending}
+          className="inline-flex items-center gap-1.5 border border-gray-300 text-sm font-medium text-gray-700 px-4 py-2 rounded-md hover:border-[#07366A] transition-all disabled:opacity-60"
+        >
+          <RefreshCw className="w-4 h-4" aria-hidden="true" />
+          Atualizar rastreio
+        </button>
       </div>
     );
   }
@@ -129,8 +163,13 @@ export function EtiquetaBotao({
   function comprar() {
     if (escolhido == null) return;
     setComprando(true);
+    // Vai junto a opção escolhida: é o que grava a transportadora e o nome do
+    // serviço no pedido, para a lista não mostrar "a definir" depois.
     startTransition(async () => {
-      const r = await comprarEtiquetaDoPedido(orderId, escolhido);
+      const r = await comprarEtiquetaDoPedido(orderId, escolhido, {
+        empresa: opcao?.empresa,
+        label: opcao?.label,
+      });
       setComprando(false);
       if (!r.success) {
         toast.error(r.error);

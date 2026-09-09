@@ -25,6 +25,9 @@ export type SyncResumo = {
 };
 
 const DELIVERED = "delivered";
+// Status do ME que significam "saiu de casa". Enquanto o envio está só gerado
+// (released/pending), o pedido continua PAGO — etiqueta comprada não é postada.
+const POSTADO = new Set(["posted", "delivered", "out_of_delivery", "undelivered"]);
 // Janela de reconciliação: pedidos recentes ainda não vinculados.
 const JANELA_DIAS = 90;
 const norm = (s: string | null | undefined) => (s ?? "").trim().toLowerCase();
@@ -142,11 +145,18 @@ async function pollStatus(): Promise<{
   ocorrenciasNovas: number;
   entregues: number;
 }> {
+  // PAGO entra junto: etiqueta comprada AQUI grava meShipmentId e o pedido segue
+  // PAGO até ser postado. Enquanto o poll só olhava ENVIADO, esses pedidos ficavam
+  // num ponto cego — nunca ganhavam código de rastreio nem viravam ENVIADO.
   const pedidos = await prisma.order.findMany({
-    where: { status: "ENVIADO", meShipmentId: { not: null } },
+    where: { status: { in: ["PAGO", "ENVIADO"] }, meShipmentId: { not: null } },
     select: {
       id: true,
       numero: true,
+      status: true,
+      clienteId: true,
+      userId: true,
+      transportadora: true,
       meShipmentId: true,
       selfTracking: true,
       codigoRastreio: true,
@@ -201,7 +211,9 @@ async function pollStatus(): Promise<{
       where: { id: pedido.id },
       data: {
         ...(rastreio.status ? { rastreioStatus: rastreio.status } : {}),
-        ...(!pedido.selfTracking && rastreio.selfTracking
+        // selfTracking vem SÓ do ME, então o valor de lá manda sempre. É o que
+        // conserta os pedidos que guardaram o id do envio no lugar do ME…BR.
+        ...(rastreio.selfTracking && rastreio.selfTracking !== pedido.selfTracking
           ? { selfTracking: rastreio.selfTracking }
           : {}),
         ...(!pedido.codigoRastreio && rastreio.tracking
@@ -209,6 +221,22 @@ async function pollStatus(): Promise<{
           : {}),
       },
     });
+
+    // Postado de verdade: PAGO vira ENVIADO, com evento e aviso ao cliente no
+    // painel dele. Sem e-mail daqui — o cliente já recebeu o rastreio quando a
+    // etiqueta foi comprada, e dois e-mails do mesmo envio confundem.
+    if (pedido.status === "PAGO" && rastreio.status && POSTADO.has(rastreio.status)) {
+      await prisma.$transaction((tx) =>
+        gravarEnvioTx(tx, {
+          id: pedido.id,
+          numero: pedido.numero,
+          clienteId: pedido.clienteId,
+          userId: pedido.userId,
+          transportadora: pedido.transportadora,
+          codigo: pedido.codigoRastreio ?? rastreio.tracking ?? rastreio.selfTracking,
+        }),
+      );
+    }
 
     const url = buildTrackingUrl(
       pedido.selfTracking ?? rastreio.selfTracking,
