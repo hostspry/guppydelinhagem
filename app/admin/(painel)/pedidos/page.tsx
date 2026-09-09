@@ -1,5 +1,7 @@
 import Link from "next/link";
-import { Plus, Search } from "lucide-react";
+import { Plus, Search,
+  MessageCircle,
+} from "lucide-react";
 import {
   listPedidos,
   cancelarPedidosAguardandoExpirados,
@@ -76,13 +78,22 @@ export default async function PedidosPage({ searchParams }: Props) {
         description="Pedidos manuais — itens do catálogo ou avulsos, frete e status."
         breadcrumb={[{ label: "Admin", href: "/admin" }, { label: "Pedidos" }]}
         action={
-          <Link
-            href="/admin/pedidos/novo"
-            className="inline-flex items-center gap-1.5 bg-[#FF035C] text-white text-sm font-medium px-4 py-2 rounded-md hover:brightness-110 transition-all"
-          >
-            <Plus className="w-4 h-4" aria-hidden="true" />
-            Novo pedido
-          </Link>
+          <div className="flex gap-2">
+            <Link
+              href="/admin/pedidos/whatsapp"
+              className="inline-flex items-center gap-1.5 border border-gray-300 text-sm font-medium text-gray-700 px-4 py-2 rounded-md hover:border-[#25D366] hover:text-[#128C4A] transition-all"
+            >
+              <MessageCircle className="w-4 h-4" aria-hidden="true" />
+              Venda do WhatsApp
+            </Link>
+            <Link
+              href="/admin/pedidos/novo"
+              className="inline-flex items-center gap-1.5 bg-[#FF035C] text-white text-sm font-medium px-4 py-2 rounded-md hover:brightness-110 transition-all"
+            >
+              <Plus className="w-4 h-4" aria-hidden="true" />
+              Novo pedido
+            </Link>
+          </div>
         }
       />
 
