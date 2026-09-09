@@ -72,23 +72,40 @@ const ROTULOS: { campo: CampoWhatsapp; nomes: string[] }[] = [
   { campo: "uf", nomes: ["estado", "uf"] },
 ];
 
+/**
+ * Tira acento para COMPARAR rótulo, sem encurtar a string.
+ *
+ * O comprimento importa: o valor é recortado da linha original por posição, e
+ * se a versão sem acento encolhesse, o corte comeria as primeiras letras
+ * ("São Paulo" virava "ão Paulo"). Compondo em NFC antes, cada letra acentuada
+ * é UM caractere na entrada e vira UM caractere na saída.
+ */
 const semAcento = (s: string) =>
-  s.normalize("NFD").replace(/[̀-ͯ]/g, "");
+  s.normalize("NFC").normalize("NFD").replace(/[̀-ͯ]/g, "");
 
 const digitos = (s: string) => s.replace(/\D/g, "");
 
-/** A linha começa com algum rótulo conhecido? Devolve qual, e o que sobra. */
+const escaparRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/**
+ * A linha começa com algum rótulo conhecido? Devolve qual, e o que sobra.
+ *
+ * O casamento acontece numa cópia sem acento e em minúsculas, mas o valor é
+ * recortado da linha ORIGINAL pelo TAMANHO DO RÓTULO casado, não pelo tamanho
+ * do que sobrou. A diferença não é acadêmica: linha vinda do WhatsApp costuma
+ * ter espaço sobrando no fim ("Nome: Raul Castro "), e medir pelo resto fazia o
+ * corte avançar demais e comer a primeira letra do valor ("aul Castro").
+ */
 function lerRotulo(linha: string): { campo: CampoWhatsapp; resto: string } | null {
-  const normal = semAcento(linha).toLowerCase().trim();
+  // Sem trim aqui de propósito: o comprimento precisa bater com a linha real.
+  const normal = semAcento(linha).toLowerCase();
   for (const { campo, nomes } of ROTULOS) {
     for (const nome of nomes) {
       // Aceita espaço antes dos dois pontos ("Rua :") e ausência depois.
-      const re = new RegExp(`^${nome}\\s*[:\\-–]\\s*(.*)$`, "i");
+      const re = new RegExp(`^\\s*${escaparRegex(nome)}\\s*[:\\-–]\\s*`, "i");
       const m = normal.match(re);
       if (m) {
-        // Recorta do texto ORIGINAL para não perder acento nem maiúscula.
-        const corte = linha.length - m[1].length;
-        return { campo, resto: linha.slice(corte).trim() };
+        return { campo, resto: linha.slice(m[0].length).trim() };
       }
     }
   }
@@ -163,7 +180,10 @@ export function lerDadosWhatsapp(texto: string): ResultadoLeitura {
   const dados: DadosWhatsapp = { ...VAZIO };
   const encontrados = new Set<CampoWhatsapp>();
 
-  const linhas = texto.split(/\r?\n/);
+  // Texto de iPhone/macOS chega com acento decomposto (letra + acento em dois
+  // caracteres). Compondo aqui, o recorte por posição bate e o que vai para o
+  // banco fica na forma normal.
+  const linhas = texto.normalize("NFC").split(/\r?\n/);
   for (let i = 0; i < linhas.length; i++) {
     const achado = lerRotulo(linhas[i]);
     if (!achado) continue;
