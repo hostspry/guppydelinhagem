@@ -1,11 +1,14 @@
 import { PageHeader } from "@/components/admin/PageHeader";
 import { VendaWhatsappForm } from "@/components/admin/VendaWhatsappForm";
-import { getPedidoFormData } from "@/lib/queries/pedidos";
+import { getPedidoFormData, getCadastrosPeloLink } from "@/lib/queries/pedidos";
 
 export const dynamic = "force-dynamic";
 
 export default async function VendaWhatsappPage() {
-  const { produtos } = await getPedidoFormData();
+  const [{ produtos }, cadastros] = await Promise.all([
+    getPedidoFormData(),
+    getCadastrosPeloLink(),
+  ]);
 
   return (
     <div>
@@ -18,7 +21,7 @@ export default async function VendaWhatsappPage() {
           { label: "WhatsApp" },
         ]}
       />
-      <VendaWhatsappForm produtos={produtos} />
+      <VendaWhatsappForm produtos={produtos} cadastros={cadastros} />
     </div>
   );
 }

@@ -21,6 +21,7 @@ import { rotuloSemana, segundaDaSemana } from "@/lib/semana-envio";
 
 const LINK_ADMIN = "https://guppydelinhagem.com.br/admin/pedidos";
 const LINK_COBRANCAS = "https://guppydelinhagem.com.br/admin/cobrancas";
+const LINK_VENDA_WHATSAPP = "https://guppydelinhagem.com.br/admin/pedidos/whatsapp";
 
 // ── Rótulos amigáveis para provider/método ────────────────────────────────────
 function rotuloProvider(p?: ProviderPagamento | null): string | null {
@@ -444,4 +445,30 @@ export async function notificarResumoEnvios(): Promise<{ pedidos: number }> {
 
   await enviarSeguro(() => secoes.join("\n\n"));
   return { pedidos: pedidos.length };
+}
+
+// ── 3.9 Cliente preencheu o cadastro pelo link (📝) ───────────────────────────
+/**
+ * Venda fechada no WhatsApp: mandamos o link, o cliente preencheu. O aviso serve
+ * para o dono saber que já pode montar o pedido sem ficar cobrando os dados.
+ */
+export async function notificarCadastroCliente(dados: {
+  nome: string;
+  cidade: string;
+  uf: string;
+  telefone: string;
+  novo: boolean;
+}): Promise<void> {
+  const d = dados.telefone.replace(/\D/g, "");
+  const tel = d
+    ? ` · <a href="https://wa.me/${d.startsWith("55") ? d : `55${d}`}">${escapeHtml(dados.telefone)}</a>`
+    : "";
+  await enviarSeguro(
+    () =>
+      `📝 <b>Cliente preencheu o cadastro</b>\n\n` +
+      `<b>${escapeHtml(dados.nome)}</b>${tel}\n` +
+      `${escapeHtml(dados.cidade)}/${escapeHtml(dados.uf)}` +
+      `${dados.novo ? " · cadastro novo" : " · atualizou o que já existia"}\n\n` +
+      `Montar a venda: ${LINK_VENDA_WHATSAPP}`,
+  );
 }

@@ -85,6 +85,8 @@ export async function listPedidos({
       transportadora: true,
       modalidadeFrete: true,
       codigoRastreio: true,
+      etiquetaUrl: true,
+      meShipmentId: true,
       total: true,
       criadoEm: true,
       cliente: { select: { nome: true } },
@@ -104,6 +106,9 @@ export async function listPedidos({
           ? ("JADLOG" as const)
           : null,
     codigoRastreio: r.codigoRastreio,
+    // Etiqueta já comprada: a lista mostra "imprimir" em vez de "gerar". O id do
+    // Melhor Envio conta junto porque o PDF salvo pode ter expirado.
+    temEtiqueta: !!(r.etiquetaUrl || r.meShipmentId),
     total: Number(r.total),
     criadoEm: r.criadoEm,
     clienteNome: r.cliente.nome,
@@ -269,6 +274,50 @@ export async function getPedidoById(id: string) {
 export type PedidoDetalhe = NonNullable<
   Awaited<ReturnType<typeof getPedidoById>>
 >;
+
+// ── Cadastros que o próprio cliente preencheu pelo link /cadastro ─────
+/**
+ * Últimos clientes que preencheram os dados sozinhos, para a tela de venda pelo
+ * WhatsApp puxar num clique em vez de copiar e colar da conversa.
+ *
+ * Sete dias: passou disso, a venda ou já virou pedido ou não vai virar, e a
+ * lista precisa caber na tela sem virar mais uma coisa para vasculhar.
+ */
+export async function getCadastrosPeloLink() {
+  const desde = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+  const clientes = await prisma.cliente.findMany({
+    where: { cadastroProprioEm: { gte: desde } },
+    orderBy: { cadastroProprioEm: "desc" },
+    take: 8,
+    select: {
+      id: true, nome: true, cpfCnpj: true, telefone: true, email: true,
+      cep: true, logradouro: true, numero: true, complemento: true,
+      bairro: true, cidade: true, uf: true, cadastroProprioEm: true,
+      _count: { select: { pedidos: true } },
+    },
+  });
+
+  return clientes.map((c) => ({
+    id: c.id,
+    nome: c.nome,
+    cpfCnpj: c.cpfCnpj ?? "",
+    telefone: c.telefone ?? "",
+    email: c.email ?? "",
+    cep: c.cep ?? "",
+    logradouro: c.logradouro ?? "",
+    numero: c.numero ?? "",
+    complemento: c.complemento ?? "",
+    bairro: c.bairro ?? "",
+    cidade: c.cidade ?? "",
+    uf: c.uf ?? "",
+    cadastroEm: c.cadastroProprioEm as Date,
+    pedidos: c._count.pedidos,
+  }));
+}
+
+export type CadastroPeloLink = Awaited<
+  ReturnType<typeof getCadastrosPeloLink>
+>[number];
 
 // ── Dados para o formulário (selects de cliente e produto) ─────
 export async function getPedidoFormData() {

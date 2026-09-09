@@ -3,9 +3,18 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { ClipboardPaste, Plus, Trash2, UserCheck, UserPlus } from "lucide-react";
+import {
+  ClipboardPaste,
+  Copy,
+  Link2,
+  Plus,
+  Trash2,
+  UserCheck,
+  UserPlus,
+} from "lucide-react";
 import { FormField } from "@/components/admin/FormField";
 import { lerDadosWhatsapp, cpfValido } from "@/lib/whatsapp-cliente";
+import type { CadastroPeloLink } from "@/lib/queries/pedidos";
 import {
   criarVendaWhatsapp,
   procurarCliente,
@@ -66,7 +75,26 @@ const input =
 const brl = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 const num = (v: string) => Number(String(v).replace(",", ".")) || 0;
 
-export function VendaWhatsappForm({ produtos }: { produtos: Produto[] }) {
+const LINK_CADASTRO = "https://guppydelinhagem.com.br/meus-dados";
+
+/** Quanto tempo faz, em palavra de gente ("agora", "há 2 h", "ontem"). */
+function faz(data: Date): string {
+  const min = Math.round((Date.now() - new Date(data).getTime()) / 60000);
+  if (min < 2) return "agora";
+  if (min < 60) return `há ${min} min`;
+  const h = Math.round(min / 60);
+  if (h < 24) return `há ${h} h`;
+  const d = Math.round(h / 24);
+  return d === 1 ? "ontem" : `há ${d} dias`;
+}
+
+export function VendaWhatsappForm({
+  produtos,
+  cadastros = [],
+}: {
+  produtos: Produto[];
+  cadastros?: CadastroPeloLink[];
+}) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
@@ -122,6 +150,46 @@ export function VendaWhatsappForm({ produtos }: { produtos: Produto[] }) {
       });
       setParecidos(achados);
     });
+  }
+
+  /** Cadastro que o cliente preencheu pelo link: já vem do banco, sem adivinhar. */
+  function usarCadastro(c: CadastroPeloLink) {
+    setCampos({
+      nome: c.nome,
+      cpfCnpj: c.cpfCnpj,
+      telefone: c.telefone,
+      email: c.email,
+      cep: c.cep,
+      logradouro: c.logradouro,
+      numero: c.numero,
+      complemento: c.complemento,
+      bairro: c.bairro,
+      cidade: c.cidade,
+      uf: c.uf,
+    });
+    // Marca todos os campos com valor como preenchidos, para a tela destacar
+    // igual faz depois de interpretar um texto colado.
+    setPreenchidos(
+      new Set(
+        CAMPOS.map(([campo]) => campo).filter((campo) =>
+          campo === "nome" ? true : !!c[campo as keyof CadastroPeloLink],
+        ),
+      ),
+    );
+    // O cliente já existe no banco: amarrar aqui evita cadastro duplicado.
+    setClienteId(c.id);
+    setParecidos(null);
+    setColado("");
+    toast.success(`Dados de ${c.nome.split(/\s+/)[0]} carregados.`);
+  }
+
+  async function copiarLink() {
+    try {
+      await navigator.clipboard.writeText(LINK_CADASTRO);
+      toast.success("Link copiado. Cole na conversa do cliente.");
+    } catch {
+      toast.error(`Copie na mão: ${LINK_CADASTRO}`);
+    }
   }
 
   function trocarProduto(i: number, produtoId: string) {
@@ -203,6 +271,61 @@ export function VendaWhatsappForm({ produtos }: { produtos: Produto[] }) {
 
   return (
     <form onSubmit={salvar} className="max-w-3xl space-y-5">
+      {/* ── 0. Link de cadastro ── */}
+      <div className="bg-white border border-gray-200 rounded-lg p-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-xs font-semibold text-[#07366A] uppercase tracking-wide">
+              Link de cadastro
+            </h2>
+            <p className="text-xs text-gray-500 mt-1">
+              Mande <code className="text-[#07366A]">guppydelinhagem.com.br/meus-dados</code>{" "}
+              e o cliente preenche o endereço sozinho — sem ditar CEP na conversa.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={copiarLink}
+            className="inline-flex items-center gap-1.5 border border-gray-300 text-[#07366A] text-sm font-medium px-3 py-2 rounded-md hover:border-[#07366A] transition-all"
+          >
+            <Copy className="w-4 h-4" aria-hidden="true" />
+            Copiar link
+          </button>
+        </div>
+
+        {cadastros.length > 0 && (
+          <div className="mt-4 border-t border-gray-100 pt-3">
+            <p className="text-xs font-semibold text-gray-600 mb-2 flex items-center gap-1.5">
+              <Link2 className="w-3.5 h-3.5" aria-hidden="true" />
+              Chegaram pelo link (últimos 7 dias)
+            </p>
+            <ul className="space-y-1.5">
+              {cadastros.map((c) => (
+                <li
+                  key={c.id}
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-gray-100 bg-gray-50 px-3 py-2"
+                >
+                  <span className="text-sm text-gray-700 min-w-0">
+                    <strong className="text-[#07366A]">{c.nome}</strong>
+                    <span className="block text-xs text-gray-500 truncate">
+                      {[c.cidade, c.uf].filter(Boolean).join("/")} · {faz(c.cadastroEm)}
+                      {c.pedidos > 0 && ` · ${c.pedidos} pedido(s)`}
+                    </span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => usarCadastro(c)}
+                    className="shrink-0 text-sm font-medium text-[#FF035C] hover:underline"
+                  >
+                    Usar estes dados
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+
       {/* ── 1. Colar ── */}
       <fieldset className="bg-white border border-gray-200 rounded-lg p-5">
         <legend className="px-2 text-xs font-semibold text-[#07366A] uppercase tracking-wide">

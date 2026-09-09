@@ -270,6 +270,11 @@ model Cliente {
   /// uma compra que a pessoa fez, não divulgação.
   aceitaEmails Boolean @default(true)
 
+  /// Quando o próprio cliente preencheu os dados pelo link público (/cadastro),
+  /// depois de fechar a venda no WhatsApp. Nulo = cadastro digitado por nós.
+  /// A tela de venda pelo WhatsApp lista os mais recentes para puxar num clique.
+  cadastroProprioEm DateTime?
+
   userId String? @unique // futuro: conta do cliente
   user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
 
@@ -278,6 +283,7 @@ model Cliente {
   criadoEm     DateTime      @default(now())
 
   @@index([nome])
+  @@index([cadastroProprioEm])
 }
 
 // ─────────────────────────────────────────────
