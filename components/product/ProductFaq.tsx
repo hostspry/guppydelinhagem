@@ -2,9 +2,10 @@
 
 import { useState } from "react";
 import { ChevronDown } from "lucide-react";
-import { FAQ } from "@/lib/product-content";
+import type { Pergunta } from "@/lib/product-content";
 
-export default function ProductFaq() {
+/** As perguntas variam por tipo de produto — quem escolhe é a página. */
+export default function ProductFaq({ itens }: { itens: Pergunta[] }) {
   // Set de índices abertos — permite abrir perguntas independentes nas 2 colunas.
   const [abertos, setAbertos] = useState<Set<number>>(() => new Set([0]));
 
@@ -19,7 +20,7 @@ export default function ProductFaq() {
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-      {FAQ.map((item, i) => {
+      {itens.map((item, i) => {
         const open = abertos.has(i);
         return (
           <div

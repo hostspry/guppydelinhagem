@@ -340,7 +340,12 @@ export type ProductDetail = {
   categoriaSlug: string;
   categoryId: string;
   tipo: ProductType;
-  peso: number | null; // frete de não-peixe
+  // Peso e medidas: frete de não-peixe e, na página, a ficha técnica de quem
+  // não tem padrão de cor nem pH para mostrar (criadeira, ração, filtro).
+  peso: number | null;
+  comprimento: number | null;
+  largura: number | null;
+  altura: number | null;
   // Atributos (ficha técnica). Só os preenchidos são exibidos.
   padraoCor: string | null;
   cauda: string | null;
@@ -396,6 +401,9 @@ export const getProductBySlug = cache(
         categoryId: true,
         tipo: true,
         peso: true,
+        comprimento: true,
+        largura: true,
+        altura: true,
         padraoCor: true,
         cauda: true,
         caracteristica: true,
@@ -457,6 +465,9 @@ export const getProductBySlug = cache(
       categoryId: p.categoryId,
       tipo: p.tipo,
       peso: p.peso == null ? null : Number(p.peso),
+      comprimento: p.comprimento == null ? null : Number(p.comprimento),
+      largura: p.largura == null ? null : Number(p.largura),
+      altura: p.altura == null ? null : Number(p.altura),
       padraoCor: p.padraoCor,
       cauda: p.cauda,
       caracteristica: p.caracteristica,

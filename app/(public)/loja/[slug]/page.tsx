@@ -14,6 +14,9 @@ import { precoComCampanha } from "@/lib/campanha-core";
 import { resolverCampanhaInfo } from "@/lib/campanha";
 import { estaEsgotado } from "@/lib/estoque";
 import { stripMarcheziSignature } from "@/lib/constants";
+import { truncateAtWord } from "@/lib/utils/text";
+import { descricaoEmTextoSimples } from "@/lib/markdown";
+import { vozDoProduto } from "@/lib/product-content";
 import { SITE_URL } from "@/lib/seo";
 import { productJsonLd, breadcrumbJsonLd } from "@/lib/seo/jsonld";
 import { JsonLd } from "@/components/seo/JsonLd";
@@ -37,7 +40,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   // (que quase ninguém otimiza) e "de linhagem" — via o sufixo da marca. A
   // linhagem específica já vem no próprio nome do produto; não repetimos para
   // não virar keyword stuffing.
-  const titulo = produto.metaTitle || `${produto.nome} | Guppy de Linhagem (Lebiste)`;
+  // Não-peixe não é lebiste: chamar uma criadeira de "Guppy de Linhagem
+  // (Lebiste)" no título do Google engana quem clica e desperdiça o clique.
+  const ehPeixe = vozDoProduto(produto.tipo) === "peixe";
+  const titulo =
+    produto.metaTitle ||
+    (ehPeixe
+      ? `${produto.nome} | Guppy de Linhagem (Lebiste)`
+      : `${produto.nome} | Guppy de Linhagem`);
   // Descrição da prévia SEM preço (preço muda; link velho não pode mostrar errado).
   // Sem meta/descrição curta própria, cai num fallback que sempre traz linhagem,
   // casal/trio (quando há) e envio vivo — os elementos que o Google e o cliente
@@ -45,14 +55,24 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const comps = new Set(produto.variantes.map((v) => v.composicao));
   const temCasalTrio = comps.has("CASAL") || comps.has("TRIO");
   const linhagem = produto.padraoCor?.trim();
-  const fallbackDesc =
-    `${produto.nome}: guppy (lebiste) de linhagem` +
-    (linhagem ? ` ${linhagem}` : "") +
-    ` da Marchezi Guppy Farm, criação tricampeã mundial.` +
-    (temCasalTrio ? " Casal e trio disponíveis." : "") +
-    " Envio de peixe vivo para todo o Brasil.";
+  const fallbackDesc = ehPeixe
+    ? `${produto.nome}: guppy (lebiste) de linhagem` +
+      (linhagem ? ` ${linhagem}` : "") +
+      ` da Marchezi Guppy Farm, criação tricampeã mundial.` +
+      (temCasalTrio ? " Casal e trio disponíveis." : "") +
+      " Envio de peixe vivo para todo o Brasil."
+    : `${produto.nome}: item para aquarismo na loja da Marchezi Guppy Farm, criação de guppy de linhagem. Envio para todo o Brasil.`;
+  // Sem meta própria nem descrição curta, o começo da descrição diz mais do que
+  // um texto genérico — mas precisa sair sem a marcação (###, **) do editor.
   const descricao =
-    produto.metaDescription || produto.descricaoCurta || fallbackDesc;
+    produto.metaDescription ||
+    produto.descricaoCurta ||
+    (ehPeixe
+      ? fallbackDesc
+      : truncateAtWord(
+          descricaoEmTextoSimples(stripMarcheziSignature(produto.descricao)),
+          155,
+        ) || fallbackDesc);
   // Imagem da prévia = thumb do vídeo principal (videos já vêm principal-primeiro,
   // só ativos). YouTube/upload já são URLs absolutas; fallback no selo da marca.
   // Prévia do link: vídeo primeiro, depois a foto do produto. Sem os dois, o
@@ -167,12 +187,15 @@ export default async function ProdutoPage({ params }: Props) {
 
   const imagemRaw =
     prod.videos[0]?.thumbnailUrl || prod.fotos?.[0]?.url || "/images/selo.webp";
+  // Sai sem HTML e sem a marcação do editor (###, **, listas): o Google mostra
+  // esse texto no rich result, e "### Criadeira" apareceria do jeito que está.
   const descricaoSchema =
-    stripMarcheziSignature(prod.descricao)
-      .replace(/<[^>]*>/g, " ")
-      .replace(/\s+/g, " ")
-      .trim()
-      .slice(0, 500) || undefined;
+    truncateAtWord(
+      descricaoEmTextoSimples(
+        stripMarcheziSignature(prod.descricao).replace(/<[^>]*>/g, " "),
+      ),
+      500,
+    ) || undefined;
 
   const produtoLd = productJsonLd({
     name: prod.nome,
@@ -180,7 +203,12 @@ export default async function ProdutoPage({ params }: Props) {
     image: imagemRaw.startsWith("http") ? imagemRaw : `${SITE_URL}${imagemRaw}`,
     sku: prod.slug,
     url: `${SITE_URL}/loja/${prod.slug}`,
+    // `tipo` e `estoque` são obrigatórios aqui: sem eles, uma criadeira (que
+    // nasce com pool 0/0 de machos e fêmeas) ia para o schema como esgotada
+    // mesmo com estoque, e o Google mostrava "fora de estoque" na busca.
     inStock: !estaEsgotado({
+      tipo: prod.tipo,
+      estoque: prod.estoque,
       estoqueMachos: prod.estoqueMachos,
       estoqueFemeas: prod.estoqueFemeas,
     }),

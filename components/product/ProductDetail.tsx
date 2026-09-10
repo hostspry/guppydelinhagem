@@ -20,6 +20,7 @@ import {
   Wind,
   Headset,
   Package,
+  Wrench,
   Tag,
   type LucideIcon,
 } from "lucide-react";
@@ -46,15 +47,12 @@ import { useCart } from "@/lib/stores/cart";
 import { whatsappLink, stripMarcheziSignature } from "@/lib/constants";
 import { trackViewItem, trackAddToCart } from "@/lib/analytics";
 import {
-  PROVA_SOCIAL_VENDIDOS,
-  PROVA_SOCIAL_CRIADOR,
-  SELOS_TOPO,
-  DIFERENCIAIS,
-  SEGURANCA,
-  INSTITUCIONAIS,
-  MARCHEZI_NOTA,
+  conteudoDoProduto,
+  vozDoProduto,
   type IconKey,
 } from "@/lib/product-content";
+import { parseDescricao, tamanhoDoTexto } from "@/lib/markdown";
+import DescricaoRica from "./DescricaoRica";
 import {
   COMPOSICAO_LABEL,
   ORDEM_COMPOSICAO,
@@ -78,6 +76,7 @@ const ICONS: Record<IconKey, LucideIcon> = {
   wind: Wind,
   headset: Headset,
   package: Package,
+  wrench: Wrench,
 };
 
 const PLATFORM_LABEL: Record<ProductDetailVideo["platform"], string> = {
@@ -227,29 +226,60 @@ export default function ProductDetail({
         : { bar: "bg-red-500", text: "text-red-600", label: "Últimas unidades!" };
   useEffect(() => setBarFill(fillPct), [fillPct]);
 
-  const lineage = stripMarcheziSignature(product.descricao);
-  const lineageParags = lineage
-    .split(/\n\s*\n/)
-    .map((s) => s.trim())
-    .filter(Boolean);
-  const descLonga = lineage.length > 320;
+  // Texto fixo da página conforme o tipo: numa criadeira, "linhagem", "ninhada"
+  // e "chegada viva" não descrevem nada e só atrapalham quem está comprando.
+  const conteudo = conteudoDoProduto(product.tipo);
+  const ehPeixe = vozDoProduto(product.tipo) === "peixe";
 
-  // Ficha técnica em 2 colunas (ordem do brief). Só linhas com valor.
+  const descricaoBruta = stripMarcheziSignature(product.descricao);
+  const descricaoBlocos = parseDescricao(descricaoBruta);
+  const descLonga = tamanhoDoTexto(descricaoBlocos) > 320;
+
+  // Ficha técnica em 2 colunas. Só linhas com valor — e só as que fazem sentido
+  // para o tipo: peixe mostra padrão/pH/cauda; o resto mostra peso e medidas,
+  // que é o que decide a compra de um acessório.
   type Row = [string, string | null];
   const filtra = (rows: Row[]) =>
     rows.filter((r): r is [string, string] => !!r[1] && r[1].trim() !== "");
-  const fichaEsq = filtra([
-    ["Padrão / cor", product.padraoCor],
-    ["Temperatura", product.temperatura],
-    ["pH", product.ph],
-  ]);
-  const fichaDir = filtra([
-    ["Alimentação", product.alimentacao],
-    ["Expectativa de vida", product.expectativaVida],
-    ["Origem", product.origem],
-    ["Cauda", product.cauda],
-    ["Característica", product.caracteristica],
-  ]);
+  const num = (v: number) => v.toString().replace(".", ",");
+  const cm = (v: number | null) => (v == null ? null : `${num(v)} cm`);
+  // As três medidas juntas viram uma linha só; faltando alguma, cada uma vai na
+  // sua (melhor uma medida solta do que "20 × ? × 3").
+  const { comprimento, largura, altura } = product;
+  const temTodas = comprimento != null && largura != null && altura != null;
+  const fichaEsq = ehPeixe
+    ? filtra([
+        ["Padrão / cor", product.padraoCor],
+        ["Temperatura", product.temperatura],
+        ["pH", product.ph],
+      ])
+    : filtra([
+        ["Peso", product.peso == null ? null : `${num(product.peso)} kg`],
+        ...(temTodas
+          ? ([
+              [
+                "Medidas (C × L × A)",
+                `${num(comprimento)} × ${num(largura)} × ${num(altura)} cm`,
+              ],
+            ] as Row[])
+          : ([
+              ["Comprimento", cm(comprimento)],
+              ["Largura", cm(largura)],
+              ["Altura", cm(altura)],
+            ] as Row[])),
+      ]);
+  const fichaDir = ehPeixe
+    ? filtra([
+        ["Alimentação", product.alimentacao],
+        ["Expectativa de vida", product.expectativaVida],
+        ["Origem", product.origem],
+        ["Cauda", product.cauda],
+        ["Característica", product.caracteristica],
+      ])
+    : filtra([
+        ["Origem", product.origem],
+        ["Característica", product.caracteristica],
+      ]);
   const temFicha = fichaEsq.length + fichaDir.length > 0;
 
   function selectVideo(id: string) {
@@ -477,14 +507,26 @@ export default function ProductDetail({
 
           {/* Prova social honesta — sem estrelas/avaliações falsas */}
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
-            <span className="flex items-center gap-1.5 font-semibold text-primary">
-              <Check size={15} className="text-green-600" aria-hidden="true" />
-              {PROVA_SOCIAL_VENDIDOS}
-            </span>
-            <span className="flex items-center gap-1.5 text-muted-foreground">
-              <Trophy size={15} className="text-accent" aria-hidden="true" />
-              {PROVA_SOCIAL_CRIADOR}
-            </span>
+            {conteudo.provaSocial.map((p) => {
+              const Icon = p.destaque ? Check : ICONS[p.icon];
+              return (
+                <span
+                  key={p.texto}
+                  className={`flex items-center gap-1.5 ${
+                    p.destaque
+                      ? "font-semibold text-primary"
+                      : "text-muted-foreground"
+                  }`}
+                >
+                  <Icon
+                    size={15}
+                    className={p.destaque ? "text-green-600" : "text-accent"}
+                    aria-hidden="true"
+                  />
+                  {p.texto}
+                </span>
+              );
+            })}
           </div>
 
           {/* Composição (só peixe) — trio pré-selecionado */}
@@ -628,7 +670,12 @@ export default function ProductDetail({
           {/* Estoque + compra / lista de espera */}
           {semEstoque ? (
             <div className="max-w-md space-y-3">
-              <WaitlistForm productId={product.id} />
+              <WaitlistForm
+                productId={product.id}
+                texto={conteudo.esperaTexto}
+                confirmacao={conteudo.esperaConfirmacao}
+                toastSucesso={conteudo.esperaToast}
+              />
               <a
                 href={duvidasHref}
                 target="_blank"
@@ -722,7 +769,7 @@ export default function ProductDetail({
 
           {/* Selos de confiança (4) */}
           <div className="grid grid-cols-2 gap-2 max-w-md">
-            {SELOS_TOPO.map((s) => (
+            {conteudo.selosTopo.map((s) => (
               <Selo key={s.label} icon={s.icon} label={s.label} />
             ))}
           </div>
@@ -732,7 +779,7 @@ export default function ProductDetail({
       {/* ═══ Diferenciais (fundo delimitado) ═══ */}
       <section className="rounded-2xl bg-bg-alt p-4 sm:p-5">
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-          {DIFERENCIAIS.map((d) => {
+          {conteudo.diferenciais.map((d) => {
             const Icon = ICONS[d.icon];
             return (
               <div
@@ -748,25 +795,25 @@ export default function ProductDetail({
         </div>
       </section>
 
-      {/* ═══ Sobre a linhagem + Ficha técnica (lado a lado) ═══ */}
-      {(lineageParags.length > 0 || temFicha) && (
+      {/* ═══ Descrição + Ficha técnica (lado a lado) ═══ */}
+      {(descricaoBlocos.length > 0 || temFicha) && (
         <section className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
-          {/* Sobre a linhagem (esquerda) */}
-          {lineageParags.length > 0 && (
+          {/* Descrição (esquerda) */}
+          {descricaoBlocos.length > 0 && (
             <div>
               <h2 className="text-primary text-lg font-semibold mb-3">
-                Sobre a linhagem
+                {conteudo.tituloDescricao}
               </h2>
+              {/* Recolhido por altura: line-clamp corta só o primeiro filho, e
+                  a descrição agora tem título, lista e vários parágrafos. */}
               <div
-                className={`space-y-3 text-text leading-relaxed ${
-                  descLonga && !descExpandida ? "line-clamp-5" : ""
-                }`}
+                className={
+                  descLonga && !descExpandida
+                    ? "max-h-40 overflow-hidden [mask-image:linear-gradient(to_bottom,black_60%,transparent)]"
+                    : ""
+                }
               >
-                {lineageParags.map((p, i) => (
-                  <p key={i} className="whitespace-pre-line">
-                    {p}
-                  </p>
-                ))}
+                <DescricaoRica blocos={descricaoBlocos} />
               </div>
               {descLonga && (
                 <button
@@ -779,13 +826,16 @@ export default function ProductDetail({
               )}
 
               {/* Nota Marchezi — fecho integrado da descrição (divisória sutil,
-                  não um box solto no meio da página) */}
-              <div className="mt-4 pt-3 border-t border-border flex items-start gap-2">
-                <Trophy size={15} className="text-accent shrink-0 mt-0.5" aria-hidden="true" />
-                <p className="text-sm text-muted-foreground italic leading-snug">
-                  {MARCHEZI_NOTA}
-                </p>
-              </div>
+                  não um box solto no meio da página). Só onde a credencial de
+                  criador diz algo sobre o item: num filtro, não diz. */}
+              {conteudo.nota && (
+                <div className="mt-4 pt-3 border-t border-border flex items-start gap-2">
+                  <Trophy size={15} className="text-accent shrink-0 mt-0.5" aria-hidden="true" />
+                  <p className="text-sm text-muted-foreground italic leading-snug">
+                    {conteudo.nota}
+                  </p>
+                </div>
+              )}
             </div>
           )}
 
@@ -820,10 +870,11 @@ export default function ProductDetail({
       {/* ═══ Blocos institucionais — padrão: título no topo, imagem à esquerda
           + texto à direita, link ao final; separadores entre colunas ═══ */}
       <section className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-border">
-        {INSTITUCIONAIS.map((b) => {
+        {conteudo.institucionais.map((b) => {
           const externo = b.link?.href.startsWith("http");
-          // Selo é emblema — bloco "Garantia" tem layout próprio (card centralizado).
-          const isSelo = b.imagem.includes("selo");
+          // Selo é emblema, e há bloco sem foto que sirva (o de suporte). Os dois
+          // usam o mesmo layout próprio: card centralizado com emblema ou ícone.
+          const IconeBloco = b.icone ? ICONS[b.icone] : null;
           const linkClass =
             "inline-flex items-center gap-1 min-h-11 text-sm font-semibold text-secondary hover:underline";
           const linkEl = b.link
@@ -845,9 +896,9 @@ export default function ProductDetail({
               )
             : null;
 
-          // ═══ "Garantia de chegada viva": card com moldura, tudo centralizado
-          //     (título topo → selo no centro → texto → link no rodapé) ═══
-          if (isSelo) {
+          // ═══ Card com moldura, tudo centralizado (título topo → emblema no
+          //     centro → texto → link no rodapé) ═══
+          if (b.imagem == null || b.imagem.includes("selo")) {
             return (
               <div
                 key={b.titulo}
@@ -857,19 +908,46 @@ export default function ProductDetail({
                   <h3 className="font-semibold text-primary text-base mb-3">
                     {b.titulo}
                   </h3>
-                  {/* Selo inteiro (object-contain, sem corte) */}
-                  <div className="relative w-32 aspect-square mb-3">
-                    <Image
-                      src={b.imagem}
-                      alt={b.titulo}
-                      fill
-                      sizes="128px"
-                      className="object-contain"
-                    />
-                  </div>
+                  {b.imagem ? (
+                    /* Selo inteiro (object-contain, sem corte) */
+                    <div className="relative w-32 aspect-square mb-3">
+                      <Image
+                        src={b.imagem}
+                        alt={b.titulo}
+                        fill
+                        sizes="128px"
+                        className="object-contain"
+                      />
+                    </div>
+                  ) : IconeBloco ? (
+                    <div className="w-20 h-20 mb-3 rounded-full bg-bg-alt flex items-center justify-center">
+                      <IconeBloco
+                        size={34}
+                        className="text-accent"
+                        aria-hidden="true"
+                      />
+                    </div>
+                  ) : null}
                   <p className="text-sm text-muted-foreground leading-relaxed">
                     {b.texto}
                   </p>
+                  {b.checks && (
+                    <ul className="mt-3 space-y-1.5 text-left">
+                      {b.checks.map((c) => (
+                        <li
+                          key={c}
+                          className="flex items-center gap-2 text-sm text-primary"
+                        >
+                          <Check
+                            size={16}
+                            className="text-green-600 shrink-0"
+                            aria-hidden="true"
+                          />
+                          {c}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                   {linkEl}
                 </div>
               </div>
@@ -941,8 +1019,8 @@ export default function ProductDetail({
         <section className="space-y-4">
           <h2 className="text-primary text-lg font-semibold">
             {relacionadosMedidos
-              ? "Quem viu este peixe também viu"
-              : "Outros peixes da loja"}
+              ? conteudo.relacionados.medido
+              : conteudo.relacionados.padrao}
           </h2>
           <div className="flex gap-4 overflow-x-auto pb-2 -mx-1 px-1">
             {relacionados.map((r) => (
@@ -957,7 +1035,7 @@ export default function ProductDetail({
       {/* ═══ FAQ (2 colunas) ═══ */}
       <section>
         <h2 className="text-primary text-lg font-semibold mb-3">Perguntas frequentes</h2>
-        <ProductFaq />
+        <ProductFaq itens={conteudo.faq} />
       </section>
 
       {/* ═══ Faixa "Sua compra 100% segura" (navy + selo) ═══ */}
@@ -969,7 +1047,7 @@ export default function ProductDetail({
               Sua compra 100% segura
             </h2>
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-              {SEGURANCA.map((s) => {
+              {conteudo.seguranca.map((s) => {
                 const Icon = ICONS[s.icon];
                 return (
                   <div key={s.label} className="flex items-center gap-2 text-sm text-white/90">
@@ -980,13 +1058,17 @@ export default function ProductDetail({
               })}
             </div>
           </div>
-          <Image
-            src="/images/selo.webp"
-            alt="Garantia de Chegada Viva"
-            width={128}
-            height={128}
-            className="w-24 h-24 sm:w-32 sm:h-32 object-contain shrink-0"
-          />
+          {/* O selo é a garantia de chegada viva. Ao lado de uma criadeira ele
+              promete uma coisa que não existe, então só aparece onde vale. */}
+          {conteudo.mostrarSeloChegadaViva && (
+            <Image
+              src="/images/selo.webp"
+              alt="Garantia de Chegada Viva"
+              width={128}
+              height={128}
+              className="w-24 h-24 sm:w-32 sm:h-32 object-contain shrink-0"
+            />
+          )}
         </div>
       </section>
     </div>

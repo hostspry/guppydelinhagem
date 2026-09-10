@@ -15,7 +15,21 @@ function formatWhatsapp(raw: string): string {
   return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
 }
 
-export default function WaitlistForm({ productId }: { productId: string }) {
+/**
+ * Lista de espera. Os textos vêm de fora porque "nova ninhada" só faz sentido em
+ * peixe: numa criadeira esgotada, o cliente espera reposição, não ninhada.
+ */
+export default function WaitlistForm({
+  productId,
+  texto,
+  confirmacao,
+  toastSucesso,
+}: {
+  productId: string;
+  texto: string;
+  confirmacao: string;
+  toastSucesso: string;
+}) {
   const [valor, setValor] = useState("");
   const [loading, setLoading] = useState(false);
   const [feito, setFeito] = useState(false);
@@ -29,9 +43,7 @@ export default function WaitlistForm({ productId }: { productId: string }) {
       const res = await entrarNaListaDeEspera(productId, valor);
       if (res.ok) {
         setFeito(true);
-        toast.success(
-          "Pronto! Avisaremos você no WhatsApp quando este peixe estiver disponível.",
-        );
+        toast.success(toastSucesso);
       } else {
         toast.error(res.error);
       }
@@ -46,10 +58,7 @@ export default function WaitlistForm({ productId }: { productId: string }) {
     return (
       <div className="rounded-xl border border-green-200 bg-green-50 p-4 flex items-start gap-2">
         <Check size={18} className="text-green-600 shrink-0 mt-0.5" aria-hidden="true" />
-        <p className="text-sm text-green-800">
-          Tudo certo! Você está na lista de espera. Assim que sair uma nova
-          ninhada deste peixe, a gente te avisa no WhatsApp.
-        </p>
+        <p className="text-sm text-green-800">{confirmacao}</p>
       </div>
     );
   }
@@ -60,10 +69,7 @@ export default function WaitlistForm({ productId }: { productId: string }) {
         <BellRing size={18} className="text-secondary" aria-hidden="true" />
         <h3 className="font-semibold text-primary">Avise-me quando disponível</h3>
       </div>
-      <p className="text-sm text-muted-foreground">
-        Sem estoque no momento. Deixe seu WhatsApp e avisamos quando houver nova
-        ninhada.
-      </p>
+      <p className="text-sm text-muted-foreground">{texto}</p>
       <form onSubmit={onSubmit} className="flex flex-col sm:flex-row gap-2" noValidate>
         <input
           type="tel"
