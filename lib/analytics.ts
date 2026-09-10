@@ -117,6 +117,15 @@ export function trackPurchase(args: {
   } catch {
     // storage indisponível: segue e dispara (melhor contar 1x do que falhar)
   }
+  // O rastreio interno estava faltando aqui — todas as outras funções deste
+  // arquivo mandam para os dois lados, e esta só falava com o GA4. O efeito era
+  // mudo e feio: o funil da tela de visitantes terminava sempre em zero, e o
+  // selo "comprou" na lista de visitantes nunca acendia, porque os dois se
+  // apoiam em pedido_criado.
+  rastrear(EVENTOS.PEDIDO, {
+    valor: round2(args.value),
+    quantidade: args.items.length,
+  });
   gtag("event", "purchase", {
     transaction_id: args.transactionId,
     currency: "BRL",
