@@ -1,7 +1,7 @@
 import "server-only";
 import { cache } from "react";
 import { prisma } from "@/lib/prisma";
-import { estaEsgotado } from "@/lib/estoque";
+import { estaEsgotado, type EstoqueProduto } from "@/lib/estoque";
 import {
   precoComCampanha,
   type CampanhaInfo,
@@ -22,7 +22,7 @@ type CampanhaVigente = {
   encerraAoEsgotarEstoque: boolean;
   categoriaIds: string[];
   produtoIds: string[];
-  estoqueEscopo: { estoqueMachos: number; estoqueFemeas: number }[];
+  estoqueEscopo: EstoqueProduto[];
 };
 
 // Produto candidato a receber campanha (preço cheio + Pix já resolvidos).
@@ -101,6 +101,11 @@ export const getCampanhasVigentes = cache(
         estoqueEscopo:
           c.escopo === "PRODUTOS"
             ? c.produtos.map((p) => ({
+                // `tipo` e `estoque` vão junto: sem eles, produto seco (que
+                // nasce com pool 0/0) entraria como esgotado e derrubaria a
+                // campanha inteira.
+                tipo: p.tipo,
+                estoque: p.estoque,
                 estoqueMachos: p.estoqueMachos,
                 estoqueFemeas: p.estoqueFemeas,
               }))
@@ -121,7 +126,8 @@ function cobreProduto(
 }
 
 // Campanha "encerra ao esgotar estoque" só vale se algum produto do escopo ainda
-// tem estoque (pool machos+fêmeas). Sem essa flag, sempre vale.
+// tem estoque (pool de machos e fêmeas no peixe, estoque real no resto). Sem
+// essa flag, sempre vale.
 function temEstoque(c: CampanhaVigente): boolean {
   if (!c.encerraAoEsgotarEstoque) return true;
   return c.estoqueEscopo.some((p) => !estaEsgotado(p));

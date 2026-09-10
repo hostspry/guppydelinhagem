@@ -461,9 +461,13 @@ async function resolverCupom(
   };
 
   // Produtos do escopo (estoque) p/ a regra "encerra ao esgotar estoque".
+  // `tipo` e `estoque` vão junto: sem eles, produto seco (pool 0/0) seria lido
+  // como esgotado e o cupom nunca valeria.
   const produtosEscopo =
     cupom.escopo === "PRODUTOS"
       ? cupom.produtos.map((p) => ({
+          tipo: p.tipo,
+          estoque: p.estoque,
           estoqueMachos: p.estoqueMachos,
           estoqueFemeas: p.estoqueFemeas,
         }))
@@ -640,6 +644,8 @@ async function resolverDescontosPorItem(
       const produtosEscopo =
         cupom.escopo === "PRODUTOS"
           ? cupom.produtos.map((p) => ({
+              tipo: p.tipo,
+              estoque: p.estoque,
               estoqueMachos: p.estoqueMachos,
               estoqueFemeas: p.estoqueFemeas,
             }))

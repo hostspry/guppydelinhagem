@@ -1,5 +1,5 @@
 import "server-only";
-import { estaEsgotado } from "@/lib/estoque";
+import { estaEsgotado, type EstoqueProduto } from "@/lib/estoque";
 
 // ─────────────────────────────────────────────────────────────
 // Lógica central do cupom de desconto. PURA (sem I/O) — o caller (validarCupom no
@@ -77,7 +77,7 @@ export function itemElegivel(
  */
 export function cupomVigente(
   cupom: CupomVigencia,
-  produtosElegiveis: { estoqueMachos: number; estoqueFemeas: number }[],
+  produtosElegiveis: EstoqueProduto[],
   agora: Date = new Date(),
 ): { ok: boolean; motivo?: string } {
   if (!cupom.ativo) return { ok: false, motivo: "Cupom indisponível." };

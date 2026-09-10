@@ -341,10 +341,14 @@ export default function CarrinhoPage() {
         <div className="bg-white border border-border rounded-xl p-5 space-y-4 lg:sticky lg:top-4">
           <h2 className="text-primary font-semibold">Resumo</h2>
 
-          <div className="flex items-center justify-between text-sm text-muted-foreground">
-            <span>Peixes no carrinho</span>
-            <span className="tabular-nums">{totalPeixes}</span>
-          </div>
+          {/* Carrinho só de produto seco (uma criadeira, uma ração) mostrava
+              "Peixes no carrinho 0". A linha só faz sentido havendo peixe. */}
+          {totalPeixes > 0 && (
+            <div className="flex items-center justify-between text-sm text-muted-foreground">
+              <span>Peixes no carrinho</span>
+              <span className="tabular-nums">{totalPeixes}</span>
+            </div>
+          )}
 
           <div className="flex items-center justify-between text-sm">
             <span className="text-primary">Subtotal</span>

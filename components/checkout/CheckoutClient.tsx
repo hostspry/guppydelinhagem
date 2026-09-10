@@ -1321,10 +1321,12 @@ export default function CheckoutClient({
                   </option>
                 ))}
               </select>
+              {/* Sem peixe no pedido, a justificativa do "peixe vivo só viaja
+                  quando o tempo ajuda" não explica nada ao cliente. */}
               <p className="text-[11px] text-muted-foreground mt-1.5 leading-snug">
-                A gente tenta encaixar na semana que você escolher. Peixe vivo só
-                viaja quando está pronto e o tempo ajuda, então isso é um pedido,
-                não uma data fechada.
+                {soSeco
+                  ? "A gente tenta encaixar na semana que você escolher. É um pedido, não uma data fechada."
+                  : "A gente tenta encaixar na semana que você escolher. Peixe vivo só viaja quando está pronto e o tempo ajuda, então isso é um pedido, não uma data fechada."}
               </p>
             </div>
           </section>

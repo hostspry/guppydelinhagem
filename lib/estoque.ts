@@ -14,12 +14,18 @@ import type { ProductType } from "@/lib/generated/prisma/enums";
 // `tipo`/`estoque` são opcionais para não quebrar quem só tem o pool em mãos,
 // mas TODO chamador que lida com catálogo misto precisa passar os dois: sem
 // `tipo`, uma ração (que nasce com pool 0/0) seria lida como esgotada.
-export function estaEsgotado(p: {
+//
+// Quem carrega esses produtos do banco deve tipar a lista com `EstoqueProduto`
+// em vez de escrever o objeto à mão: foi assim que campanha e cupom perderam o
+// `tipo` no meio do caminho e passaram a ler todo produto seco como esgotado.
+export type EstoqueProduto = {
   tipo?: ProductType;
   estoque?: number;
   estoqueMachos: number;
   estoqueFemeas: number;
-}): boolean {
+};
+
+export function estaEsgotado(p: EstoqueProduto): boolean {
   // Peixe vive do pool macho/fêmea. Todo o resto (ração, criadeira, filtro)
   // tem estoque real na própria linha do produto.
   if (p.tipo != null && p.tipo !== "PEIXE") return (p.estoque ?? 0) <= 0;
