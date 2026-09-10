@@ -17,6 +17,7 @@ import {
   Ticket,
   Fish,
   Receipt,
+  CreditCard,
   Megaphone,
   ShieldCheck,
 } from "lucide-react";
@@ -86,6 +87,12 @@ const NAV_SECTIONS: NavSection[] = [
         href: "/admin/cobrancas",
         label: "Cobranças",
         icon: Receipt,
+        permissao: "pedidos.ver",
+      },
+      {
+        href: "/admin/cartoes",
+        label: "Cartões recusados",
+        icon: CreditCard,
         permissao: "pedidos.ver",
       },
       {

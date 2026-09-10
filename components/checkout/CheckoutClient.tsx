@@ -58,6 +58,7 @@ import PixPanel from "@/components/checkout/PixPanel";
 import CardPaymentBrick from "@/components/checkout/CardPaymentBrick";
 import ThreeDsChallenge from "@/components/checkout/ThreeDsChallenge";
 import { carregarDeviceMp } from "@/lib/mp-device";
+import { relatarFalhaCartao } from "@/lib/falha-cartao";
 import { semanasDisponiveis } from "@/lib/semana-envio";
 
 export type CheckoutPrefill = {
@@ -642,7 +643,11 @@ export default function CheckoutClient({
     trackAddPaymentInfo(gaItens(), totalCartao, "cartao");
 
     const dados = getValues();
-    const res = await pagarComCartao(
+    // A própria chamada pode morrer (rede, deploy no meio da sessão). Sem este
+    // catch a tentativa sumia: nada no gateway, nada no banco, nada no log.
+    let res;
+    try {
+      res = await pagarComCartao(
       {
         ...dados,
         complemento: dados.complemento ?? "",
@@ -659,7 +664,21 @@ export default function CheckoutClient({
         itens: itensPedido(),
       },
       cartao,
-    );
+      );
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      relatarFalhaCartao({
+        etapa: "COBRANCA",
+        mensagem: `chamada do checkout falhou: ${msg}`,
+        valor: totalCartao,
+        email: dados.email,
+        telefone: dados.telefone,
+      });
+      setErro(
+        "A conexão caiu antes de concluir o pagamento. Tente de novo ou pague no Pix (com desconto).",
+      );
+      throw e;
+    }
 
     if (res.resultado === "aprovado") {
       router.push(`/pedido/${res.numero.replace(/^#/, "")}/sucesso${res.token ? `?t=${res.token}` : ""}`);
@@ -1724,8 +1743,16 @@ export default function CheckoutClient({
                     amount={totalCartao}
                     maxInstallments={teto}
                     payerEmail={watch("email")}
+                    payerTelefone={watch("telefone")}
                     onPagar={onCartao}
-                    onErro={(m) => setErro(m)}
+                    // A mensagem crua do gateway ("invalid parameter", em
+                    // inglês) só assusta. O motivo técnico vai para o registro;
+                    // aqui o cliente lê o que fazer agora.
+                    onErro={() =>
+                      setErro(
+                        "Não conseguimos ler os dados do cartão. Confira número, validade, CVV e o CPF do titular, ou pague no Pix (com desconto).",
+                      )
+                    }
                   />
                 </>
               )}

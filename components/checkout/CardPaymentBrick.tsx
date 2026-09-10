@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { Loader2 } from "lucide-react";
 import type { CartaoInput } from "@/actions/checkout";
+import { relatarFalhaCartao } from "@/lib/falha-cartao";
 import { carregarDeviceMp, esperarDeviceId } from "@/lib/mp-device";
 
 // Dados que o Brick devolve no onSubmit (campos seguros ficam no iframe do MP;
@@ -73,6 +74,7 @@ export default function CardPaymentBrick({
   amount,
   maxInstallments,
   payerEmail,
+  payerTelefone,
   onPagar,
   onErro,
 }: {
@@ -80,6 +82,7 @@ export default function CardPaymentBrick({
   amount: number;
   maxInstallments: number;
   payerEmail?: string;
+  payerTelefone?: string;
   onPagar: (cartao: CartaoInput) => Promise<void>;
   onErro?: (msg: string) => void;
 }) {
@@ -88,11 +91,28 @@ export default function CardPaymentBrick({
   const onPagarRef = useRef(onPagar);
   const onErroRef = useRef(onErro);
   const emailRef = useRef(payerEmail);
+  const telefoneRef = useRef(payerTelefone);
+  const amountRef = useRef(amount);
   useEffect(() => {
     onPagarRef.current = onPagar;
     onErroRef.current = onErro;
     emailRef.current = payerEmail;
+    telefoneRef.current = payerTelefone;
+    amountRef.current = amount;
   });
+
+  // Falha aqui não chega ao gateway e não cria pedido: sem este registro, a
+  // tentativa some e o dono só descobre se o cliente contar. Nunca manda dado de
+  // cartão — o número e o CVV ficam no iframe do gateway e nem passam por aqui.
+  function relatar(etapa: "SDK" | "FORMULARIO", mensagem: string) {
+    relatarFalhaCartao({
+      etapa,
+      mensagem,
+      valor: amountRef.current,
+      email: emailRef.current,
+      telefone: telefoneRef.current,
+    });
+  }
 
   const carregando = useRef<HTMLDivElement>(null);
 
@@ -123,9 +143,9 @@ export default function CardPaymentBrick({
               if (carregando.current) carregando.current.style.display = "none";
             },
             onError: (err: { message?: string }) => {
-              onErroRef.current?.(
-                err?.message ?? "Erro no formulário de cartão.",
-              );
+              const msg = err?.message ?? "Erro no formulário de cartão.";
+              relatar("FORMULARIO", msg);
+              onErroRef.current?.(msg);
             },
             onSubmit: async (formData: CardBrickFormData) =>
               onPagarRef.current({
@@ -155,9 +175,9 @@ export default function CardPaymentBrick({
         });
       } catch (e) {
         if (!cancelado) {
-          onErroRef.current?.(
-            e instanceof Error ? e.message : "Falha ao carregar o cartão.",
-          );
+          const msg = e instanceof Error ? e.message : "Falha ao carregar o cartão.";
+          relatar("SDK", msg);
+          onErroRef.current?.(msg);
         }
       }
     })();

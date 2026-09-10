@@ -152,6 +152,56 @@ export async function notificarPagamentoRecusado(
   );
 }
 
+// ── 3.2b Tentativa de cartão que nem virou pagamento (🧨 defeito ou fraude) ───
+// Diferente da recusa acima: aqui NÃO existe pedido nem pagamento no gateway. É
+// o cartão que morreu no navegador (SDK, formulário) ou na chamada da cobrança,
+// o caso que antes não deixava rastro nenhum e só se descobria se o cliente
+// avisasse. Quem decide o que avisar e o que calar é lib/pagamento-tentativas.
+const ETAPA_CARTAO_ROTULO: Record<string, string> = {
+  SDK: "o formulário de cartão não carregou no navegador do cliente",
+  FORMULARIO: "o formulário recusou os dados antes de cobrar",
+  COBRANCA: "falhamos ao criar a cobrança no gateway",
+  RECUSA: "o gateway recusou o cartão",
+};
+
+export async function notificarFalhaCartao(f: {
+  etapa: string;
+  mensagem: string;
+  statusDetail?: string | null;
+  valor?: number | null;
+  numero?: string | null;
+  email?: string | null;
+  telefone?: string | null;
+  deviceOk?: boolean;
+}): Promise<void> {
+  const explicacao = ETAPA_CARTAO_ROTULO[f.etapa] ?? "tentativa de cartão falhou";
+  await enviarSeguro(
+    () =>
+      `🧨 <b>Cartão não foi adiante</b>
+
+` +
+      `${escapeHtml(explicacao)}.
+` +
+      (f.numero ? `Pedido: <b>${escapeHtml(f.numero)}</b>
+` : "") +
+      (f.valor != null ? `Valor: <b>${formatBRL(f.valor)}</b>
+` : "") +
+      `Motivo: ${escapeHtml(f.mensagem)}
+` +
+      (f.statusDetail ? `Código: ${escapeHtml(f.statusDetail)}
+` : "") +
+      (f.etapa === "RECUSA" && !f.deviceOk
+        ? `⚠️ Sem o antifraude do dispositivo — cartão bom costuma cair aqui.
+`
+        : "") +
+      (f.email ? `✉️ ${escapeHtml(f.email)}
+` : "") +
+      `${linhaWhatsapp(f.telefone, "chamar no WhatsApp")}
+` +
+      `💡 Ofereça o Pix (tem desconto) enquanto isso.`,
+  );
+}
+
 // ── 3.3 Pedido pago (💰 venda + separar para envio) ───────────────────────────
 export async function notificarPedidoPago(
   orderId: string,

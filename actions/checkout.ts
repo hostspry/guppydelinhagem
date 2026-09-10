@@ -24,6 +24,7 @@ import {
   notificarTentativaCompra,
   notificarPedidoPago,
 } from "@/lib/notificacoes";
+import { registrarFalhaCartao } from "@/lib/pagamento-tentativas";
 import { calcularPrecos } from "@/lib/precos";
 import {
   normalizarCodigo,
@@ -1812,6 +1813,21 @@ export async function pagarComCartao(
     });
   } catch (e) {
     console.error("[checkout] cobrar cartão", e);
+    // Deixa rastro: aqui não nasce linha de Pagamento (o gateway não chegou a
+    // criar nada), e sem isso a falha sumiria — foi o que aconteceu quando um
+    // cliente avisou que "deu recusado" e não havia o que investigar.
+    await registrarFalhaCartao({
+      etapa: "COBRANCA",
+      provider: ProviderPagamento.MERCADO_PAGO,
+      mensagem: e instanceof Error ? e.message : String(e),
+      valor,
+      parcelas,
+      deviceOk: !!cartao.deviceId,
+      orderId,
+      numero,
+      email: emailPagador,
+      telefone: order.data.telefone,
+    });
     // Erro de comunicação → sem pagamento. Remove só se foi recém-criado; pedido
     // REUSADO (com tentativas anteriores) não se apaga — a varredura limpa depois.
     if (!order.data.reused) {
@@ -1900,6 +1916,21 @@ export async function pagarComCartao(
   }
 
   // RECUSADO (ou qualquer não-pago): pedido segue aguardando; tenta de novo.
+  // Avisa o dono na hora — é venda escapando, e o cliente costuma estar com o
+  // WhatsApp na mão. O webhook do MP também notifica, mas só quando chega.
+  await registrarFalhaCartao({
+    etapa: "RECUSA",
+    provider: ProviderPagamento.MERCADO_PAGO,
+    mensagem: mensagemRecusa(pago.statusDetail),
+    statusDetail: pago.statusDetail,
+    valor,
+    parcelas: pago.parcelas,
+    deviceOk: !!cartao.deviceId,
+    orderId,
+    numero,
+    email: emailPagador,
+    telefone: order.data.telefone,
+  });
   return { resultado: "recusado", mensagem: mensagemRecusa(pago.statusDetail) };
 }
 

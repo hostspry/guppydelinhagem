@@ -614,6 +614,43 @@ model Pagamento {
   @@index([orderId])
 }
 
+/// Etapa em que a tentativa de cartão morreu.
+enum EtapaCartao {
+  SDK // o SDK/Brick do gateway não carregou no navegador do cliente
+  FORMULARIO // o Brick recusou os dados antes de gerar o token (não virou pagamento)
+  COBRANCA // falhamos ao criar o pagamento no gateway (rede, 4xx, timeout)
+  RECUSA // o gateway criou o pagamento e recusou
+}
+
+/// Tentativa de cartão que NÃO virou uma linha de Pagamento.
+///
+/// Existe porque a recusa que o cliente vê nem sempre chega até aqui: quando o
+/// SDK não carrega ou o Brick nega os dados, não há pedido, não há Pagamento e
+/// não há log — o cliente avisa que "deu recusado" e não sobra nada para
+/// investigar. Cada tentativa frustrada agora deixa rastro, com o motivo
+/// técnico, para o dono saber se é cartão do cliente ou defeito nosso.
+///
+/// NUNCA guarda dado de cartão (número, CVV, token): só o motivo e o contexto.
+model TentativaCartao {
+  id           String            @id @default(cuid())
+  etapa        EtapaCartao
+  provider     ProviderPagamento?
+  mensagem     String // motivo técnico (gateway ou navegador)
+  statusDetail String? // status_detail do gateway, quando houver
+  valor        Decimal?          @db.Decimal(10, 2)
+  parcelas     Int?
+  deviceOk     Boolean           @default(false) // fingerprint do antifraude chegou?
+  orderId      String? // pedido, quando já existia
+  numero       String? // snapshot do número do pedido
+  email        String? // p/ chamar o cliente de volta
+  telefone     String?
+  userAgent    String?
+  criadoEm     DateTime          @default(now())
+
+  @@index([criadoEm])
+  @@index([etapa, criadoEm])
+}
+
 // ─────────────────────────────────────────────
 // Hero / Home — slides editáveis e configurações globais
 // ─────────────────────────────────────────────
