@@ -2,7 +2,9 @@ import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/admin/PageHeader";
 import { ClienteForm } from "@/components/admin/ClienteForm";
 import { AcessoCliente } from "@/components/admin/AcessoCliente";
+import { HistoricoNavegacao } from "@/components/admin/HistoricoNavegacao";
 import { getClienteById } from "@/lib/queries/clientes";
+import { historicoDoCliente } from "@/lib/rastreio/identificar";
 
 type Props = { params: Promise<{ id: string }> };
 
@@ -10,6 +12,10 @@ export default async function EditarClientePage({ params }: Props) {
   const { id } = await params;
   const cliente = await getClienteById(id);
   if (!cliente) notFound();
+
+  // Navegação ligada a este cliente. Null quando ele nunca abriu o site (ou
+  // abriu antes de a gente saber quem era) — aí o cartão nem aparece.
+  const historico = await historicoDoCliente(id);
 
   return (
     <div>
@@ -51,6 +57,12 @@ export default async function EditarClientePage({ params }: Props) {
           jaTemAcesso={cliente.userId != null}
         />
       </div>
+
+      {historico && (
+        <div className="max-w-2xl mt-6">
+          <HistoricoNavegacao h={historico} />
+        </div>
+      )}
     </div>
   );
 }

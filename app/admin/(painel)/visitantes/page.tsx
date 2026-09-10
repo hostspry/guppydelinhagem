@@ -326,6 +326,16 @@ export default async function VisitantesPage({
                     >
                       {v.clienteNome ?? "Visitante anônimo"}
                     </Link>
+                    {/* Atalho para a ficha: daí sai a conversa de venda, que é
+                        o motivo de ter ligado navegação a pessoa. */}
+                    {v.clienteId && (
+                      <Link
+                        href={`/admin/clientes/${v.clienteId}/editar`}
+                        className="ml-1.5 text-[11px] text-gray-400 hover:text-[#FF035C]"
+                      >
+                        ver ficha
+                      </Link>
+                    )}
                     {v.comprou && (
                       <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full bg-green-100 text-green-700">
                         comprou

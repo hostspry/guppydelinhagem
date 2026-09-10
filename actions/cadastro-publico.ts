@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { rateLimit, clientIp } from "@/lib/rate-limit";
 import { notificarCadastroCliente } from "@/lib/notificacoes";
+import { identificarVisitante } from "@/lib/rastreio/identificar";
 import {
   cadastroPublicoSchema,
   type CadastroPublicoInput,
@@ -81,6 +82,7 @@ export async function enviarCadastroPublico(
   };
 
   let novo = false;
+  let clienteId = "";
   try {
     const existente = await prisma.cliente.findFirst({
       where: { OR: ors },
@@ -92,8 +94,10 @@ export async function enviarCadastroPublico(
       // Sobrescreve mesmo. Cliente que mudou de casa depende disso — e ele
       // acabou de digitar o endereço, é o dado mais novo que temos.
       await prisma.cliente.update({ where: { id: existente.id }, data: dados });
+      clienteId = existente.id;
     } else {
-      await prisma.cliente.create({ data: dados });
+      const criado = await prisma.cliente.create({ data: dados, select: { id: true } });
+      clienteId = criado.id;
       novo = true;
     }
   } catch (e) {
@@ -104,6 +108,10 @@ export async function enviarCadastroPublico(
         "Não consegui salvar agora. Tente de novo em instantes ou mande os dados pelo WhatsApp.",
     };
   }
+
+  // Quem preencheu o link normalmente navegou no site antes de comprar. Ligar
+  // aqui recupera esse histórico, que senão ficaria órfão para sempre.
+  void identificarVisitante(clienteId, "cadastro");
 
   // Aviso é conveniência: se o Telegram cair, o cadastro já está salvo.
   await notificarCadastroCliente({

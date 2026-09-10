@@ -288,6 +288,7 @@ model Cliente {
 
   pedidos      Order[]
   notificacoes Notificacao[]
+  visitas      Visitante[]
   criadoEm     DateTime      @default(now())
 
   @@index([nome])
@@ -1122,6 +1123,23 @@ model Visitante {
   userId String?
   user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
 
+  /// Quem é essa pessoa, quando a gente descobre.
+  ///
+  /// `userId` só pega quem faz login, e quase ninguém faz: a loja vende por
+  /// WhatsApp e por checkout sem cadastro. O vínculo útil é com Cliente, que
+  /// é onde mora o comprador de verdade.
+  ///
+  /// NÃO é unique de propósito: a mesma pessoa no celular e no computador são
+  /// dois visitantes, e os dois apontam para o mesmo cliente. É isso que junta
+  /// a navegação dela num histórico só.
+  clienteId String?
+  cliente   Cliente? @relation(fields: [clienteId], references: [id], onDelete: SetNull)
+
+  /// Quando e como a identidade foi descoberta — para o painel poder dizer de
+  /// onde veio a ligação em vez de só afirmar que ela existe.
+  identificadoEm  DateTime?
+  identificadoPor String? // 'pedido' | 'cadastro' | 'login'
+
   primeiroAcesso DateTime @default(now())
   ultimoAcesso   DateTime @default(now())
   totalSessoes   Int      @default(0)
@@ -1132,6 +1150,7 @@ model Visitante {
 
   @@index([ultimoAcesso])
   @@index([userId])
+  @@index([clienteId])
 }
 
 model SessaoVisita {

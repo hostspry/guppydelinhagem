@@ -58,6 +58,7 @@ import { randomBytes } from "node:crypto";
 import { headers } from "next/headers";
 import { rateLimit, clientIp } from "@/lib/rate-limit";
 import { semanaDaChave, semanasDisponiveis } from "@/lib/semana-envio";
+import { identificarVisitante } from "@/lib/rastreio/identificar";
 
 /**
  * Freio das ações públicas do checkout.
@@ -1233,6 +1234,10 @@ export async function criarOrderDoCheckout(
     console.error("[checkout] criar pedido", e);
     return { ok: false, error: "Não foi possível criar o pedido. Tente novamente." };
   }
+
+  // A navegação anônima deste navegador passa a ter dono. Sem await: o
+  // checkout não espera por rastreio, e a função nunca lança.
+  void identificarVisitante(clienteId, "pedido");
 
   // Lead que virou pedido não deve mais gerar aviso de abandono (fire-and-forget).
   {

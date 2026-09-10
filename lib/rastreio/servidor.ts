@@ -119,6 +119,23 @@ export async function registrarEvento(
         where: { id: visitanteId, userId: null },
         data: { userId: ctx.userId },
       });
+      // E, se essa conta tem cadastro de cliente, amarra também a ele. É o
+      // vínculo que o painel usa: quase ninguém cria conta, mas todo comprador
+      // tem Cliente, e é lá que o histórico precisa aparecer.
+      const doUser = await prisma.cliente.findFirst({
+        where: { userId: ctx.userId },
+        select: { id: true },
+      });
+      if (doUser) {
+        await prisma.visitante.updateMany({
+          where: { id: visitanteId, clienteId: null },
+          data: {
+            clienteId: doUser.id,
+            identificadoEm: new Date(),
+            identificadoPor: "login",
+          },
+        });
+      }
     }
 
     // Sessão aberta = última atividade dentro da janela.

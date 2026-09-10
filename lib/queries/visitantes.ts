@@ -2,6 +2,8 @@ import { prisma } from "@/lib/prisma";
 
 export type VisitanteItem = {
   id: string;
+  /** Ficha do cliente, quando a navegação já tem dono. */
+  clienteId: string | null;
   clienteNome: string | null;
   clienteEmail: string | null;
   primeiroAcesso: Date;
@@ -33,6 +35,9 @@ export async function listarVisitantes(pagina = 1): Promise<{
         totalSessoes: true,
         totalEventos: true,
         user: { select: { nome: true, email: true } },
+        // O cliente é o vínculo que pega quase todo mundo; o user só pega quem
+        // fez login, e quase ninguém faz. Por isso o cliente vem primeiro.
+        cliente: { select: { id: true, nome: true, email: true } },
         sessoes: {
           orderBy: { iniciadaEm: "desc" },
           take: 1,
@@ -59,8 +64,9 @@ export async function listarVisitantes(pagina = 1): Promise<{
       const s = v.sessoes[0];
       return {
         id: v.id,
-        clienteNome: v.user?.nome ?? null,
-        clienteEmail: v.user?.email ?? null,
+        clienteId: v.cliente?.id ?? null,
+        clienteNome: v.cliente?.nome ?? v.user?.nome ?? null,
+        clienteEmail: v.cliente?.email ?? v.user?.email ?? null,
         primeiroAcesso: v.primeiroAcesso,
         ultimoAcesso: v.ultimoAcesso,
         totalSessoes: v.totalSessoes,
@@ -119,6 +125,7 @@ export async function getVisitante(id: string): Promise<{
       totalSessoes: true,
       totalEventos: true,
       user: { select: { nome: true, email: true } },
+      cliente: { select: { id: true, nome: true, email: true } },
       sessoes: {
         orderBy: { iniciadaEm: "desc" },
         take: 50,
@@ -164,8 +171,9 @@ export async function getVisitante(id: string): Promise<{
   return {
     visitante: {
       id: v.id,
-      clienteNome: v.user?.nome ?? null,
-      clienteEmail: v.user?.email ?? null,
+      clienteId: v.cliente?.id ?? null,
+      clienteNome: v.cliente?.nome ?? v.user?.nome ?? null,
+      clienteEmail: v.cliente?.email ?? v.user?.email ?? null,
       primeiroAcesso: v.primeiroAcesso,
       ultimoAcesso: v.ultimoAcesso,
       totalSessoes: v.totalSessoes,
