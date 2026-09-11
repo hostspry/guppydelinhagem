@@ -10,7 +10,7 @@ import {
   MessageCircle,
   XCircle,
 } from "lucide-react";
-import { auth } from "@/lib/auth";
+import { exigirSessao } from "@/lib/auth";
 import { getPedidoDoUsuario } from "@/lib/queries/minha-conta";
 import { STATUS_PEDIDO } from "@/lib/pedido-status";
 import { formatBRL } from "@/lib/utils/format";
@@ -39,8 +39,7 @@ type Props = { params: Promise<{ numero: string }> };
 
 export default async function DetalhePedidoPage({ params }: Props) {
   const { numero } = await params;
-  const session = await auth();
-  const user = session!.user;
+  const user = await exigirSessao("/minha-conta/pedidos");
 
   const pedido = await getPedidoDoUsuario(numero, user.id, user.email);
   if (!pedido) notFound();

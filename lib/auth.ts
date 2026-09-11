@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import Google from "next-auth/providers/google";
@@ -160,3 +161,20 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
     // session: herdado de authConfig (edge-safe, mapeia token → sessão com role).
   },
 });
+
+/**
+ * Sessão obrigatória numa página do painel do cliente.
+ *
+ * O layout de /minha-conta já redireciona quem não está logado, mas layout e
+ * página renderizam ao mesmo tempo: o redirect do layout não impede a página de
+ * rodar. Quem confiava nisso escrevia `session!.user`, e bastava a sessão ter
+ * expirado para a página estourar `Cannot read properties of null` e o cliente
+ * ver a tela de erro no lugar da tela de login. Aconteceu em produção.
+ */
+export async function exigirSessao(callbackUrl = "/minha-conta") {
+  const session = await auth();
+  if (!session?.user) {
+    redirect(`/login?callbackUrl=${encodeURIComponent(callbackUrl)}`);
+  }
+  return session.user;
+}

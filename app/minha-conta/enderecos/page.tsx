@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { auth } from "@/lib/auth";
+import { exigirSessao } from "@/lib/auth";
 import { listEnderecos } from "@/lib/queries/minha-conta";
 import EnderecosClient from "@/components/conta/EnderecosClient";
 
@@ -9,8 +9,8 @@ export const metadata: Metadata = {
 };
 
 export default async function EnderecosPage() {
-  const session = await auth();
-  const enderecos = await listEnderecos(session!.user.id);
+  const user = await exigirSessao("/minha-conta/enderecos");
+  const enderecos = await listEnderecos(user.id);
 
   return (
     <div className="space-y-5">

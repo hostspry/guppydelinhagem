@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Package, Clock, ArrowRight, Truck } from "lucide-react";
-import { auth } from "@/lib/auth";
+import { exigirSessao } from "@/lib/auth";
 import {
   listPedidosDoUsuario,
   listEsperasDoUsuario,
@@ -19,8 +19,7 @@ function pedidoHref(numero: string): string {
 }
 
 export default async function VisaoGeralPage() {
-  const session = await auth();
-  const user = session!.user; // o layout garante a sessão
+  const user = await exigirSessao("/minha-conta");
   const [pedidos, esperas] = await Promise.all([
     listPedidosDoUsuario(user.id, user.email),
     listEsperasDoUsuario(user.id, null),

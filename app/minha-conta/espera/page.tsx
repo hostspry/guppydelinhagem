@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Clock } from "lucide-react";
-import { auth } from "@/lib/auth";
+import { exigirSessao } from "@/lib/auth";
 import {
   getDadosPerfil,
   listEsperasDoUsuario,
@@ -15,8 +15,7 @@ export const metadata: Metadata = {
 };
 
 export default async function EsperaPage() {
-  const session = await auth();
-  const user = session!.user;
+  const user = await exigirSessao("/minha-conta/espera");
   const perfil = await getDadosPerfil(user.id, user.email);
   const esperas = await listEsperasDoUsuario(user.id, perfil.telefone);
 

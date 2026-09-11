@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { auth } from "@/lib/auth";
+import { exigirSessao } from "@/lib/auth";
 import { getDadosPerfil } from "@/lib/queries/minha-conta";
 import { formatTelefone, formatCpfCnpj } from "@/lib/utils/format";
 import PerfilForm from "@/components/conta/PerfilForm";
@@ -10,8 +10,7 @@ export const metadata: Metadata = {
 };
 
 export default async function PerfilPage() {
-  const session = await auth();
-  const user = session!.user;
+  const user = await exigirSessao("/minha-conta/perfil");
   const perfil = await getDadosPerfil(user.id, user.email);
 
   return (

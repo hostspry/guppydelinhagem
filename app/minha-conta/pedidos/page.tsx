@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Package, ChevronRight } from "lucide-react";
-import { auth } from "@/lib/auth";
+import { exigirSessao } from "@/lib/auth";
 import { listPedidosDoUsuario } from "@/lib/queries/minha-conta";
 import { STATUS_PEDIDO } from "@/lib/pedido-status";
 import { formatBRL } from "@/lib/utils/format";
@@ -20,8 +20,7 @@ function resumoItens(itens: { nomeProduto: string; quantidade: number }[]): stri
 }
 
 export default async function ListaPedidosPage() {
-  const session = await auth();
-  const user = session!.user;
+  const user = await exigirSessao("/minha-conta/pedidos");
   const pedidos = await listPedidosDoUsuario(user.id, user.email);
 
   return (
