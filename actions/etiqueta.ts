@@ -18,6 +18,7 @@ import {
   volumesDoCarrinhoSeco,
   carrinhoTemCargaViva,
   calcularPesoECaixa,
+  seguroDeCargaViva,
   cotarFrete,
   transportadoraDaEmpresa,
 } from "@/lib/shipping";
@@ -200,7 +201,12 @@ export async function cotarEtiquetaDoPedido(
       0,
     );
     const { pesoGramas, caixa } = calcularPesoECaixa(Math.max(1, totalPeixes));
-    const cot = await cotarFrete({ cepDestino: cep, pesoGramas, caixa });
+    const cot = await cotarFrete({
+      cepDestino: cep,
+      pesoGramas,
+      caixa,
+      qtdPeixes: totalPeixes,
+    });
     if (!cot.ok) return { success: false, error: cot.error };
     const jad = cot.data.jadlog[0];
     if (!jad) {
@@ -386,13 +392,12 @@ export async function comprarEtiquetaDoPedido(
 
   const itens = itensParaFrete(order.items);
   const vivo = carrinhoTemCargaViva(itens);
+  const totalPeixes = order.items.reduce(
+    (s, it) => s + ((it.qtdMachos ?? 0) + (it.qtdFemeas ?? 0)) * it.quantidade,
+    0,
+  );
   const volumes = vivo
     ? (() => {
-        const totalPeixes = order.items.reduce(
-          (s, it) =>
-            s + ((it.qtdMachos ?? 0) + (it.qtdFemeas ?? 0)) * it.quantidade,
-          0,
-        );
         const { pesoGramas, caixa } = calcularPesoECaixa(Math.max(1, totalPeixes));
         return [
           {
@@ -409,6 +414,13 @@ export async function comprarEtiquetaDoPedido(
         length: v.length,
         weight: v.weight,
       }));
+
+  // Valor declarado: peixe vai por cabeça (R$ 10 cada), a MESMA conta da
+  // cotação que o cliente viu. Produto seco declara o valor do pedido, que é o
+  // que se perde de fato num extravio.
+  const valorDeclarado = vivo
+    ? seguroDeCargaViva(totalPeixes)
+    : Number(order.total) || 0;
 
   const entrada = {
     service: servicoId,
@@ -434,7 +446,7 @@ export async function comprarEtiquetaDoPedido(
     })),
     volumes,
     options: {
-      insurance_value: Number(order.total) || 0,
+      insurance_value: valorDeclarado,
       receipt: false,
       own_hand: false,
       non_commercial: true,

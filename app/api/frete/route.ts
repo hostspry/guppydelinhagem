@@ -41,6 +41,9 @@ export async function POST(req: Request) {
     cepDestino: String(body.cepDestino ?? ""),
     pesoGramas,
     caixa,
+    // Sem `qtd` (calculadora genérica de /frete) o seguro cai no mínimo de um
+    // peixe — ali o número serve de referência, não fecha pedido.
+    qtdPeixes: Number.isFinite(qtd) && qtd >= 1 ? qtd : 1,
   });
 
   if (!result.ok) {

@@ -12,7 +12,6 @@ export { FRETE_POR_TIPO } from "./frete-tipos";
 export const FRETE_CONFIG = {
   cepOrigem: "29201010", // CEP da fazenda em Guarapari
   pacotePadrao: { height: 30, width: 30, length: 30, weight: 2 }, // cm / kg
-  insuranceValue: 100,
   // Regras de precificação — SERVIDOR APENAS
   jadlogMarkup: 1.1, // multiplicador sobre o preço bruto da API (+10%)
   caixaIsopor: 20, // R$ adicionados após o markup
@@ -32,6 +31,22 @@ export const FRETE_CONFIG = {
 // Ajustado em 2026-09-13 (era 15×15×20 cm / 2 kg) para bater com a embalagem
 // que sai de verdade. Declarar menos do que se posta dá diferença na hora do
 // despacho, então este número tem que acompanhar a caixa real.
+
+/**
+ * Valor declarado (seguro) de um envio de peixe: R$ 10 por cabeça.
+ *
+ * Antes a cotação declarava R$ 100 fixos e a compra da etiqueta declarava o
+ * total do pedido — duas contas diferentes para o mesmo envio, e a segunda
+ * encarecia a etiqueta sem aparecer na margem. Agora é a mesma regra nos dois,
+ * decidida por quem vende: o que se perde num extravio é o peixe, não o valor
+ * de venda do pedido.
+ */
+export const SEGURO_POR_PEIXE = 10;
+
+export function seguroDeCargaViva(qtdPeixes: number): number {
+  const n = Math.trunc(Number(qtdPeixes));
+  return Math.max(1, Number.isFinite(n) ? n : 1) * SEGURO_POR_PEIXE;
+}
 
 export type Caixa = { comprimento: number; largura: number; altura: number };
 export type PesoCaixa = { pesoGramas: number; caixa: Caixa };
@@ -106,6 +121,8 @@ export async function cotarFrete(params: {
   cepDestino: string;
   pesoGramas: number;
   caixa: Caixa;
+  /** Peixes no envio — define o valor declarado (R$ 10 cada). */
+  qtdPeixes?: number;
 }): Promise<CotarFreteResult> {
   const token = process.env.MELHOR_ENVIO_TOKEN;
   if (!token) {
@@ -137,7 +154,7 @@ export async function cotarFrete(params: {
             width: params.caixa.largura,
             length: params.caixa.comprimento,
             weight: params.pesoGramas / 1000, // ME espera kg
-            insurance_value: FRETE_CONFIG.insuranceValue,
+            insurance_value: seguroDeCargaViva(params.qtdPeixes ?? 1),
           },
         ],
         options: { receipt: false, own_hand: false },

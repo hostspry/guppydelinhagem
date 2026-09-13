@@ -995,7 +995,12 @@ export async function criarOrderDoCheckout(
     } else {
       // Terrestre: re-cota Jadlog via Melhor Envio pra esse CEP + peso/caixa.
       const { pesoGramas, caixa } = calcularPesoECaixa(Math.max(1, totalPeixes));
-      const cot = await cotarFrete({ cepDestino: data.cep, pesoGramas, caixa });
+      const cot = await cotarFrete({
+        cepDestino: data.cep,
+        pesoGramas,
+        caixa,
+        qtdPeixes: totalPeixes,
+      });
       if (!cot.ok) {
         return { ok: false, error: cot.error };
       }
