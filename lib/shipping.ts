@@ -23,18 +23,22 @@ export const FRETE_CONFIG = {
 };
 
 // ── Regra de peso/caixa por quantidade ────────────────────────────────────
-// CENTRALIZADA aqui — usada na página de produto, no carrinho e no checkout
-// futuro. NÃO duplicar em outro lugar.
+// CENTRALIZADA aqui — usada na cotação da página de produto, no frete cobrado
+// no checkout e na compra da etiqueta. NÃO duplicar em outro lugar: os três
+// precisam declarar a MESMA caixa, senão a gente cobra um frete e paga outro.
 //
-// Caixa e peso FIXOS para todo pedido de peixe: 15×15×20 cm / 2 kg,
+// Caixa e peso FIXOS para todo pedido de peixe: 10×10×10 cm / 1 kg,
 // independentemente da quantidade (sem escalonamento por nº de peixes).
+// Ajustado em 2026-09-13 (era 15×15×20 cm / 2 kg) para bater com a embalagem
+// que sai de verdade. Declarar menos do que se posta dá diferença na hora do
+// despacho, então este número tem que acompanhar a caixa real.
 
 export type Caixa = { comprimento: number; largura: number; altura: number };
 export type PesoCaixa = { pesoGramas: number; caixa: Caixa };
 
 export function calcularPesoECaixa(_qtdPeixes: number): PesoCaixa {
-  const pesoGramas = 2000; // g — fixo
-  const caixa: Caixa = { comprimento: 15, largura: 15, altura: 20 };
+  const pesoGramas = 1000; // g — fixo
+  const caixa: Caixa = { comprimento: 10, largura: 10, altura: 10 };
   return { pesoGramas, caixa };
 }
 

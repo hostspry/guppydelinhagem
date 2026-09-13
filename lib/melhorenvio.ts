@@ -297,3 +297,129 @@ export async function listarEnvios(
 export function melhorRastreioUrl(selfTracking: string): string {
   return `https://www.melhorrastreio.com.br/rastreio/${selfTracking}`;
 }
+
+// ── Carteira (saldo e recarga) ───────────────────────────────────────────────
+//
+// A compra de etiqueta debita a carteira do Melhor Envio. Quando o saldo acaba,
+// a compra falha com 422 ("saldo insuficiente") no meio do despacho — foi o que
+// aconteceu aqui, com R$ 12,00 na conta e uma etiqueta de R$ 14,48. Por isso o
+// painel mostra o saldo e gera a recarga sem sair do site.
+
+export type MeSaldo = {
+  /** Disponível para gastar. */
+  saldo: number;
+  /** Preso em etiqueta comprada e ainda não usada. */
+  reservado: number;
+  /** Dívida em aberto com o Melhor Envio (etiqueta paga depois). */
+  dividas: number;
+};
+
+/** Saldo atual da carteira. Leitura pura, não gasta nada. */
+export async function consultarSaldo(): Promise<MeResult<MeSaldo>> {
+  const r = await meFetch<{ balance?: number; reserved?: number; debts?: number }>(
+    "/api/v2/me/balance",
+    { method: "GET" },
+  );
+  if (!r.ok) return r;
+  return {
+    ok: true,
+    data: {
+      saldo: Number(r.data?.balance ?? 0),
+      reservado: Number(r.data?.reserved ?? 0),
+      dividas: Number(r.data?.debts ?? 0),
+    },
+  };
+}
+
+export type MeRecarga = {
+  /** Protocolo do pagamento no Melhor Envio (PAY-…), para conferir lá depois. */
+  protocolo: string | null;
+  status: string | null;
+  valor: number | null;
+  /** QR Code (Pix) ou PDF (boleto). É o que a pessoa abre para pagar. */
+  link: string | null;
+  /** Pix copia e cola, quando a API devolve. */
+  copiaECola: string | null;
+  /** Linha digitável do boleto, quando é boleto. */
+  linhaDigitavel: string | null;
+};
+
+/**
+ * Gera uma recarga da carteira (Pix ou boleto) pelo gateway do Melhor Envio.
+ *
+ * NÃO debita nada: cria uma cobrança em aberto. O saldo só sobe quando o Pix
+ * for pago. O gateway é o `yapay-transparente`, único aceito por este endpoint.
+ *
+ * A resposta muda de formato conforme o meio e o gateway, então a leitura é
+ * defensiva: procura o link do QR/PDF em mais de um lugar em vez de confiar num
+ * campo só. O que não achar volta null, e a tela mostra o que existir.
+ */
+export async function inserirSaldo(params: {
+  valor: number;
+  metodo: "pix" | "boleto";
+  redirectUrl?: string;
+  empresa?: { nome: string; cnpj: string };
+}): Promise<MeResult<MeRecarga>> {
+  const corpo: Record<string, unknown> = {
+    gateway: "yapay-transparente",
+    slug: params.metodo,
+    // A API espera o valor como texto com duas casas ("10.50").
+    value: params.valor.toFixed(2),
+    ...(params.redirectUrl ? { redirect_url: params.redirectUrl } : {}),
+    ...(params.empresa
+      ? { company_name: params.empresa.nome, cnpj: params.empresa.cnpj }
+      : {}),
+  };
+
+  const r = await meFetch<Record<string, unknown>>("/api/v2/me/balance", {
+    method: "POST",
+    body: corpo,
+  });
+  if (!r.ok) return r;
+
+  const raiz = (r.data ?? {}) as Record<string, unknown>;
+  const pagamento = (raiz.payment ?? {}) as Record<string, unknown>;
+  const texto = (v: unknown): string | null =>
+    typeof v === "string" && v.trim() !== "" ? v.trim() : null;
+
+  const link =
+    texto(pagamento.link) ??
+    texto(raiz.link) ??
+    texto(pagamento.qr_code_url) ??
+    texto(raiz.qr_code_url) ??
+    texto(pagamento.redirect) ??
+    texto(raiz.redirect);
+
+  // `digitable` serve aos dois meios e muda de significado: no Pix vem o
+  // copia e cola (começa com 00020101...), no boleto vem a linha digitável.
+  // Conferido na API de produção em 2026-09-13.
+  const digitavel = texto(raiz.digitable) ?? texto(pagamento.digitable);
+  const copiaECola =
+    params.metodo === "pix"
+      ? (texto(pagamento.qr_code) ?? texto(raiz.qr_code) ?? digitavel)
+      : null;
+
+  const valorBruto = pagamento.value ?? raiz.value;
+
+  const recarga: MeRecarga = {
+    protocolo: texto(pagamento.protocol) ?? texto(raiz.protocol),
+    status: texto(pagamento.status),
+    valor: typeof valorBruto === "number" ? Number(valorBruto) : null,
+    link,
+    copiaECola,
+    linhaDigitavel: params.metodo === "boleto" ? digitavel : null,
+  };
+
+  // Sem nada para pagar, a tela não teria o que mostrar. Registra o formato que
+  // veio (sem dado sensível) para ajustar a leitura em vez de adivinhar.
+  if (!recarga.link && !recarga.copiaECola && !recarga.linhaDigitavel) {
+    console.error(
+      "[melhorenvio] recarga sem link de pagamento. Campos:",
+      Object.keys(raiz).join(","),
+      "| payment:",
+      Object.keys(pagamento).join(","),
+    );
+  }
+
+  return { ok: true, data: recarga };
+}

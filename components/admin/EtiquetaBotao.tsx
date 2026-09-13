@@ -172,6 +172,18 @@ export function EtiquetaBotao({
       });
       setComprando(false);
       if (!r.success) {
+        // Saldo insuficiente é o erro mais comum aqui, e a solução fica em outra
+        // tela: o toast leva direto para a carteira em vez de deixar procurando.
+        if (/saldo/i.test(r.error)) {
+          toast.error(r.error, {
+            action: {
+              label: "Adicionar crédito",
+              onClick: () => router.push("/admin/configuracoes/entrega"),
+            },
+            duration: 10000,
+          });
+          return;
+        }
         toast.error(r.error);
         return;
       }
