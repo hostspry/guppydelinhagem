@@ -88,6 +88,8 @@ async function carregarPedido(orderId: string) {
       numero: true,
       status: true,
       total: true,
+      transportadora: true,
+      modalidadeFrete: true,
       enderecoEntrega: true,
       etiquetaUrl: true,
       meShipmentId: true,
@@ -169,6 +171,24 @@ function volumesDoPedido(order: Pedido) {
 }
 
 /**
+ * Pedido fechado no aéreo não tem etiqueta para comprar.
+ *
+ * A Gollog é paga no balcão do aeroporto, no ato do despacho, e o cliente já
+ * pagou esse frete no checkout. Comprar uma etiqueta do Melhor Envio aqui é
+ * pagar o frete duas vezes, por uma transportadora que nem vai levar a caixa.
+ * O caminho certo nesses pedidos é registrar o AWB à mão depois de despachar.
+ */
+function bloqueioAereo(order: {
+  transportadora: Transportadora | null;
+  modalidadeFrete: string | null;
+}): string | null {
+  if (order.transportadora === "GOLLOG" || order.modalidadeFrete === "AEREO") {
+    return "Este pedido saiu no aéreo (Gollog), que se paga no aeroporto, no despacho. Não gere etiqueta do Melhor Envio: registre o AWB no envio manual quando despachar.";
+  }
+  return null;
+}
+
+/**
  * Passo 1: cota. NÃO gasta saldo.
  *
  * Pedido com carga viva só oferece Jadlog .Com — é a única do catálogo que a
@@ -182,6 +202,9 @@ export async function cotarEtiquetaDoPedido(
 
   const order = await carregarPedido(orderId);
   if (!order) return { success: false, error: "Pedido não encontrado." };
+
+  const aereo = bloqueioAereo(order);
+  if (aereo) return { success: false, error: aereo };
 
   const dest = (order.enderecoEntrega ?? {}) as EnderecoPedido;
   const cep = digitos(dest.cep);
@@ -346,6 +369,8 @@ export async function comprarEtiquetaDoPedido(
 
   const order = await carregarPedido(orderId);
   if (!order) return { success: false, error: "Pedido não encontrado." };
+  const aereoCompra = bloqueioAereo(order);
+  if (aereoCompra) return { success: false, error: aereoCompra };
   if (order.etiquetaUrl || order.meShipmentId) {
     return {
       success: false,

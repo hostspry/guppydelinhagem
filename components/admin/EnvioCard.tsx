@@ -75,6 +75,8 @@ export function EnvioCard({
 
   const enviado = status === "ENVIADO" || status === "ENTREGUE";
   const podeRegistrar = status === "PAGO";
+  /** Gollog não passa pelo Melhor Envio: paga no aeroporto, no despacho. */
+  const aereo = transportadora === "GOLLOG";
   const editando = enviado; // modal em modo edição quando já enviado
 
   const url = buildTrackingUrl(selfTracking, codigoRastreio);
@@ -233,18 +235,31 @@ export function EnvioCard({
         </p>
       ) : podeRegistrar ? (
         <div className="space-y-3">
-          {/* Compra da etiqueta pelo painel, em dois passos (cotar → comprar). */}
-          <EtiquetaBotao
-            orderId={id}
-            etiquetaUrl={etiquetaUrl}
-            podeComprar
-          />
+          {/* Aéreo não tem etiqueta para comprar: a Gollog é paga no balcão do
+              aeroporto, e o cliente já pagou esse frete no checkout. Oferecer o
+              botão aqui seria pagar o frete duas vezes, na transportadora
+              errada. O servidor recusa do mesmo jeito. */}
+          {aereo ? (
+            <p className="text-gray-600 text-xs leading-snug rounded-md bg-amber-50 border border-amber-200 p-2.5">
+              Este pedido saiu no <strong>aéreo (Gollog)</strong>, que se paga no
+              aeroporto, na hora do despacho. Não tem etiqueta do Melhor Envio
+              aqui: despache e registre o AWB no envio manual.
+            </p>
+          ) : (
+            <>
+              {/* Compra da etiqueta pelo painel, em dois passos (cotar → comprar). */}
+              <EtiquetaBotao
+                orderId={id}
+                etiquetaUrl={etiquetaUrl}
+                podeComprar
+              />
 
-          <p className="text-gray-500 text-xs leading-snug border-t border-gray-100 pt-3">
-            Ou, se comprou a etiqueta no site do Melhor Envio ou vai enviar pela
-            Gollog, registre o código aqui para marcar como enviado e avisar o
-            cliente.
-          </p>
+              <p className="text-gray-500 text-xs leading-snug border-t border-gray-100 pt-3">
+                Ou, se comprou a etiqueta no site do Melhor Envio, registre o
+                código aqui para marcar como enviado e avisar o cliente.
+              </p>
+            </>
+          )}
           <button
             type="button"
             onClick={() => setModalAberto(true)}
