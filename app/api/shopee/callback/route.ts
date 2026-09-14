@@ -1,6 +1,17 @@
 import { NextResponse } from "next/server";
 import { trocarCodePorToken } from "@/lib/shopee/cliente";
 
+/**
+ * Endereço público do site. Atrás do proxy do Coolify, `request.url` traz o host
+ * interno (0.0.0.0:3000) — mandar o navegador para lá dá ERR_ADDRESS_INVALID.
+ */
+function base(): string {
+  return (
+    process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ??
+    "https://guppydelinhagem.com.br"
+  );
+}
+
 // Volta da tela de autorização da Shopee.
 //
 // A Shopee manda o dono para cá com ?code=...&shop_id=..., e o code vale uma vez
@@ -22,7 +33,7 @@ export async function GET(request: Request): Promise<Response> {
   if (!code || !shopId) {
     // Sem os dois, o dono chegou aqui por engano (ou a Shopee recusou antes).
     return NextResponse.redirect(
-      new URL(`${destino}?erro=${encodeURIComponent("A Shopee não devolveu o código de autorização.")}`, url.origin),
+      new URL(`${destino}?erro=${encodeURIComponent("A Shopee não devolveu o código de autorização.")}`, base()),
     );
   }
 
@@ -31,7 +42,7 @@ export async function GET(request: Request): Promise<Response> {
     ? "ok=1"
     : `erro=${encodeURIComponent(r.erro)}`;
 
-  return NextResponse.redirect(new URL(`${destino}?${query}`, url.origin));
+  return NextResponse.redirect(new URL(`${destino}?${query}`, base()));
 }
 
 // A Shopee não usa POST aqui, mas mantém o mesmo tratamento caso mude.
