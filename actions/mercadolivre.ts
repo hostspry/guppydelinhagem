@@ -213,14 +213,16 @@ export async function listarAnunciosMl(): Promise<
     variations?: { id: number | string; available_quantity?: number; attribute_combinations?: { value_name?: string }[] }[];
   };
 
+  // /items/bulk substitui o /items?ids=, que o ML colocou em descontinuação
+  // (prazo 25/10/2026). A resposta traz {id, status_code, body} por item.
   const itens: ItemMl[] = [];
   for (const lote of lotes) {
-    const r = await chamarMl<{ code?: number; body?: ItemMl }[]>(
-      `/items?ids=${lote.join(",")}&attributes=id,title,status,available_quantity,variations`,
+    const r = await chamarMl<{ id?: string; status_code?: number; body?: ItemMl }[]>(
+      `/items/bulk?ids=${lote.join(",")}`,
     );
     if (!r.ok) return { ok: false, erro: r.erro };
     for (const linha of r.dados ?? []) {
-      if (linha?.body) itens.push(linha.body);
+      if (linha?.status_code === 200 && linha.body) itens.push(linha.body);
     }
   }
 

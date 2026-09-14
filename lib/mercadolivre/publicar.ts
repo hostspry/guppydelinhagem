@@ -123,12 +123,6 @@ export async function publicarNoMl(
       estoqueMachos: true,
       estoqueFemeas: true,
       imagens: { orderBy: { ordem: "asc" }, select: { url: true } },
-      videos: {
-        where: { ativo: true, platform: "YOUTUBE" },
-        orderBy: [{ principal: "desc" }, { ordem: "asc" }],
-        select: { videoId: true },
-        take: 1,
-      },
       variantes: {
         where: { ativo: true },
         select: { composicao: true, qtdMachos: true, qtdFemeas: true, rotulo: true },
@@ -172,8 +166,6 @@ export async function publicarNoMl(
       erro: "Sem estoque para esta composição. O ML recusa anúncio com quantidade zero.",
     };
   }
-
-  const videoId = p.videos[0]?.videoId ?? null;
 
   const tipo = entrada.tipoAnuncio ?? LISTING_TYPE;
   // O Grátis aceita 1 unidade por anúncio. Mandar mais faz o ML recusar a
@@ -227,10 +219,10 @@ export async function publicarNoMl(
     // Nasce pausado de propósito. Quem ativa é o dono, depois de conferir.
     status: "paused",
     pictures: p.imagens.slice(0, 10).map((i) => ({ source: i.url })),
-    // Vídeo do YouTube no anúncio. Peixe vivo se vende pelo movimento: a foto
-    // mostra o padrão, o vídeo mostra o bicho nadando, que é o que convence
-    // quem compra linhagem. O ML aceita um vídeo por anúncio, pelo id.
-    ...(videoId ? { video_id: videoId } : {}),
+    // SEM VÍDEO, e não por esquecimento: o ML desligou o vídeo do YouTube por
+    // API em 09/2024. O campo `video_id` continua existindo no item e aceita o
+    // PUT sem reclamar, mas o valor volta null — testado em produção. Hoje o
+    // vídeo entra só como Clip, enviado no painel deles. Não readicionar.
     attributes: atributos,
   };
 
