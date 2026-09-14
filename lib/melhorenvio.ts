@@ -210,6 +210,9 @@ type TrackingRespItem = {
   id?: string;
   status?: string;
   tracking?: string;
+  // O ME…BR aqui se chama `melhorenvio_tracking`. Só a listagem (/me/orders) usa
+  // `self_tracking`. Lendo o nome errado, o código nunca chegava ao pedido.
+  melhorenvio_tracking?: string;
   self_tracking?: string;
   tracking_events?: { status?: string; description?: string; date?: string }[];
   events?: { status?: string; description?: string; date?: string }[];
@@ -239,7 +242,7 @@ export async function rastrearEnvios(
       meShipmentId: v.id ?? id,
       status: v.status ?? null,
       tracking: v.tracking ?? null,
-      selfTracking: v.self_tracking ?? null,
+      selfTracking: v.melhorenvio_tracking ?? v.self_tracking ?? null,
       eventos,
     };
   });
