@@ -9,6 +9,7 @@ import {
   Link2,
   RefreshCw,
   Unlink,
+  Upload,
   AlertTriangle,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -21,8 +22,12 @@ import {
   listarAnunciosMl,
   ligarAnuncioMl,
   desligarAnuncioMl,
+  salvarLicencaIbama,
+  publicarProdutoNoMl,
   type AnuncioMl,
 } from "@/actions/mercadolivre";
+import { COMPOSICAO_LABEL } from "@/lib/composicoes";
+import type { TipoComposicao } from "@/lib/generated/prisma/enums";
 
 /**
  * Tela da integração com o Mercado Livre.
@@ -45,7 +50,19 @@ type Ligacao = {
   produtoEstoque: number;
 };
 
-type Produto = { id: string; nome: string; estoque: number; ehPeixe: boolean };
+type Composicao = {
+  composicao: TipoComposicao;
+  preco: number;
+  disponivel: number;
+};
+type Produto = {
+  id: string;
+  nome: string;
+  estoque: number;
+  ehPeixe: boolean;
+  temFoto: boolean;
+  composicoes: Composicao[];
+};
 
 const input =
   "w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:border-[#FF035C] focus:ring-1 focus:ring-[#FF035C]";
@@ -55,6 +72,7 @@ export function ConfigMercadoLivre({
   enderecos,
   ligacoes,
   produtos,
+  licencaIbama,
 }: {
   inicial: {
     ativo: boolean;
@@ -70,6 +88,7 @@ export function ConfigMercadoLivre({
   enderecos: { redirect: string; notificacoes: string };
   ligacoes: Ligacao[];
   produtos: Produto[];
+  licencaIbama: string;
 }) {
   const router = useRouter();
   const [clientId, setClientId] = useState(inicial.clientId);
@@ -78,7 +97,15 @@ export function ConfigMercadoLivre({
   const [copiado, setCopiado] = useState<string | null>(null);
   const [anuncios, setAnuncios] = useState<AnuncioMl[] | null>(null);
   const [escolha, setEscolha] = useState<Record<string, string>>({});
+  const [licenca, setLicenca] = useState(licencaIbama);
+  const [publProduto, setPublProduto] = useState("");
+  const [publComposicao, setPublComposicao] = useState("");
+  const [publPreco, setPublPreco] = useState("");
   const [pending, startTransition] = useTransition();
+
+  const produtoSel = produtos.find((p) => p.id === publProduto) ?? null;
+  const composicaoSel =
+    produtoSel?.composicoes.find((c) => c.composicao === publComposicao) ?? null;
 
   const conectado = !!inicial.sellerId;
 
@@ -298,6 +325,151 @@ export function ConfigMercadoLivre({
             Sincronizar estoque
           </button>
         </div>
+      </div>
+
+      {/* ── Licença do IBAMA ── */}
+      <div className="bg-white border border-gray-200 rounded-lg p-5 space-y-3">
+        <h2 className="text-xs font-semibold text-[#07366A] uppercase tracking-wide">
+          Licença do IBAMA
+        </h2>
+        <p className="text-xs text-gray-600 leading-relaxed">
+          O Mercado Livre exige o número da licença no anúncio de peixe vivo. Ele
+          entra sozinho na descrição de todo anúncio que a gente publicar daqui —
+          sem ele, o ML cancela o anúncio.
+        </p>
+        <div className="flex flex-wrap items-end gap-2">
+          <label className="flex-1 min-w-[220px]">
+            <span className="block text-xs text-gray-500 mb-1">Número</span>
+            <input
+              value={licenca}
+              onChange={(e) => setLicenca(e.target.value)}
+              placeholder="ex.: 1234567"
+              className={input}
+            />
+          </label>
+          <button
+            type="button"
+            disabled={pending}
+            onClick={() => rodar(() => salvarLicencaIbama(licenca))}
+            className="px-4 py-2 rounded-md bg-[#07366A] text-white text-sm font-semibold hover:brightness-110 disabled:opacity-60"
+          >
+            Salvar
+          </button>
+        </div>
+      </div>
+
+      {/* ── Publicar anúncio ── */}
+      <div className="bg-white border border-gray-200 rounded-lg p-5 space-y-3">
+        <h2 className="text-xs font-semibold text-[#07366A] uppercase tracking-wide flex items-center gap-1.5">
+          <Upload className="w-3.5 h-3.5" aria-hidden="true" />
+          Publicar anúncio no Mercado Livre
+        </h2>
+        <p className="text-xs text-gray-600 leading-relaxed">
+          O anúncio nasce <strong>pausado</strong>: você revisa no ML e ativa
+          quando quiser. Uma composição por anúncio, porque lá o preço é um só.
+          O estoque enviado é quantos conjuntos o pool sustenta.
+        </p>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          <label className="block">
+            <span className="block text-xs text-gray-500 mb-1">Produto</span>
+            <select
+              value={publProduto}
+              onChange={(e) => {
+                setPublProduto(e.target.value);
+                setPublComposicao("");
+                setPublPreco("");
+              }}
+              className={input}
+            >
+              <option value="">Escolha…</option>
+              {produtos.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.nome}
+                  {p.temFoto ? "" : " (sem foto)"}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="block">
+            <span className="block text-xs text-gray-500 mb-1">Composição</span>
+            <select
+              value={publComposicao}
+              onChange={(e) => {
+                setPublComposicao(e.target.value);
+                const c = produtoSel?.composicoes.find(
+                  (x) => x.composicao === e.target.value,
+                );
+                setPublPreco(c ? String(c.preco) : "");
+              }}
+              disabled={!produtoSel || produtoSel.composicoes.length === 0}
+              className={input}
+            >
+              <option value="">
+                {produtoSel && produtoSel.composicoes.length === 0
+                  ? "produto sem composição"
+                  : "Escolha…"}
+              </option>
+              {(produtoSel?.composicoes ?? []).map((c) => (
+                <option key={c.composicao} value={c.composicao}>
+                  {COMPOSICAO_LABEL[c.composicao]} — R$ {c.preco} ({c.disponivel} disp.)
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="block">
+            <span className="block text-xs text-gray-500 mb-1">
+              Preço no ML (R$)
+            </span>
+            <input
+              inputMode="decimal"
+              value={publPreco}
+              onChange={(e) => setPublPreco(e.target.value)}
+              placeholder="0,00"
+              className={input}
+            />
+          </label>
+        </div>
+
+        {produtoSel && !produtoSel.temFoto && (
+          <p className="flex items-start gap-1.5 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md p-2">
+            <AlertTriangle size={13} className="shrink-0 mt-0.5" aria-hidden="true" />
+            Este produto não tem foto. O Mercado Livre não publica anúncio sem
+            imagem — suba as fotos no cadastro do produto antes.
+          </p>
+        )}
+        {composicaoSel && composicaoSel.disponivel === 0 && (
+          <p className="flex items-start gap-1.5 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md p-2">
+            <AlertTriangle size={13} className="shrink-0 mt-0.5" aria-hidden="true" />
+            Sem estoque para esta composição. O ML recusa anúncio com quantidade
+            zero.
+          </p>
+        )}
+
+        <button
+          type="button"
+          disabled={
+            pending ||
+            !produtoSel ||
+            !produtoSel.temFoto ||
+            (produtoSel.composicoes.length > 0 && !publComposicao) ||
+            !publPreco
+          }
+          onClick={() =>
+            rodar(() =>
+              publicarProdutoNoMl({
+                productId: publProduto,
+                composicao: (publComposicao || null) as TipoComposicao | null,
+                preco: Number(publPreco.replace(",", ".")),
+              }),
+            )
+          }
+          className="px-4 py-2 rounded-md bg-[#FF035C] text-white text-sm font-semibold hover:brightness-110 disabled:opacity-40"
+        >
+          {pending ? "Publicando…" : "Publicar pausado"}
+        </button>
       </div>
 
       {/* ── Anúncios ligados ── */}

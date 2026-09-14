@@ -12,6 +12,8 @@ import {
   urlAutorizacao,
 } from "@/lib/mercadolivre/cliente";
 import { sincronizarEstoqueMl } from "@/lib/mercadolivre/estoque";
+import { publicarNoMl } from "@/lib/mercadolivre/publicar";
+import type { TipoComposicao } from "@/lib/generated/prisma/enums";
 
 /**
  * Ações da tela de integração com o Mercado Livre.
@@ -333,4 +335,69 @@ export async function desligarAnuncioMl(id: string): Promise<MlActionResult> {
 
   revalidatePath(CAMINHO);
   return { ok: true, mensagem: "Ligação desfeita." };
+}
+
+/** Salva o número da licença do IBAMA (vai na descrição de todo anúncio de peixe). */
+export async function salvarLicencaIbama(licenca: string): Promise<MlActionResult> {
+  const membro = await assertPermissao("config.editar");
+  const valor = licenca.trim();
+  if (valor.length < 3) return { ok: false, erro: "Informe o número da licença." };
+
+  await prisma.integracaoMercadoLivre.upsert({
+    where: { id: "default" },
+    create: { id: "default", licencaIbama: valor },
+    update: { licencaIbama: valor },
+  });
+  await auditar(membro, {
+    acao: "config.mercadolivre.ibama",
+    entidade: "MercadoLivre",
+    descricao: "Atualizou o número da licença do IBAMA usado nos anúncios",
+  });
+
+  revalidatePath(CAMINHO);
+  return { ok: true, mensagem: "Licença salva." };
+}
+
+/**
+ * Cria o anúncio no ML a partir de um produto do site.
+ *
+ * O anúncio nasce PAUSADO: quem confere título, foto e preço e ativa é o dono,
+ * no painel do ML. Uma composição por anúncio, porque anúncio do ML tem um
+ * preço só.
+ */
+export async function publicarProdutoNoMl(dados: {
+  productId: string;
+  composicao: TipoComposicao | null;
+  preco: number;
+}): Promise<MlActionResult> {
+  const membro = await assertPermissao("config.editar");
+
+  const preco = Math.round(Number(dados.preco) * 100) / 100;
+  if (!Number.isFinite(preco) || preco <= 0) {
+    return { ok: false, erro: "Informe o preço do anúncio." };
+  }
+
+  const r = await publicarNoMl({
+    productId: dados.productId,
+    composicao: dados.composicao,
+    preco,
+  });
+  if (!r.ok) return { ok: false, erro: r.erro };
+
+  await auditar(membro, {
+    acao: "config.mercadolivre.publicar",
+    entidade: "MercadoLivreAnuncio",
+    entidadeId: r.dados.itemId,
+    descricao: `Publicou o anúncio ${r.dados.itemId} no Mercado Livre (pausado) por R$ ${preco.toFixed(2).replace(".", ",")}`,
+    depois: { itemId: r.dados.itemId, composicao: dados.composicao, preco },
+  });
+
+  revalidatePath(CAMINHO);
+  // Sem `url` de propósito: quem recebe `url` na tela é o fluxo de autorização,
+  // que redireciona o navegador. Publicar não pode arrastar o dono para fora do
+  // painel no meio de uma sequência de cadastros.
+  return {
+    ok: true,
+    mensagem: `Anúncio ${r.dados.itemId} criado e PAUSADO. Revise no ML e ative quando quiser.`,
+  };
 }

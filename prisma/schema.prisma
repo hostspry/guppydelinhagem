@@ -641,6 +641,11 @@ model IntegracaoMercadoLivre {
   /// refresh_token vale 6 meses. Renovando sempre, a corrente não quebra.
   refreshEmitidoEm          DateTime?
 
+  /// Número da licença do IBAMA. O ML exige que ele apareça no anúncio de peixe
+  /// vivo — sem isso o anúncio cai e a conta pode ser suspensa. Fica aqui, e não
+  /// no texto de cada produto, para ser impossível esquecer num cadastro novo.
+  licencaIbama String?
+
   ultimaSincronizacaoEm DateTime?
   ultimoErro            String?
 

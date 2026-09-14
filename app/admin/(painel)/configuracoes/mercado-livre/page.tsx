@@ -41,6 +41,17 @@ export default async function ConfiguracoesMercadoLivrePage() {
         estoque: true,
         estoqueMachos: true,
         estoqueFemeas: true,
+        imagens: { select: { url: true }, take: 1 },
+        variantes: {
+          where: { ativo: true },
+          orderBy: [{ padrao: "desc" }, { ordem: "asc" }],
+          select: {
+            composicao: true,
+            preco: true,
+            qtdMachos: true,
+            qtdFemeas: true,
+          },
+        },
       },
     }),
   ]);
@@ -86,7 +97,22 @@ export default async function ConfiguracoesMercadoLivrePage() {
         nome: p.nome,
         estoque: disponivel(p),
         ehPeixe: p.tipo === "PEIXE",
+        temFoto: p.imagens.length > 0,
+        // Uma composição por anúncio: o preço do ML é um só, e trio, casal e
+        // macho têm preços diferentes.
+        composicoes: p.variantes.map((v) => ({
+          composicao: v.composicao,
+          preco: Number(v.preco),
+          // Quantos conjuntos o pool sustenta — é o estoque que vai ao anúncio.
+          disponivel: (() => {
+            const porM = v.qtdMachos > 0 ? Math.floor(p.estoqueMachos / v.qtdMachos) : Infinity;
+            const porF = v.qtdFemeas > 0 ? Math.floor(p.estoqueFemeas / v.qtdFemeas) : Infinity;
+            const u = Math.min(porM, porF);
+            return Number.isFinite(u) ? Math.max(0, u) : 0;
+          })(),
+        })),
       }))}
+      licencaIbama={cfg?.licencaIbama ?? ""}
     />
   );
 }
