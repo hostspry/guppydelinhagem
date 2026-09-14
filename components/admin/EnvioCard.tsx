@@ -35,6 +35,8 @@ type Props = {
   clienteTelefone: string | null;
   /** Pedido de marketplace: quem despacha, etiqueta e rastreia é ele. */
   daShopee?: boolean;
+  /** Pedido do Mercado Livre com envio pelo ML (Mercado Envios). */
+  doMercadoLivre?: boolean;
 };
 
 const inputCls =
@@ -51,6 +53,7 @@ export function EnvioCard({
   clienteNome,
   clienteTelefone,
   daShopee = false,
+  doMercadoLivre = false,
 }: Props) {
   const [pending, startTransition] = useTransition();
   const [modalAberto, setModalAberto] = useState(false);
@@ -225,6 +228,15 @@ export function EnvioCard({
             </button>
           </div>
         </>
+      ) : doMercadoLivre ? (
+        // O ML emite a etiqueta dele quando o envio é pelo Mercado Envios.
+        // Comprar etiqueta aqui seria pagar o frete duas vezes. Quando o frete
+        // é combinado (peixe vivo), o envio é seu: registre o código à mão.
+        <p className="text-gray-500 text-xs leading-snug">
+          Pedido do Mercado Livre. Se o envio for pelo Mercado Envios, a etiqueta
+          sai no painel deles. Se o frete foi combinado, despache e registre o
+          código aqui para avisar o cliente.
+        </p>
       ) : daShopee ? (
         // Marketplace cuida do envio inteiro. Oferecer etiqueta do Melhor Envio
         // aqui seria pagar duas vezes pelo mesmo frete.

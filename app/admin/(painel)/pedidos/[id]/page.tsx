@@ -171,6 +171,7 @@ export default async function PedidoDetalhePage({ params }: Props) {
               clienteNome={e.nome}
               clienteTelefone={e.telefone}
               daShopee={pedido.origem === "SHOPEE"}
+              doMercadoLivre={pedido.origem === "MERCADO_LIVRE"}
             />
           )}
 

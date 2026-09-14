@@ -667,6 +667,9 @@ model MercadoLivreAnuncio {
   /// id da variação, quando o anúncio tem variações. Nulo = anúncio simples.
   variationId String?
   titulo      String?
+  /// gold_special (Clássico), gold_pro (Premium) ou free (Grátis). Guardado
+  /// para a tela mostrar a comissão sem consultar o ML a cada carregamento.
+  tipoAnuncio String?
 
   estoqueEnviado Int?
   sincronizadoEm DateTime?

@@ -238,6 +238,7 @@ export async function publicarNoMl(
       itemId,
       variationId: null,
       titulo,
+      tipoAnuncio: tipo,
       estoqueEnviado: quantidade,
       sincronizadoEm: new Date(),
     },

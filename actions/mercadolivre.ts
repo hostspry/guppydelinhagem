@@ -498,3 +498,61 @@ export async function sugerirPrecoMl(dados: {
 
   return { ok: true, dados: { precoSite, opcoes } };
 }
+
+/**
+ * Troca o tipo de um anúncio que já existe (Clássico ↔ Premium ↔ Grátis).
+ *
+ * É assim que se testa outro tipo sem infringir a política: o ML proíbe o mesmo
+ * produto em dois anúncios, mas trocar o tipo do mesmo anúncio é permitido e
+ * feito por endpoint próprio.
+ *
+ * ATENÇÃO AO PREÇO: a comissão muda junto. Subir de Clássico (12,5%) para
+ * Premium (17,5%) sem mexer no preço tira a diferença da margem, então a
+ * resposta traz quanto passaria a sobrar.
+ */
+export async function trocarTipoAnuncioMl(dados: {
+  anuncioId: string;
+  tipoAnuncio: string;
+}): Promise<MlActionResult> {
+  const membro = await assertPermissao("config.editar");
+
+  if (!ehTipoAnuncio(dados.tipoAnuncio)) {
+    return { ok: false, erro: "Tipo de anúncio inválido." };
+  }
+  const tipo: TipoAnuncio = dados.tipoAnuncio;
+
+  const anuncio = await prisma.mercadoLivreAnuncio.findUnique({
+    where: { id: dados.anuncioId },
+    select: { id: true, itemId: true, titulo: true, tipoAnuncio: true },
+  });
+  if (!anuncio) return { ok: false, erro: "Anúncio não encontrado." };
+  if (anuncio.tipoAnuncio === tipo) {
+    return { ok: false, erro: `O anúncio já está no ${TIPOS_ANUNCIO[tipo].nome}.` };
+  }
+
+  const r = await chamarMl(`/items/${anuncio.itemId}/listing_type`, {
+    method: "POST",
+    body: { id: tipo },
+  });
+  if (!r.ok) return { ok: false, erro: r.erro };
+
+  await prisma.mercadoLivreAnuncio.update({
+    where: { id: anuncio.id },
+    data: { tipoAnuncio: tipo, ultimoErro: null },
+  });
+
+  await auditar(membro, {
+    acao: "config.mercadolivre.tipo",
+    entidade: "MercadoLivreAnuncio",
+    entidadeId: anuncio.itemId,
+    descricao: `Trocou o anúncio ${anuncio.itemId} para ${TIPOS_ANUNCIO[tipo].nome} no Mercado Livre`,
+    antes: { tipo: anuncio.tipoAnuncio },
+    depois: { tipo },
+  });
+
+  revalidatePath(CAMINHO);
+  return {
+    ok: true,
+    mensagem: `Anúncio agora é ${TIPOS_ANUNCIO[tipo].nome}. Confira o preço: a comissão mudou.`,
+  };
+}

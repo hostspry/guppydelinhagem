@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { importarPedidoMl } from "@/lib/mercadolivre/pedidos";
 
 // Aviso do Mercado Livre (notificação) — pedido novo, mudança de anúncio, envio.
 //
@@ -53,6 +54,23 @@ export async function POST(request: Request): Promise<Response> {
       tentativa: aviso.attempts ?? 0,
     }),
   );
+
+  // "/orders/2000012345678" → 2000012345678
+  const topico = (aviso.topic ?? "").toLowerCase();
+  const ehPedido = topico.startsWith("orders");
+  const id = (aviso.resource ?? "").split("/").filter(Boolean).pop() ?? "";
+
+  if (ehPedido && /^\d+$/.test(id)) {
+    // Em linha mesmo: responder 200 antes de gravar faria o ML considerar
+    // entregue um aviso que ainda pode falhar, e ele não repete o que deu certo.
+    const resumo = await importarPedidoMl(id);
+    if (resumo.erros.length > 0) {
+      console.error("[ml-webhook] importar", id, resumo.erros);
+      // 500 faz o ML tentar de novo, que é o que queremos num erro nosso.
+      return NextResponse.json({ error: "falha ao importar" }, { status: 500 });
+    }
+    return NextResponse.json({ ok: true, ...resumo });
+  }
 
   return NextResponse.json({ ok: true });
 }

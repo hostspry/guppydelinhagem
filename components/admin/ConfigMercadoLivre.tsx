@@ -25,6 +25,7 @@ import {
   salvarLicencaIbama,
   publicarProdutoNoMl,
   sugerirPrecoMl,
+  trocarTipoAnuncioMl,
   type AnuncioMl,
   type PrecoSugerido,
 } from "@/actions/mercadolivre";
@@ -45,6 +46,7 @@ type Ligacao = {
   itemId: string;
   variationId: string | null;
   titulo: string | null;
+  tipoAnuncio: string | null;
   estoqueEnviado: number | null;
   sincronizadoEm: Date | null;
   ultimoErro: string | null;
@@ -598,15 +600,37 @@ export function ConfigMercadoLivre({
                     <p className="text-xs text-red-700 mt-0.5">{l.ultimoErro}</p>
                   )}
                 </div>
-                <button
-                  type="button"
-                  disabled={pending}
-                  onClick={() => rodar(() => desligarAnuncioMl(l.id))}
-                  className="shrink-0 inline-flex items-center gap-1 text-xs text-gray-500 hover:text-red-700 disabled:opacity-50"
-                >
-                  <Unlink size={13} aria-hidden="true" />
-                  Desligar
-                </button>
+                <div className="shrink-0 flex flex-col items-end gap-1.5">
+                  {/* Trocar o tipo do anúncio existente é o jeito permitido de
+                      testar outro: criar um segundo anúncio seria duplicata. */}
+                  <select
+                    value={l.tipoAnuncio ?? ""}
+                    disabled={pending}
+                    onChange={(e) =>
+                      rodar(() =>
+                        trocarTipoAnuncioMl({
+                          anuncioId: l.id,
+                          tipoAnuncio: e.target.value,
+                        }),
+                      )
+                    }
+                    className="px-2 py-1 border border-gray-300 rounded-md text-[11px] bg-white"
+                  >
+                    <option value="">tipo do anúncio…</option>
+                    <option value="gold_special">Clássico (12,5%)</option>
+                    <option value="gold_pro">Premium (17,5%)</option>
+                    <option value="free">Grátis (0%, 1 un.)</option>
+                  </select>
+                  <button
+                    type="button"
+                    disabled={pending}
+                    onClick={() => rodar(() => desligarAnuncioMl(l.id))}
+                    className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-red-700 disabled:opacity-50"
+                  >
+                    <Unlink size={13} aria-hidden="true" />
+                    Desligar
+                  </button>
+                </div>
               </li>
             ))}
           </ul>
