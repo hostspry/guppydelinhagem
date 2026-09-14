@@ -104,6 +104,7 @@ export function ConfigMercadoLivre({
   const [publComposicao, setPublComposicao] = useState("");
   const [publPreco, setPublPreco] = useState("");
   const [sugestao, setSugestao] = useState<PrecoSugerido | null>(null);
+  const [publTipo, setPublTipo] = useState("gold_special");
   const [pending, startTransition] = useTransition();
 
   const produtoSel = produtos.find((p) => p.id === publProduto) ?? null;
@@ -418,7 +419,13 @@ export function ConfigMercadoLivre({
                     return;
                   }
                   setSugestao(r.dados);
-                  setPublPreco(r.dados.precoSugerido.toFixed(2));
+                  const escolhido =
+                    r.dados.opcoes.find((o) => o.tipoAnuncio === publTipo) ??
+                    r.dados.opcoes[0];
+                  if (escolhido) {
+                    setPublTipo(escolhido.tipoAnuncio);
+                    setPublPreco(escolhido.precoSugerido.toFixed(2));
+                  }
                 });
               }}
               disabled={!produtoSel || produtoSel.composicoes.length === 0}
@@ -452,14 +459,53 @@ export function ConfigMercadoLivre({
         </div>
 
         {sugestao && (
-          <p className="text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-md p-2 leading-relaxed">
-            No site sai por <strong>R$ {sugestao.precoSite.toFixed(2)}</strong>. O
-            ML cobra {(sugestao.percentual * 100).toFixed(1)}% de comissão no{" "}
-            {sugestao.tipoNome}, então anunciando por{" "}
-            <strong>R$ {sugestao.precoSugerido.toFixed(2)}</strong> você recebe os
-            mesmos R$ {sugestao.precoSite.toFixed(2)} (comissão de R${" "}
-            {sugestao.comissao.toFixed(2)}). O frete é combinado à parte.
-          </p>
+          <div className="space-y-2">
+            <p className="text-xs font-medium text-gray-700">
+              Tipo de anúncio — o preço sobe para o líquido continuar sendo os R${" "}
+              {sugestao.precoSite.toFixed(2)} do site
+            </p>
+            <div className="space-y-1.5">
+              {sugestao.opcoes.map((o) => (
+                <label
+                  key={o.tipoAnuncio}
+                  className={`flex items-start gap-2 rounded-md border p-2.5 cursor-pointer transition-colors ${
+                    publTipo === o.tipoAnuncio
+                      ? "border-[#FF035C] bg-[#FF035C]/5"
+                      : "border-gray-200 hover:border-gray-300"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="tipoAnuncio"
+                    checked={publTipo === o.tipoAnuncio}
+                    onChange={() => {
+                      setPublTipo(o.tipoAnuncio);
+                      setPublPreco(o.precoSugerido.toFixed(2));
+                    }}
+                    className="mt-0.5 accent-[#FF035C]"
+                  />
+                  <span className="text-xs text-gray-700 leading-relaxed">
+                    <strong className="text-[#07366A]">{o.tipoNome}</strong> —
+                    comissão {(o.percentual * 100).toFixed(1)}%. Anunciar por{" "}
+                    <strong>R$ {o.precoSugerido.toFixed(2)}</strong> e receber R${" "}
+                    {sugestao.precoSite.toFixed(2)} (o ML fica com R${" "}
+                    {o.comissao.toFixed(2)}).
+                    {o.estoqueMax === 1 && (
+                      <span className="block text-amber-700">
+                        Só 1 unidade por anúncio e 60 dias de validade. O resto do
+                        estoque fica no site.
+                      </span>
+                    )}
+                  </span>
+                </label>
+              ))}
+            </div>
+            <p className="text-[11px] text-gray-500 leading-snug">
+              Escolha um só. Publicar o mesmo peixe em mais de um tipo é anúncio
+              duplicado: o ML cancela os dois e reincidir derruba a conta. Para
+              testar outro tipo, troque o do anúncio existente.
+            </p>
+          </div>
         )}
 
         {produtoSel && !produtoSel.temFoto && (
@@ -492,6 +538,7 @@ export function ConfigMercadoLivre({
                 productId: publProduto,
                 composicao: (publComposicao || null) as TipoComposicao | null,
                 preco: Number(publPreco.replace(",", ".")),
+                tipoAnuncio: publTipo,
               }),
             )
           }

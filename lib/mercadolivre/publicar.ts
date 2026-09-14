@@ -22,8 +22,30 @@ import type { TipoComposicao } from "@/lib/generated/prisma/enums";
  *  Envios (`shipping_options: ["custom"]`), que é o que viabiliza bicho vivo. */
 export const CATEGORIA_PEIXE = "MLB1098";
 
-/** Clássico. Premium cobra 17,5% contra 12,5% — a diferença sai da margem. */
-export const LISTING_TYPE = "gold_special";
+/**
+ * Tipos de anúncio que o MLB realmente vende hoje. Os outros quatro (Diamante,
+ * Ouro, Prata, Bronze) ainda aparecem na API, mas estão desativados há anos.
+ *
+ * PUBLICAR O MESMO PRODUTO EM MAIS DE UM TIPO É DUPLICATA, e a política do ML
+ * cancela os anúncios e pode derrubar a conta — "oferecer o mesmo produto em
+ * mais de um anúncio para oferecer diferentes condições de pagamento" é o
+ * exemplo do manual deles. Por isso a escolha é UMA por anúncio, e trocar de
+ * tipo depois se faz no anúncio existente, não criando outro.
+ */
+export const TIPOS_ANUNCIO = {
+  gold_special: { nome: "Clássico", estoqueMax: 99999 },
+  gold_pro: { nome: "Premium", estoqueMax: 99999 },
+  // Grátis: 0% de comissão, mas 1 unidade por anúncio e 60 dias de validade.
+  free: { nome: "Grátis", estoqueMax: 1 },
+} as const;
+
+export type TipoAnuncio = keyof typeof TIPOS_ANUNCIO;
+
+export const LISTING_TYPE: TipoAnuncio = "gold_special";
+
+export function ehTipoAnuncio(v: string): v is TipoAnuncio {
+  return v in TIPOS_ANUNCIO;
+}
 
 /** Valores obrigatórios da categoria, lidos da própria API do ML. */
 const ESPECIE_GUPPY = "3221175";
@@ -70,6 +92,8 @@ export type EntradaPublicacao = {
   composicao: TipoComposicao | null;
   /** Preço do anúncio no ML. Quem decide é o dono — o do site é só a sugestão. */
   preco: number;
+  /** Clássico, Premium ou Grátis. Um por anúncio (ver TIPOS_ANUNCIO). */
+  tipoAnuncio?: TipoAnuncio;
 };
 
 /**
@@ -143,6 +167,11 @@ export async function publicarNoMl(
     };
   }
 
+  const tipo = entrada.tipoAnuncio ?? LISTING_TYPE;
+  // O Grátis aceita 1 unidade por anúncio. Mandar mais faz o ML recusar a
+  // publicação inteira, então corta aqui e o resto do estoque fica no site.
+  const quantidade = Math.min(disponivel, TIPOS_ANUNCIO[tipo].estoqueMax);
+
   const rotulo = entrada.composicao ? COMPOSICAO_LABEL[entrada.composicao] : null;
   const titulo = cortarTitulo(rotulo ? `${p.nome} ${rotulo}` : p.nome);
 
@@ -170,9 +199,9 @@ export async function publicarNoMl(
     category_id: ehPeixe ? CATEGORIA_PEIXE : undefined,
     price: Number(entrada.preco.toFixed(2)),
     currency_id: "BRL",
-    available_quantity: disponivel,
+    available_quantity: quantidade,
     buying_mode: "buy_it_now",
-    listing_type_id: LISTING_TYPE,
+    listing_type_id: tipo,
     condition: "new",
     // A categoria de peixe não usa Mercado Envios: o frete é combinado, que é
     // justamente o que permite mandar bicho vivo no isopor.
@@ -209,7 +238,7 @@ export async function publicarNoMl(
       itemId,
       variationId: null,
       titulo,
-      estoqueEnviado: disponivel,
+      estoqueEnviado: quantidade,
       sincronizadoEm: new Date(),
     },
   });

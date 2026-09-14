@@ -12,7 +12,14 @@ import {
   urlAutorizacao,
 } from "@/lib/mercadolivre/cliente";
 import { sincronizarEstoqueMl } from "@/lib/mercadolivre/estoque";
-import { publicarNoMl, CATEGORIA_PEIXE, LISTING_TYPE } from "@/lib/mercadolivre/publicar";
+import {
+  publicarNoMl,
+  CATEGORIA_PEIXE,
+  LISTING_TYPE,
+  TIPOS_ANUNCIO,
+  ehTipoAnuncio,
+  type TipoAnuncio,
+} from "@/lib/mercadolivre/publicar";
 import { sugerirPreco } from "@/lib/mercadolivre/precos";
 import type { TipoComposicao } from "@/lib/generated/prisma/enums";
 
@@ -370,6 +377,7 @@ export async function publicarProdutoNoMl(dados: {
   productId: string;
   composicao: TipoComposicao | null;
   preco: number;
+  tipoAnuncio?: string;
 }): Promise<MlActionResult> {
   const membro = await assertPermissao("config.editar");
 
@@ -378,10 +386,17 @@ export async function publicarProdutoNoMl(dados: {
     return { ok: false, erro: "Informe o preço do anúncio." };
   }
 
+  // Tipo vem do cliente: normaliza para os três que existem, em vez de confiar.
+  const tipo: TipoAnuncio =
+    dados.tipoAnuncio && ehTipoAnuncio(dados.tipoAnuncio)
+      ? dados.tipoAnuncio
+      : LISTING_TYPE;
+
   const r = await publicarNoMl({
     productId: dados.productId,
     composicao: dados.composicao,
     preco,
+    tipoAnuncio: tipo,
   });
   if (!r.ok) return { ok: false, erro: r.erro };
 
@@ -389,8 +404,8 @@ export async function publicarProdutoNoMl(dados: {
     acao: "config.mercadolivre.publicar",
     entidade: "MercadoLivreAnuncio",
     entidadeId: r.dados.itemId,
-    descricao: `Publicou o anúncio ${r.dados.itemId} no Mercado Livre (pausado) por R$ ${preco.toFixed(2).replace(".", ",")}`,
-    depois: { itemId: r.dados.itemId, composicao: dados.composicao, preco },
+    descricao: `Publicou o anúncio ${r.dados.itemId} no Mercado Livre (${TIPOS_ANUNCIO[tipo].nome}, pausado) por R$ ${preco.toFixed(2).replace(".", ",")}`,
+    depois: { itemId: r.dados.itemId, composicao: dados.composicao, preco, tipo },
   });
 
   revalidatePath(CAMINHO);
@@ -403,12 +418,19 @@ export async function publicarProdutoNoMl(dados: {
   };
 }
 
-export type PrecoSugerido = {
-  precoSite: number;
+export type OpcaoTipoAnuncio = {
+  tipoAnuncio: TipoAnuncio;
+  tipoNome: string;
+  percentual: number;
   precoSugerido: number;
   comissao: number;
-  percentual: number;
-  tipoNome: string;
+  /** Teto de estoque do tipo (o Grátis só aceita 1 por anúncio). */
+  estoqueMax: number;
+};
+
+export type PrecoSugerido = {
+  precoSite: number;
+  opcoes: OpcaoTipoAnuncio[];
 };
 
 /**
@@ -450,21 +472,29 @@ export async function sugerirPrecoMl(dados: {
     };
   }
 
-  const r = await sugerirPreco({
-    categoriaId: CATEGORIA_PEIXE,
-    listingTypeId: LISTING_TYPE,
-    precoSite,
-  });
-  if (!r.ok) return { ok: false, erro: r.erro };
-
-  return {
-    ok: true,
-    dados: {
-      precoSite: r.dados.precoSite,
+  // Os três de uma vez: a escolha do tipo é comercial, e comparar comissão com
+  // o preço já ajustado ao lado é o que torna a decisão possível.
+  const tipos = Object.keys(TIPOS_ANUNCIO) as TipoAnuncio[];
+  const opcoes: OpcaoTipoAnuncio[] = [];
+  for (const t of tipos) {
+    const r = await sugerirPreco({
+      categoriaId: CATEGORIA_PEIXE,
+      listingTypeId: t,
+      precoSite,
+    });
+    if (!r.ok) continue; // tipo indisponível na categoria: some da lista
+    opcoes.push({
+      tipoAnuncio: t,
+      tipoNome: TIPOS_ANUNCIO[t].nome,
+      percentual: r.dados.percentual,
       precoSugerido: r.dados.precoSugerido,
       comissao: r.dados.comissao,
-      percentual: r.dados.percentual,
-      tipoNome: r.dados.tipoNome,
-    },
-  };
+      estoqueMax: TIPOS_ANUNCIO[t].estoqueMax,
+    });
+  }
+  if (opcoes.length === 0) {
+    return { ok: false, erro: "O ML não devolveu tarifa para nenhum tipo de anúncio." };
+  }
+
+  return { ok: true, dados: { precoSite, opcoes } };
 }
