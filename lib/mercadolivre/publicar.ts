@@ -2,6 +2,7 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { chamarMl, type MlResult } from "./cliente";
 import { COMPOSICAO_LABEL } from "@/lib/composicoes";
+import { tituloPeixeMl, atributosPeixe } from "./seo";
 import { stripMarcheziSignature } from "@/lib/constants";
 import { descricaoEmTextoSimples } from "@/lib/markdown";
 import type { TipoComposicao } from "@/lib/generated/prisma/enums";
@@ -47,9 +48,7 @@ export function ehTipoAnuncio(v: string): v is TipoAnuncio {
   return v in TIPOS_ANUNCIO;
 }
 
-/** Valores obrigatórios da categoria, lidos da própria API do ML. */
-const ESPECIE_GUPPY = "3221175";
-const AGUA_DOCE = "3221180";
+/** Gênero por composição. Os demais valores da ficha moram em ./seo. */
 const GENERO = {
   MACHO: "3896960",
   FEMEA: "3896959",
@@ -118,6 +117,7 @@ export async function publicarNoMl(
       nome: true,
       descricao: true,
       descricaoCurta: true,
+      padraoCor: true,
       tipo: true,
       estoque: true,
       estoqueMachos: true,
@@ -173,7 +173,12 @@ export async function publicarNoMl(
   const quantidade = Math.min(disponivel, TIPOS_ANUNCIO[tipo].estoqueMax);
 
   const rotulo = entrada.composicao ? COMPOSICAO_LABEL[entrada.composicao] : null;
-  const titulo = cortarTitulo(rotulo ? `${p.nome} ${rotulo}` : p.nome);
+  // Peixe ganha título montado para a BUSCA do ML (ver lib/mercadolivre/seo):
+  // o nome da vitrine gasta caracteres com travessão e "Premium", que ninguém
+  // digita, e deixa de fora "peixe", "lebiste" e "vivo", que é o que se busca.
+  const titulo = ehPeixe
+    ? tituloPeixeMl({ nome: p.nome, composicao: rotulo })
+    : cortarTitulo(rotulo ? `${p.nome} ${rotulo}` : p.nome);
 
   const corpo = [
     stripMarcheziSignature(p.descricao || p.descricaoCurta || p.nome),
@@ -186,12 +191,17 @@ export async function publicarNoMl(
     "\n\nEnvio combinado com o vendedor, em caixa preparada para transporte de peixe vivo.",
   ].join("");
 
-  const atributos: { id: string; value_id?: string; value_name?: string }[] = ehPeixe
-    ? [
-        { id: "FISH_SPECIES", value_id: ESPECIE_GUPPY },
-        { id: "ANIMAL_GENDER", value_id: generoDaComposicao(entrada.composicao) },
-        { id: "REQUIRED_WATER_TYPE", value_id: AGUA_DOCE },
-      ]
+  // Ficha técnica vale ranqueamento: o ML usa os atributos nos FILTROS da busca,
+  // e anúncio sem ficha some quando o comprador filtra por espécie, cor ou
+  // quantidade. Os obrigatórios são três; mandamos o que mais der para saber.
+  const atributos = ehPeixe
+    ? atributosPeixe({
+        genero: generoDaComposicao(entrada.composicao),
+        quantidadePeixes: receita
+          ? receita.qtdMachos + receita.qtdFemeas
+          : null,
+        textoParaCor: `${p.nome} ${p.padraoCor ?? ""}`,
+      })
     : [];
 
   const item = {
