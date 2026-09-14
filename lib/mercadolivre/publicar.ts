@@ -20,7 +20,10 @@ import type { TipoComposicao } from "@/lib/generated/prisma/enums";
 
 /** Categoria de peixe vivo. Conferido na API: aceita anúncio e NÃO usa Mercado
  *  Envios (`shipping_options: ["custom"]`), que é o que viabiliza bicho vivo. */
-const CATEGORIA_PEIXE = "MLB1098";
+export const CATEGORIA_PEIXE = "MLB1098";
+
+/** Clássico. Premium cobra 17,5% contra 12,5% — a diferença sai da margem. */
+export const LISTING_TYPE = "gold_special";
 
 /** Valores obrigatórios da categoria, lidos da própria API do ML. */
 const ESPECIE_GUPPY = "3221175";
@@ -169,7 +172,7 @@ export async function publicarNoMl(
     currency_id: "BRL",
     available_quantity: disponivel,
     buying_mode: "buy_it_now",
-    listing_type_id: "gold_special",
+    listing_type_id: LISTING_TYPE,
     condition: "new",
     // A categoria de peixe não usa Mercado Envios: o frete é combinado, que é
     // justamente o que permite mandar bicho vivo no isopor.

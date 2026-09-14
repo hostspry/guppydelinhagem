@@ -12,7 +12,8 @@ import {
   urlAutorizacao,
 } from "@/lib/mercadolivre/cliente";
 import { sincronizarEstoqueMl } from "@/lib/mercadolivre/estoque";
-import { publicarNoMl } from "@/lib/mercadolivre/publicar";
+import { publicarNoMl, CATEGORIA_PEIXE, LISTING_TYPE } from "@/lib/mercadolivre/publicar";
+import { sugerirPreco } from "@/lib/mercadolivre/precos";
 import type { TipoComposicao } from "@/lib/generated/prisma/enums";
 
 /**
@@ -399,5 +400,71 @@ export async function publicarProdutoNoMl(dados: {
   return {
     ok: true,
     mensagem: `Anúncio ${r.dados.itemId} criado e PAUSADO. Revise no ML e ative quando quiser.`,
+  };
+}
+
+export type PrecoSugerido = {
+  precoSite: number;
+  precoSugerido: number;
+  comissao: number;
+  percentual: number;
+  tipoNome: string;
+};
+
+/**
+ * Preço a anunciar para o líquido continuar sendo o preço do site.
+ *
+ * A tarifa é perguntada ao ML na hora, por categoria e tipo de anúncio — não é
+ * número decorado aqui, porque eles mexem nisso e a categoria muda a conta.
+ */
+export async function sugerirPrecoMl(dados: {
+  productId: string;
+  composicao: TipoComposicao | null;
+}): Promise<{ ok: true; dados: PrecoSugerido } | { ok: false; erro: string }> {
+  await assertPermissao("config.editar");
+
+  const p = await prisma.product.findUnique({
+    where: { id: dados.productId },
+    select: {
+      tipo: true,
+      preco: true,
+      variantes: {
+        where: { ativo: true },
+        select: { composicao: true, preco: true },
+      },
+    },
+  });
+  if (!p) return { ok: false, erro: "Produto não encontrado." };
+
+  const variante = dados.composicao
+    ? p.variantes.find((v) => v.composicao === dados.composicao)
+    : null;
+  const precoSite = Number(variante?.preco ?? p.preco);
+  if (!(precoSite > 0)) return { ok: false, erro: "Produto sem preço no site." };
+
+  // Produto seco ainda não tem categoria decidida aqui; a do peixe é fixa.
+  if (p.tipo !== "PEIXE") {
+    return {
+      ok: false,
+      erro: "Sugestão de preço disponível só para peixe por enquanto (a categoria do seco varia por produto).",
+    };
+  }
+
+  const r = await sugerirPreco({
+    categoriaId: CATEGORIA_PEIXE,
+    listingTypeId: LISTING_TYPE,
+    precoSite,
+  });
+  if (!r.ok) return { ok: false, erro: r.erro };
+
+  return {
+    ok: true,
+    dados: {
+      precoSite: r.dados.precoSite,
+      precoSugerido: r.dados.precoSugerido,
+      comissao: r.dados.comissao,
+      percentual: r.dados.percentual,
+      tipoNome: r.dados.tipoNome,
+    },
   };
 }

@@ -24,7 +24,9 @@ import {
   desligarAnuncioMl,
   salvarLicencaIbama,
   publicarProdutoNoMl,
+  sugerirPrecoMl,
   type AnuncioMl,
+  type PrecoSugerido,
 } from "@/actions/mercadolivre";
 import { COMPOSICAO_LABEL } from "@/lib/composicoes";
 import type { TipoComposicao } from "@/lib/generated/prisma/enums";
@@ -101,6 +103,7 @@ export function ConfigMercadoLivre({
   const [publProduto, setPublProduto] = useState("");
   const [publComposicao, setPublComposicao] = useState("");
   const [publPreco, setPublPreco] = useState("");
+  const [sugestao, setSugestao] = useState<PrecoSugerido | null>(null);
   const [pending, startTransition] = useTransition();
 
   const produtoSel = produtos.find((p) => p.id === publProduto) ?? null;
@@ -397,11 +400,26 @@ export function ConfigMercadoLivre({
             <select
               value={publComposicao}
               onChange={(e) => {
-                setPublComposicao(e.target.value);
-                const c = produtoSel?.composicoes.find(
-                  (x) => x.composicao === e.target.value,
-                );
+                const comp = e.target.value;
+                setPublComposicao(comp);
+                setSugestao(null);
+                const c = produtoSel?.composicoes.find((x) => x.composicao === comp);
                 setPublPreco(c ? String(c.preco) : "");
+                if (!comp || !publProduto) return;
+                // Pergunta a tarifa ao ML e já sobe o preço para o líquido
+                // continuar sendo o do site.
+                startTransition(async () => {
+                  const r = await sugerirPrecoMl({
+                    productId: publProduto,
+                    composicao: comp as TipoComposicao,
+                  });
+                  if (!r.ok) {
+                    toast.error(r.erro);
+                    return;
+                  }
+                  setSugestao(r.dados);
+                  setPublPreco(r.dados.precoSugerido.toFixed(2));
+                });
               }}
               disabled={!produtoSel || produtoSel.composicoes.length === 0}
               className={input}
@@ -432,6 +450,17 @@ export function ConfigMercadoLivre({
             />
           </label>
         </div>
+
+        {sugestao && (
+          <p className="text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-md p-2 leading-relaxed">
+            No site sai por <strong>R$ {sugestao.precoSite.toFixed(2)}</strong>. O
+            ML cobra {(sugestao.percentual * 100).toFixed(1)}% de comissão no{" "}
+            {sugestao.tipoNome}, então anunciando por{" "}
+            <strong>R$ {sugestao.precoSugerido.toFixed(2)}</strong> você recebe os
+            mesmos R$ {sugestao.precoSite.toFixed(2)} (comissão de R${" "}
+            {sugestao.comissao.toFixed(2)}). O frete é combinado à parte.
+          </p>
+        )}
 
         {produtoSel && !produtoSel.temFoto && (
           <p className="flex items-start gap-1.5 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md p-2">
