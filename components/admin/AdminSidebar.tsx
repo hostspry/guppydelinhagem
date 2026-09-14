@@ -17,6 +17,7 @@ import {
   Ticket,
   Fish,
   Receipt,
+  Store,
   CreditCard,
   Megaphone,
   ShieldCheck,
@@ -88,6 +89,12 @@ const NAV_SECTIONS: NavSection[] = [
         label: "Cobranças",
         icon: Receipt,
         permissao: "pedidos.ver",
+      },
+      {
+        href: "/admin/configuracoes/mercado-livre",
+        label: "Mercado Livre",
+        icon: Store,
+        permissao: "config.editar",
       },
       {
         href: "/admin/cartoes",

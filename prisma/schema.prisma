@@ -65,6 +65,7 @@ enum OrigemVenda {
   SITE
   WHATSAPP
   SHOPEE
+  MERCADO_LIVRE
 }
 
 enum ProviderPagamento {
@@ -353,14 +354,15 @@ model Product {
   criadoEm              DateTime    @default(now())
   atualizadoEm          DateTime    @updatedAt
 
-  category   Category         @relation(fields: [categoryId], references: [id])
-  imagens    ProductImage[]
-  videos     ProductVideo[]
-  waitlist   WaitlistEntry[]
-  orderItems OrderItem[]
-  variantes  ProductVariant[]
-  cupons     CupomDesconto[]  @relation("CupomProdutos")
-  shopee     ShopeeAnuncio[]
+  category     Category              @relation(fields: [categoryId], references: [id])
+  imagens      ProductImage[]
+  videos       ProductVideo[]
+  waitlist     WaitlistEntry[]
+  orderItems   OrderItem[]
+  variantes    ProductVariant[]
+  cupons       CupomDesconto[]       @relation("CupomProdutos")
+  shopee       ShopeeAnuncio[]
+  mercadoLivre MercadoLivreAnuncio[]
 }
 
 // Composição de venda (trio/casal/macho/fêmea/lote). Só produtos PEIXE têm
@@ -614,6 +616,63 @@ model Pagamento {
   @@index([orderId])
 }
 
+/// Credenciais e tokens da integração com o Mercado Livre.
+///
+/// Mesma forma da IntegracaoShopee, com uma diferença que manda no código: o
+/// refresh_token do ML é de USO ÚNICO. Cada renovação devolve um novo, e quem
+/// não gravar o novo perde a autorização e obriga o dono a autorizar de novo.
+model IntegracaoMercadoLivre {
+  id    String  @id @default("default")
+  ativo Boolean @default(false)
+
+  /// App ID da aplicação criada em developers.mercadolivre.com.br.
+  clientId                  String?
+  clientSecretCriptografado String?
+
+  /// Vendedor autorizado (user_id do ML) e o apelido dele, para o painel
+  /// mostrar qual conta está ligada sem precisar consultar a API.
+  sellerId String?
+  apelido  String?
+
+  accessTokenCriptografado  String?
+  refreshTokenCriptografado String?
+  /// access_token dura 6 h. A renovação acontece antes disso.
+  tokenExpiraEm             DateTime?
+  /// refresh_token vale 6 meses. Renovando sempre, a corrente não quebra.
+  refreshEmitidoEm          DateTime?
+
+  ultimaSincronizacaoEm DateTime?
+  ultimoErro            String?
+
+  atualizadoEm DateTime @updatedAt
+}
+
+/// Produto do site ligado a um anúncio do Mercado Livre.
+///
+/// Ligação explícita, feita no painel, pelo mesmo motivo da Shopee: título de
+/// marketplace é escrito para busca, e casar por semelhança sincronizaria o
+/// estoque do produto errado.
+model MercadoLivreAnuncio {
+  id        String  @id @default(cuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  /// item_id do anúncio (MLB…).
+  itemId      String
+  /// id da variação, quando o anúncio tem variações. Nulo = anúncio simples.
+  variationId String?
+  titulo      String?
+
+  estoqueEnviado Int?
+  sincronizadoEm DateTime?
+  ultimoErro     String?
+
+  criadoEm DateTime @default(now())
+
+  @@unique([itemId, variationId])
+  @@index([productId])
+}
+
 /// Etapa em que a tentativa de cartão morreu.
 enum EtapaCartao {
   SDK // o SDK/Brick do gateway não carregou no navegador do cliente
@@ -632,20 +691,20 @@ enum EtapaCartao {
 ///
 /// NUNCA guarda dado de cartão (número, CVV, token): só o motivo e o contexto.
 model TentativaCartao {
-  id           String            @id @default(cuid())
+  id           String             @id @default(cuid())
   etapa        EtapaCartao
   provider     ProviderPagamento?
   mensagem     String // motivo técnico (gateway ou navegador)
   statusDetail String? // status_detail do gateway, quando houver
-  valor        Decimal?          @db.Decimal(10, 2)
+  valor        Decimal?           @db.Decimal(10, 2)
   parcelas     Int?
-  deviceOk     Boolean           @default(false) // fingerprint do antifraude chegou?
+  deviceOk     Boolean            @default(false) // fingerprint do antifraude chegou?
   orderId      String? // pedido, quando já existia
   numero       String? // snapshot do número do pedido
   email        String? // p/ chamar o cliente de volta
   telefone     String?
   userAgent    String?
-  criadoEm     DateTime          @default(now())
+  criadoEm     DateTime           @default(now())
 
   @@index([criadoEm])
   @@index([etapa, criadoEm])
