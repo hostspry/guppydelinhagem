@@ -33,6 +33,10 @@ const VAR_NUMERO: VariavelTemplate = {
   nome: "numero",
   descricao: "Número do pedido (ex.: #2026-0041)",
 };
+const VAR_QUANDO_POSTOU: VariavelTemplate = {
+  nome: "quando_postou",
+  descricao: "Dia da postagem: “hoje”, “ontem” ou “no dia 12/09”",
+};
 
 export const TEMPLATES: TemplateDef[] = [
   {
@@ -88,12 +92,13 @@ export const TEMPLATES: TemplateDef[] = [
   },
   {
     chave: "pedido-enviado",
-    rotulo: "Pedido enviado (bicho vivo)",
+    rotulo: "Encomenda postada (bicho vivo)",
     quando:
-      "Sai quando o pedido com bicho vivo é despachado. Contém a instrução de aclimatar o saquinho.",
+      "Sai quando a transportadora registra a postagem do pedido com bicho vivo, quando o envio é registrado à mão ou quando um código de rastreio é adicionado. Contém a instrução de aclimatar o saquinho.",
     variaveis: [
       VAR_NOME,
       VAR_NUMERO,
+      VAR_QUANDO_POSTOU,
       {
         nome: "transportadora",
         descricao: "Nome da transportadora (vazio se não houver)",
@@ -113,12 +118,13 @@ export const TEMPLATES: TemplateDef[] = [
   },
   {
     chave: "pedido-enviado-seco",
-    rotulo: "Pedido enviado (sem bicho vivo)",
+    rotulo: "Encomenda postada (sem bicho vivo)",
     quando:
-      "Mesma hora do “Pedido enviado”, quando não vai bicho vivo na caixa — sem a instrução de aclimatar o saquinho.",
+      "Mesma hora da “Encomenda postada”, quando não vai bicho vivo na caixa — sem a instrução de aclimatar o saquinho.",
     variaveis: [
       VAR_NOME,
       VAR_NUMERO,
+      VAR_QUANDO_POSTOU,
       {
         nome: "transportadora",
         descricao: "Nome da transportadora (vazio se não houver)",

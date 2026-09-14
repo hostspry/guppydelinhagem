@@ -11,6 +11,7 @@ import type { EnderecoEntrega } from "@/lib/validations/pedido";
 import { ehCargaViva } from "@/lib/frete-tipos";
 import { botao, destaque, listaItens, moeda } from "./layout";
 import { montarEmail } from "./render";
+import { FUSO } from "@/lib/rastreio/periodo";
 
 /**
  * E-mails do ciclo do pedido para o CLIENTE.
@@ -40,6 +41,7 @@ type DadosPedido = {
   servicoEnvioNome: string | null;
   codigoRastreio: string | null;
   selfTracking: string | null;
+  enviadoEm: Date | null;
 };
 
 async function carregar(orderId: string): Promise<DadosPedido | null> {
@@ -55,6 +57,7 @@ async function carregar(orderId: string): Promise<DadosPedido | null> {
         servicoEnvioNome: true,
         codigoRastreio: true,
         selfTracking: true,
+        enviadoEm: true,
         enderecoEntrega: true,
         cliente: { select: { nome: true, email: true } },
         items: {
@@ -92,6 +95,7 @@ async function carregar(orderId: string): Promise<DadosPedido | null> {
       servicoEnvioNome: o.servicoEnvioNome,
       codigoRastreio: o.codigoRastreio,
       selfTracking: o.selfTracking,
+      enviadoEm: o.enviadoEm,
     };
   } catch (e) {
     console.error("[email-pedido] carregar", e);
@@ -100,6 +104,24 @@ async function carregar(orderId: string): Promise<DadosPedido | null> {
 }
 
 const primeiroNome = (n: string) => n.trim().split(/\s+/)[0] || n.trim();
+
+/** Dia do calendário em São Paulo, "AAAA-MM-DD". O servidor roda em UTC. */
+const diaSp = (d: Date) =>
+  new Intl.DateTimeFormat("en-CA", { timeZone: FUSO }).format(d);
+
+/**
+ * "hoje", "ontem" ou "no dia 12/09". Sem data de envio (status mudado à mão,
+ * sem passar pelo registro de envio) conta como agora, que é quando o dono
+ * disse que saiu.
+ */
+function quandoPostou(enviadoEm: Date | null, agora = new Date()): string {
+  const quando = enviadoEm ?? agora;
+  const dia = diaSp(quando);
+  if (dia === diaSp(agora)) return "hoje";
+  if (dia === diaSp(new Date(agora.getTime() - 24 * 60 * 60 * 1000))) return "ontem";
+  const [, mes, d] = dia.split("-");
+  return `no dia ${d}/${mes}`;
+}
 
 /** Pagamento confirmado. Um só por pedido — quem chama já tem a trava. */
 export async function emailPedidoPago(orderId: string): Promise<boolean> {
@@ -134,7 +156,13 @@ export async function emailPedidoPago(orderId: string): Promise<boolean> {
   return enviarEmail({ para: d.email, assunto: email.assunto, html: email.html });
 }
 
-/** Pedido despachado, com o código de rastreio quando existe. */
+/**
+ * Encomenda postada, com o código de rastreio quando existe.
+ *
+ * Sai na postagem de verdade (o cron vê o ME marcar "posted"), no registro
+ * manual de envio e quando entra um código de rastreio. NÃO sai na compra da
+ * etiqueta: ali a caixa ainda está em casa, e o texto diz que foi postada.
+ */
 export async function emailPedidoEnviado(orderId: string): Promise<boolean> {
   const d = await carregar(orderId);
   if (!d?.email || d.ehCobranca) return false;
@@ -158,17 +186,18 @@ export async function emailPedidoEnviado(orderId: string): Promise<boolean> {
     {
       nome: primeiroNome(d.nome),
       numero: d.numero,
+      quando_postou: quandoPostou(d.enviadoEm),
       // Sai por extenso na frase; vazio quando não há transportadora definida.
       transportadora: transp ? `pela ${transp}` : "",
       rastreio: codigo ?? "",
       caixa_rastreio: codigo ? destaque("Código de rastreio", codigo) : "",
       botao_rastrear: url ? botao("Rastrear entrega", url) : "",
     },
-    codigo ? `Código de rastreio: ${codigo}` : `Pedido ${d.numero} despachado.`,
+    codigo ? `Código de rastreio: ${codigo}` : `Pedido ${d.numero} postado.`,
   );
   if (!email) return false;
 
   // O código no assunto ajuda quem procura o e-mail depois.
-  const assunto = codigo ? `${email.assunto} — rastreio ${codigo}` : email.assunto;
+  const assunto = codigo ? `${email.assunto} (rastreio ${codigo})` : email.assunto;
   return enviarEmail({ para: d.email, assunto, html: email.html });
 }

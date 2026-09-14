@@ -539,13 +539,8 @@ export async function comprarEtiquetaDoPedido(
     },
   });
 
-  // Avisa o cliente com o código de rastreio. Fora do caminho crítico de
-  // propósito: a etiqueta já foi paga e gerada, e falha de e-mail (caixa cheia,
-  // SMTP fora) não pode fazer a ação inteira parecer que deu errado. Se falhar,
-  // o dono reenvia pelo botão no card de envio.
-  void emailPedidoEnviado(orderId).catch((e) =>
-    console.error("[etiqueta] e-mail de rastreio", e),
-  );
+  // Sem e-mail ao cliente aqui: a caixa ainda está em casa. O "encomenda
+  // postada" sai quando a transportadora registra a postagem (lib/rastreio-sync).
 
   await auditar(membro, {
     acao: "pedido.envio",
@@ -654,12 +649,22 @@ export async function reenviarRastreio(orderId: string): Promise<ReenvioResult> 
     where: { id: orderId },
     select: {
       numero: true,
+      status: true,
       selfTracking: true,
       codigoRastreio: true,
       cliente: { select: { email: true } },
     },
   });
   if (!order) return { success: false, error: "Pedido não encontrado." };
+  // O e-mail diz que a encomenda foi postada. Com a etiqueta comprada e a caixa
+  // ainda em casa, mandar agora seria mentir para o cliente.
+  if (order.status === "PAGO") {
+    return {
+      success: false,
+      error:
+        "O pacote ainda não foi postado. O e-mail sai sozinho quando a transportadora registrar a postagem.",
+    };
+  }
 
   const para = order.cliente?.email;
   if (!para) {

@@ -4,10 +4,14 @@ import { rastrearEnvios, listarEnvios } from "@/lib/melhorenvio";
 import { gravarEnvioTx } from "@/lib/pedido-envio";
 import { buildTrackingUrl } from "@/lib/tracking";
 import {
+  notificarLoteEnviado,
   notificarPedidoEnviado,
   notificarPedidoEntregue,
   notificarRastreioAtualizado,
 } from "@/lib/notificacoes";
+import { emailPedidoEnviado } from "@/lib/emails/pedido";
+
+type LinhaLote = Parameters<typeof notificarLoteEnviado>[0][number];
 
 // Sincroniza o rastreio dos pedidos com o Melhor Envio. DUAS partes:
 //  - reconciliar: casa envios comprados no PAINEL do ME com pedidos ainda sem
@@ -160,6 +164,7 @@ async function pollStatus(): Promise<{
       meShipmentId: true,
       selfTracking: true,
       codigoRastreio: true,
+      enderecoEntrega: true,
       cliente: { select: { nome: true } },
     },
   });
@@ -183,6 +188,7 @@ async function pollStatus(): Promise<{
     url: string | null;
   }[] = [];
   let entregues = 0;
+  const postados: { id: string; lote: LinhaLote }[] = [];
 
   for (const rastreio of r.data) {
     const pedido = porShipment.get(rastreio.meShipmentId);
@@ -223,9 +229,11 @@ async function pollStatus(): Promise<{
     });
 
     // Postado de verdade: PAGO vira ENVIADO, com evento e aviso ao cliente no
-    // painel dele. Sem e-mail daqui — o cliente já recebeu o rastreio quando a
-    // etiqueta foi comprada, e dois e-mails do mesmo envio confundem.
+    // painel dele, e o e-mail "encomenda postada" (depois do laço). É a ÚNICA
+    // hora em que o e-mail sai para etiqueta comprada pelo site: a compra não
+    // avisa, porque a caixa ainda está em casa.
     if (pedido.status === "PAGO" && rastreio.status && POSTADO.has(rastreio.status)) {
+      const codigo = pedido.codigoRastreio ?? rastreio.tracking ?? rastreio.selfTracking;
       await prisma.$transaction((tx) =>
         gravarEnvioTx(tx, {
           id: pedido.id,
@@ -233,9 +241,20 @@ async function pollStatus(): Promise<{
           clienteId: pedido.clienteId,
           userId: pedido.userId,
           transportadora: pedido.transportadora,
-          codigo: pedido.codigoRastreio ?? rastreio.tracking ?? rastreio.selfTracking,
+          codigo,
         }),
       );
+      const e = (pedido.enderecoEntrega ?? {}) as { cidade?: string | null; uf?: string | null };
+      postados.push({
+        id: pedido.id,
+        lote: {
+          numero: pedido.numero,
+          cliente: pedido.cliente.nome,
+          cidade: e.cidade ?? null,
+          uf: e.uf ?? null,
+          rastreio: codigo,
+        },
+      });
     }
 
     const url = buildTrackingUrl(
@@ -262,6 +281,19 @@ async function pollStatus(): Promise<{
   }
 
   if (avisos.length > 0) await notificarRastreioAtualizado(avisos);
+
+  // Mesmo acordo do envio em lote do painel: um postado → 🚚 individual (que já
+  // manda o e-mail); vários → uma mensagem só para a loja e o e-mail de cada um.
+  if (postados.length === 1) {
+    await notificarPedidoEnviado(postados[0].id);
+  } else if (postados.length >= 2) {
+    await notificarLoteEnviado(postados.map((p) => p.lote));
+    for (const p of postados) {
+      await emailPedidoEnviado(p.id).catch((e) =>
+        console.error(`[rastreio-sync] e-mail de postado ${p.lote.numero}`, e),
+      );
+    }
+  }
 
   return {
     verificados: r.data.length,

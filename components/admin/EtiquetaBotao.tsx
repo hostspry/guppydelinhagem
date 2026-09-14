@@ -71,8 +71,8 @@ export function EtiquetaBotao({
   });
 
   if (etiquetaUrl) {
-    // Comprada. O e-mail com o rastreio já saiu sozinho aqui; o botão existe
-    // porque e-mail some (spam, caixa cheia, cliente apagou sem ler).
+    // Comprada. O e-mail com o rastreio sai sozinho quando a postagem é
+    // registrada; o botão existe porque e-mail some (spam, caixa cheia).
     return (
       <div className="flex flex-wrap gap-2">
         <ImprimirEtiqueta orderId={orderId} />

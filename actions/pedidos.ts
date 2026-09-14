@@ -508,8 +508,9 @@ export async function registrarEnvioManual(
 }
 
 /**
- * Corrige o rastreio de um pedido JÁ enviado (erro de digitação). NÃO mexe no
- * status nem cria evento/notificação — é só correção.
+ * Adiciona ou corrige o rastreio de um pedido JÁ enviado. NÃO mexe no status
+ * nem cria evento. Se o código mudou, o cliente recebe o e-mail de novo com o
+ * código certo: quem recebeu um código errado (ou nenhum) precisa do bom.
  */
 export async function atualizarRastreio(
   id: string,
@@ -525,7 +526,7 @@ export async function atualizarRastreio(
 
   const order = await prisma.order.findUnique({
     where: { id },
-    select: { status: true },
+    select: { status: true, codigoRastreio: true },
   });
   if (!order) return { success: false, error: "Pedido não encontrado." };
   if (order.status !== "ENVIADO" && order.status !== "ENTREGUE") {
@@ -550,8 +551,20 @@ export async function atualizarRastreio(
     depois: { transportadora: input.transportadora, codigo: input.codigo },
   });
 
+  // Entregue não recebe: o pacote já chegou, rastreio novo só confunde.
+  const avisar =
+    order.status === "ENVIADO" && !!codigo && codigo !== (order.codigoRastreio ?? "");
+  if (avisar) {
+    void emailPedidoEnviado(id).catch((e) =>
+      console.error("[pedidos] e-mail de rastreio atualizado", e),
+    );
+  }
+
   revalidatePath(`/admin/pedidos/${id}`);
-  return { success: true, message: "Rastreio atualizado." };
+  return {
+    success: true,
+    message: avisar ? "Rastreio atualizado e enviado ao cliente por e-mail." : "Rastreio atualizado.",
+  };
 }
 
 // ── Envio rápido em LOTE (listagem) ───────────────────────────────────────────
