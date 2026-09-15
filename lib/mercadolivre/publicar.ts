@@ -1,11 +1,13 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import { chamarMl, type MlResult } from "./cliente";
-import { COMPOSICAO_LABEL } from "@/lib/composicoes";
+import { COMPOSICAO_LABEL, conjuntosDoPool } from "@/lib/composicoes";
 import { tituloPeixeMl, atributosPeixe, type AtributoMl } from "./seo";
 import { stripMarcheziSignature } from "@/lib/constants";
-import { descricaoEmTextoSimples } from "@/lib/markdown";
+import { descricaoEmParagrafos } from "@/lib/markdown";
 import type { TipoComposicao } from "@/lib/generated/prisma/enums";
+import { TEXTO_ENVIO_SEGUNDA } from "@/lib/envio-peixe";
+import { prazoMl, saleTermPrazo } from "./prazo";
 
 /**
  * Cria anúncio no Mercado Livre a partir de um produto do site.
@@ -72,18 +74,120 @@ function generoDaComposicao(c: TipoComposicao | null): string {
   return GENERO.MISTO;
 }
 
-/** Quantos conjuntos desta composição o pool sustenta. Mesma conta da loja. */
-function unidadesDoPool(
-  pool: { machos: number; femeas: number },
-  receita: { qtdMachos: number; qtdFemeas: number },
-): number {
-  const porM = receita.qtdMachos > 0 ? Math.floor(pool.machos / receita.qtdMachos) : Infinity;
-  const porF = receita.qtdFemeas > 0 ? Math.floor(pool.femeas / receita.qtdFemeas) : Infinity;
-  const u = Math.min(porM, porF);
-  return Number.isFinite(u) ? Math.max(0, u) : 0;
-}
-
 export type PublicacaoOk = { itemId: string; permalink: string | null; status: string };
+
+/**
+ * O anúncio como ele vai sair, antes de ir. A aba do produto mostra isto para o
+ * dono ver título, ficha e descrição sem publicar, e a publicação usa o mesmo
+ * objeto: o que se vê na prévia é exatamente o que vai.
+ */
+export type AnuncioMontado = {
+  titulo: string;
+  descricao: string;
+  atributos: AtributoMl[];
+  /** Conjuntos que o pool monta (peixe) ou estoque da linha (seco). */
+  disponivel: number;
+  quantidade: number;
+  fotos: string[];
+  ehPeixe: boolean;
+  receita: { qtdMachos: number; qtdFemeas: number } | null;
+};
+
+/** Monta o anúncio sem chamar o ML. Erro em texto quando falta algo do lado de cá. */
+export async function montarAnuncio(
+  entrada: Omit<EntradaPublicacao, "preco">,
+): Promise<MlResult<AnuncioMontado>> {
+  const cfg = await prisma.integracaoMercadoLivre.findUnique({
+    where: { id: "default" },
+    select: { licencaIbama: true },
+  });
+
+  const p = await prisma.product.findUnique({
+    where: { id: entrada.productId },
+    select: {
+      nome: true,
+      descricao: true,
+      descricaoCurta: true,
+      padraoCor: true,
+      tipo: true,
+      estoque: true,
+      estoqueMachos: true,
+      estoqueFemeas: true,
+      imagens: { orderBy: { ordem: "asc" }, select: { url: true } },
+      variantes: {
+        where: { ativo: true },
+        select: { composicao: true, qtdMachos: true, qtdFemeas: true },
+      },
+    },
+  });
+  if (!p) return { ok: false, erro: "Produto não encontrado." };
+
+  const ehPeixe = p.tipo === "PEIXE";
+
+  // Estoque: peixe sai do pool pela receita da composição; o resto, do estoque.
+  let disponivel = p.estoque;
+  let receita: { qtdMachos: number; qtdFemeas: number } | null = null;
+  if (ehPeixe) {
+    const v = p.variantes.find((x) => x.composicao === entrada.composicao);
+    if (!v) return { ok: false, erro: "Composição não encontrada neste produto." };
+    receita = { qtdMachos: v.qtdMachos, qtdFemeas: v.qtdFemeas };
+    disponivel = conjuntosDoPool(receita, {
+      machos: p.estoqueMachos,
+      femeas: p.estoqueFemeas,
+    });
+  }
+
+  const tipo = entrada.tipoAnuncio ?? LISTING_TYPE;
+  // O Grátis aceita 1 unidade por anúncio. Mandar mais faz o ML recusar a
+  // publicação inteira, então corta aqui e o resto do estoque fica no site.
+  const quantidade = Math.min(disponivel, TIPOS_ANUNCIO[tipo].estoqueMax);
+
+  const rotulo = entrada.composicao ? COMPOSICAO_LABEL[entrada.composicao] : null;
+  // Peixe ganha título montado para a BUSCA do ML (ver lib/mercadolivre/seo):
+  // o nome da vitrine gasta caracteres com travessão e "Premium", que ninguém
+  // digita, e deixa de fora "peixe", "lebiste" e "vivo", que é o que se busca.
+  const titulo = ehPeixe
+    ? tituloPeixeMl({ nome: p.nome, composicao: rotulo })
+    : cortarTitulo(rotulo ? `${p.nome} ${rotulo}` : p.nome);
+
+  const corpo = [
+    stripMarcheziSignature(p.descricao || p.descricaoCurta || p.nome),
+    receita
+      ? `\n\nO que vai no envio: ${receita.qtdMachos} macho(s) e ${receita.qtdFemeas} fêmea(s).`
+      : "",
+    ehPeixe && cfg?.licencaIbama
+      ? `\n\nPeixe ornamental vivo, criado em cativeiro. Licença IBAMA: ${cfg.licencaIbama}.`
+      : "",
+    ehPeixe
+      ? `\n\n${TEXTO_ENVIO_SEGUNDA}\n\nO peixe vai em caixa preparada para transporte de peixe vivo.`
+      : "",
+  ].join("");
+
+  // Ficha técnica vale ranqueamento: o ML usa os atributos nos FILTROS da busca,
+  // e anúncio sem ficha some quando o comprador filtra por espécie, cor ou
+  // quantidade. Os obrigatórios são três; mandamos o que mais der para saber.
+  const atributos = ehPeixe
+    ? atributosPeixe({
+        genero: generoDaComposicao(entrada.composicao),
+        quantidadePeixes: receita ? receita.qtdMachos + receita.qtdFemeas : null,
+        textoParaCor: `${p.nome} ${p.padraoCor ?? ""}`,
+      })
+    : [];
+
+  return {
+    ok: true,
+    dados: {
+      titulo,
+      descricao: descricaoEmParagrafos(corpo).slice(0, 50000),
+      atributos,
+      disponivel,
+      quantidade,
+      fotos: p.imagens.slice(0, 10).map((i) => i.url),
+      ehPeixe,
+      receita,
+    },
+  };
+}
 
 export type EntradaPublicacao = {
   productId: string;
@@ -110,103 +214,62 @@ export async function publicarNoMl(
     return { ok: false, erro: "Conecte a conta do Mercado Livre primeiro." };
   }
 
-  const p = await prisma.product.findUnique({
-    where: { id: entrada.productId },
-    select: {
-      id: true,
-      nome: true,
-      descricao: true,
-      descricaoCurta: true,
-      padraoCor: true,
-      tipo: true,
-      estoque: true,
-      estoqueMachos: true,
-      estoqueFemeas: true,
-      imagens: { orderBy: { ordem: "asc" }, select: { url: true } },
-      variantes: {
-        where: { ativo: true },
-        select: { composicao: true, qtdMachos: true, qtdFemeas: true, rotulo: true },
-      },
-    },
-  });
-  if (!p) return { ok: false, erro: "Produto não encontrado." };
+  const montado = await montarAnuncio(entrada);
+  if (!montado.ok) return montado;
+  const m = montado.dados;
+
+  // Produto seco não tem categoria decidida aqui: cada um cai numa categoria do
+  // ML com ficha obrigatória própria (marca, modelo, GTIN). Publicar sem isso
+  // volta erro do ML; melhor dizer o caminho que funciona.
+  if (!m.ehPeixe) {
+    return {
+      ok: false,
+      erro: "Publicar produto seco por aqui ainda não dá: cada categoria do ML pede uma ficha diferente. Publique no painel do ML e ligue o anúncio pelo número (MLB…).",
+    };
+  }
 
   // Foto é barreira real: o ML não publica anúncio sem imagem, e não aceita
   // link de vídeo no lugar. Melhor dizer isso aqui do que receber o erro cru.
-  if (p.imagens.length === 0) {
+  if (m.fotos.length === 0) {
     return {
       ok: false,
       erro: "Este produto não tem foto cadastrada, e o Mercado Livre não publica anúncio sem imagem. Suba as fotos no cadastro do produto e tente de novo.",
     };
   }
-
-  const ehPeixe = p.tipo === "PEIXE";
-  if (ehPeixe && !cfg.licencaIbama) {
+  if (!cfg.licencaIbama) {
     return {
       ok: false,
       erro: "Informe o número da licença do IBAMA nas configurações do Mercado Livre. Anúncio de peixe vivo sem ela é cancelado pelo ML.",
     };
   }
-
-  // Estoque: peixe sai do pool pela receita da composição; o resto, do estoque.
-  let disponivel = p.estoque;
-  let receita: { qtdMachos: number; qtdFemeas: number } | null = null;
-  if (ehPeixe) {
-    const v = p.variantes.find((x) => x.composicao === entrada.composicao);
-    if (!v) return { ok: false, erro: "Composição não encontrada neste produto." };
-    receita = { qtdMachos: v.qtdMachos, qtdFemeas: v.qtdFemeas };
-    disponivel = unidadesDoPool(
-      { machos: p.estoqueMachos, femeas: p.estoqueFemeas },
-      receita,
-    );
-  }
-  if (disponivel <= 0) {
+  if (m.quantidade <= 0) {
     return {
       ok: false,
       erro: "Sem estoque para esta composição. O ML recusa anúncio com quantidade zero.",
     };
   }
 
+  // Composição já anunciada: um segundo anúncio do mesmo peixe é duplicata, e o
+  // ML cancela os dois. Trocar tipo ou preço se faz no anúncio que existe.
+  const jaTem = await prisma.mercadoLivreAnuncio.findFirst({
+    where: { productId: entrada.productId, composicao: entrada.composicao },
+    select: { itemId: true },
+  });
+  if (jaTem) {
+    return {
+      ok: false,
+      erro: `Esta composição já está no anúncio ${jaTem.itemId}. Publicar outro é duplicata, e o ML cancela os dois. Edite o que existe.`,
+    };
+  }
+
   const tipo = entrada.tipoAnuncio ?? LISTING_TYPE;
-  // O Grátis aceita 1 unidade por anúncio. Mandar mais faz o ML recusar a
-  // publicação inteira, então corta aqui e o resto do estoque fica no site.
-  const quantidade = Math.min(disponivel, TIPOS_ANUNCIO[tipo].estoqueMax);
-
-  const rotulo = entrada.composicao ? COMPOSICAO_LABEL[entrada.composicao] : null;
-  // Peixe ganha título montado para a BUSCA do ML (ver lib/mercadolivre/seo):
-  // o nome da vitrine gasta caracteres com travessão e "Premium", que ninguém
-  // digita, e deixa de fora "peixe", "lebiste" e "vivo", que é o que se busca.
-  const titulo = ehPeixe
-    ? tituloPeixeMl({ nome: p.nome, composicao: rotulo })
-    : cortarTitulo(rotulo ? `${p.nome} ${rotulo}` : p.nome);
-
-  const corpo = [
-    stripMarcheziSignature(p.descricao || p.descricaoCurta || p.nome),
-    receita
-      ? `\n\nO que vai no envio: ${receita.qtdMachos} macho(s) e ${receita.qtdFemeas} fêmea(s).`
-      : "",
-    ehPeixe
-      ? `\n\nPeixe ornamental vivo, criado em cativeiro. Licença IBAMA: ${cfg.licencaIbama}.`
-      : "",
-    "\n\nEnvio combinado com o vendedor, em caixa preparada para transporte de peixe vivo.",
-  ].join("");
-
-  // Ficha técnica vale ranqueamento: o ML usa os atributos nos FILTROS da busca,
-  // e anúncio sem ficha some quando o comprador filtra por espécie, cor ou
-  // quantidade. Os obrigatórios são três; mandamos o que mais der para saber.
-  const atributos = ehPeixe
-    ? atributosPeixe({
-        genero: generoDaComposicao(entrada.composicao),
-        quantidadePeixes: receita
-          ? receita.qtdMachos + receita.qtdFemeas
-          : null,
-        textoParaCor: `${p.nome} ${p.padraoCor ?? ""}`,
-      })
-    : [];
+  const titulo = m.titulo;
+  const quantidade = m.quantidade;
+  const atributos = m.atributos;
 
   const item = {
     title: titulo,
-    category_id: ehPeixe ? CATEGORIA_PEIXE : undefined,
+    category_id: CATEGORIA_PEIXE,
     price: Number(entrada.preco.toFixed(2)),
     currency_id: "BRL",
     available_quantity: quantidade,
@@ -218,7 +281,10 @@ export async function publicarNoMl(
     shipping: { mode: "custom", local_pick_up: false, free_shipping: false },
     // Nasce pausado de propósito. Quem ativa é o dono, depois de conferir.
     status: "paused",
-    pictures: p.imagens.slice(0, 10).map((i) => ({ source: i.url })),
+    // Peixe sai só na segunda: o anúncio já nasce dizendo em quantos dias o
+    // pedido sai, e o cron mantém o número em dia (lib/mercadolivre/prazo).
+    sale_terms: [saleTermPrazo(prazoMl())],
+    pictures: m.fotos.map((url) => ({ source: url })),
     // SEM VÍDEO, e não por esquecimento: o ML desligou o vídeo do YouTube por
     // API em 09/2024. O campo `video_id` continua existindo no item e aceita o
     // PUT sem reclamar, mas o valor volta null — testado em produção. Hoje o
@@ -239,7 +305,7 @@ export async function publicarNoMl(
   // e o markdown do admin viraria lixo na tela do comprador.
   const descricao = await chamarMl(`/items/${itemId}/description`, {
     method: "POST",
-    body: { plain_text: descricaoEmTextoSimples(corpo).slice(0, 50000) },
+    body: { plain_text: m.descricao },
   });
   if (!descricao.ok) {
     console.error("[ml] anúncio criado sem descrição", itemId, descricao.erro);
@@ -248,11 +314,13 @@ export async function publicarNoMl(
   // Liga na hora: anúncio criado e não ligado é estoque que não sincroniza.
   await prisma.mercadoLivreAnuncio.create({
     data: {
-      productId: p.id,
+      productId: entrada.productId,
       itemId,
       variationId: null,
       titulo,
       tipoAnuncio: tipo,
+      composicao: entrada.composicao,
+      prazoEnvioDias: prazoMl(),
       estoqueEnviado: quantidade,
       sincronizadoEm: new Date(),
     },

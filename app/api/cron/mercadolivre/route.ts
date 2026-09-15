@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { renovarToken } from "@/lib/mercadolivre/cliente";
 import { importarPedidosMl } from "@/lib/mercadolivre/pedidos";
 import { sincronizarEstoqueMl } from "@/lib/mercadolivre/estoque";
+import { sincronizarPrazoEnvioMl } from "@/lib/mercadolivre/prazo";
 
 // Rodada do Mercado Livre: renova o token, importa pedidos e empurra o estoque.
 // Agendada no Coolify (Scheduled Task), como as outras. Bearer CRON_SECRET.
@@ -49,8 +50,10 @@ async function handle(request: Request): Promise<Response> {
 
   const pedidos = await importarPedidosMl();
   const estoque = await sincronizarEstoqueMl();
+  // Peixe sai só na segunda: o prazo no anúncio muda com o dia da semana.
+  const prazo = await sincronizarPrazoEnvioMl();
 
-  return NextResponse.json({ ok: true, pedidos, estoque });
+  return NextResponse.json({ ok: true, pedidos, estoque, prazo });
 }
 
 export const GET = handle;

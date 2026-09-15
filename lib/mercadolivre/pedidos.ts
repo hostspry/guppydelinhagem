@@ -234,6 +234,7 @@ async function gravarPedido(
       itemId: true,
       variationId: true,
       productId: true,
+      composicao: true,
       product: {
         select: {
           tipo: true,
@@ -260,11 +261,12 @@ async function gravarPedido(
 
     // Peixe precisa da RECEITA (machos/fêmeas) para baixar o pool. Sem ela, a
     // baixa não acontece e o estoque do site ficaria maior que a prateleira.
-    // O anúncio é criado a partir de uma composição, então usamos a padrão do
-    // produto quando não há como distinguir.
+    // A composição vem do anúncio (venda de macho baixa um macho, não um trio);
+    // só a ligação antiga, sem composição gravada, cai na padrão do produto.
     const variante =
       anuncio?.product.tipo === "PEIXE"
-        ? (anuncio.product.variantes.find((v) => v.padrao) ??
+        ? (anuncio.product.variantes.find((v) => v.composicao === anuncio.composicao) ??
+           anuncio.product.variantes.find((v) => v.padrao) ??
            anuncio.product.variantes[0] ??
            null)
         : null;

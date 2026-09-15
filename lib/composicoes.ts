@@ -31,6 +31,20 @@ export const composicaoDisponivel = (
   pool: { machos: number; femeas: number },
 ) => pool.machos >= v.qtdMachos && pool.femeas >= v.qtdFemeas;
 
+/**
+ * Quantos conjuntos desta composição o pool monta. É o estoque de um anúncio de
+ * marketplace: um anúncio de trio com 20 machos e 20 fêmeas tem 10, não 40.
+ */
+export function conjuntosDoPool(
+  receita: { qtdMachos: number; qtdFemeas: number },
+  pool: { machos: number; femeas: number },
+): number {
+  const porM = receita.qtdMachos > 0 ? Math.floor(pool.machos / receita.qtdMachos) : Infinity;
+  const porF = receita.qtdFemeas > 0 ? Math.floor(pool.femeas / receita.qtdFemeas) : Infinity;
+  const u = Math.min(porM, porF);
+  return Number.isFinite(u) ? Math.max(0, u) : 0;
+}
+
 export const ORDEM_COMPOSICAO: TipoComposicao[] = [
   "TRIO",
   "CASAL",

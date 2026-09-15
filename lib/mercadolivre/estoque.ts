@@ -2,6 +2,8 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { chamarMl } from "./cliente";
 import { estaEsgotado } from "@/lib/estoque";
+import { conjuntosDoPool } from "@/lib/composicoes";
+import type { TipoComposicao } from "@/lib/generated/prisma/enums";
 
 /**
  * Manda para o Mercado Livre o estoque que o site tem.
@@ -24,20 +26,38 @@ export type ResumoEstoqueMl = {
 /** O ML recusa estoque negativo. Pool negativo no site vira zero lá. */
 const paraMl = (estoque: number) => Math.max(0, Math.trunc(estoque));
 
-/**
- * Quanto este produto tem para vender no marketplace.
- *
- * Peixe é contado pelo POOL (machos + fêmeas), não pelo campo `estoque`, que no
- * peixe é só espelho. Sem isso, anúncio de guppy ficaria sempre zerado no ML.
- */
-function disponivel(p: {
+type ProdutoEstoque = {
   tipo: string;
   estoque: number;
   estoqueMachos: number;
   estoqueFemeas: number;
-}): number {
-  if (p.tipo === "PEIXE") return p.estoqueMachos + p.estoqueFemeas;
-  return p.estoque;
+  variantes: {
+    composicao: TipoComposicao;
+    qtdMachos: number;
+    qtdFemeas: number;
+    padrao: boolean;
+  }[];
+};
+
+/**
+ * Quanto um ANÚNCIO tem para vender.
+ *
+ * Peixe é contado em CONJUNTOS da composição do anúncio, tirados do pool: o
+ * anúncio de trio com 20 machos e 20 fêmeas tem 10 trios. Mandar a soma do pool
+ * (40) deixava o ML vender trio que não existe. Ligação antiga sem composição
+ * usa a padrão do produto, que é a mesma hipótese da importação de pedidos.
+ */
+export function disponivelNoAnuncio(
+  p: ProdutoEstoque,
+  composicao: TipoComposicao | null,
+): number {
+  if (p.tipo !== "PEIXE") return p.estoque;
+  const receita =
+    p.variantes.find((v) => v.composicao === composicao) ??
+    p.variantes.find((v) => v.padrao) ??
+    p.variantes[0];
+  if (!receita) return 0;
+  return conjuntosDoPool(receita, { machos: p.estoqueMachos, femeas: p.estoqueFemeas });
 }
 
 /**
@@ -118,6 +138,7 @@ export async function sincronizarEstoqueMl(
       id: true,
       itemId: true,
       variationId: true,
+      composicao: true,
       estoqueEnviado: true,
       product: {
         select: {
@@ -125,13 +146,17 @@ export async function sincronizarEstoqueMl(
           estoque: true,
           estoqueMachos: true,
           estoqueFemeas: true,
+          variantes: {
+            where: { ativo: true },
+            select: { composicao: true, qtdMachos: true, qtdFemeas: true, padrao: true },
+          },
         },
       },
     },
   });
 
   for (const a of anuncios) {
-    const estoque = disponivel(a.product);
+    const estoque = disponivelNoAnuncio(a.product, a.composicao);
     if (a.estoqueEnviado === paraMl(estoque)) {
       resumo.semMudanca += 1;
       continue;

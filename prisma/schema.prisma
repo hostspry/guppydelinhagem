@@ -670,6 +670,13 @@ model MercadoLivreAnuncio {
   /// gold_special (Clássico), gold_pro (Premium) ou free (Grátis). Guardado
   /// para a tela mostrar a comissão sem consultar o ML a cada carregamento.
   tipoAnuncio String?
+  /// Composição que o anúncio vende (peixe). Decide a RECEITA: quantos
+  /// conjuntos o pool sustenta (estoque enviado) e quanto baixar numa venda.
+  /// Nulo em produto seco e em ligação antiga sem como saber.
+  composicao  TipoComposicao?
+  /// Último prazo de envio ("Disponibilidade de estoque", em dias) mandado ao
+  /// ML. Espelho para o cron só escrever quando o número muda.
+  prazoEnvioDias Int?
 
   estoqueEnviado Int?
   sincronizadoEm DateTime?

@@ -91,6 +91,22 @@ export function tamanhoDoTexto(blocos: BlocoTexto[]): number {
   }, 0);
 }
 
+/**
+ * Texto sem marcação, mas COM parágrafos e listas — para descrição de
+ * marketplace, que aceita só texto simples. A versão de uma linha abaixo serve
+ * para meta description; no anúncio ela vira um paredão que ninguém lê.
+ */
+export function descricaoEmParagrafos(texto: string): string {
+  return parseDescricao(texto)
+    .map((b) =>
+      b.tipo === "lista"
+        ? b.itens.map((i) => `- ${i.map((t) => t.texto).join("").trim()}`).join("\n")
+        : b.trechos.map((t) => t.texto).join("").replace(/\s+/g, " ").trim(),
+    )
+    .filter(Boolean)
+    .join("\n\n");
+}
+
 /** Texto limpo, sem marcação — para meta description e JSON-LD. */
 export function descricaoEmTextoSimples(texto: string): string {
   return parseDescricao(texto)

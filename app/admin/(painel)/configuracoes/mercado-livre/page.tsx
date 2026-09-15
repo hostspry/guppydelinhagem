@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { ConfigMercadoLivre } from "@/components/admin/ConfigMercadoLivre";
 import { diasAteExpirarAutorizacao } from "@/lib/mercadolivre/cliente";
 import { urlRedirect, urlNotificacoes } from "@/actions/mercadolivre";
+import { disponivelNoAnuncio } from "@/lib/mercadolivre/estoque";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +20,7 @@ export default async function ConfiguracoesMercadoLivrePage() {
         estoqueEnviado: true,
         sincronizadoEm: true,
         ultimoErro: true,
+        composicao: true,
         product: {
           select: {
             nome: true,
@@ -26,6 +28,10 @@ export default async function ConfiguracoesMercadoLivrePage() {
             estoque: true,
             estoqueMachos: true,
             estoqueFemeas: true,
+            variantes: {
+              where: { ativo: true },
+              select: { composicao: true, qtdMachos: true, qtdFemeas: true, padrao: true },
+            },
           },
         },
       },
@@ -92,7 +98,8 @@ export default async function ConfiguracoesMercadoLivrePage() {
         sincronizadoEm: l.sincronizadoEm,
         ultimoErro: l.ultimoErro,
         produtoNome: l.product.nome,
-        produtoEstoque: disponivel(l.product),
+        // Conjuntos da composição do anúncio, igual ao que a sincronização manda.
+        produtoEstoque: disponivelNoAnuncio(l.product, l.composicao),
       }))}
       produtos={produtos.map((p) => ({
         id: p.id,
