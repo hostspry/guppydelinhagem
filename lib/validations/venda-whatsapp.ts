@@ -69,6 +69,9 @@ export const vendaWhatsappSchema = z
         z.enum(["JADLOG", "GOLLOG", "OUTRO"]).nullable(),
       )
       .optional(),
+    /** Serviço do Melhor Envio escolhido na cotação (produto seco). */
+    servicoEnvioId: z.coerce.number().int().positive().optional().nullable(),
+    servicoEnvioNome: z.string().trim().max(80).optional().nullable(),
     /** Segunda-feira da semana do envio ("AAAA-MM-DD"), ou vazio. */
     semanaEnvio: z
       .union([z.string().regex(/^\d{4}-\d{2}-\d{2}$/), z.literal("")])

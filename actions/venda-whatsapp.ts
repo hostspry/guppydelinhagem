@@ -15,6 +15,13 @@ import {
 } from "@/lib/ai/conversa-venda";
 import { lerDadosWhatsapp, normalizarDadosCliente } from "@/lib/whatsapp-cliente";
 import { getCatalogoPedido } from "@/lib/queries/pedidos";
+import { getTaxaEmbalagemSeco } from "@/lib/queries/config";
+import {
+  carrinhoTemCargaViva,
+  cotarFreteSeco,
+  volumesDoCarrinhoSeco,
+  type OpcaoFreteSeco,
+} from "@/lib/shipping";
 import { transicionarParaPago } from "@/lib/pedido-baixa";
 import { empurrarEstoqueDoPedido } from "@/lib/shopee/estoque";
 import { pedirConfirmacaoEnvioAereo } from "@/lib/gollog/confirmacao";
@@ -167,6 +174,78 @@ export async function buscarClientes(q: string): Promise<ClienteCompleto[]> {
     uf: c.uf ?? "",
     pedidos: c._count.pedidos,
   }));
+}
+
+export type CotacaoPedidoResult =
+  | { ok: true; opcoes: OpcaoFreteSeco[]; semMedida: number }
+  | { ok: false; error: string };
+
+/**
+ * Frete de produto seco (sem peixe) para o pedido manual: a mesma cotação do
+ * checkout, em todas as transportadoras do Melhor Envio, já com a taxa de
+ * embalagem. Volta a mais barata primeiro (e a mais rápida, quando é outra).
+ *
+ * Peso e medidas saem do cadastro do produto. Item avulso não tem cadastro:
+ * entra com o pacote padrão, e a tela avisa para conferir.
+ */
+export async function cotarFretePedido(input: {
+  cep: string;
+  itens: { produtoId: string | null; quantidade: number }[];
+}): Promise<CotacaoPedidoResult> {
+  await assertPermissao("pedidos.editar");
+
+  const ids = [...new Set(input.itens.map((i) => i.produtoId).filter((v): v is string => !!v))];
+  const produtos = ids.length
+    ? await prisma.product.findMany({
+        where: { id: { in: ids } },
+        select: {
+          id: true,
+          tipo: true,
+          preco: true,
+          peso: true,
+          comprimento: true,
+          largura: true,
+          altura: true,
+        },
+      })
+    : [];
+  const pmap = new Map(produtos.map((p) => [p.id, p]));
+
+  let semMedida = 0;
+  let valor = 0;
+  const itens = input.itens.map((it) => {
+    const q = Math.max(1, Math.min(99, Math.round(Number(it.quantidade)) || 1));
+    const p = it.produtoId ? pmap.get(it.produtoId) : undefined;
+    if (!p) {
+      semMedida++;
+      return { tipo: "ACESSORIO" as const, quantidade: q, pesoGramas: null, comprimento: null, largura: null, altura: null };
+    }
+    valor += Number(p.preco) * q;
+    if (p.peso == null || p.comprimento == null) semMedida++;
+    return {
+      tipo: p.tipo,
+      quantidade: q,
+      pesoGramas: p.peso == null ? null : Math.round(Number(p.peso) * 1000),
+      comprimento: p.comprimento == null ? null : Number(p.comprimento),
+      largura: p.largura == null ? null : Number(p.largura),
+      altura: p.altura == null ? null : Number(p.altura),
+    };
+  });
+
+  if (carrinhoTemCargaViva(itens)) {
+    return { ok: false, error: "Pedido com peixe vai de Jadlog ou Gollog, sem cotação do Melhor Envio." };
+  }
+  const volumes = volumesDoCarrinhoSeco(itens);
+  if (volumes.length === 0) return { ok: false, error: "Nenhum item para despachar." };
+
+  const r = await cotarFreteSeco({
+    cepDestino: input.cep,
+    volumes,
+    valorSegurado: valor,
+    taxaEmbalagem: await getTaxaEmbalagemSeco(),
+  });
+  if (!r.ok) return { ok: false, error: r.error };
+  return { ok: true, opcoes: r.data.opcoes, semMedida };
 }
 
 export type LeituraConversaResult =
@@ -430,7 +509,16 @@ export async function criarVendaWhatsapp(input: unknown): Promise<VendaResult> {
           origem: "WHATSAPP",
           status: "AGUARDANDO_PAGAMENTO",
           formaPagamento: d.formaPagamento ?? null,
-          transportadora: d.transportadora ?? null,
+          transportadora: d.transportadora ?? (d.servicoEnvioId ? "OUTRO" : null),
+          // Produto seco com serviço cotado: mesmo formato do checkout, para a
+          // etiqueta e o painel tratarem igual.
+          ...(d.servicoEnvioId
+            ? {
+                modalidadeFrete: "SECO",
+                servicoEnvioId: d.servicoEnvioId,
+                servicoEnvioNome: d.servicoEnvioNome || null,
+              }
+            : {}),
           semanaEnvio: semanaDaChave(d.semanaEnvio),
           observacoes: d.observacoes || null,
           enderecoEntrega: endereco as unknown as Prisma.InputJsonValue,

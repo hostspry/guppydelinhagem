@@ -6,6 +6,8 @@ import { toast } from "sonner";
 import {
   AlertTriangle,
   CheckCircle2,
+  Loader2,
+  Truck,
   Copy,
   Link2,
   PackageSearch,
@@ -18,6 +20,7 @@ import { FormField } from "@/components/admin/FormField";
 import { lerDadosWhatsapp, cpfValido } from "@/lib/whatsapp-cliente";
 import type { CadastroPeloLink, ProdutoPedido } from "@/lib/queries/pedidos";
 import {
+  cotarFretePedido,
   criarVendaWhatsapp,
   procurarCliente,
   type ClienteCompleto,
@@ -27,6 +30,8 @@ import {
 import { COMPOSICAO_LABEL } from "@/lib/composicoes";
 import { semanasParaAdmin } from "@/lib/semana-envio";
 import type { TipoComposicao } from "@/lib/generated/prisma/enums";
+import type { OpcaoFreteSeco } from "@/lib/shipping";
+import { ehCargaViva } from "@/lib/frete-tipos";
 import { LeitorConversa } from "./LeitorConversa";
 import { BuscaProduto } from "./BuscaProduto";
 import { BuscaCliente } from "./BuscaCliente";
@@ -139,6 +144,16 @@ export function NovoPedidoForm({
   const [formaPagamento, setFormaPagamento] = useState("PIX");
   const [transportadora, setTransportadora] = useState("");
   const [semanaEnvio, setSemanaEnvio] = useState("");
+  // Cotação do Melhor Envio (só pedido sem peixe). A chave guarda o CEP e os
+  // itens cotados: mudou qualquer um, a cotação deixa de valer.
+  const [cotacao, setCotacao] = useState<{
+    opcoes: OpcaoFreteSeco[];
+    semMedida: number;
+    chave: string;
+  } | null>(null);
+  const [servico, setServico] = useState<OpcaoFreteSeco | null>(null);
+  const [cotando, setCotando] = useState(false);
+  const [freteDaCotacao, setFreteDaCotacao] = useState<string | null>(null);
 
   const [aviso, setAviso] = useState<{ texto: string; nivel: "ALTA" | "MEDIA" | "BAIXA" } | null>(
     null,
@@ -330,6 +345,62 @@ export function NovoPedidoForm({
     setItens(novos);
   }
 
+  // ── Frete do produto seco ──────────────────────────────────
+
+  const itensComNome = itens.filter((it) => it.produtoId || it.nomeProduto.trim());
+  // Um peixe basta para a caixa ir de isopor pela Jadlog/Gollog. Item avulso
+  // sem produto conta como seco (ração, acessório digitado à mão).
+  const soSeco =
+    itensComNome.length > 0 &&
+    itensComNome.every((it) => {
+      const p = produtos.find((x) => x.id === it.produtoId);
+      return !p || !ehCargaViva(p.tipo);
+    });
+  const cepDigitos = campos.cep.replace(/\D/g, "");
+  const chaveCotacao = `${cepDigitos}|${itensComNome
+    .map((it) => `${it.produtoId ?? it.nomeProduto}:${num(it.quantidade)}`)
+    .join(",")}`;
+  const cotacaoValida = !!cotacao && cotacao.chave === chaveCotacao;
+
+  function escolherServico(o: OpcaoFreteSeco) {
+    setServico(o);
+    setTransportadora(/jadlog/i.test(o.empresa) ? "JADLOG" : "OUTRO");
+    // O valor cotado só entra no frete se o campo está vazio ou ainda tem o
+    // valor de uma cotação anterior: frete combinado com o cliente não é trocado.
+    const valor = paraCampo(o.preco);
+    if (!frete.trim() || frete === freteDaCotacao) {
+      setFrete(valor);
+      setFreteDaCotacao(valor);
+    }
+  }
+
+  async function cotar() {
+    if (cepDigitos.length !== 8) {
+      toast.error("Preencha o CEP do cliente para cotar.");
+      return;
+    }
+    setCotando(true);
+    try {
+      const r = await cotarFretePedido({
+        cep: cepDigitos,
+        itens: itensComNome.map((it) => ({
+          produtoId: it.produtoId,
+          quantidade: num(it.quantidade),
+        })),
+      });
+      if (!r.ok) {
+        toast.error(r.error);
+        setCotacao(null);
+        return;
+      }
+      setCotacao({ opcoes: r.opcoes, semMedida: r.semMedida, chave: chaveCotacao });
+      // A mais barata já vem escolhida.
+      if (r.opcoes[0]) escolherServico(r.opcoes[0]);
+    } finally {
+      setCotando(false);
+    }
+  }
+
   // ── Salvar ─────────────────────────────────────────────────
 
   const cpfSuspeito =
@@ -355,6 +426,8 @@ export function NovoPedidoForm({
         formaPagamento: jaPago ? formaPagamento : null,
         transportadora,
         semanaEnvio,
+        servicoEnvioId: soSeco && cotacaoValida ? (servico?.servicoId ?? null) : null,
+        servicoEnvioNome: soSeco && cotacaoValida ? (servico?.label ?? null) : null,
       });
       if (!r.success) {
         toast.error(r.error);
@@ -729,15 +802,94 @@ export function NovoPedidoForm({
       {/* ── 4. Envio ── */}
       <fieldset className={caixa}>
         <legend className={legenda}>4. Envio</legend>
+        {soSeco && (
+          <div className="mb-4 rounded-md border border-gray-200 p-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-sm text-[#07366A] font-medium flex items-center gap-1.5">
+                <Truck className="w-4 h-4" aria-hidden="true" />
+                Frete do produto (Melhor Envio)
+              </p>
+              <button
+                type="button"
+                onClick={cotar}
+                disabled={cotando}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-[#07366A] text-white text-xs font-medium hover:brightness-125 disabled:opacity-60"
+              >
+                {cotando && <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />}
+                {cotacao ? "Cotar de novo" : "Cotar frete"}
+              </button>
+            </div>
+            <p className="text-xs text-gray-500 mt-1">
+              Sem peixe no pedido: cota todas as transportadoras para o CEP do cliente,
+              com a taxa de embalagem, e já escolhe a mais barata.
+            </p>
+
+            {cotacao && !cotacaoValida && (
+              <p className="mt-2 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-2.5 py-1.5">
+                O CEP ou os itens mudaram depois da cotação. Cote de novo.
+              </p>
+            )}
+
+            {cotacao && cotacaoValida && (
+              <div className="mt-3 space-y-2" role="radiogroup" aria-label="Serviço de envio">
+                {cotacao.opcoes.map((o, i) => (
+                  <label
+                    key={o.servicoId}
+                    className={`flex items-center gap-3 rounded-md border p-2.5 text-sm cursor-pointer ${
+                      servico?.servicoId === o.servicoId
+                        ? "border-[#07366A] bg-blue-50/50"
+                        : "border-gray-200"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="servicoEnvio"
+                      checked={servico?.servicoId === o.servicoId}
+                      onChange={() => escolherServico(o)}
+                      className="accent-[#FF035C]"
+                    />
+                    <span className="flex-1">
+                      <span className="block text-[#07366A] font-medium">{o.label}</span>
+                      <span className="block text-xs text-gray-500">
+                        {i === 0 ? "Mais barata" : "Mais rápida"} · {o.prazoDias} dia(s) útil(eis)
+                      </span>
+                    </span>
+                    <span className="font-semibold text-[#07366A]">{brl.format(o.preco)}</span>
+                  </label>
+                ))}
+                {cotacao.semMedida > 0 && (
+                  <p className="text-xs text-amber-800">
+                    {cotacao.semMedida} item(ns) sem peso ou medida no cadastro entraram com o
+                    pacote padrão. Confira o valor antes de fechar com o cliente.
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4">
-          <FormField label="Transportadora" name="transportadora">
-            <select id="transportadora" value={transportadora} onChange={(e) => setTransportadora(e.target.value)} className={input}>
-              <option value="">Decidir depois</option>
-              <option value="JADLOG">Jadlog</option>
-              <option value="GOLLOG">Gollog</option>
-              <option value="OUTRO">Outra</option>
-            </select>
-          </FormField>
+          {soSeco && cotacaoValida ? (
+            <FormField label="Transportadora" name="transportadora">
+              <p className="min-h-10 flex items-center text-sm text-[#07366A]">
+                {servico?.label ?? "Escolha uma opção acima"}
+              </p>
+            </FormField>
+          ) : (
+            <FormField label="Transportadora" name="transportadora">
+              <select
+                id="transportadora"
+                value={transportadora}
+                onChange={(e) => setTransportadora(e.target.value)}
+                className={input}
+              >
+                <option value="">Decidir depois</option>
+                <option value="JADLOG">Jadlog</option>
+                <option value="GOLLOG">Gollog</option>
+                <option value="OUTRO">Outra</option>
+              </select>
+            </FormField>
+          )}
           <FormField
             label="Semana do envio"
             name="semanaEnvio"
