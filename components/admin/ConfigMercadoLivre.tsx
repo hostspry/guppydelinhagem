@@ -26,6 +26,7 @@ import {
   publicarProdutoNoMl,
   sugerirPrecoMl,
   trocarTipoAnuncioMl,
+  atualizarAnuncioMl,
   type AnuncioMl,
   type PrecoSugerido,
 } from "@/actions/mercadolivre";
@@ -621,6 +622,17 @@ export function ConfigMercadoLivre({
                     <option value="gold_pro">Premium (17,5%)</option>
                     <option value="free">Grátis (0%, 1 un.)</option>
                   </select>
+                  {/* Foto subida no site depois de publicar não chega sozinha
+                      ao ML, e anúncio com menos de 3 perde qualidade. */}
+                  <button
+                    type="button"
+                    disabled={pending}
+                    onClick={() => rodar(() => atualizarAnuncioMl(l.id))}
+                    className="inline-flex items-center gap-1 text-xs font-medium text-[#07366A] hover:text-[#FF035C] disabled:opacity-50"
+                  >
+                    <RefreshCw size={13} aria-hidden="true" />
+                    Atualizar fotos e ficha
+                  </button>
                   <button
                     type="button"
                     disabled={pending}

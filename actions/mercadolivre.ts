@@ -14,6 +14,7 @@ import {
 import { sincronizarEstoqueMl } from "@/lib/mercadolivre/estoque";
 import {
   publicarNoMl,
+  atualizarAnuncioNoMl,
   CATEGORIA_PEIXE,
   LISTING_TYPE,
   TIPOS_ANUNCIO,
@@ -417,6 +418,37 @@ export async function publicarProdutoNoMl(dados: {
   return {
     ok: true,
     mensagem: `Anúncio ${r.dados.itemId} criado e PAUSADO. Revise no ML e ative quando quiser.`,
+  };
+}
+
+/**
+ * Manda ao anúncio existente as fotos atuais do produto e a ficha completa.
+ * Não mexe em título, preço nem estoque (ver atualizarAnuncioNoMl).
+ */
+export async function atualizarAnuncioMl(anuncioId: string): Promise<MlActionResult> {
+  const membro = await assertPermissao("config.editar");
+
+  const anuncio = await prisma.mercadoLivreAnuncio.findUnique({
+    where: { id: anuncioId },
+    select: { itemId: true },
+  });
+  if (!anuncio) return { ok: false, erro: "Anúncio não encontrado." };
+
+  const r = await atualizarAnuncioNoMl(anuncioId);
+  if (!r.ok) return { ok: false, erro: r.erro };
+
+  await auditar(membro, {
+    acao: "config.mercadolivre.atualizar",
+    entidade: "MercadoLivreAnuncio",
+    entidadeId: anuncio.itemId,
+    descricao: `Atualizou fotos (${r.dados.fotos}) e ficha técnica (${r.dados.atributos} atributos) do anúncio ${anuncio.itemId} no Mercado Livre`,
+    depois: r.dados,
+  });
+
+  revalidatePath(CAMINHO);
+  return {
+    ok: true,
+    mensagem: `Anúncio atualizado: ${r.dados.fotos} fotos${r.dados.atributos ? ` e ${r.dados.atributos} itens da ficha` : ""}. O ML recalcula a qualidade em alguns minutos.`,
   };
 }
 

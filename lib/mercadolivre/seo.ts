@@ -149,6 +149,18 @@ export function corPrincipalMl(texto: string): string | null {
 
 export type AtributoMl = { id: string; value_id?: string; value_name?: string };
 
+/**
+ * Tamanho do peixe adulto que vai na caixa. O ML conta "Tamanho" entre as
+ * características principais, e sem ele a ficha fica em 70%.
+ *
+ * Número conservador de propósito: a fêmea de guppy chega a 5 cm e o macho
+ * a 3,5, mas anunciar o teto é pedir reclamação de "veio menor". Lote misto
+ * usa o do macho, que é o menor da caixa.
+ */
+export function tamanhoPeixeMl(genero: string): string {
+  return genero === ML_VALOR.GENERO_FEMEA ? "4 cm" : "3 cm";
+}
+
 export function atributosPeixe(params: {
   genero: string;
   /** Quantos peixes vão na venda (trio = 3). Entra no filtro de quantidade. */
@@ -161,6 +173,7 @@ export function atributosPeixe(params: {
     { id: "ANIMAL_GENDER", value_id: params.genero },
     { id: "REQUIRED_WATER_TYPE", value_id: ML_VALOR.AGUA_DOCE },
     { id: "REQUIRED_WATER_TEMPERATURE", value_name: AGUA_QUENTE },
+    { id: "FISH_SIZE", value_name: tamanhoPeixeMl(params.genero) },
   ];
 
   if (params.quantidadePeixes && params.quantidadePeixes > 0) {
@@ -168,7 +181,13 @@ export function atributosPeixe(params: {
   }
 
   const cor = params.textoParaCor ? corPrincipalMl(params.textoParaCor) : null;
-  if (cor) attrs.push({ id: "MAIN_COLOR", value_name: cor });
+  // "Cor principal" (filtro) e "Cor" (característica principal) são atributos
+  // diferentes no ML, e a qualidade do anúncio cobra os dois. As oito cores que
+  // deduzimos existem com o mesmo nome nas duas listas (conferido na categoria).
+  if (cor) {
+    attrs.push({ id: "MAIN_COLOR", value_name: cor });
+    attrs.push({ id: "COLOR", value_name: cor });
+  }
 
   return attrs;
 }

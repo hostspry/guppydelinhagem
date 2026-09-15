@@ -2,7 +2,7 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { chamarMl, type MlResult } from "./cliente";
 import { COMPOSICAO_LABEL } from "@/lib/composicoes";
-import { tituloPeixeMl, atributosPeixe } from "./seo";
+import { tituloPeixeMl, atributosPeixe, type AtributoMl } from "./seo";
 import { stripMarcheziSignature } from "@/lib/constants";
 import { descricaoEmTextoSimples } from "@/lib/markdown";
 import type { TipoComposicao } from "@/lib/generated/prisma/enums";
@@ -265,5 +265,85 @@ export async function publicarNoMl(
       permalink: criado.dados?.permalink ?? null,
       status: criado.dados?.status ?? "paused",
     },
+  };
+}
+
+export type AtualizacaoOk = { fotos: number; atributos: number };
+
+/**
+ * Leva ao anúncio que JÁ EXISTE as fotos atuais do produto e a ficha técnica
+ * completa.
+ *
+ * Existe porque publicar tira uma foto do momento: foto subida no site depois
+ * não chega sozinha ao ML, e a qualidade do anúncio cai por "menos de 3 fotos"
+ * mesmo com o produto cheio de foto aqui.
+ *
+ * Não mexe em título, preço nem estoque. Título de anúncio com venda o ML não
+ * deixa trocar, preço é decisão do dono e estoque tem sincronização própria.
+ * As fotos são SUBSTITUÍDAS pela lista do site, na ordem do site: a primeira
+ * vira a capa. Atributo o ML mescla: só muda o que vai no corpo.
+ */
+export async function atualizarAnuncioNoMl(
+  anuncioId: string,
+): Promise<MlResult<AtualizacaoOk>> {
+  const anuncio = await prisma.mercadoLivreAnuncio.findUnique({
+    where: { id: anuncioId },
+    select: {
+      itemId: true,
+      product: {
+        select: {
+          nome: true,
+          padraoCor: true,
+          tipo: true,
+          imagens: { orderBy: { ordem: "asc" }, select: { url: true } },
+        },
+      },
+    },
+  });
+  if (!anuncio) return { ok: false, erro: "Anúncio não encontrado." };
+  const p = anuncio.product;
+  if (p.imagens.length === 0) {
+    return { ok: false, erro: "O produto não tem foto no site para mandar." };
+  }
+
+  let atributos: AtributoMl[] = [];
+  if (p.tipo === "PEIXE") {
+    // O anúncio não guarda a composição aqui. O gênero que foi publicado está no
+    // próprio item, e é dele que sai o tamanho; a quantidade de peixes já está
+    // lá e não vai no corpo, então não muda.
+    const item = await chamarMl<{ attributes?: { id: string; value_id?: string | null }[] }>(
+      `/items/${anuncio.itemId}`,
+    );
+    if (!item.ok) return item;
+    const genero =
+      item.dados.attributes?.find((a) => a.id === "ANIMAL_GENDER")?.value_id ??
+      GENERO.MISTO;
+    atributos = atributosPeixe({
+      genero,
+      textoParaCor: `${p.nome} ${p.padraoCor ?? ""}`,
+    });
+  }
+
+  const r = await chamarMl(`/items/${anuncio.itemId}`, {
+    method: "PUT",
+    body: {
+      pictures: p.imagens.slice(0, 10).map((i) => ({ source: i.url })),
+      ...(atributos.length > 0 ? { attributes: atributos } : {}),
+    },
+  });
+  if (!r.ok) {
+    await prisma.mercadoLivreAnuncio
+      .update({ where: { id: anuncioId }, data: { ultimoErro: r.erro } })
+      .catch(() => {});
+    return r;
+  }
+
+  await prisma.mercadoLivreAnuncio.update({
+    where: { id: anuncioId },
+    data: { ultimoErro: null },
+  });
+  return {
+    ok: true,
+    dados: { fotos: Math.min(p.imagens.length, 10), atributos: atributos.length },
   };
 }
