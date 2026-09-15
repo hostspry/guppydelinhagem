@@ -387,7 +387,11 @@ model ProductVariant {
 model ProductImage {
   id        String  @id @default(cuid())
   productId String
+  /// Versão do SITE: até 100 KB (regra do dono), sem perda visível.
   url       String
+  /// Versão em ALTA (até 1920 px) para o Mercado Livre, que precisa de foto
+  /// grande para o zoom. Nulo em foto antiga, de antes da otimização: aí vale url.
+  urlAlta   String?
   alt       String?
   ordem     Int     @default(0)
 

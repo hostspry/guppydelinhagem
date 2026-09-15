@@ -171,7 +171,7 @@ export async function montarAnuncio(
       estoque: true,
       estoqueMachos: true,
       estoqueFemeas: true,
-      imagens: { orderBy: { ordem: "asc" }, select: { url: true } },
+      imagens: { orderBy: { ordem: "asc" }, select: { url: true, urlAlta: true } },
       variantes: {
         where: { ativo: true },
         select: { composicao: true, qtdMachos: true, qtdFemeas: true },
@@ -252,7 +252,8 @@ export async function montarAnuncio(
       atributos,
       disponivel,
       quantidade,
-      fotos: p.imagens.slice(0, 10).map((i) => i.url),
+      // O ML recebe a versão em alta (zoom acima de 800 px); foto antiga não tem, e vai a do site.
+      fotos: p.imagens.slice(0, 10).map((i) => i.urlAlta ?? i.url),
       ehPeixe,
       receita,
     },
@@ -444,7 +445,7 @@ export async function atualizarAnuncioNoMl(
           nome: true,
           padraoCor: true,
           tipo: true,
-          imagens: { orderBy: { ordem: "asc" }, select: { url: true } },
+          imagens: { orderBy: { ordem: "asc" }, select: { url: true, urlAlta: true } },
         },
       },
     },
@@ -476,7 +477,7 @@ export async function atualizarAnuncioNoMl(
   const r = await chamarMl(`/items/${anuncio.itemId}`, {
     method: "PUT",
     body: {
-      pictures: p.imagens.slice(0, 10).map((i) => ({ source: i.url })),
+      pictures: p.imagens.slice(0, 10).map((i) => ({ source: i.urlAlta ?? i.url })),
       ...(atributos.length > 0 ? { attributes: atributos } : {}),
     },
   });

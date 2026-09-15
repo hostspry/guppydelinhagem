@@ -640,7 +640,8 @@ export async function getProductById(id: string) {
     comprimento: p.comprimento == null ? null : Number(p.comprimento),
     largura: p.largura == null ? null : Number(p.largura),
     altura: p.altura == null ? null : Number(p.altura),
-    imagens: p.imagens.map((img) => ({ url: img.url, alt: img.alt ?? "" })),
+    // urlAlta volta junto: sem ele, salvar o produto apagaria a versão do ML.
+    imagens: p.imagens.map((img) => ({ url: img.url, urlAlta: img.urlAlta, alt: img.alt ?? "" })),
     variantes: p.variantes.map((v) => ({
       composicao: v.composicao,
       preco: Number(v.preco),

@@ -163,15 +163,19 @@ const imagensSchema = z
   .array(
     z.object({
       url: z.string().url("URL de imagem inválida"),
+      // Versão em alta para o Mercado Livre (nula em foto antiga).
+      urlAlta: z.string().url().nullable().optional(),
       alt: z.string().max(200).optional().default(""),
     }),
   )
   .max(8, "Máximo de 8 fotos");
 
+type ImagemEntrada = z.infer<typeof imagensSchema>[number];
+
 /** Fotos do produto, serializadas em JSON pelo ProductImagesField. */
 function parseImagens(
   formData: FormData,
-): { ok: true; imagens: { url: string; alt: string }[] } | { ok: false } {
+): { ok: true; imagens: ImagemEntrada[] } | { ok: false } {
   const raw = formData.get("imagens");
   if (typeof raw !== "string" || raw.trim() === "") {
     return { ok: true, imagens: [] };
@@ -188,9 +192,10 @@ function parseImagens(
 }
 
 /** Ordem pela posição na lista: a primeira é a capa. */
-function buildImagemCreates(imagens: { url: string; alt: string }[]) {
+function buildImagemCreates(imagens: ImagemEntrada[]) {
   return imagens.map((img, i) => ({
     url: img.url,
+    urlAlta: img.urlAlta ?? null,
     alt: img.alt.trim() ? img.alt.trim() : null,
     ordem: i,
   }));

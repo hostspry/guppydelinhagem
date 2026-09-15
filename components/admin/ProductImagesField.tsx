@@ -6,7 +6,8 @@ import { toast } from "sonner";
 import { ArrowLeft, ArrowRight, ImagePlus, Trash2 } from "lucide-react";
 import { uploadProductImage } from "@/actions/upload";
 
-export type ImagemDraft = { url: string; alt: string };
+/** url = versão do site (até 100 KB); urlAlta = versão do Mercado Livre. */
+export type ImagemDraft = { url: string; urlAlta?: string | null; alt: string };
 
 const MAX = 8;
 
@@ -49,14 +50,35 @@ export function ProductImagesField({
     setEnviando(true);
     try {
       const novas: ImagemDraft[] = [];
+      let kbAntes = 0;
+      let kbDepois = 0;
       for (const file of lote) {
         const fd = new FormData();
         fd.append("file", file);
         const res = await uploadProductImage(fd);
-        if (res.ok) novas.push({ url: res.url, alt: "" });
-        else toast.error(`${file.name}: ${res.error}`);
+        if (!res.ok) {
+          toast.error(`${file.name}: ${res.error}`);
+          continue;
+        }
+        novas.push({ url: res.url, urlAlta: res.urlAlta, alt: "" });
+        kbAntes += res.info.kbAntes;
+        kbDepois += res.info.kbSite;
+        // Aviso por foto: é na hora de subir que dá para trocar por uma melhor.
+        if (res.info.avisos.length > 0) {
+          const tamanho = res.info.largura ? ` (${res.info.largura}x${res.info.altura})` : "";
+          toast.warning(`${file.name}${tamanho}: ${res.info.avisos.join("; ")}.`, {
+            duration: 10_000,
+          });
+        }
       }
-      if (novas.length > 0) onChange([...value, ...novas]);
+      if (novas.length > 0) {
+        onChange([...value, ...novas]);
+        const kb = (n: number) => (n >= 1024 ? `${(n / 1024).toFixed(1)} MB` : `${n} KB`);
+        toast.success(
+          `${novas.length} foto(s) otimizada(s) para o site: ${kb(kbAntes)} → ${kb(kbDepois)}, sem perda visível. O Mercado Livre recebe a versão em alta. Salve o produto para gravar.`,
+          { duration: 8000 },
+        );
+      }
     } finally {
       setEnviando(false);
     }
@@ -85,7 +107,10 @@ export function ProductImagesField({
       </legend>
 
       <p className="text-xs text-gray-500 mb-3">
-        Use as setas para trocar a ordem. JPG, PNG ou WebP, até 5 MB cada.
+        Use as setas para trocar a ordem. JPG, PNG ou WebP, até 9 MB cada. Não precisa
+        otimizar antes: o site grava uma versão de até 100 KB para a loja e outra em alta
+        para o Mercado Livre, e tira o GPS da foto. Para o ML, prefira foto quadrada com
+        mais de 800 px.
         {semVideo ? (
           <>
             {" "}
