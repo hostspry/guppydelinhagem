@@ -9,6 +9,8 @@ import { chamarMl } from "@/lib/mercadolivre/cliente";
 import { sincronizarEstoqueMl, disponivelNoAnuncio } from "@/lib/mercadolivre/estoque";
 import {
   montarAnuncio,
+  conferirTitulo,
+  conferirDescricao,
   LISTING_TYPE,
   TIPOS_ANUNCIO,
   ehTipoAnuncio,
@@ -34,8 +36,6 @@ import { prazoMl } from "@/lib/mercadolivre/prazo";
  */
 
 export type Resultado = { ok: true; mensagem?: string } | { ok: false; erro: string };
-
-const TITULO_MAX = 60;
 
 function caminhoProduto(productId: string) {
   return `/admin/produtos/${productId}/editar`;
@@ -235,10 +235,10 @@ export async function salvarAnuncioMl(dados: {
   const mudancas: { titulo?: string; preco?: number } = {};
   if (dados.titulo !== undefined) {
     const t = dados.titulo.trim().replace(/\s+/g, " ");
-    if (t.length < 10) return { ok: false, erro: "Título curto demais." };
-    if (t.length > TITULO_MAX) {
-      return { ok: false, erro: `O ML aceita até ${TITULO_MAX} caracteres no título.` };
-    }
+    // Mesmas regras que filtram a IA: tamanho, composição, palavra proibida e
+    // título repetido entre os anúncios do produto.
+    const erro = await conferirTitulo(a.productId, a.composicao, t, a.id);
+    if (erro) return { ok: false, erro };
     mudancas.titulo = t;
   }
   if (dados.preco !== undefined) {
@@ -324,14 +324,25 @@ export async function descricaoAnuncioMl(dados: {
 }): Promise<Resultado> {
   const membro = await assertPermissao("config.editar");
   const texto = dados.texto.trim();
-  if (texto.length < 20) return { ok: false, erro: "Descrição curta demais." };
-  // O ML recusa HTML e link na descrição; dizer antes poupa o erro genérico.
-  if (/<[a-z][\s\S]*>/i.test(texto)) {
-    return { ok: false, erro: "A descrição do ML aceita só texto, sem HTML." };
-  }
 
   const a = await anuncioDoBanco(dados.anuncioId);
   if (!a) return { ok: false, erro: "Anúncio não encontrado." };
+
+  // HTML, link, telefone e contato por fora o ML pune; peixe sem a licença do
+  // IBAMA ele cancela. Dizer antes poupa o erro genérico deles.
+  const produto = await prisma.product.findUnique({
+    where: { id: a.productId },
+    select: { tipo: true },
+  });
+  const cfg = await prisma.integracaoMercadoLivre.findUnique({
+    where: { id: "default" },
+    select: { licencaIbama: true },
+  });
+  const erro = conferirDescricao(
+    texto,
+    produto?.tipo === "PEIXE" ? (cfg?.licencaIbama ?? null) : null,
+  );
+  if (erro) return { ok: false, erro };
 
   const r = await salvarDescricaoAnuncio(a.itemId, texto);
   if (!r.ok) return { ok: false, erro: r.erro };

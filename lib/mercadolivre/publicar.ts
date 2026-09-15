@@ -8,6 +8,7 @@ import { descricaoEmParagrafos } from "@/lib/markdown";
 import type { TipoComposicao } from "@/lib/generated/prisma/enums";
 import { TEXTO_ENVIO_SEGUNDA } from "@/lib/envio-peixe";
 import { prazoMl, saleTermPrazo } from "./prazo";
+import { problemasTitulo, problemasDescricao } from "./texto-ml";
 
 /**
  * Cria anúncio no Mercado Livre a partir de um produto do site.
@@ -84,6 +85,10 @@ export type PublicacaoOk = { itemId: string; permalink: string | null; status: s
 export type AnuncioMontado = {
   titulo: string;
   descricao: string;
+  /** Parte da descrição que vem do produto (a IA pode reescrever). */
+  textoProduto: string;
+  /** Envio, licença e regra da segunda: sempre do código, sempre no fim. */
+  blocosFixos: string;
   atributos: AtributoMl[];
   /** Conjuntos que o pool monta (peixe) ou estoque da linha (seco). */
   disponivel: number;
@@ -92,6 +97,41 @@ export type AnuncioMontado = {
   ehPeixe: boolean;
   receita: { qtdMachos: number; qtdFemeas: number } | null;
 };
+
+/**
+ * Título que pode ir ao ML: regras de lib/mercadolivre/texto-ml, contra os
+ * títulos dos outros anúncios do mesmo produto. Devolve a mensagem ou null.
+ */
+export async function conferirTitulo(
+  productId: string,
+  composicao: TipoComposicao | null,
+  titulo: string,
+  anuncioIdIgnorar?: string,
+): Promise<string | null> {
+  const outros = await prisma.mercadoLivreAnuncio.findMany({
+    where: { productId, ...(anuncioIdIgnorar ? { NOT: { id: anuncioIdIgnorar } } : {}) },
+    select: { titulo: true },
+  });
+  const problemas = problemasTitulo(titulo, {
+    composicao,
+    outrosTitulos: outros.map((o) => o.titulo ?? "").filter(Boolean),
+  });
+  return problemas.length ? `Título recusado: ${problemas.join(", ")}.` : null;
+}
+
+/** Descrição que pode ir ao ML. Peixe tem que manter a licença do IBAMA. */
+export function conferirDescricao(texto: string, licencaIbama: string | null): string | null {
+  const problemas = problemasDescricao(texto);
+  if (licencaIbama && !texto.includes(licencaIbama)) {
+    problemas.push("tirou a licença do IBAMA, sem a qual o ML cancela o anúncio");
+  }
+  return problemas.length ? `Descrição recusada: ${problemas.join(", ")}.` : null;
+}
+
+/** Descrição final: texto do produto e, depois, os blocos fixos. */
+export function juntarDescricao(textoProduto: string, blocosFixos: string): string {
+  return [textoProduto.trim(), blocosFixos.trim()].filter(Boolean).join("\n\n").slice(0, 50000);
+}
 
 /** Monta o anúncio sem chamar o ML. Erro em texto quando falta algo do lado de cá. */
 export async function montarAnuncio(
@@ -150,18 +190,23 @@ export async function montarAnuncio(
     ? tituloPeixeMl({ nome: p.nome, composicao: rotulo })
     : cortarTitulo(rotulo ? `${p.nome} ${rotulo}` : p.nome);
 
-  const corpo = [
+  // Texto do produto (o que a IA pode reescrever) separado dos blocos fixos
+  // (o que vai no envio, licença e regra da segunda), que só o código escreve.
+  const textoProduto = descricaoEmParagrafos(
     stripMarcheziSignature(p.descricao || p.descricaoCurta || p.nome),
+  );
+  const blocosFixos = [
     receita
-      ? `\n\nO que vai no envio: ${receita.qtdMachos} macho(s) e ${receita.qtdFemeas} fêmea(s).`
+      ? `O que vai no envio: ${receita.qtdMachos} macho(s) e ${receita.qtdFemeas} fêmea(s).`
       : "",
     ehPeixe && cfg?.licencaIbama
-      ? `\n\nPeixe ornamental vivo, criado em cativeiro. Licença IBAMA: ${cfg.licencaIbama}.`
+      ? `Peixe ornamental vivo, criado em cativeiro. Licença IBAMA: ${cfg.licencaIbama}.`
       : "",
-    ehPeixe
-      ? `\n\n${TEXTO_ENVIO_SEGUNDA}\n\nO peixe vai em caixa preparada para transporte de peixe vivo.`
-      : "",
-  ].join("");
+    ehPeixe ? TEXTO_ENVIO_SEGUNDA : "",
+    ehPeixe ? "O peixe vai em caixa preparada para transporte de peixe vivo." : "",
+  ]
+    .filter(Boolean)
+    .join("\n\n");
 
   // Ficha técnica vale ranqueamento: o ML usa os atributos nos FILTROS da busca,
   // e anúncio sem ficha some quando o comprador filtra por espécie, cor ou
@@ -178,7 +223,9 @@ export async function montarAnuncio(
     ok: true,
     dados: {
       titulo,
-      descricao: descricaoEmParagrafos(corpo).slice(0, 50000),
+      descricao: juntarDescricao(textoProduto, blocosFixos),
+      textoProduto,
+      blocosFixos,
       atributos,
       disponivel,
       quantidade,
@@ -197,6 +244,10 @@ export type EntradaPublicacao = {
   preco: number;
   /** Clássico, Premium ou Grátis. Um por anúncio (ver TIPOS_ANUNCIO). */
   tipoAnuncio?: TipoAnuncio;
+  /** Título editado (à mão ou pela IA). Vazio = o montado pelo site. */
+  titulo?: string;
+  /** Descrição editada. Vazio = a montada pelo site. */
+  descricao?: string;
 };
 
 /**
@@ -263,9 +314,16 @@ export async function publicarNoMl(
   }
 
   const tipo = entrada.tipoAnuncio ?? LISTING_TYPE;
-  const titulo = m.titulo;
   const quantidade = m.quantidade;
   const atributos = m.atributos;
+
+  // Texto editado passa pelas mesmas regras que filtram a IA.
+  const titulo = entrada.titulo?.trim().replace(/\s+/g, " ") || m.titulo;
+  const erroTitulo = await conferirTitulo(entrada.productId, entrada.composicao, titulo);
+  if (erroTitulo) return { ok: false, erro: erroTitulo };
+  const descricaoFinal = entrada.descricao?.trim() || m.descricao;
+  const erroDescricao = conferirDescricao(descricaoFinal, cfg.licencaIbama);
+  if (erroDescricao) return { ok: false, erro: erroDescricao };
 
   const item = {
     title: titulo,
@@ -305,7 +363,7 @@ export async function publicarNoMl(
   // e o markdown do admin viraria lixo na tela do comprador.
   const descricao = await chamarMl(`/items/${itemId}/description`, {
     method: "POST",
-    body: { plain_text: m.descricao },
+    body: { plain_text: descricaoFinal },
   });
   if (!descricao.ok) {
     console.error("[ml] anúncio criado sem descrição", itemId, descricao.erro);

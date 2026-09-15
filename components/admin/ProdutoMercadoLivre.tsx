@@ -39,6 +39,12 @@ import {
   type PrecoSugerido,
 } from "@/actions/mercadolivre";
 import { COMPOSICAO_LABEL } from "@/lib/composicoes";
+import {
+  AvisosTitulo,
+  MelhorarDescricao,
+  RevisarTexto,
+  SugerirTitulos,
+} from "@/components/admin/IaTextoMl";
 import type { TipoComposicao } from "@/lib/generated/prisma/enums";
 
 /**
@@ -558,6 +564,26 @@ function CartaoAnuncio({
               </span>
             )}
           </label>
+          {d.podeEditarTitulo && (
+            <div className="-mt-1 space-y-2">
+              <AvisosTitulo titulo={tituloEd} composicao={a.composicao} />
+              <div className="flex flex-wrap items-start gap-2">
+                <SugerirTitulos
+                  productId={produto.id}
+                  composicao={a.composicao}
+                  anuncioId={a.id}
+                  onUsar={setTituloEd}
+                  disabled={travado}
+                />
+                <RevisarTexto
+                  texto={tituloEd}
+                  tipo="titulo"
+                  onAplicar={setTituloEd}
+                  disabled={travado}
+                />
+              </div>
+            </div>
+          )}
 
           <div className="flex flex-wrap items-end gap-2">
             <label className="block w-40">
@@ -625,6 +651,21 @@ function CartaoAnuncio({
                 disabled={travado}
                 className={`${input} font-mono text-xs leading-relaxed`}
               />
+              <div className="flex flex-wrap items-start gap-2">
+                <MelhorarDescricao
+                  productId={produto.id}
+                  composicao={a.composicao}
+                  atual={desc}
+                  onUsar={setDesc}
+                  disabled={travado}
+                />
+                <RevisarTexto
+                  texto={desc}
+                  tipo="descricao"
+                  onAplicar={setDesc}
+                  disabled={travado}
+                />
+              </div>
               <div className="flex flex-wrap gap-2">
                 <button type="button" disabled={travado} onClick={usarTextoDoSite} className={botao}>
                   Usar texto do site
@@ -775,6 +816,12 @@ function PublicarComposicao({
 
   const p = previa?.ok ? previa.dados : null;
   const precoNum = numero(preco);
+  // Nulo = o texto que o site montou. Editado (à mão ou pela IA) fica guardado
+  // mesmo trocando o tipo de anúncio, que remonta a prévia.
+  const [tituloEd, setTituloEd] = useState<string | null>(null);
+  const [descEd, setDescEd] = useState<string | null>(null);
+  const tituloFinal = tituloEd ?? p?.titulo ?? "";
+  const descFinal = descEd ?? p?.descricao ?? "";
 
   return (
     <div className="rounded-md border border-gray-200 p-3">
@@ -846,11 +893,36 @@ function PublicarComposicao({
           </label>
 
           {p && (
-            <div className="rounded-md bg-gray-50 p-3 space-y-2 text-xs text-gray-700">
-              <p>
-                <span className="text-gray-500">Título: </span>
-                <strong className="text-[#07366A]">{p.titulo}</strong> ({p.titulo.length}/60)
-              </p>
+            <div className="rounded-md bg-gray-50 p-3 space-y-3 text-xs text-gray-700">
+              <div>
+                <span className="flex justify-between text-gray-500 mb-1">
+                  <span>Título</span>
+                  <span className={tituloFinal.length > 60 ? "text-red-600" : ""}>
+                    {tituloFinal.length}/60
+                  </span>
+                </span>
+                <input
+                  value={tituloFinal}
+                  maxLength={60}
+                  onChange={(e) => setTituloEd(e.target.value)}
+                  className={input}
+                />
+                <AvisosTitulo titulo={tituloFinal} composicao={c.composicao} />
+                <div className="mt-2 flex flex-wrap items-start gap-2">
+                  <SugerirTitulos
+                    productId={productId}
+                    composicao={c.composicao}
+                    onUsar={setTituloEd}
+                    disabled={ocupado}
+                  />
+                  <RevisarTexto
+                    texto={tituloFinal}
+                    tipo="titulo"
+                    onAplicar={setTituloEd}
+                    disabled={ocupado}
+                  />
+                </div>
+              </div>
               <p>
                 <span className="text-gray-500">Quantidade: </span>
                 {p.quantidade}
@@ -869,8 +941,35 @@ function PublicarComposicao({
                 </ul>
               </div>
               <details>
-                <summary className="cursor-pointer text-gray-500">Descrição</summary>
-                <pre className="mt-1 whitespace-pre-wrap font-sans leading-relaxed">{p.descricao}</pre>
+                <summary className="cursor-pointer text-gray-500">
+                  Descrição{descEd !== null ? " (editada)" : ""}
+                </summary>
+                <textarea
+                  value={descFinal}
+                  onChange={(e) => setDescEd(e.target.value)}
+                  rows={12}
+                  className={`${input} mt-1 font-mono text-xs leading-relaxed`}
+                />
+                <div className="mt-2 flex flex-wrap items-start gap-2">
+                  <MelhorarDescricao
+                    productId={productId}
+                    composicao={c.composicao}
+                    atual={descFinal}
+                    onUsar={setDescEd}
+                    disabled={ocupado}
+                  />
+                  <RevisarTexto
+                    texto={descFinal}
+                    tipo="descricao"
+                    onAplicar={setDescEd}
+                    disabled={ocupado}
+                  />
+                  {descEd !== null && (
+                    <button type="button" onClick={() => setDescEd(null)} className={botao}>
+                      Voltar ao texto do site
+                    </button>
+                  )}
+                </div>
               </details>
             </div>
           )}
@@ -886,6 +985,8 @@ function PublicarComposicao({
                     composicao: c.composicao,
                     preco: precoNum,
                     tipoAnuncio: tipo,
+                    ...(tituloEd !== null ? { titulo: tituloEd } : {}),
+                    ...(descEd !== null ? { descricao: descEd } : {}),
                   }),
                 )
               }

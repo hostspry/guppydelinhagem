@@ -381,6 +381,8 @@ export async function publicarProdutoNoMl(dados: {
   composicao: TipoComposicao | null;
   preco: number;
   tipoAnuncio?: string;
+  titulo?: string;
+  descricao?: string;
 }): Promise<MlActionResult> {
   const membro = await assertPermissao("config.editar");
 
@@ -400,6 +402,8 @@ export async function publicarProdutoNoMl(dados: {
     composicao: dados.composicao,
     preco,
     tipoAnuncio: tipo,
+    titulo: dados.titulo,
+    descricao: dados.descricao,
   });
   if (!r.ok) return { ok: false, erro: r.erro };
 
