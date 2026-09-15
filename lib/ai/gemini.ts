@@ -1,5 +1,6 @@
 import "server-only";
 import { z } from "zod";
+import { registrarUsoIa, tratarErroGemini, usoDaResposta } from "./uso";
 
 // ─────────────────────────────────────────────────────────────
 // Integração com o Gemini (Google AI Studio) — geração de conteúdo de produto.
@@ -181,6 +182,7 @@ type GeminiResponse = {
   candidates?: {
     content?: { parts?: { text?: string }[] };
   }[];
+  usageMetadata?: Parameters<typeof usoDaResposta>[0];
 };
 
 /**
@@ -232,10 +234,14 @@ export async function generateProductContent(
 
   if (!res.ok) {
     const errBody = await res.text().catch(() => "");
-    throw new Error(`Gemini API ${res.status}: ${errBody.slice(0, 300)}`);
+    throw new Error(await tratarErroGemini(res.status, errBody));
   }
 
   const data = (await res.json()) as GeminiResponse;
+  await registrarUsoIa({
+    funcao: pesquisar ? "produto.conteudo.pesquisa" : "produto.conteudo",
+    uso: usoDaResposta(data.usageMetadata),
+  });
   // O grounding pode devolver o texto em múltiplas parts — junta todas.
   const text = (data.candidates?.[0]?.content?.parts ?? [])
     .map((p) => p.text)

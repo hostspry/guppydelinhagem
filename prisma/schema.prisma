@@ -618,6 +618,37 @@ model Pagamento {
 
 /// Credenciais e tokens da integração com o Mercado Livre.
 ///
+/// Uma chamada à IA (Gemini) e quanto ela custou.
+///
+/// O Google não deixa ler o saldo de créditos com a chave da API (só no painel
+/// do AI Studio, com login). Então o site conta o próprio gasto: cada chamada
+/// grava os tokens e o custo pela tabela de preço do modelo.
+model UsoIa {
+  id            String   @id @default(cuid())
+  /// De onde veio: "ml.titulos", "produto.conteudo", "comprovante"…
+  funcao        String
+  modelo        String
+  tokensEntrada Int
+  tokensSaida   Int
+  custoUsd      Decimal  @db.Decimal(12, 6)
+  criadoEm      DateTime @default(now())
+
+  @@index([criadoEm])
+}
+
+/// Linha única ("default"): o saldo que o dono informou e o alerta.
+model ConfiguracaoIa {
+  id               String    @id @default("default")
+  /// Saldo de créditos no AI Studio no momento em que foi informado (US$).
+  saldoUsd         Decimal?  @db.Decimal(10, 2)
+  saldoInformadoEm DateTime?
+  /// Avisar quando o saldo estimado cair abaixo disto (US$).
+  alertaUsd        Decimal?  @db.Decimal(10, 2)
+  /// Última vez que o Google recusou por falta de crédito.
+  semCreditoEm     DateTime?
+  atualizadoEm     DateTime  @updatedAt
+}
+
 /// Mesma forma da IntegracaoShopee, com uma diferença que manda no código: o
 /// refresh_token do ML é de USO ÚNICO. Cada renovação devolve um novo, e quem
 /// não gravar o novo perde a autorização e obriga o dono a autorizar de novo.

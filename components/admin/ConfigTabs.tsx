@@ -7,6 +7,7 @@ import {
   Mail,
   MessageSquareText,
   ShoppingBag,
+  Sparkles,
   Store,
   Truck,
 } from "lucide-react";
@@ -27,6 +28,7 @@ const ABAS = [
     icon: MessageSquareText,
   },
   { href: "/admin/configuracoes/shopee", label: "Shopee", icon: ShoppingBag },
+  { href: "/admin/configuracoes/ia", label: "IA", icon: Sparkles },
 ];
 
 export function ConfigTabs() {

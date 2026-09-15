@@ -1,5 +1,6 @@
 import "server-only";
 import { z } from "zod";
+import { registrarUsoIa, tratarErroGemini, usoDaResposta } from "./uso";
 
 // ─────────────────────────────────────────────────────────────
 // Leitura de comprovante — texto colado, PDF ou imagem (print/foto).
@@ -174,6 +175,7 @@ function parseJsonLoose(text: string): unknown {
 
 type GeminiResponse = {
   candidates?: { content?: { parts?: { text?: string }[] } }[];
+  usageMetadata?: Parameters<typeof usoDaResposta>[0];
 };
 
 export type EntradaComprovante =
@@ -252,10 +254,11 @@ export async function lerComprovante(
 
   if (!res.ok) {
     const err = await res.text().catch(() => "");
-    throw new Error(`Gemini API ${res.status}: ${err.slice(0, 300)}`);
+    throw new Error(await tratarErroGemini(res.status, err));
   }
 
   const data = (await res.json()) as GeminiResponse;
+  await registrarUsoIa({ funcao: "comprovante", uso: usoDaResposta(data.usageMetadata) });
   const texto = (data.candidates?.[0]?.content?.parts ?? [])
     .map((p) => p.text)
     .filter((t): t is string => typeof t === "string")
