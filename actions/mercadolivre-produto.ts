@@ -27,6 +27,7 @@ import { COMPOSICAO_LABEL, ORDEM_COMPOSICAO, conjuntosDoPool } from "@/lib/compo
 import type { TipoComposicao } from "@/lib/generated/prisma/enums";
 import { proximoEnvioPeixe, rotuloSegunda } from "@/lib/envio-peixe";
 import { prazoMl } from "@/lib/mercadolivre/prazo";
+import { aplicarDescricaoDoSite } from "@/lib/mercadolivre/descricao-site";
 
 /**
  * Ações da aba "Mercado Livre" do produto.
@@ -354,6 +355,25 @@ export async function descricaoAnuncioMl(dados: {
     descricao: `Trocou a descrição do anúncio ${a.itemId} no Mercado Livre`,
   });
   return { ok: true, mensagem: "Descrição salva no Mercado Livre." };
+}
+
+/**
+ * Troca a descrição do anúncio no ML pelo texto que o site monta hoje:
+ * apresentação da loja, texto do produto, envio, licença, regra da segunda e
+ * garantia. Um clique, para quem mudou os textos da loja e quer ver no ML.
+ */
+export async function atualizarDescricaoDoSiteMl(anuncioId: string): Promise<Resultado> {
+  const membro = await assertPermissao("config.editar");
+  const r = await aplicarDescricaoDoSite(anuncioId);
+  if (!r.ok) return r;
+
+  await auditar(membro, {
+    acao: "config.mercadolivre.descricao",
+    entidade: "MercadoLivreAnuncio",
+    entidadeId: r.itemId,
+    descricao: `Atualizou a descrição do anúncio ${r.itemId} com o texto do site`,
+  });
+  return { ok: true, mensagem: "Descrição atualizada no Mercado Livre com o texto do site." };
 }
 
 /** Texto que o site montaria hoje para este anúncio (para restaurar/atualizar). */

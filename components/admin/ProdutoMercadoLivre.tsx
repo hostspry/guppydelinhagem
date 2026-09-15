@@ -23,6 +23,7 @@ import {
   statusAnuncioMl,
   descricaoAnuncioMl,
   descricaoDoSiteMl,
+  atualizarDescricaoDoSiteMl,
   composicaoAnuncioMl,
   enviarEstoqueProdutoMl,
   ligarAnuncioPorNumeroMl,
@@ -720,6 +721,25 @@ function CartaoAnuncio({
           >
             <RefreshCw size={13} aria-hidden="true" />
             Atualizar fotos e ficha
+          </button>
+        )}
+        {d && d.status !== "closed" && (
+          <button
+            type="button"
+            disabled={travado}
+            onClick={() => {
+              if (
+                window.confirm(
+                  "A descrição do anúncio no ML vai ser trocada pelo texto do site: apresentação da loja, texto do produto, envio, licença e garantia. O que foi editado à mão ou pela IA neste anúncio se perde. Continuar?",
+                )
+              ) {
+                rodar(() => atualizarDescricaoDoSiteMl(a.id));
+              }
+            }}
+            className={botao}
+          >
+            <FileText size={13} aria-hidden="true" />
+            Atualizar descrição no ML
           </button>
         )}
         <button

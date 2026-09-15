@@ -24,6 +24,7 @@ import {
   desligarAnuncioMl,
   salvarLicencaIbama,
   salvarTextosAnuncioMl,
+  aplicarDescricaoTodosPeixesMl,
   publicarProdutoNoMl,
   sugerirPrecoMl,
   trocarTipoAnuncioMl,
@@ -427,6 +428,24 @@ export function ConfigMercadoLivre({
           className="px-4 py-2 rounded-md bg-[#07366A] text-white text-sm font-semibold hover:brightness-110 disabled:opacity-60"
         >
           Salvar textos
+        </button>
+        {/* Salvar vale para anúncio novo. Os que já estão no ar só mudam com
+            este botão: trocar descrição sozinho apagaria edição feita à mão. */}
+        <button
+          type="button"
+          disabled={pending}
+          onClick={() => {
+            if (
+              window.confirm(
+                "A descrição de TODOS os anúncios de peixe no ML vai ser trocada pelo texto do site, com os textos salvos acima. O que foi editado à mão ou pela IA nesses anúncios se perde. Salve os textos antes. Continuar?",
+              )
+            ) {
+              rodar(aplicarDescricaoTodosPeixesMl);
+            }
+          }}
+          className="ml-2 px-4 py-2 rounded-md border border-gray-300 text-sm font-medium text-gray-700 hover:border-[#07366A] disabled:opacity-60"
+        >
+          Aplicar em todos os anúncios de peixe
         </button>
       </div>
 

@@ -22,6 +22,7 @@ import {
   type TipoAnuncio,
 } from "@/lib/mercadolivre/publicar";
 import { sugerirPreco } from "@/lib/mercadolivre/precos";
+import { aplicarDescricaoDoSite } from "@/lib/mercadolivre/descricao-site";
 import { problemasDescricao, semTravessao } from "@/lib/mercadolivre/texto-ml";
 import type { TipoComposicao } from "@/lib/generated/prisma/enums";
 
@@ -391,8 +392,46 @@ export async function salvarTextosAnuncioMl(dados: {
   return {
     ok: true,
     mensagem:
-      "Textos salvos. Anúncio novo já sai com eles; nos publicados, use \"Usar texto do site\" na aba do produto.",
+      "Textos salvos. Anúncio novo já sai com eles. Para os publicados, clique em \"Aplicar em todos os anúncios de peixe\".",
   };
+}
+
+/**
+ * Leva a descrição do site (com a apresentação e a garantia salvas) a TODOS os
+ * anúncios de peixe ligados. Substitui edição feita à mão ou pela IA: a tela
+ * pede confirmação antes.
+ */
+export async function aplicarDescricaoTodosPeixesMl(): Promise<MlActionResult> {
+  const membro = await assertPermissao("config.editar");
+
+  const anuncios = await prisma.mercadoLivreAnuncio.findMany({
+    where: { product: { tipo: "PEIXE" } },
+    select: { id: true },
+  });
+  if (anuncios.length === 0) return { ok: false, erro: "Nenhum anúncio de peixe ligado." };
+
+  let feitos = 0;
+  const erros: string[] = [];
+  for (const a of anuncios) {
+    const r = await aplicarDescricaoDoSite(a.id);
+    if (r.ok) feitos++;
+    else erros.push(r.erro);
+  }
+
+  await auditar(membro, {
+    acao: "config.mercadolivre.descricao",
+    entidade: "MercadoLivre",
+    descricao: `Atualizou a descrição de ${feitos} anúncio(s) de peixe com o texto do site`,
+    depois: { feitos, erros },
+  });
+
+  if (erros.length > 0) {
+    return {
+      ok: false,
+      erro: `${feitos} atualizado(s), ${erros.length} com erro: ${erros.slice(0, 2).join(" · ")}`,
+    };
+  }
+  return { ok: true, mensagem: `Descrição atualizada em ${feitos} anúncio(s) de peixe.` };
 }
 
 /** Salva o número da licença do IBAMA (vai na descrição de todo anúncio de peixe). */
