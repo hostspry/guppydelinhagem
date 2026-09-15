@@ -7,6 +7,7 @@ import { montarAnuncio, juntarDescricao, LISTING_TYPE } from "@/lib/mercadolivre
 import { descricaoEmParagrafos } from "@/lib/markdown";
 import { stripMarcheziSignature } from "@/lib/constants";
 import { COMPOSICAO_LABEL } from "@/lib/composicoes";
+import { ehSemCredito } from "@/lib/ai/credito";
 import {
   sugerirTitulosIa,
   melhorarDescricaoIa,
@@ -28,6 +29,7 @@ function erroAmigavel(e: unknown): Falha {
   const msg = e instanceof Error ? e.message : String(e);
   console.error("[ia-ml]", msg);
   if (/GEMINI_API_KEY/.test(msg)) return { ok: false, erro: "A chave do Gemini não está configurada." };
+  if (ehSemCredito(msg)) return { ok: false, erro: msg };
   if (/timeout|aborted/i.test(msg)) return { ok: false, erro: "A IA demorou demais. Tente de novo." };
   return { ok: false, erro: msg.startsWith("Gemini ") ? "A IA falhou agora. Tente de novo." : msg };
 }

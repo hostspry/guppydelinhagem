@@ -4,6 +4,7 @@ import { useRef, useState, useTransition } from "react";
 import { FileText, Loader2, Sparkles, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 import { lerComprovanteEnviado } from "@/actions/comprovante";
+import { avisarErroIa } from "@/lib/ai/avisar-erro";
 import type { ComprovanteLido } from "@/lib/ai/comprovante";
 import type { LancamentoParecido } from "@/lib/queries/financeiro";
 
@@ -60,7 +61,7 @@ export function LeitorComprovante({
       const r = await lerComprovanteEnviado(fd);
 
       if (!r.ok) {
-        toast.error(r.error);
+        avisarErroIa(r.error);
         // Mesmo sem leitura, o arquivo já subiu: mantém o anexo no lançamento
         // para o dono preencher à mão sem perder o comprovante.
         if (r.comprovanteUrl) {

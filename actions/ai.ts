@@ -5,6 +5,7 @@ import {
   type GeneratedProductContent,
 } from "@/lib/ai/gemini";
 import { assertPermissao } from "@/lib/permissoes-server";
+import { ehSemCredito } from "@/lib/ai/credito";
 
 export type GenerateContentResult =
   | { ok: true; data: GeneratedProductContent }
@@ -34,10 +35,14 @@ export async function generateContent(input: {
     return { ok: true, data };
   } catch (e) {
     console.error("generateContent:", e);
+    // Crédito acabado passa com a mensagem própria: a tela mostra o botão de
+    // comprar mais. "Tente de novo" seria mentira, porque não vai funcionar.
+    const msg = e instanceof Error ? e.message : "";
     return {
       ok: false,
-      error:
-        "Não foi possível gerar agora. Tente novamente ou preencha manualmente.",
+      error: ehSemCredito(msg)
+        ? msg
+        : "Não foi possível gerar agora. Tente novamente ou preencha manualmente.",
     };
   }
 }

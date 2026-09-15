@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { AlertTriangle, ExternalLink, Sparkles, Wallet } from "lucide-react";
 import { salvarSaldoIa } from "@/actions/ia";
+import { URL_CREDITOS_GEMINI, URL_USO_GEMINI } from "@/lib/ai/credito";
 
 /**
  * Configurações → IA: gasto do Gemini e saldo de créditos.
@@ -14,9 +15,8 @@ import { salvarSaldoIa } from "@/actions/ia";
  * gasto e descontar do saldo que o dono informou.
  */
 
-// Não vêm de lib/ai/uso (server-only): são só endereços.
-const URL_COMPRAR = "https://aistudio.google.com/billing";
-const URL_USO = "https://aistudio.google.com/usage";
+const URL_COMPRAR = URL_CREDITOS_GEMINI;
+const URL_USO = URL_USO_GEMINI;
 
 const usd = (v: number) =>
   v.toLocaleString("pt-BR", {
@@ -69,11 +69,22 @@ export function ConfigIa(props: {
         </p>
       )}
       {props.semCreditoEm && (
-        <p className="flex items-start gap-1.5 text-sm text-red-700 bg-red-50 border border-red-200 rounded-md p-3">
-          <AlertTriangle size={15} className="shrink-0 mt-0.5" aria-hidden="true" />
-          Em {dataHora(props.semCreditoEm)} o Google recusou uma chamada por falta de crédito.
-          Compre mais e informe o saldo novo abaixo.
-        </p>
+        <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-red-700 bg-red-50 border border-red-200 rounded-md p-3">
+          <p className="flex items-start gap-1.5">
+            <AlertTriangle size={15} className="shrink-0 mt-0.5" aria-hidden="true" />
+            Em {dataHora(props.semCreditoEm)} o Google recusou uma chamada por falta de crédito.
+            A IA está parada até entrar crédito novo.
+          </p>
+          <a
+            href={URL_COMPRAR}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-red-600 text-white text-xs font-semibold hover:brightness-110"
+          >
+            Adicionar crédito no Google
+            <ExternalLink size={13} aria-hidden="true" />
+          </a>
+        </div>
       )}
 
       {/* ── Saldo ── */}

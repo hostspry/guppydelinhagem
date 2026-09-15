@@ -1,5 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
+import { MSG_SEM_CREDITO } from "./credito";
 
 /**
  * Conta o gasto da IA no próprio site.
@@ -14,10 +15,6 @@ const PRECO_POR_MILHAO: Record<string, { entrada: number; saida: number }> = {
 };
 
 export const MODELO_PADRAO = "gemini-2.5-flash";
-
-/** Onde o dono compra crédito e vê o saldo de verdade. */
-export const URL_CREDITOS_GEMINI = "https://aistudio.google.com/billing";
-export const URL_USO_GEMINI = "https://aistudio.google.com/usage";
 
 export function custoUsd(modelo: string, entrada: number, saida: number): number {
   const p = PRECO_POR_MILHAO[modelo] ?? PRECO_POR_MILHAO[MODELO_PADRAO];
@@ -41,6 +38,12 @@ export async function registrarUsoIa(params: {
         custoUsd: custoUsd(modelo, params.uso.entrada, params.uso.saida),
       },
     });
+    // Chamada paga que funcionou: se havia aviso de crédito acabado, o crédito
+    // voltou. Some com o aviso sem o dono ter que lembrar de limpar.
+    await prisma.configuracaoIa.updateMany({
+      where: { id: "default", semCreditoEm: { not: null } },
+      data: { semCreditoEm: null },
+    });
   } catch (e) {
     console.error("[ia] não registrei o uso", e);
   }
@@ -60,7 +63,8 @@ export async function tratarErroGemini(status: number, corpo: string): Promise<s
         update: { semCreditoEm: new Date() },
       })
       .catch(() => {});
-    return "Os créditos do Gemini acabaram (ou chegaram no limite). Compre mais em Configurações → IA.";
+    // A tela reconhece esta mensagem e mostra o botão para comprar crédito.
+    return MSG_SEM_CREDITO;
   }
   return `Gemini ${status}: ${corpo.slice(0, 300)}`;
 }

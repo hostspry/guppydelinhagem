@@ -1,6 +1,7 @@
 "use server";
 
 import { assertPermissao } from "@/lib/permissoes-server";
+import { ehSemCredito } from "@/lib/ai/credito";
 import { prisma } from "@/lib/prisma";
 import { uploadComprovante } from "@/lib/s3";
 import {
@@ -141,8 +142,10 @@ export async function lerComprovanteEnviado(
     return { ok: true, dados, comprovanteUrl, categoriaId, parecidos, parecidosSao };
   } catch (e) {
     console.error("[comprovante] leitura", e);
-    const msg =
-      e instanceof Error && /GEMINI_API_KEY/.test(e.message)
+    const erro = e instanceof Error ? e.message : "";
+    const msg = ehSemCredito(erro)
+      ? erro
+      : /GEMINI_API_KEY/.test(erro)
         ? "A leitura por IA não está configurada (falta a chave do Gemini)."
         : "Não consegui ler este comprovante. Preencha os campos à mão.";
     return { ok: false, error: msg, comprovanteUrl };

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { toast } from "sonner";
+import { avisarErroIa } from "@/lib/ai/avisar-erro";
 import { Sparkles, SpellCheck } from "lucide-react";
 import {
   iaSugerirTitulosMl,
@@ -96,7 +96,7 @@ export function SugerirTitulos({
           start(async () => {
             const r = await iaSugerirTitulosMl({ productId, composicao, anuncioId });
             if (!r.ok) {
-              toast.error(r.erro);
+              avisarErroIa(r.erro);
               return;
             }
             setOpcoes(r.opcoes);
@@ -207,7 +207,7 @@ export function RevisarTexto({
           start(async () => {
             const r = await iaRevisarTextoMl({ texto, tipo });
             if (!r.ok) {
-              toast.error(r.erro);
+              avisarErroIa(r.erro);
               return;
             }
             setProposta({ antes: texto, depois: r.texto });
@@ -259,7 +259,7 @@ export function MelhorarDescricao({
           start(async () => {
             const r = await iaMelhorarDescricaoMl({ productId, composicao });
             if (!r.ok) {
-              toast.error(r.erro);
+              avisarErroIa(r.erro);
               return;
             }
             setProposta({ antes: atual, depois: r.descricao });

@@ -31,6 +31,7 @@ import { truncateAtWord } from "@/lib/utils/text";
 import { MARCHEZI_SIGNATURE } from "@/lib/constants";
 import { createProduct, updateProduct } from "@/actions/products";
 import { generateContent } from "@/actions/ai";
+import { avisarErroIa } from "@/lib/ai/avisar-erro";
 import { ProductVideosField } from "./ProductVideosField";
 import {
   ProductImagesField,
@@ -379,7 +380,7 @@ export function ProductForm({ categorias, initialData }: ProductFormProps) {
         pesquisar: pesquisarAtivo,
       });
       if (!res.ok) {
-        toast.error(res.error);
+        avisarErroIa(res.error);
         return;
       }
       const d = res.data;
