@@ -79,7 +79,7 @@ export async function confirmarEnvioAereo(token: string, input: unknown): Promis
 
   const base = baseGollog(d.aeroporto);
   if (!base) {
-    return { ok: false, error: "Escolha um aeroporto da lista.", fieldErrors: { aeroporto: ["Escolha um aeroporto da lista"] } };
+    return { ok: false, error: "Escolha onde vai retirar.", fieldErrors: { aeroporto: ["Escolha uma unidade da lista"] } };
   }
 
   const endereco = {
@@ -166,7 +166,7 @@ export async function definirEnvioAereo(
   const membro = await assertPermissao("pedidos.envio");
 
   const iata = String(input.aeroporto ?? "").trim().toUpperCase();
-  if (iata && !baseGollog(iata)) return { ok: false, error: "Aeroporto fora da lista da Gollog." };
+  if (iata && !baseGollog(iata)) return { ok: false, error: "Unidade fora da lista da Gollog." };
 
   const nome = String(input.recebedorNome ?? "").trim();
   const cpf = String(input.recebedorCpf ?? "").replace(/\D/g, "");

@@ -10,7 +10,7 @@ const digitos = (s: string) => s.replace(/\D/g, "");
  */
 export const confirmacaoAereoSchema = cadastroPublicoSchema
   .extend({
-    aeroporto: z.string().trim().toUpperCase().regex(/^[A-Z]{3}$/, "Escolha o aeroporto"),
+    aeroporto: z.string().trim().toUpperCase().regex(/^[A-Z]{3}$/, "Escolha onde vai retirar"),
     outraPessoaRetira: z.boolean().default(false),
     recebedorNome: z.string().trim().max(120).optional().default(""),
     recebedorCpf: z.string().transform(digitos).optional().default(""),

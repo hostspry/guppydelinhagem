@@ -64,12 +64,20 @@ export function basesPorDistancia(
 }
 
 /**
- * Aeroporto que vai na minuta.
+ * Unidade da cidade do cliente, quando existe. Cidade grande tem várias (São
+ * Paulo tem uma dúzia de lojas): a do aeroporto vem primeiro, porque a caixa
+ * chega nela direto do avião; depois a mais perto.
+ */
+export function baseNaCidade(lista: BaseComDistancia[]): BaseComDistancia | null {
+  return lista.find((b) => b.naCidade && b.noAeroporto) ?? lista.find((b) => b.naCidade) ?? null;
+}
+
+/**
+ * Base que vai na minuta.
  *
- * O escolhido pelo cliente (ou pelo dono) manda. Sem escolha, só entra a base
- * que fica na cidade do cliente, a mais perto se houver duas. Cidade sem Gollog
- * fica em branco: chutar um aeroporto a 200 km é mandar a caixa para onde o
- * cliente talvez não consiga ir.
+ * A escolhida pelo cliente (ou pelo dono) manda. Sem escolha, só entra a
+ * unidade da cidade do cliente. Cidade sem Gollog fica em branco: chutar uma
+ * base a 400 km é mandar a caixa para onde o cliente talvez não vá.
  */
 export function aeroportoDaMinuta(
   escolhido: string | null | undefined,
@@ -78,5 +86,5 @@ export function aeroportoDaMinuta(
 ): string | null {
   const base = baseGollog(escolhido);
   if (base) return base.iata;
-  return basesPorDistancia(cidade, uf).find((b) => b.naCidade)?.iata ?? null;
+  return baseNaCidade(basesPorDistancia(cidade, uf))?.iata ?? null;
 }

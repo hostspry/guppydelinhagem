@@ -83,8 +83,8 @@ export function GollogCard({
   }
 
   const mensagem = (link: string) =>
-    `Oi ${clienteNome.split(/\s+/)[0]}! Seu pedido ${numero} vai de avião pela Gollog e fica para retirada no aeroporto. ` +
-    `Confirme por aqui o seu endereço, o aeroporto onde vai buscar e quem vai retirar: ${link}`;
+    `Oi ${clienteNome.split(/\s+/)[0]}! Seu pedido ${numero} vai de avião pela Gollog e fica para retirada numa unidade da Gollog. ` +
+    `Confirme por aqui o seu endereço, onde vai buscar e quem vai retirar: ${link}`;
 
   function whatsapp() {
     comLink((link) => {
@@ -143,13 +143,13 @@ export function GollogCard({
 
       <div className="space-y-1">
         <p className="text-gray-600">
-          Aeroporto na minuta:{" "}
+          Base na minuta:{" "}
           <span className="font-medium text-[#07366A]">
             {base ? `${base.iata} · ${base.cidade}/${base.uf}` : "em branco"}
           </span>
         </p>
         {!aeroportoDestino && base && (
-          <p className="text-xs text-gray-400">Base da cidade do cliente. Ele ainda não escolheu.</p>
+          <p className="text-xs text-gray-400">Unidade da cidade do cliente. Ele ainda não escolheu.</p>
         )}
         {!base && (
           <p className="text-xs text-gray-400">
@@ -202,11 +202,11 @@ export function GollogCard({
       {aberto && (
         <details className="border-t border-gray-100 pt-3">
           <summary className="cursor-pointer text-xs font-medium text-[#07366A]">
-            Definir aeroporto ou quem retira à mão
+            Definir unidade ou quem retira à mão
           </summary>
           <div className="space-y-3 mt-3">
-            <select value={aeroporto} onChange={(e) => setAeroporto(e.target.value)} className={inputCls} aria-label="Aeroporto de retirada">
-              <option value="">Sem escolha (usa a base da cidade, se houver)</option>
+            <select value={aeroporto} onChange={(e) => setAeroporto(e.target.value)} className={inputCls} aria-label="Unidade de retirada">
+              <option value="">Sem escolha (usa a unidade da cidade, se houver)</option>
               {bases.map((b) => (
                 <option key={b.iata} value={b.iata}>
                   {b.iata} · {b.cidade}/{b.uf}
@@ -268,7 +268,7 @@ export function GollogCard({
         </a>
         {!confirmadaEm && aberto && (
           <p className="text-[11px] text-gray-400 leading-snug">
-            Dá para baixar antes da confirmação, mas o endereço e o aeroporto podem mudar
+            Dá para baixar antes da confirmação, mas o endereço e a unidade podem mudar
             quando o cliente responder.
           </p>
         )}

@@ -110,7 +110,7 @@ export async function pedirConfirmacaoEnvioAereo(
       {
         nome,
         numero: o.numero,
-        botao_confirmar: botao("Confirmar aeroporto e endereço", link),
+        botao_confirmar: botao("Confirmar onde vou retirar", link),
         link,
       },
       `Pedido ${o.numero}: falta confirmar onde você vai retirar.`,

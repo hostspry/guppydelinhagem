@@ -10,7 +10,7 @@ import { ConfirmacaoAereoForm } from "@/components/site/ConfirmacaoAereoForm";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Confirme o aeroporto de retirada | Guppy de Linhagem",
+  title: "Confirme onde retirar seus peixes | Guppy de Linhagem",
   robots: { index: false, follow: false },
 };
 
@@ -47,10 +47,10 @@ export default async function EnvioAereoPage({ params }: Props) {
   const end = (pedido.enderecoEntrega ?? {}) as Partial<EnderecoEntrega>;
   const aberto = ehEnvioAereoPendente(pedido);
   const bases = basesPorDistancia(end.cidade, end.uf);
-  // Sugestão: o que já foi escolhido; senão a base da cidade; senão a mais perto.
-  const sugerido =
-    aeroportoDaMinuta(pedido.aeroportoDestino, end.cidade, end.uf) ??
-    (bases[0]?.km != null ? bases[0].iata : "");
+  // Já vem marcada só a escolhida ou a unidade da cidade do cliente. A mais
+  // perto em outra cidade não: o cliente pode retirar em outro lugar, e marcar
+  // por ele faz parecer que a loja já decidiu.
+  const sugerido = aeroportoDaMinuta(pedido.aeroportoDestino, end.cidade, end.uf) ?? "";
 
   return (
     <div className="bg-muted/30 min-h-screen">
@@ -62,8 +62,8 @@ export default async function EnvioAereoPage({ params }: Props) {
           </h1>
           <p className="mt-2 text-sm text-muted-foreground max-w-lg mx-auto">
             Pedido <strong className="text-primary">{pedido.numero}</strong>. O envio
-            aéreo não chega em casa: a caixa fica na base da Gollog no aeroporto.
-            Confirme seus dados, o aeroporto e quem vai buscar.
+            aéreo não chega em casa: a caixa fica numa unidade da Gollog para
+            retirada. Confirme seus dados, onde vai retirar e quem vai buscar.
           </p>
           <ul className="mt-3 text-xs text-muted-foreground">
             {pedido.items.map((it, i) => (

@@ -78,7 +78,7 @@ export function ConfirmacaoAereoForm({
   const numeroRef = useRef<HTMLInputElement>(null);
   const isca = useRef<HTMLInputElement>(null);
   const cidadeConsultada = useRef(`${inicial.cidade}|${inicial.uf}`);
-  // Aeroporto que veio só como sugestão acompanha a mudança de cidade; o que a
+  // Unidade que veio só como sugestão acompanha a mudança de cidade; a que a
   // pessoa clicou (ou já tinha confirmado) fica.
   const escolhaManual = useRef(aeroportoEscolhido);
 
@@ -94,9 +94,11 @@ export function ConfirmacaoAereoForm({
     cidadeConsultada.current = chave;
     const novas = await basesParaCidade(cidade, uf);
     setBases(novas);
-    const perto = novas[0];
-    if (!escolhaManual.current && perto?.km != null) {
-      setCampos((a) => ({ ...a, aeroporto: perto.iata }));
+    // Sugestão só da cidade do cliente; sem unidade lá, fica sem marcação.
+    if (!escolhaManual.current) {
+      const daCidade =
+        novas.find((b) => b.naCidade && b.noAeroporto) ?? novas.find((b) => b.naCidade);
+      setCampos((a) => ({ ...a, aeroporto: daCidade?.iata ?? "" }));
     }
   }
 
@@ -174,6 +176,7 @@ export function ConfirmacaoAereoForm({
         ...(escolhida && !bases.slice(0, PRIMEIRAS).includes(escolhida) ? [escolhida] : []),
       ];
   const maisPerto = bases[0];
+  const temNaCidade = bases.some((b) => b.naCidade);
 
   return (
     <form onSubmit={enviar} className="space-y-5" noValidate>
@@ -299,23 +302,23 @@ export function ConfirmacaoAereoForm({
         </div>
       </fieldset>
 
-      {/* ── Aeroporto ── */}
+      {/* ── Unidade de retirada ── */}
       <fieldset className={caixa}>
-        <legend className={legenda}>Aeroporto de retirada</legend>
+        <legend className={legenda}>Onde retirar</legend>
         <p className="text-xs text-muted-foreground mb-3">
-          Escolha a base da Gollog onde você consegue buscar a caixa. Estão em ordem
-          de distância da sua cidade.
+          Escolha a unidade da Gollog onde você vai buscar a caixa: pode ser no
+          aeroporto ou numa loja da Gollog. Estão em ordem de distância da sua cidade.
         </p>
 
-        {maisPerto?.km != null && maisPerto.km > 120 && (
+        {!temNaCidade && maisPerto?.km != null && (
           <p className="mb-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
-            Sua cidade não tem base da Gollog. A mais perto fica a cerca de{" "}
-            {maisPerto.km} km. Confira se dá para buscar lá em até 72 horas antes de
-            confirmar.
+            Não achei unidade da Gollog na sua cidade. A mais perto fica a cerca de{" "}
+            {maisPerto.km} km. Se você costuma retirar em outro lugar, é só escolher
+            na lista. A retirada precisa ser em até 72 horas.
           </p>
         )}
 
-        <div className="space-y-2" role="radiogroup" aria-label="Aeroporto de retirada">
+        <div className="space-y-2" role="radiogroup" aria-label="Unidade de retirada">
           {visiveis.map((b) => {
             const ativo = campos.aeroporto === b.iata;
             return (
@@ -368,7 +371,7 @@ export function ConfirmacaoAereoForm({
             onClick={() => setVerTodas(true)}
             className="mt-3 text-sm font-medium text-secondary hover:underline"
           >
-            Ver todos os {bases.length} aeroportos
+            Ver todas as {bases.length} unidades
           </button>
         )}
         <Erro msg={erros.aeroporto} />
