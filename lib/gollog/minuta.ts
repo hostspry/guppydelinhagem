@@ -65,10 +65,6 @@ function latino(s: string): string {
 const endereco = (logradouro?: string | null, numero?: string | null) =>
   [logradouro, numero].filter((x) => x && x.trim()).join(", ");
 
-/** Dia de hoje em São Paulo, "dd/mm/aaaa". O servidor roda em UTC. */
-const hojeSp = () =>
-  new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo" }).format(new Date());
-
 const INSTRUCOES =
   "Peixes ornamentais vivos. Produto perecível - manuseio cuidadoso; não expor ao calor/sol.";
 
@@ -184,7 +180,8 @@ export async function gerarMinutaGollog(
   // ── Autorização ──
   const autorizo = form.getFieldMaybe("Autorizacao");
   if (autorizo instanceof PDFCheckBox) autorizo.check();
-  texto("Local_data", `${loja.localAssinatura}, ${hojeSp()}`);
+  // A data fica em branco: é preenchida no dia do despacho, no aeroporto.
+  texto("Local_data", `${loja.localAssinatura},`);
   texto("Nome_Responsavel", loja.nome);
 
   const primeiroNome = (end.nome || pedido.cliente.nome).split(/\s+/)[0] ?? "cliente";
