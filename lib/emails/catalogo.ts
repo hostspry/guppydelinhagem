@@ -143,6 +143,22 @@ export const TEMPLATES: TemplateDef[] = [
     ],
   },
   {
+    chave: "envio-aereo-confirmar",
+    rotulo: "Confirmar aeroporto (envio aéreo)",
+    quando:
+      "Sai quando um pedido com envio aéreo (Gollog) é pago, ou quando você pede a confirmação na página do pedido. O cliente confirma endereço, aeroporto de retirada e quem vai buscar.",
+    variaveis: [
+      VAR_NOME,
+      VAR_NUMERO,
+      {
+        nome: "botao_confirmar",
+        descricao: "Botão “Confirmar aeroporto e endereço”",
+        bloco: true,
+      },
+      { nome: "link", descricao: "Endereço do link, em texto" },
+    ],
+  },
+  {
     chave: "acesso-cliente",
     rotulo: "Acesso do cliente",
     quando:

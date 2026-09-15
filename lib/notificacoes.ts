@@ -13,6 +13,7 @@ import type {
 } from "@/lib/generated/prisma/enums";
 import { emailPedidoPago, emailPedidoEnviado } from "@/lib/emails/pedido";
 import { rotuloSemana, segundaDaSemana } from "@/lib/semana-envio";
+import { pedirConfirmacaoEnvioAereo } from "@/lib/gollog/confirmacao";
 
 // Camada de eventos semânticos do ciclo do pedido. Os pontos de disparo (checkout,
 // webhooks, actions) chamam estes eventos — não montam texto. Um lugar só para
@@ -215,6 +216,9 @@ export async function notificarPedidoPago(
   void emailPedidoPago(orderId).catch((e) =>
     console.error("[notificacoes] e-mail de pago", e),
   );
+  // Aéreo: a caixa fica no aeroporto, então o cliente confirma onde retira.
+  // Sai só uma vez e só para pedido Gollog; os outros saem sem fazer nada.
+  void pedirConfirmacaoEnvioAereo(orderId);
   const met = rotuloMetodo(opts?.metodo);
   const prov = rotuloProvider(opts?.provider);
   const linhaPag =
@@ -495,6 +499,25 @@ export async function notificarResumoEnvios(): Promise<{ pedidos: number }> {
 
   await enviarSeguro(() => secoes.join("\n\n"));
   return { pedidos: pedidos.length };
+}
+
+// ── 3.10 Cliente confirmou o envio aéreo (✈️) ──────────────────────────────────
+/** O cliente respondeu o link: dá para gerar a minuta e despachar. */
+export async function notificarConfirmacaoAereo(dados: {
+  orderId: string;
+  numero: string;
+  nome: string;
+  aeroporto: string;
+  recebedor: string | null;
+}): Promise<void> {
+  await enviarSeguro(
+    () =>
+      `✈️ <b>Envio aéreo confirmado</b>\n\n` +
+      `Pedido <b>${escapeHtml(dados.numero)}</b> · ${escapeHtml(dados.nome)}\n` +
+      `Retira em: <b>${escapeHtml(dados.aeroporto)}</b>\n` +
+      (dados.recebedor ? `Quem busca: ${escapeHtml(dados.recebedor)}\n` : "") +
+      `\nMinuta: ${LINK_ADMIN}/${dados.orderId}`,
+  );
 }
 
 // ── 3.9 Cliente preencheu o cadastro pelo link (📝) ───────────────────────────

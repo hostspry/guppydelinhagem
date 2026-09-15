@@ -17,6 +17,7 @@ import { lerDadosWhatsapp, normalizarDadosCliente } from "@/lib/whatsapp-cliente
 import { getCatalogoPedido } from "@/lib/queries/pedidos";
 import { transicionarParaPago } from "@/lib/pedido-baixa";
 import { empurrarEstoqueDoPedido } from "@/lib/shopee/estoque";
+import { pedirConfirmacaoEnvioAereo } from "@/lib/gollog/confirmacao";
 import { semanaDaChave } from "@/lib/semana-envio";
 import { COMPOSICAO_LABEL } from "@/lib/composicoes";
 import {
@@ -459,7 +460,11 @@ export async function criarVendaWhatsapp(input: unknown): Promise<VendaResult> {
   }
 
   // Estoque baixou: reflete na Shopee, sem o painel esperar o marketplace.
-  if (d.jaPago) void empurrarEstoqueDoPedido(orderId);
+  if (d.jaPago) {
+    void empurrarEstoqueDoPedido(orderId);
+    // Aéreo: o cliente recebe o link para confirmar aeroporto e quem retira.
+    void pedirConfirmacaoEnvioAereo(orderId);
+  }
 
   await auditar(membro, {
     acao: "pedido.criar",

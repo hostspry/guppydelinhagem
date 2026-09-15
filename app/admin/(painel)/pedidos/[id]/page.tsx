@@ -8,6 +8,9 @@ import { EnvioCard } from "@/components/admin/EnvioCard";
 import { AcessoCliente } from "@/components/admin/AcessoCliente";
 import { rotuloSemana, semanaVencida } from "@/lib/semana-envio";
 import { EstornarButton } from "@/components/admin/EstornarButton";
+import { GollogCard } from "@/components/admin/GollogCard";
+import { aeroportoDaMinuta, basesPorDistancia } from "@/lib/gollog/bases";
+import { ehEnvioAereoPendente } from "@/lib/gollog/confirmacao";
 import { podeEditarItens } from "@/lib/pedido-status";
 import {
   formatBRL,
@@ -28,6 +31,9 @@ export default async function PedidoDetalhePage({ params }: Props) {
     .filter(Boolean)
     .join(", ");
   const linhaCidade = [e.cidade, e.uf].filter(Boolean).join(" / ");
+  const aereo =
+    pedido.tipoEntrega !== "RETIRADA" &&
+    (pedido.transportadora === "GOLLOG" || pedido.modalidadeFrete === "AEREO");
 
   // Estorno: pagamento já estornado (estado final) e pagamento PAGO ainda
   // reembolsável (mostra aviso + botão). O valor vem do banco, nunca do client.
@@ -156,6 +162,25 @@ export default async function PedidoDetalhePage({ params }: Props) {
               {e.cep && <p>CEP {e.cep}</p>}
             </div>
           </div>
+
+          {/* Aéreo: confirmação do cliente (aeroporto, quem retira) + minuta. */}
+          {aereo && (
+            <GollogCard
+              orderId={pedido.id}
+              numero={pedido.numero}
+              aberto={ehEnvioAereoPendente(pedido)}
+              clienteNome={e.nome}
+              clienteTelefone={e.telefone}
+              aeroportoDestino={pedido.aeroportoDestino}
+              aeroportoMinuta={aeroportoDaMinuta(pedido.aeroportoDestino, e.cidade, e.uf)}
+              bases={basesPorDistancia(e.cidade, e.uf)}
+              recebedorNome={pedido.recebedorNome}
+              recebedorCpf={pedido.recebedorCpf}
+              recebedorTelefone={pedido.recebedorTelefone}
+              pedidaEm={pedido.confirmacaoEnvioPedidaEm}
+              confirmadaEm={pedido.confirmacaoEnvioEm}
+            />
+          )}
 
           {/* Envio & rastreio — registro manual + WhatsApp + link de rastreio.
               Na retirada não há envio a rastrear. */}

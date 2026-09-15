@@ -507,6 +507,22 @@ model Order {
   /// Telegram lembrar a loja na semana certa.
   semanaEnvio DateTime?
 
+  /// Envio aéreo (Gollog): a caixa não vai para casa, fica na base do
+  /// aeroporto. Sigla IATA da base onde o cliente retira. Nulo = ainda não
+  /// definido (a minuta sai com o campo em branco).
+  aeroportoDestino String?  @db.VarChar(3)
+  /// Quem vai retirar na base, quando não é o próprio cliente. A Gollog só
+  /// entrega a caixa com documento, então o nome e o CPF vão na minuta.
+  recebedorNome     String?
+  recebedorCpf      String? // só dígitos
+  recebedorTelefone String? // só dígitos
+  /// Link que o cliente recebe por e-mail para confirmar endereço, aeroporto e
+  /// quem retira. Segredo do link: o número do pedido é sequencial.
+  confirmacaoEnvioToken    String?   @unique
+  confirmacaoEnvioPedidaEm DateTime?
+  /// Quando o cliente confirmou pela página. Nulo = ainda não respondeu.
+  confirmacaoEnvioEm       DateTime?
+
   publicToken String?   @unique
   expiraEm    DateTime?
   maxParcelas Int?

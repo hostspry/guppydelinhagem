@@ -24,6 +24,7 @@ import {
   notificarLoteEnviado,
 } from "@/lib/notificacoes";
 import { emailPedidoEnviado } from "@/lib/emails/pedido";
+import { pedirConfirmacaoEnvioAereo } from "@/lib/gollog/confirmacao";
 import { COMPOSICAO_LABEL } from "@/lib/composicoes";
 import type {
   Prisma,
@@ -420,6 +421,8 @@ export async function atualizarStatusPedido(
 
   // Notificações (após a transição persistir; helpers nunca lançam). PAGO não
   // notifica aqui — é confirmação manual do dono / o gateway já avisa.
+  // Pago à mão também pede a confirmação do aéreo (o site pede pelo webhook).
+  if (novoStatus === "PAGO") void pedirConfirmacaoEnvioAereo(id);
   if (novoStatus === "ENVIADO") await notificarPedidoEnviado(id);
   else if (novoStatus === "ENTREGUE") await notificarPedidoEntregue(id);
   else if (novoStatus === "CANCELADO") await notificarPedidoCancelado(id);
