@@ -24,6 +24,9 @@ export async function cancelarPedidosAguardandoExpirados(): Promise<number> {
   const res = await prisma.order.updateMany({
     where: {
       tipo: "PEDIDO", // cobrança avulsa tem validade própria (Order.expiraEm)
+      // Venda combinada no WhatsApp não tem Pix com prazo: o cliente paga quando
+      // combinou, e quem cancela é o dono.
+      origem: { not: "WHATSAPP" },
       status: "AGUARDANDO_PAGAMENTO",
       criadoEm: { lt: limite },
       pagamentos: { none: { status: { in: ["PAGO", "EM_ANALISE"] } } },
@@ -335,49 +338,56 @@ export type CadastroPeloLink = Awaited<
 >[number];
 
 // ── Dados para o formulário (selects de cliente e produto) ─────
+
+/** Produtos ativos com as composições, na forma que os formulários e a IA usam. */
+export async function getCatalogoPedido() {
+  const produtos = await prisma.product.findMany({
+    where: { ativo: true },
+    orderBy: { nome: "asc" },
+    select: {
+      id: true,
+      nome: true,
+      preco: true,
+      tipo: true,
+      variantes: {
+        where: { ativo: true },
+        orderBy: [{ padrao: "desc" }, { ordem: "asc" }],
+        select: {
+          composicao: true,
+          preco: true,
+          rotulo: true,
+          qtdMachos: true,
+          qtdFemeas: true,
+        },
+      },
+    },
+  });
+
+  return produtos.map((p) => ({
+    id: p.id,
+    nome: p.nome,
+    preco: Number(p.preco),
+    tipo: p.tipo,
+    variantes: p.variantes.map((v) => ({
+      composicao: v.composicao,
+      preco: Number(v.preco),
+      rotulo: v.rotulo,
+      qtdMachos: v.qtdMachos,
+      qtdFemeas: v.qtdFemeas,
+    })),
+  }));
+}
+
+export type ProdutoPedido = Awaited<ReturnType<typeof getCatalogoPedido>>[number];
+
 export async function getPedidoFormData() {
   const [clientes, produtos] = await Promise.all([
     prisma.cliente.findMany({
       orderBy: { nome: "asc" },
       select: { id: true, nome: true },
     }),
-    prisma.product.findMany({
-      where: { ativo: true },
-      orderBy: { nome: "asc" },
-      select: {
-        id: true,
-        nome: true,
-        preco: true,
-        tipo: true,
-        variantes: {
-          where: { ativo: true },
-          orderBy: [{ padrao: "desc" }, { ordem: "asc" }],
-          select: {
-            composicao: true,
-            preco: true,
-            rotulo: true,
-            qtdMachos: true,
-            qtdFemeas: true,
-          },
-        },
-      },
-    }),
+    getCatalogoPedido(),
   ]);
 
-  return {
-    clientes,
-    produtos: produtos.map((p) => ({
-      id: p.id,
-      nome: p.nome,
-      preco: Number(p.preco),
-      tipo: p.tipo,
-      variantes: p.variantes.map((v) => ({
-        composicao: v.composicao,
-        preco: Number(v.preco),
-        rotulo: v.rotulo,
-        qtdMachos: v.qtdMachos,
-        qtdFemeas: v.qtdFemeas,
-      })),
-    })),
-  };
+  return { clientes, produtos };
 }

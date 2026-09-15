@@ -3,7 +3,22 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { assertPermissao } from "@/lib/permissoes-server";
+import { checarDescontoDoPedido } from "@/lib/permissoes";
 import { auditar } from "@/lib/auditoria";
+import { ehSemCredito } from "@/lib/ai/credito";
+import {
+  lerConversa,
+  MAX_BYTES_PRINTS,
+  MAX_PRINTS,
+  MIMES_PRINT,
+  type ConversaLida,
+} from "@/lib/ai/conversa-venda";
+import { lerDadosWhatsapp, normalizarDadosCliente } from "@/lib/whatsapp-cliente";
+import { getCatalogoPedido } from "@/lib/queries/pedidos";
+import { transicionarParaPago } from "@/lib/pedido-baixa";
+import { empurrarEstoqueDoPedido } from "@/lib/shopee/estoque";
+import { semanaDaChave } from "@/lib/semana-envio";
+import { COMPOSICAO_LABEL } from "@/lib/composicoes";
 import {
   vendaWhatsappSchema,
   type VendaWhatsappInput,
@@ -28,7 +43,25 @@ export type ClienteParecido = {
   pedidos: number;
 };
 
+/** Cadastro completo, para a tela preencher o formulário ao escolher um cliente. */
+export type ClienteCompleto = {
+  id: string;
+  nome: string;
+  cpfCnpj: string;
+  telefone: string;
+  email: string;
+  cep: string;
+  logradouro: string;
+  numero: string;
+  complemento: string;
+  bairro: string;
+  cidade: string;
+  uf: string;
+  pedidos: number;
+};
+
 const soDigitos = (s: string | null | undefined) => (s ?? "").replace(/\D/g, "");
+const round2 = (n: number) => Math.round(n * 100) / 100;
 
 /**
  * Procura o cliente pelos dados colados, na ordem de confiança.
@@ -52,7 +85,10 @@ export async function procurarCliente(dados: {
   const ors: Prisma.ClienteWhereInput[] = [];
   if (cpf) ors.push({ cpfCnpj: cpf });
   if (email) ors.push({ email: { equals: email, mode: "insensitive" } });
-  if (tel) ors.push({ telefone: tel });
+  if (tel) {
+    // Cadastro que veio de outro canal pode ter guardado o número com o 55.
+    ors.push({ telefone: { in: [tel, `55${tel}`] } });
+  }
   if (ors.length === 0) return [];
 
   const achados = await prisma.cliente.findMany({
@@ -88,6 +124,128 @@ export async function procurarCliente(dados: {
   }));
 }
 
+/** Busca manual por nome, telefone ou CPF — para quando a leitura não achou o cliente. */
+export async function buscarClientes(q: string): Promise<ClienteCompleto[]> {
+  await assertPermissao("clientes.ver");
+  const termo = q.trim();
+  if (termo.length < 2) return [];
+
+  const dig = soDigitos(termo);
+  const ors: Prisma.ClienteWhereInput[] = [
+    { nome: { contains: termo, mode: "insensitive" } },
+    { email: { contains: termo, mode: "insensitive" } },
+  ];
+  if (dig.length >= 4) {
+    ors.push({ telefone: { contains: dig } }, { cpfCnpj: { contains: dig } });
+  }
+
+  const achados = await prisma.cliente.findMany({
+    where: { OR: ors },
+    orderBy: { nome: "asc" },
+    take: 8,
+    select: {
+      id: true, nome: true, cpfCnpj: true, telefone: true, email: true,
+      cep: true, logradouro: true, numero: true, complemento: true,
+      bairro: true, cidade: true, uf: true,
+      _count: { select: { pedidos: true } },
+    },
+  });
+
+  return achados.map((c) => ({
+    id: c.id,
+    nome: c.nome,
+    cpfCnpj: c.cpfCnpj ?? "",
+    telefone: c.telefone ?? "",
+    email: c.email ?? "",
+    cep: c.cep ?? "",
+    logradouro: c.logradouro ?? "",
+    numero: c.numero ?? "",
+    complemento: c.complemento ?? "",
+    bairro: c.bairro ?? "",
+    cidade: c.cidade ?? "",
+    uf: c.uf ?? "",
+    pedidos: c._count.pedidos,
+  }));
+}
+
+export type LeituraConversaResult =
+  | { ok: true; dados: ConversaLida; parecidos: ClienteParecido[] }
+  | { ok: false; error: string };
+
+/**
+ * Lê a conversa (texto colado e/ou prints) e devolve um RASCUNHO do pedido.
+ * Nada é gravado aqui: o operador confere na tela e só então registra a venda.
+ */
+export async function lerConversaVenda(
+  formData: FormData,
+): Promise<LeituraConversaResult> {
+  await assertPermissao("pedidos.editar");
+
+  const texto = String(formData.get("texto") ?? "").trim();
+  const arquivos = formData
+    .getAll("prints")
+    .filter((f): f is File => f instanceof File && f.size > 0);
+
+  if (arquivos.length > MAX_PRINTS) {
+    return { ok: false, error: `Mande no máximo ${MAX_PRINTS} prints por vez.` };
+  }
+  for (const f of arquivos) {
+    if (!(MIMES_PRINT as readonly string[]).includes(f.type)) {
+      return { ok: false, error: "Os prints precisam ser imagem (JPG, PNG ou WEBP)." };
+    }
+  }
+  if (arquivos.reduce((s, f) => s + f.size, 0) > MAX_BYTES_PRINTS) {
+    return { ok: false, error: "Os prints passaram de 9 MB juntos. Mande menos de cada vez." };
+  }
+  if (arquivos.length === 0 && texto.length < 10) {
+    return { ok: false, error: "Cole a conversa ou escolha os prints." };
+  }
+
+  const imagens = await Promise.all(
+    arquivos.map(async (f) => ({
+      base64: Buffer.from(await f.arrayBuffer()).toString("base64"),
+      mimeType: f.type,
+    })),
+  );
+
+  try {
+    const catalogo = await getCatalogoPedido();
+    const lido = await lerConversa({ texto, imagens }, catalogo);
+
+    // O parser por regras continua valendo para texto colado: bloco com rótulo
+    // ("CPF: ...") ele lê sem errar. Completa o que a IA deixou em branco.
+    let cliente = normalizarDadosCliente(lido.cliente);
+    if (texto) {
+      const { dados: regras } = lerDadosWhatsapp(texto);
+      cliente = Object.fromEntries(
+        Object.entries(cliente).map(([k, v]) => [
+          k,
+          v || regras[k as keyof typeof regras] || "",
+        ]),
+      ) as typeof cliente;
+    }
+
+    const parecidos = await procurarCliente({
+      cpfCnpj: cliente.cpfCnpj,
+      email: cliente.email,
+      telefone: cliente.telefone,
+    });
+
+    return { ok: true, dados: { ...lido, cliente }, parecidos };
+  } catch (e) {
+    console.error("[venda-whatsapp] leitura", e);
+    const erro = e instanceof Error ? e.message : "";
+    return {
+      ok: false,
+      error: ehSemCredito(erro)
+        ? erro
+        : /GEMINI_API_KEY/.test(erro)
+          ? "A leitura por IA não está configurada (falta a chave do Gemini)."
+          : "Não consegui ler a conversa com a IA. Use a leitura sem IA ou preencha à mão.",
+    };
+  }
+}
+
 /** Preenche só o que está vazio: dado antigo do cadastro não é sobrescrito à toa. */
 function completar<T extends Record<string, string | null>>(
   atual: T,
@@ -102,15 +260,19 @@ function completar<T extends Record<string, string | null>>(
 }
 
 /**
- * Registra uma venda feita no WhatsApp.
+ * Registra uma venda feita no WhatsApp (ou qualquer venda lançada no painel).
  *
  * Cliente: usa o que o operador confirmou (clienteId) ou cria um novo. Quando
  * reusa, completa os campos que faltavam no cadastro sem apagar o que já havia
  * — endereço novo costuma ser mais atual, mas quem decide trocar é o operador,
  * na tela de clientes.
  *
- * Pago: nasce PAGO e a venda entra no caixa como sugestão pendente, igual à do
- * site. Não pago: AGUARDANDO_PAGAMENTO.
+ * Preço: sempre o que o cliente pagou, digitado na tela. O catálogo só liga o
+ * item ao produto (nome, foto, receita do peixe para o estoque).
+ *
+ * Pago: o pedido nasce aguardando e passa, na mesma transação, pela confirmação
+ * de pagamento que o site e o botão de status usam — baixa o estoque e põe a
+ * venda no caixa para conferência. Não pago: fica AGUARDANDO_PAGAMENTO.
  */
 export async function criarVendaWhatsapp(input: unknown): Promise<VendaResult> {
   const membro = await assertPermissao("pedidos.editar");
@@ -125,7 +287,15 @@ export async function criarVendaWhatsapp(input: unknown): Promise<VendaResult> {
   }
   const d: VendaWhatsappInput = parsed.data;
 
-  // ── Itens: preço e nome do catálogo mandam; avulso usa o que foi digitado ──
+  // Confirmar pagamento é mudar status: mesma permissão do botão no detalhe.
+  if (d.jaPago && !membro.permissoes.includes("pedidos.status")) {
+    return {
+      success: false,
+      error: "Seu cargo não pode confirmar pagamento. Registre sem marcar como pago.",
+    };
+  }
+
+  // ── Itens: nome e receita do catálogo; preço é o pago ──
   const idsCatalogo = d.itens
     .map((i) => i.produtoId)
     .filter((v): v is string => !!v);
@@ -151,7 +321,13 @@ export async function criarVendaWhatsapp(input: unknown): Promise<VendaResult> {
     const variante = prod?.variantes.find((v) => v.composicao === it.composicao);
     return {
       productId: prod?.id ?? null,
-      nomeProduto: prod ? prod.nome : it.nomeProduto.trim(),
+      // Mesmo formato do pedido manual: a composição no nome é o que aparece
+      // na separação e na etiqueta.
+      nomeProduto: prod
+        ? variante
+          ? `${prod.nome} — ${COMPOSICAO_LABEL[variante.composicao]}`
+          : prod.nome
+        : it.nomeProduto.trim(),
       precoUnitario: it.precoUnitario,
       quantidade: it.quantidade,
       imagemSnapshot:
@@ -162,11 +338,13 @@ export async function criarVendaWhatsapp(input: unknown): Promise<VendaResult> {
     };
   });
 
-  const subtotal = itensData.reduce(
-    (s, i) => s + i.precoUnitario * i.quantidade,
-    0,
+  const subtotal = round2(
+    itensData.reduce((s, i) => s + i.precoUnitario * i.quantidade, 0),
   );
-  const total = Math.max(0, subtotal + d.frete - d.desconto);
+  const total = round2(Math.max(0, subtotal + d.frete - d.desconto));
+
+  const foraDoLimite = checarDescontoDoPedido(membro, subtotal, d.desconto);
+  if (foraDoLimite) return { success: false, error: foraDoLimite };
 
   const dadosCliente = {
     nome: d.nome,
@@ -242,14 +420,17 @@ export async function criarVendaWhatsapp(input: unknown): Promise<VendaResult> {
       const sequencia = (ultimo?.sequencia ?? 0) + 1;
       const num = `#${ano}-${String(sequencia).padStart(4, "0")}`;
 
-      return tx.order.create({
+      const order = await tx.order.create({
         data: {
           numero: num,
           ano,
           sequencia,
           clienteId,
-          status: d.jaPago ? "PAGO" : "AGUARDANDO_PAGAMENTO",
+          origem: "WHATSAPP",
+          status: "AGUARDANDO_PAGAMENTO",
           formaPagamento: d.formaPagamento ?? null,
+          transportadora: d.transportadora ?? null,
+          semanaEnvio: semanaDaChave(d.semanaEnvio),
           observacoes: d.observacoes || null,
           enderecoEntrega: endereco as unknown as Prisma.InputJsonValue,
           subtotal,
@@ -260,6 +441,9 @@ export async function criarVendaWhatsapp(input: unknown): Promise<VendaResult> {
         },
         select: { id: true, numero: true },
       });
+
+      if (d.jaPago) await transicionarParaPago(tx, order.id);
+      return order;
     });
     orderId = criado.id;
     numero = criado.numero;
@@ -274,6 +458,9 @@ export async function criarVendaWhatsapp(input: unknown): Promise<VendaResult> {
     };
   }
 
+  // Estoque baixou: reflete na Shopee, sem o painel esperar o marketplace.
+  if (d.jaPago) void empurrarEstoqueDoPedido(orderId);
+
   await auditar(membro, {
     acao: "pedido.criar",
     entidade: "Order",
@@ -284,5 +471,7 @@ export async function criarVendaWhatsapp(input: unknown): Promise<VendaResult> {
 
   revalidatePath("/admin/pedidos");
   revalidatePath("/admin/clientes");
+  revalidatePath("/admin/produtos");
+  if (d.jaPago) revalidatePath("/admin/financeiro");
   return { success: true, orderId, numero, clienteNovo };
 }

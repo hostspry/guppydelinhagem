@@ -72,6 +72,18 @@ export function semanasDisponiveis(
   });
 }
 
+/**
+ * Semanas para o painel: começa na ATUAL, porque venda fechada à mão muitas
+ * vezes sai nos próximos dias. Depois seguem as mesmas do checkout.
+ */
+export function semanasParaAdmin(hoje = new Date()): OpcaoSemana[] {
+  const atual = segundaDaSemana(hoje);
+  return [
+    { chave: chaveSemana(atual), rotulo: `${rotuloSemana(atual)} (esta semana)` },
+    ...semanasDisponiveis(hoje),
+  ];
+}
+
 /** A semana escolhida já passou (ou é a corrente)? Serve para o alerta do painel. */
 export function semanaVencida(semana: Date, hoje = new Date()): boolean {
   return segundaDaSemana(semana).getTime() <= segundaDaSemana(hoje).getTime();

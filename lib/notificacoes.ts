@@ -21,7 +21,7 @@ import { rotuloSemana, segundaDaSemana } from "@/lib/semana-envio";
 
 const LINK_ADMIN = "https://guppydelinhagem.com.br/admin/pedidos";
 const LINK_COBRANCAS = "https://guppydelinhagem.com.br/admin/cobrancas";
-const LINK_VENDA_WHATSAPP = "https://guppydelinhagem.com.br/admin/pedidos/whatsapp";
+const LINK_VENDA_WHATSAPP = "https://guppydelinhagem.com.br/admin/pedidos/novo";
 
 // ── Rótulos amigáveis para provider/método ────────────────────────────────────
 function rotuloProvider(p?: ProviderPagamento | null): string | null {

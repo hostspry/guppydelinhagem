@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import Link from "next/link";
 import { Plus, Trash2 } from "lucide-react";
 import { FormField } from "./FormField";
-import { semanasDisponiveis, chaveSemana, rotuloSemana, segundaDaSemana } from "@/lib/semana-envio";
+import { semanasParaAdmin } from "@/lib/semana-envio";
 import { pedidoSchema, type PedidoInput } from "@/lib/validations/pedido";
 import { createPedido, updatePedido } from "@/actions/pedidos";
 import { formatBRL } from "@/lib/utils/format";
@@ -78,15 +78,6 @@ const ITEM_VAZIO: ItemInicial = {
   qtdMachos: null,
   qtdFemeas: null,
 };
-
-/** Semanas para o admin: da atual em diante (a venda avulsa costuma sair já). */
-function semanasParaAdmin() {
-  const atual = segundaDaSemana(new Date());
-  return [
-    { chave: chaveSemana(atual), rotulo: `${rotuloSemana(atual)} (esta semana)` },
-    ...semanasDisponiveis(),
-  ];
-}
 
 export function PedidoForm({
   clientes,

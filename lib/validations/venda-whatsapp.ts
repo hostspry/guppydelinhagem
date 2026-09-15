@@ -57,12 +57,23 @@ export const vendaWhatsappSchema = z
     frete: z.coerce.number().min(0).default(0),
     desconto: z.coerce.number().min(0).default(0),
     observacoes: z.string().trim().max(500).optional().default(""),
-    /** Cliente já pagou: o pedido nasce PAGO e cai no caixa para conferência. */
+    /** Cliente já pagou: o pedido passa pela confirmação de pagamento (estoque + caixa). */
     jaPago: z.coerce.boolean().default(false),
     formaPagamento: z
       .enum(["PIX", "CARTAO", "DINHEIRO", "BOLETO", "OUTRO"])
       .optional()
       .nullable(),
+    transportadora: z
+      .preprocess(
+        (v) => (v === "" ? null : v),
+        z.enum(["JADLOG", "GOLLOG", "OUTRO"]).nullable(),
+      )
+      .optional(),
+    /** Segunda-feira da semana do envio ("AAAA-MM-DD"), ou vazio. */
+    semanaEnvio: z
+      .union([z.string().regex(/^\d{4}-\d{2}-\d{2}$/), z.literal("")])
+      .optional()
+      .default(""),
   })
   .superRefine((d, ctx) => {
     // Endereço é obrigatório para despachar. Sem CEP não há etiqueta nem frete.

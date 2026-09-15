@@ -60,6 +60,8 @@ function parsePedidoForm(formData: FormData) {
     formaPagamento: formData.get("formaPagamento"),
     transportadora: formData.get("transportadora"),
     observacoes: formData.get("observacoes"),
+    // Sem esta linha o schema caía no default "" e a semana escolhida sumia.
+    semanaEnvio: formData.get("semanaEnvio") ?? "",
   });
 }
 

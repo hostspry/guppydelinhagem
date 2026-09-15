@@ -681,3 +681,25 @@ export function cpfValido(cpf: string): boolean {
 }
 
 export const somenteDigitos = digitos;
+
+/**
+ * Passa dados que vieram de outra fonte (a leitura por IA) pelas mesmas regras
+ * do parser: documento, CEP e telefone só valem com o tamanho certo, e o estado
+ * vira sigla. Valor que não passa volta vazio para o operador completar.
+ */
+export function normalizarDadosCliente(d: DadosWhatsapp): DadosWhatsapp {
+  const email = d.email.trim().toLowerCase();
+  return {
+    nome: d.nome.trim(),
+    cpfCnpj: normalizarDoc(d.cpfCnpj),
+    email: /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? email : "",
+    telefone: normalizarTelefone(d.telefone),
+    cep: normalizarCep(d.cep),
+    logradouro: d.logradouro.trim(),
+    numero: d.numero.trim(),
+    complemento: d.complemento.trim(),
+    bairro: d.bairro.trim(),
+    cidade: d.cidade.trim(),
+    uf: normalizarUf(d.uf),
+  };
+}
