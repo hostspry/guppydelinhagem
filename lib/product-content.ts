@@ -136,7 +136,7 @@ const CONTEUDO_PEIXE: ConteudoProduto = {
       titulo: "Sobre a criação",
       texto:
         "Nossa estufa é só para guppies de linhagem. A gente seleciona com critério e acompanha cada geração de perto, todo dia.",
-      imagem: "/images/estufa.jpg",
+      imagem: "/images/estufa.webp",
       link: { label: "Conheça nossa estrutura", href: "/sobre-nos" },
     },
     {
@@ -339,7 +339,7 @@ const CONTEUDO_SECO: ConteudoProduto = {
       titulo: "Sobre a loja",
       texto:
         "A loja nasceu da nossa estufa de guppy de linhagem. Além dos peixes, vendemos os itens que usamos no manejo do dia a dia.",
-      imagem: "/images/estufa.jpg",
+      imagem: "/images/estufa.webp",
       link: { label: "Conheça nossa estrutura", href: "/sobre-nos" },
     },
     {
@@ -452,7 +452,7 @@ const CONTEUDO_DIGITAL: ConteudoProduto = {
       titulo: "Sobre a loja",
       texto:
         "A loja nasceu da nossa estufa de guppy de linhagem, em Guarapari/ES, com mais de dez anos de criação.",
-      imagem: "/images/estufa.jpg",
+      imagem: "/images/estufa.webp",
       link: { label: "Conheça nossa estrutura", href: "/sobre-nos" },
     },
     {

@@ -54,7 +54,7 @@ export const HOME_BANNERS: { estufa: HomeBanner; aprenda: HomeBanner } = {
       "A gente cuida de cada peixe de perto, da escolha das matrizes até a hora de embalar. Veja como nossos guppys são criados.",
     ctaLabel: "Conhecer a estufa",
     ctaHref: "/sobre-nos",
-    imagem: "/images/estufa.jpg",
+    imagem: "/images/estufa.webp",
   },
   // Banner 2 — aprenda (mantido).
   aprenda: {

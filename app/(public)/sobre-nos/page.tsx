@@ -455,13 +455,13 @@ export default function SobreNosPage() {
               sizes="(max-width: 768px) 50vw, 25vw"
             />
             <Figura
-              src={`${IMG}/construcao-tanques.png`}
+              src={`${IMG}/construcao-tanques.webp`}
               alt="Construção e ampliação dos tanques da nova estufa em Guarapari"
               ratio="1 / 1"
               sizes="(max-width: 768px) 50vw, 25vw"
             />
             <Figura
-              src={`${IMG}/estufa-nova-prateleiras.png`}
+              src={`${IMG}/estufa-nova-prateleiras.webp`}
               alt="Estufa nova com prateleiras de tanques para a criação de guppies de linhagem"
               ratio="2 / 1"
               sizes="(max-width: 768px) 100vw, 50vw"
@@ -516,21 +516,21 @@ export default function SobreNosPage() {
             caption="Com Rodrigo Ziviani, da World Guppy Association"
           />
           <Figura
-            src={`${IMG}/visita-unaqua.png`}
+            src={`${IMG}/visita-unaqua.webp`}
             alt="Encontro com Mário Garcia e Léia, da UNAQUA, em Belo Horizonte"
             ratio="1 / 1"
             sizes="(max-width: 768px) 100vw, 25vw"
             caption="Com a UNAQUA, em Belo Horizonte"
           />
           <Figura
-            src={`${IMG}/mestre-mauro.png`}
+            src={`${IMG}/mestre-mauro.webp`}
             alt="Encontro com o professor Mauro Schettino, referência em alimentação viva para peixes"
             ratio="1 / 1"
             sizes="(max-width: 768px) 100vw, 25vw"
             caption="Com o prof. Mauro Schettino"
           />
           <Figura
-            src={`${IMG}/elias-abdalla.png`}
+            src={`${IMG}/elias-abdalla.webp`}
             alt="Encontro com o Sr. Abdala, referência de caráter e qualidade técnica no guppy brasileiro"
             ratio="1 / 1"
             sizes="(max-width: 768px) 100vw, 25vw"
