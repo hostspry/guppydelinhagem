@@ -6,6 +6,7 @@ import {
   CreditCard,
   Mail,
   MessageSquareText,
+  Plane,
   ShoppingBag,
   Sparkles,
   Store,
@@ -21,6 +22,7 @@ const ABAS = [
   { href: "/admin/configuracoes", label: "Loja", icon: Store },
   { href: "/admin/configuracoes/pagamentos", label: "Pagamentos", icon: CreditCard },
   { href: "/admin/configuracoes/entrega", label: "Entrega", icon: Truck },
+  { href: "/admin/configuracoes/gollog", label: "Gollog", icon: Plane },
   { href: "/admin/configuracoes/email", label: "E-mail", icon: Mail },
   {
     href: "/admin/configuracoes/mensagens",

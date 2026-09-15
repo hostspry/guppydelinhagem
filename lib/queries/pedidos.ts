@@ -256,6 +256,7 @@ export async function getPedidoById(id: string) {
     semanaEnvio: p.semanaEnvio,
     modalidadeFrete: p.modalidadeFrete,
     aeroportoDestino: p.aeroportoDestino,
+    unidadeGollogId: p.unidadeGollogId,
     recebedorNome: p.recebedorNome,
     recebedorCpf: p.recebedorCpf,
     recebedorTelefone: p.recebedorTelefone,

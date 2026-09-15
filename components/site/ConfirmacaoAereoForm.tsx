@@ -2,8 +2,8 @@
 
 import { useRef, useState, useTransition } from "react";
 import { CheckCircle2, Loader2, MapPin, Plane, Send } from "lucide-react";
-import { basesParaCidade, confirmarEnvioAereo } from "@/actions/envio-aereo";
-import type { BaseComDistancia } from "@/lib/gollog/bases";
+import { unidadesParaEndereco, confirmarEnvioAereo } from "@/actions/envio-aereo";
+import type { UnidadeParaCliente, UnidadesParaCliente } from "@/lib/gollog/unidades";
 import { UFS_BR } from "@/lib/validations/cadastro-publico";
 import { mascaraCep, mascaraDoc, mascaraTelefone } from "@/lib/mascaras";
 
@@ -19,7 +19,7 @@ type Campos = {
   bairro: string;
   cidade: string;
   uf: string;
-  aeroporto: string;
+  unidadeId: string;
   outraPessoaRetira: boolean;
   recebedorNome: string;
   recebedorCpf: string;
@@ -49,15 +49,17 @@ function Erro({ msg }: { msg?: string }) {
 export function ConfirmacaoAereoForm({
   token,
   inicial,
-  bases: basesIniciais,
+  unidades: unidadesIniciais,
+  fonteDistancia: fonteInicial,
   jaConfirmado,
   aeroportoEscolhido,
 }: {
   token: string;
   inicial: Campos;
-  bases: BaseComDistancia[];
+  unidades: UnidadeParaCliente[];
+  fonteDistancia: UnidadesParaCliente["fonteDistancia"];
   jaConfirmado: boolean;
-  /** O aeroporto inicial foi escolhido (pelo cliente ou pela loja), não sugerido. */
+  /** A unidade inicial foi escolhida (pelo cliente ou pela loja), não sugerida. */
   aeroportoEscolhido: boolean;
 }) {
   const [campos, setCampos] = useState<Campos>({
@@ -68,7 +70,8 @@ export function ConfirmacaoAereoForm({
     recebedorCpf: mascaraDoc(inicial.recebedorCpf),
     recebedorTelefone: mascaraTelefone(inicial.recebedorTelefone),
   });
-  const [bases, setBases] = useState(basesIniciais);
+  const [bases, setBases] = useState(unidadesIniciais);
+  const [fonte, setFonte] = useState(fonteInicial);
   const [verTodas, setVerTodas] = useState(false);
   const [erros, setErros] = useState<Partial<Record<keyof Campos, string>>>({});
   const [aviso, setAviso] = useState<string | null>(null);
@@ -77,7 +80,7 @@ export function ConfirmacaoAereoForm({
   const [isPending, startTransition] = useTransition();
   const numeroRef = useRef<HTMLInputElement>(null);
   const isca = useRef<HTMLInputElement>(null);
-  const cidadeConsultada = useRef(`${inicial.cidade}|${inicial.uf}`);
+  const enderecoConsultado = useRef(`${inicial.cep.replace(/\D/g, "")}|${inicial.cidade}|${inicial.uf}`);
   // Unidade que veio só como sugestão acompanha a mudança de cidade; a que a
   // pessoa clicou (ou já tinha confirmado) fica.
   const escolhaManual = useRef(aeroportoEscolhido);
@@ -87,18 +90,19 @@ export function ConfirmacaoAereoForm({
     setErros((a) => ({ ...a, [campo]: undefined }));
   }
 
-  /** Cidade mudou: reordena as bases pela distância da nova cidade. */
-  async function atualizarBases(cidade: string, uf: string) {
-    const chave = `${cidade}|${uf}`;
-    if (!cidade || uf.length !== 2 || chave === cidadeConsultada.current) return;
-    cidadeConsultada.current = chave;
-    const novas = await basesParaCidade(cidade, uf);
-    setBases(novas);
+  /** Endereço mudou: a Gollog recalcula a distância das unidades pelo CEP novo. */
+  async function atualizarBases(cep: string, cidade: string, uf: string) {
+    const chave = `${cep.replace(/\D/g, "")}|${cidade}|${uf}`;
+    if (!cidade || uf.length !== 2 || chave === enderecoConsultado.current) return;
+    enderecoConsultado.current = chave;
+    const r = await unidadesParaEndereco(cep, cidade, uf);
+    if (!r) return;
+    setBases(r.unidades);
+    setFonte(r.fonteDistancia);
     // Sugestão só da cidade do cliente; sem unidade lá, fica sem marcação.
     if (!escolhaManual.current) {
-      const daCidade =
-        novas.find((b) => b.naCidade && b.noAeroporto) ?? novas.find((b) => b.naCidade);
-      setCampos((a) => ({ ...a, aeroporto: daCidade?.iata ?? "" }));
+      const daCidade = r.unidades.find((b) => b.naCidade);
+      setCampos((a) => ({ ...a, unidadeId: daCidade?.id ?? "" }));
     }
   }
 
@@ -118,7 +122,7 @@ export function ConfirmacaoAereoForm({
           uf: data.uf || a.uf,
         }));
         numeroRef.current?.focus();
-        void atualizarBases(data.localidade, data.uf);
+        void atualizarBases(cep, data.localidade, data.uf);
       }
     } catch {
       // sem rede: a pessoa completa na mão
@@ -149,7 +153,7 @@ export function ConfirmacaoAereoForm({
     });
   }
 
-  const escolhida = bases.find((b) => b.iata === campos.aeroporto) ?? null;
+  const escolhida = bases.find((b) => b.id === campos.unidadeId) ?? null;
 
   if (pronto) {
     return (
@@ -159,7 +163,7 @@ export function ConfirmacaoAereoForm({
         <p className="text-sm text-muted-foreground">
           Sua caixa vai para{" "}
           <strong className="text-primary">
-            {escolhida ? `${escolhida.aeroporto} (${escolhida.iata})` : campos.aeroporto}
+            {escolhida ? `${escolhida.titulo} (${escolhida.cidade}/${escolhida.uf})` : "a unidade escolhida"}
           </strong>
           . Quando ela chegar, a Gollog manda um SMS. A retirada é em até 72 horas,
           com documento com foto. Qualquer coisa, me chame no WhatsApp.
@@ -276,7 +280,7 @@ export function ConfirmacaoAereoForm({
               id="cidade"
               value={campos.cidade}
               onChange={(e) => set("cidade", e.target.value)}
-              onBlur={() => void atualizarBases(campos.cidade, campos.uf)}
+              onBlur={() => void atualizarBases(campos.cep, campos.cidade, campos.uf)}
               className={cls(erros.cidade)}
             />
             <Erro msg={erros.cidade} />
@@ -288,7 +292,7 @@ export function ConfirmacaoAereoForm({
               value={campos.uf}
               onChange={(e) => {
                 set("uf", e.target.value);
-                void atualizarBases(campos.cidade, e.target.value);
+                void atualizarBases(campos.cep, campos.cidade, e.target.value);
               }}
               className={`${cls(erros.uf)} appearance-none`}
             >
@@ -307,7 +311,8 @@ export function ConfirmacaoAereoForm({
         <legend className={legenda}>Onde retirar</legend>
         <p className="text-xs text-muted-foreground mb-3">
           Escolha a unidade da Gollog onde você vai buscar a caixa: pode ser no
-          aeroporto ou numa loja da Gollog. Estão em ordem de distância da sua cidade.
+          aeroporto ou numa loja da Gollog. A lista é a da própria Gollog, em ordem de
+          distância {fonte === "gollog" ? "do seu CEP" : "da sua cidade"}.
         </p>
 
         {!temNaCidade && maisPerto?.km != null && (
@@ -320,36 +325,36 @@ export function ConfirmacaoAereoForm({
 
         <div className="space-y-2" role="radiogroup" aria-label="Unidade de retirada">
           {visiveis.map((b) => {
-            const ativo = campos.aeroporto === b.iata;
+            const ativo = campos.unidadeId === b.id;
             return (
               <label
-                key={b.iata}
+                key={b.id}
                 className={`flex gap-3 rounded-lg border p-3 text-sm cursor-pointer transition-all ${
                   ativo ? "border-primary/60 bg-primary/5" : "border-border hover:border-primary/40"
                 }`}
               >
                 <input
                   type="radio"
-                  name="aeroporto"
-                  value={b.iata}
+                  name="unidadeId"
+                  value={b.id}
                   checked={ativo}
                   onChange={() => {
                     escolhaManual.current = true;
-                    set("aeroporto", b.iata);
+                    set("unidadeId", b.id);
                   }}
                   className="mt-1 accent-secondary"
                 />
                 <span className="flex-1 min-w-0">
                   <span className="flex flex-wrap items-baseline gap-x-2 text-primary font-medium">
                     <Plane size={14} className="self-center shrink-0" aria-hidden="true" />
-                    {b.iata} · {b.cidade}/{b.uf}
+                    {b.titulo}
                     {b.km != null && (
                       <span className="text-xs font-normal text-muted-foreground">
-                        {b.naCidade ? "na sua cidade" : `${b.km} km`}
+                        {b.km} km{b.naCidade ? " · na sua cidade" : ""}
                       </span>
                     )}
                   </span>
-                  <span className="block text-xs text-muted-foreground">{b.aeroporto}</span>
+                  <span className="block text-xs text-muted-foreground">{b.cidade}/{b.uf}</span>
                   {ativo && (
                     <span className="mt-1 block text-xs text-muted-foreground space-y-0.5">
                       <span className="flex gap-1">
@@ -374,7 +379,7 @@ export function ConfirmacaoAereoForm({
             Ver todas as {bases.length} unidades
           </button>
         )}
-        <Erro msg={erros.aeroporto} />
+        <Erro msg={erros.unidadeId} />
       </fieldset>
 
       {/* ── Quem retira ── */}

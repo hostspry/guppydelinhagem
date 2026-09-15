@@ -7,7 +7,7 @@ import { rateLimit, clientIp } from "@/lib/rate-limit";
 import { assertPermissao } from "@/lib/permissoes-server";
 import { auditar } from "@/lib/auditoria";
 import { notificarConfirmacaoAereo } from "@/lib/notificacoes";
-import { basesPorDistancia, baseGollog, type BaseComDistancia } from "@/lib/gollog/bases";
+import { unidadesParaCliente, type UnidadesParaCliente } from "@/lib/gollog/unidades";
 import {
   ehEnvioAereoPendente,
   garantirTokenConfirmacao,
@@ -24,15 +24,32 @@ type Resultado =
 
 // ── Público: página do link ─────────────────────────────────
 
-/** Bases ordenadas pela distância da cidade digitada (a página chama quando o CEP muda). */
-export async function basesParaCidade(cidade: string, uf: string): Promise<BaseComDistancia[]> {
+/** Unidades ordenadas pela distância do endereço digitado (a página chama quando o CEP muda). */
+export async function unidadesParaEndereco(
+  cep: string,
+  cidade: string,
+  uf: string,
+): Promise<UnidadesParaCliente | null> {
   const h = await headers();
-  if (!rateLimit(`bases-aereo:${clientIp(h)}`, 30, 60_000).ok) return basesPorDistancia(null, null);
-  return basesPorDistancia(String(cidade ?? "").slice(0, 80), String(uf ?? "").slice(0, 2));
+  if (!rateLimit(`bases-aereo:${clientIp(h)}`, 20, 60_000).ok) return null;
+  return unidadesParaCliente({
+    cep: String(cep ?? "").slice(0, 9),
+    cidade: String(cidade ?? "").slice(0, 80),
+    uf: String(uf ?? "").slice(0, 2),
+  });
+}
+
+/** Unidade ativa e ainda na lista da Gollog. */
+async function unidadeValida(id: string) {
+  if (!id) return null;
+  return prisma.unidadeGollog.findFirst({
+    where: { id, ativa: true, naListaGollog: true },
+    select: { id: true, codigo: true, titulo: true, cidade: true, uf: true },
+  });
 }
 
 /**
- * O cliente confirma endereço, aeroporto e quem retira.
+ * O cliente confirma endereço, unidade da Gollog e quem retira.
  *
  * O link é o segredo (token longo, único por pedido). Enquanto a caixa não
  * saiu, dá para confirmar de novo e corrigir. O endereço confirmado vira o do
@@ -77,9 +94,9 @@ export async function confirmarEnvioAereo(token: string, input: unknown): Promis
   const d = parsed.data;
   if (d.site) return { ok: true }; // isca de robô
 
-  const base = baseGollog(d.aeroporto);
+  const base = await unidadeValida(d.unidadeId);
   if (!base) {
-    return { ok: false, error: "Escolha onde vai retirar.", fieldErrors: { aeroporto: ["Escolha uma unidade da lista"] } };
+    return { ok: false, error: "Escolha onde vai retirar.", fieldErrors: { unidadeId: ["Escolha uma unidade da lista"] } };
   }
 
   const endereco = {
@@ -102,7 +119,8 @@ export async function confirmarEnvioAereo(token: string, input: unknown): Promis
         where: { id: pedido.id },
         data: {
           enderecoEntrega: endereco as unknown as Prisma.InputJsonValue,
-          aeroportoDestino: base.iata,
+          aeroportoDestino: base.codigo,
+          unidadeGollogId: base.id,
           recebedorNome: d.outraPessoaRetira ? d.recebedorNome : null,
           recebedorCpf: d.outraPessoaRetira ? d.recebedorCpf : null,
           recebedorTelefone: d.outraPessoaRetira ? d.recebedorTelefone : null,
@@ -123,7 +141,7 @@ export async function confirmarEnvioAereo(token: string, input: unknown): Promis
     orderId: pedido.id,
     numero: pedido.numero,
     nome: d.nome,
-    aeroporto: `${base.iata} · ${base.cidade}/${base.uf}`,
+    aeroporto: base.titulo,
     recebedor: d.outraPessoaRetira ? d.recebedorNome : null,
   });
 
@@ -158,15 +176,16 @@ export async function linkConfirmacaoAereo(
   return { ok: true, link: linkConfirmacao(token) };
 }
 
-/** O dono define o aeroporto e quem retira, quando o cliente combinou na conversa. */
+/** O dono define a unidade e quem retira, quando o cliente combinou na conversa. */
 export async function definirEnvioAereo(
   orderId: string,
-  input: { aeroporto: string; recebedorNome?: string; recebedorCpf?: string; recebedorTelefone?: string },
+  input: { unidadeId: string; recebedorNome?: string; recebedorCpf?: string; recebedorTelefone?: string },
 ): Promise<Resultado> {
   const membro = await assertPermissao("pedidos.envio");
 
-  const iata = String(input.aeroporto ?? "").trim().toUpperCase();
-  if (iata && !baseGollog(iata)) return { ok: false, error: "Unidade fora da lista da Gollog." };
+  const unidadeId = String(input.unidadeId ?? "").trim();
+  const unidade = unidadeId ? await unidadeValida(unidadeId) : null;
+  if (unidadeId && !unidade) return { ok: false, error: "Unidade desligada ou fora da lista da Gollog." };
 
   const nome = String(input.recebedorNome ?? "").trim();
   const cpf = String(input.recebedorCpf ?? "").replace(/\D/g, "");
@@ -176,7 +195,8 @@ export async function definirEnvioAereo(
   await prisma.order.update({
     where: { id: orderId },
     data: {
-      aeroportoDestino: iata || null,
+      aeroportoDestino: unidade?.codigo ?? null,
+      unidadeGollogId: unidade?.id ?? null,
       recebedorNome: nome || null,
       recebedorCpf: nome ? cpf || null : null,
       recebedorTelefone: nome ? tel || null : null,
@@ -187,7 +207,7 @@ export async function definirEnvioAereo(
     acao: "pedido.aereo.definir",
     entidade: "Order",
     entidadeId: orderId,
-    descricao: `Definiu a retirada aérea em ${iata || "(sem aeroporto)"}${nome ? ` por ${nome}` : ""}`,
+    descricao: `Definiu a retirada aérea em ${unidade?.titulo ?? "(sem unidade)"}${nome ? ` por ${nome}` : ""}`,
   });
   revalidatePath(`/admin/pedidos/${orderId}`);
   return { ok: true, message: "Envio aéreo atualizado." };

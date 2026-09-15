@@ -511,6 +511,9 @@ model Order {
   /// aeroporto. Sigla IATA da base onde o cliente retira. Nulo = ainda não
   /// definido (a minuta sai com o campo em branco).
   aeroportoDestino String?  @db.VarChar(3)
+  /// Unidade escolhida (UnidadeGollog.id). O código acima não basta: Manaus
+  /// tem duas unidades com o mesmo código.
+  unidadeGollogId  String?
   /// Quem vai retirar na base, quando não é o próprio cliente. A Gollog só
   /// entrega a caixa com documento, então o nome e o CPF vão na minuta.
   recebedorNome     String?
@@ -979,6 +982,37 @@ model ConfiguracaoEmail {
   ultimoTesteErro String?
 
   atualizadoEm DateTime @updatedAt
+}
+
+/// Unidades da Gollog, copiadas da lista oficial que a própria Gollog publica
+/// (channelcfg-api.voegol.com.br/ApplicationList/UnidadesGolLog). Nada aqui é
+/// digitado ou deduzido: título, endereço, cidade e coordenadas são os da
+/// Gollog. O que é da loja é só `ativa` (unidade para onde não enviamos).
+model UnidadeGollog {
+  id          String  @id @default(cuid())
+  /// Título oficial, ex.: "OPS - Sinop". É a chave da sincronização.
+  titulo      String  @unique
+  /// Código da base (vai na minuta). Não é único: Manaus tem duas.
+  codigo      String  @db.VarChar(3)
+  cidade      String
+  uf          String  @db.VarChar(2)
+  endereco    String
+  cep         String?
+  telefone    String?
+  horario     String?
+  email       String?
+  tipoServico String?
+  latitude    Float?
+  longitude   Float?
+  /// Decisão da loja. Unidade desligada não aparece para o cliente.
+  ativa       Boolean @default(true)
+  /// Saiu da lista oficial na última sincronização (unidade fechada).
+  naListaGollog Boolean @default(true)
+  sincronizadaEm DateTime @default(now())
+  criadaEm    DateTime @default(now())
+
+  @@index([codigo])
+  @@index([uf, cidade])
 }
 
 model ConfiguracaoLoja {

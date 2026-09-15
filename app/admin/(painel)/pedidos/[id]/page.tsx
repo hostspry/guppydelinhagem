@@ -9,7 +9,7 @@ import { AcessoCliente } from "@/components/admin/AcessoCliente";
 import { rotuloSemana, semanaVencida } from "@/lib/semana-envio";
 import { EstornarButton } from "@/components/admin/EstornarButton";
 import { GollogCard } from "@/components/admin/GollogCard";
-import { aeroportoDaMinuta, basesPorDistancia } from "@/lib/gollog/bases";
+import { unidadeDaMinuta, unidadesParaCliente } from "@/lib/gollog/unidades";
 import { ehEnvioAereoPendente } from "@/lib/gollog/confirmacao";
 import { podeEditarItens } from "@/lib/pedido-status";
 import {
@@ -34,6 +34,18 @@ export default async function PedidoDetalhePage({ params }: Props) {
   const aereo =
     pedido.tipoEntrega !== "RETIRADA" &&
     (pedido.transportadora === "GOLLOG" || pedido.modalidadeFrete === "AEREO");
+  const [gollogUnidades, gollogMinuta] = aereo
+    ? await Promise.all([
+        unidadesParaCliente(e),
+        unidadeDaMinuta({
+          unidadeGollogId: pedido.unidadeGollogId,
+          aeroportoDestino: pedido.aeroportoDestino,
+          cep: e.cep,
+          cidade: e.cidade,
+          uf: e.uf,
+        }),
+      ])
+    : [null, null];
 
   // Estorno: pagamento já estornado (estado final) e pagamento PAGO ainda
   // reembolsável (mostra aviso + botão). O valor vem do banco, nunca do client.
@@ -171,9 +183,9 @@ export default async function PedidoDetalhePage({ params }: Props) {
               aberto={ehEnvioAereoPendente(pedido)}
               clienteNome={e.nome}
               clienteTelefone={e.telefone}
-              aeroportoDestino={pedido.aeroportoDestino}
-              aeroportoMinuta={aeroportoDaMinuta(pedido.aeroportoDestino, e.cidade, e.uf)}
-              bases={basesPorDistancia(e.cidade, e.uf)}
+              unidadeEscolhidaId={pedido.unidadeGollogId}
+              unidadeMinuta={gollogMinuta}
+              unidades={gollogUnidades?.unidades ?? []}
               recebedorNome={pedido.recebedorNome}
               recebedorCpf={pedido.recebedorCpf}
               recebedorTelefone={pedido.recebedorTelefone}

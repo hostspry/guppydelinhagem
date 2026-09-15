@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Plane } from "lucide-react";
 import { prisma } from "@/lib/prisma";
-import { basesPorDistancia, aeroportoDaMinuta } from "@/lib/gollog/bases";
+import { unidadesParaCliente, unidadeDaCidade } from "@/lib/gollog/unidades";
 import { ehEnvioAereoPendente } from "@/lib/gollog/confirmacao";
 import type { EnderecoEntrega } from "@/lib/validations/pedido";
 import { ConfirmacaoAereoForm } from "@/components/site/ConfirmacaoAereoForm";
@@ -17,8 +17,8 @@ export const metadata: Metadata = {
 type Props = { params: Promise<{ token: string }> };
 
 /**
- * Link do e-mail do envio aéreo. O cliente confirma endereço, CPF, o aeroporto
- * onde vai buscar a caixa e quem retira. O token é o segredo: sem login, porque
+ * Link do e-mail do envio aéreo. O cliente confirma endereço, CPF, a unidade
+ * da Gollog onde vai buscar a caixa e quem retira. O token é o segredo: sem login, porque
  * quem compra pelo WhatsApp não tem conta.
  */
 export default async function EnvioAereoPage({ params }: Props) {
@@ -35,6 +35,7 @@ export default async function EnvioAereoPage({ params }: Props) {
       tipoEntrega: true,
       enderecoEntrega: true,
       aeroportoDestino: true,
+      unidadeGollogId: true,
       recebedorNome: true,
       recebedorCpf: true,
       recebedorTelefone: true,
@@ -46,11 +47,16 @@ export default async function EnvioAereoPage({ params }: Props) {
 
   const end = (pedido.enderecoEntrega ?? {}) as Partial<EnderecoEntrega>;
   const aberto = ehEnvioAereoPendente(pedido);
-  const bases = basesPorDistancia(end.cidade, end.uf);
+  const { unidades, fonteDistancia } = await unidadesParaCliente(end);
   // Já vem marcada só a escolhida ou a unidade da cidade do cliente. A mais
   // perto em outra cidade não: o cliente pode retirar em outro lugar, e marcar
   // por ele faz parecer que a loja já decidiu.
-  const sugerido = aeroportoDaMinuta(pedido.aeroportoDestino, end.cidade, end.uf) ?? "";
+  const escolhida =
+    unidades.find((u) => u.id === pedido.unidadeGollogId) ??
+    (pedido.aeroportoDestino && !pedido.unidadeGollogId
+      ? unidades.find((u) => u.codigo === pedido.aeroportoDestino)
+      : undefined);
+  const sugerido = (escolhida ?? unidadeDaCidade(unidades))?.id ?? "";
 
   return (
     <div className="bg-muted/30 min-h-screen">
@@ -78,7 +84,8 @@ export default async function EnvioAereoPage({ params }: Props) {
           <ConfirmacaoAereoForm
             token={token}
             jaConfirmado={!!pedido.confirmacaoEnvioEm}
-            aeroportoEscolhido={!!pedido.aeroportoDestino}
+            aeroportoEscolhido={!!escolhida}
+            fonteDistancia={fonteDistancia}
             inicial={{
               nome: end.nome ?? "",
               cpfCnpj: end.cpfCnpj ?? "",
@@ -91,13 +98,13 @@ export default async function EnvioAereoPage({ params }: Props) {
               bairro: end.bairro ?? "",
               cidade: end.cidade ?? "",
               uf: end.uf ?? "",
-              aeroporto: sugerido,
+              unidadeId: sugerido,
               outraPessoaRetira: !!pedido.recebedorNome,
               recebedorNome: pedido.recebedorNome ?? "",
               recebedorCpf: pedido.recebedorCpf ?? "",
               recebedorTelefone: pedido.recebedorTelefone ?? "",
             }}
-            bases={bases}
+            unidades={unidades}
           />
         ) : (
           <div className="rounded-xl border border-border bg-white p-6 text-center text-sm text-muted-foreground">

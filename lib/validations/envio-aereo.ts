@@ -6,11 +6,11 @@ const digitos = (s: string) => s.replace(/\D/g, "");
 
 /**
  * O que o cliente confirma no link do envio aéreo: os mesmos dados do cadastro
- * público (vão na minuta), o aeroporto e, se não for ele, quem vai retirar.
+ * público (vão na minuta), a unidade da Gollog e, se não for ele, quem vai retirar.
  */
 export const confirmacaoAereoSchema = cadastroPublicoSchema
   .extend({
-    aeroporto: z.string().trim().toUpperCase().regex(/^[A-Z]{3}$/, "Escolha onde vai retirar"),
+    unidadeId: z.string().trim().min(1, "Escolha onde vai retirar").max(40),
     outraPessoaRetira: z.boolean().default(false),
     recebedorNome: z.string().trim().max(120).optional().default(""),
     recebedorCpf: z.string().transform(digitos).optional().default(""),

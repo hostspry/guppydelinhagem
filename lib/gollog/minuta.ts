@@ -10,7 +10,7 @@ import {
 import { prisma } from "@/lib/prisma";
 import type { EnderecoEntrega } from "@/lib/validations/pedido";
 import { MINUTA_GOLLOG_BASE64 } from "./minuta-template";
-import { aeroportoDaMinuta } from "./bases";
+import { unidadeDaMinuta } from "./unidades";
 import { REMETENTE_GOLLOG } from "./remetente";
 
 /**
@@ -86,6 +86,7 @@ export async function gerarMinutaGollog(
       numero: true,
       enderecoEntrega: true,
       aeroportoDestino: true,
+      unidadeGollogId: true,
       recebedorNome: true,
       recebedorCpf: true,
       recebedorTelefone: true,
@@ -95,7 +96,14 @@ export async function gerarMinutaGollog(
   if (!pedido) return null;
 
   const end = (pedido.enderecoEntrega ?? {}) as Partial<EnderecoEntrega>;
-  const destino = aeroportoDaMinuta(pedido.aeroportoDestino, end.cidade, end.uf);
+  const unidade = await unidadeDaMinuta({
+    unidadeGollogId: pedido.unidadeGollogId,
+    aeroportoDestino: pedido.aeroportoDestino,
+    cep: end.cep,
+    cidade: end.cidade,
+    uf: end.uf,
+  });
+  const destino = unidade?.codigo ?? null;
 
   const pdf = await PDFDocument.load(Buffer.from(MINUTA_GOLLOG_BASE64, "base64"));
   const form = pdf.getForm();

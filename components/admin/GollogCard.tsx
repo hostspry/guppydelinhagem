@@ -9,7 +9,7 @@ import {
   linkConfirmacaoAereo,
   pedirConfirmacaoAereo,
 } from "@/actions/envio-aereo";
-import type { BaseComDistancia } from "@/lib/gollog/bases";
+import type { UnidadeParaCliente } from "@/lib/gollog/unidades";
 
 const inputCls =
   "w-full min-h-10 px-3 rounded-md border border-gray-300 text-sm text-[#07366A] focus:outline-none focus:border-[#07366A] focus:ring-1 focus:ring-[#07366A]/30";
@@ -19,7 +19,7 @@ const quando = (d: Date | null) =>
 
 /**
  * Envio aéreo no painel: pedir a confirmação ao cliente, ver o que ele
- * respondeu, ajustar o aeroporto e baixar a minuta da Gollog preenchida.
+ * respondeu, ajustar a unidade e baixar a minuta da Gollog preenchida.
  */
 export function GollogCard({
   orderId,
@@ -27,9 +27,9 @@ export function GollogCard({
   aberto,
   clienteNome,
   clienteTelefone,
-  aeroportoDestino,
-  aeroportoMinuta,
-  bases,
+  unidadeEscolhidaId,
+  unidadeMinuta,
+  unidades: bases,
   recebedorNome,
   recebedorCpf,
   recebedorTelefone,
@@ -42,10 +42,11 @@ export function GollogCard({
   aberto: boolean;
   clienteNome: string;
   clienteTelefone: string | null;
-  aeroportoDestino: string | null;
-  /** O que a minuta vai usar agora (escolhido, ou a base da cidade, ou nada). */
-  aeroportoMinuta: string | null;
-  bases: BaseComDistancia[];
+  /** Unidade escolhida pelo cliente ou pela loja (nulo = ninguém escolheu). */
+  unidadeEscolhidaId: string | null;
+  /** O que a minuta vai usar agora (escolhida, ou a da cidade, ou nada). */
+  unidadeMinuta: { codigo: string; titulo: string } | null;
+  unidades: UnidadeParaCliente[];
   recebedorNome: string | null;
   recebedorCpf: string | null;
   recebedorTelefone: string | null;
@@ -53,7 +54,7 @@ export function GollogCard({
   confirmadaEm: Date | null;
 }) {
   const [pending, startTransition] = useTransition();
-  const [aeroporto, setAeroporto] = useState(aeroportoDestino ?? "");
+  const [unidadeId, setUnidadeId] = useState(unidadeEscolhidaId ?? "");
   const [outra, setOutra] = useState(!!recebedorNome);
   const [rNome, setRNome] = useState(recebedorNome ?? "");
   const [rCpf, setRCpf] = useState(recebedorCpf ?? "");
@@ -61,7 +62,6 @@ export function GollogCard({
   const [nf, setNf] = useState("");
   const [volumes, setVolumes] = useState("1");
 
-  const base = bases.find((b) => b.iata === aeroportoMinuta) ?? null;
 
   function pedir() {
     startTransition(async () => {
@@ -107,7 +107,7 @@ export function GollogCard({
   function salvar() {
     startTransition(async () => {
       const r = await definirEnvioAereo(orderId, {
-        aeroporto,
+        unidadeId,
         recebedorNome: outra ? rNome : "",
         recebedorCpf: outra ? rCpf : "",
         recebedorTelefone: outra ? rTel : "",
@@ -145,16 +145,16 @@ export function GollogCard({
         <p className="text-gray-600">
           Base na minuta:{" "}
           <span className="font-medium text-[#07366A]">
-            {base ? `${base.iata} · ${base.cidade}/${base.uf}` : "em branco"}
+            {unidadeMinuta ? unidadeMinuta.titulo : "em branco"}
           </span>
         </p>
-        {!aeroportoDestino && base && (
+        {!unidadeEscolhidaId && unidadeMinuta && (
           <p className="text-xs text-gray-400">Unidade da cidade do cliente. Ele ainda não escolheu.</p>
         )}
-        {!base && (
+        {!unidadeMinuta && (
           <p className="text-xs text-gray-400">
             A cidade do cliente não tem Gollog e ele não escolheu. Mais perto:{" "}
-            {bases[0] ? `${bases[0].iata} (${bases[0].km ?? "?"} km)` : "-"}.
+            {bases[0] ? `${bases[0].titulo} (${bases[0].km ?? "?"} km)` : "-"}.
           </p>
         )}
         {recebedorNome && (
@@ -205,12 +205,12 @@ export function GollogCard({
             Definir unidade ou quem retira à mão
           </summary>
           <div className="space-y-3 mt-3">
-            <select value={aeroporto} onChange={(e) => setAeroporto(e.target.value)} className={inputCls} aria-label="Unidade de retirada">
+            <select value={unidadeId} onChange={(e) => setUnidadeId(e.target.value)} className={inputCls} aria-label="Unidade de retirada">
               <option value="">Sem escolha (usa a unidade da cidade, se houver)</option>
               {bases.map((b) => (
-                <option key={b.iata} value={b.iata}>
-                  {b.iata} · {b.cidade}/{b.uf}
-                  {b.km != null ? ` · ${b.naCidade ? "na cidade" : `${b.km} km`}` : ""}
+                <option key={b.id} value={b.id}>
+                  {b.titulo} · {b.cidade}/{b.uf}
+                  {b.km != null ? ` · ${b.km} km` : ""}
                 </option>
               ))}
             </select>
