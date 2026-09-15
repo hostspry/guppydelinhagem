@@ -87,8 +87,10 @@ export type AnuncioMontado = {
   descricao: string;
   /** Parte da descrição que vem do produto (a IA pode reescrever). */
   textoProduto: string;
-  /** Envio, licença e regra da segunda: sempre do código, sempre no fim. */
+  /** Envio, licença, regra da segunda e garantia: sempre do código, sempre no fim. */
   blocosFixos: string;
+  /** Apresentação da loja: sempre do código, sempre no topo. */
+  abertura: string;
   atributos: AtributoMl[];
   /** Conjuntos que o pool monta (peixe) ou estoque da linha (seco). */
   disponivel: number;
@@ -128,9 +130,25 @@ export function conferirDescricao(texto: string, licencaIbama: string | null): s
   return problemas.length ? `Descrição recusada: ${problemas.join(", ")}.` : null;
 }
 
-/** Descrição final: texto do produto e, depois, os blocos fixos. */
-export function juntarDescricao(textoProduto: string, blocosFixos: string): string {
-  return [textoProduto.trim(), blocosFixos.trim()].filter(Boolean).join("\n\n").slice(0, 50000);
+/** Descrição final: apresentação da loja, texto do produto e blocos fixos. */
+export function juntarDescricao(
+  textoProduto: string,
+  blocosFixos: string,
+  abertura = "",
+): string {
+  return [abertura.trim(), textoProduto.trim(), blocosFixos.trim()]
+    .filter(Boolean)
+    .join("\n\n")
+    .slice(0, 50000);
+}
+
+/** "1 macho e 2 fêmeas", "3 machos", "1 fêmea". */
+export function descreverReceita(r: { qtdMachos: number; qtdFemeas: number }): string {
+  const partes = [
+    r.qtdMachos > 0 ? `${r.qtdMachos} ${r.qtdMachos === 1 ? "macho" : "machos"}` : "",
+    r.qtdFemeas > 0 ? `${r.qtdFemeas} ${r.qtdFemeas === 1 ? "fêmea" : "fêmeas"}` : "",
+  ].filter(Boolean);
+  return partes.join(" e ");
 }
 
 /** Monta o anúncio sem chamar o ML. Erro em texto quando falta algo do lado de cá. */
@@ -139,7 +157,7 @@ export async function montarAnuncio(
 ): Promise<MlResult<AnuncioMontado>> {
   const cfg = await prisma.integracaoMercadoLivre.findUnique({
     where: { id: "default" },
-    select: { licencaIbama: true },
+    select: { licencaIbama: true, apresentacaoLoja: true, garantiaChegada: true },
   });
 
   const p = await prisma.product.findUnique({
@@ -190,20 +208,24 @@ export async function montarAnuncio(
     ? tituloPeixeMl({ nome: p.nome, composicao: rotulo })
     : cortarTitulo(rotulo ? `${p.nome} ${rotulo}` : p.nome);
 
-  // Texto do produto (o que a IA pode reescrever) separado dos blocos fixos
-  // (o que vai no envio, licença e regra da segunda), que só o código escreve.
+  // Texto do produto (o que a IA pode reescrever) separado do que só o código
+  // escreve: a apresentação da loja no topo e, no fim, o que vai no envio,
+  // licença, regra da segunda e garantia. Os dois textos da loja vêm de
+  // Configurações → Mercado Livre.
   const textoProduto = descricaoEmParagrafos(
     stripMarcheziSignature(p.descricao || p.descricaoCurta || p.nome),
   );
+  const abertura = ehPeixe ? (cfg?.apresentacaoLoja?.trim() ?? "") : "";
   const blocosFixos = [
-    receita
-      ? `O que vai no envio: ${receita.qtdMachos} macho(s) e ${receita.qtdFemeas} fêmea(s).`
+    receita && descreverReceita(receita)
+      ? `O que vai no envio: ${descreverReceita(receita)}.`
       : "",
     ehPeixe && cfg?.licencaIbama
       ? `Peixe ornamental vivo, criado em cativeiro. Licença IBAMA: ${cfg.licencaIbama}.`
       : "",
     ehPeixe ? TEXTO_ENVIO_SEGUNDA : "",
     ehPeixe ? "O peixe vai em caixa preparada para transporte de peixe vivo." : "",
+    ehPeixe ? (cfg?.garantiaChegada?.trim() ?? "") : "",
   ]
     .filter(Boolean)
     .join("\n\n");
@@ -223,9 +245,10 @@ export async function montarAnuncio(
     ok: true,
     dados: {
       titulo,
-      descricao: juntarDescricao(textoProduto, blocosFixos),
+      descricao: juntarDescricao(textoProduto, blocosFixos, abertura),
       textoProduto,
       blocosFixos,
+      abertura,
       atributos,
       disponivel,
       quantidade,

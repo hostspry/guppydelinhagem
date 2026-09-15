@@ -22,6 +22,7 @@ import {
   type TipoAnuncio,
 } from "@/lib/mercadolivre/publicar";
 import { sugerirPreco } from "@/lib/mercadolivre/precos";
+import { problemasDescricao, semTravessao } from "@/lib/mercadolivre/texto-ml";
 import type { TipoComposicao } from "@/lib/generated/prisma/enums";
 
 /**
@@ -346,6 +347,52 @@ export async function desligarAnuncioMl(id: string): Promise<MlActionResult> {
 
   revalidatePath(CAMINHO);
   return { ok: true, mensagem: "Ligação desfeita." };
+}
+
+/**
+ * Apresentação da loja (abre) e garantia de chegada (fecha) a descrição de todo
+ * anúncio de peixe. Vazio = o parágrafo não entra. Passa pelas regras de texto
+ * do ML: sem link, telefone, contato por fora nem parágrafo em maiúsculas.
+ */
+export async function salvarTextosAnuncioMl(dados: {
+  apresentacaoLoja: string;
+  garantiaChegada: string;
+}): Promise<MlActionResult> {
+  const membro = await assertPermissao("config.editar");
+
+  const campos = [
+    ["Apresentação da loja", semTravessao(dados.apresentacaoLoja.trim())],
+    ["Garantia de chegada", semTravessao(dados.garantiaChegada.trim())],
+  ] as const;
+
+  for (const [nome, texto] of campos) {
+    if (!texto) continue;
+    if (texto.length > 1500) return { ok: false, erro: `${nome}: passa de 1500 caracteres.` };
+    // "Curta demais" é regra da descrição inteira; um parágrafo pode ser curto.
+    const problemas = problemasDescricao(texto).filter((p) => p !== "curta demais");
+    if (problemas.length) return { ok: false, erro: `${nome}: ${problemas.join(", ")}.` };
+  }
+
+  const [apresentacaoLoja, garantiaChegada] = campos.map(([, t]) => t || null);
+  await prisma.integracaoMercadoLivre.upsert({
+    where: { id: "default" },
+    create: { id: "default", apresentacaoLoja, garantiaChegada },
+    update: { apresentacaoLoja, garantiaChegada },
+  });
+
+  await auditar(membro, {
+    acao: "config.mercadolivre.textos",
+    entidade: "MercadoLivre",
+    descricao: "Atualizou a apresentação da loja e a garantia dos anúncios de peixe",
+    depois: { apresentacaoLoja, garantiaChegada },
+  });
+
+  revalidatePath(CAMINHO);
+  return {
+    ok: true,
+    mensagem:
+      "Textos salvos. Anúncio novo já sai com eles; nos publicados, use \"Usar texto do site\" na aba do produto.",
+  };
 }
 
 /** Salva o número da licença do IBAMA (vai na descrição de todo anúncio de peixe). */

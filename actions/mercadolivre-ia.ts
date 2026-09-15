@@ -71,6 +71,10 @@ async function contexto(dados: {
   });
   if (!p) return null;
 
+  const cfg = await prisma.integracaoMercadoLivre.findUnique({
+    where: { id: "default" },
+    select: { apresentacaoLoja: true },
+  });
   const v = p.variantes.find((x) => x.composicao === dados.composicao);
   const atual = p.mercadoLivre.find((a) => a.id === dados.anuncioId);
 
@@ -92,6 +96,7 @@ async function contexto(dados: {
       .filter((a) => a.id !== dados.anuncioId && a.titulo)
       .map((a) => a.titulo as string),
     tendenciasMl: await tendenciasPeixes(),
+    temApresentacaoLoja: !!cfg?.apresentacaoLoja?.trim(),
   };
 }
 
@@ -134,7 +139,10 @@ export async function iaMelhorarDescricaoMl(dados: {
     if (!ctx) return { ok: false, erro: "Produto não encontrado." };
     if (!montado.ok) return { ok: false, erro: montado.erro };
     const texto = await melhorarDescricaoIa(ctx);
-    return { ok: true, descricao: juntarDescricao(texto, montado.dados.blocosFixos) };
+    return {
+      ok: true,
+      descricao: juntarDescricao(texto, montado.dados.blocosFixos, montado.dados.abertura),
+    };
   } catch (e) {
     return erroAmigavel(e);
   }

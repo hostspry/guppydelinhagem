@@ -124,6 +124,12 @@ export function problemasDescricao(texto: string): string[] {
   if (/[\w.+-]+@[\w-]+\.\w+/.test(t)) erros.push("tem e-mail");
   if (/\(?\d{2}\)?\s?9?\d{4}[-\s]?\d{4}/.test(t)) erros.push("tem telefone");
   if (/whats|zap\b|instagram|facebook|telegram/i.test(t)) erros.push("pede contato por fora");
+  // Parágrafo todo em maiúsculas é grito: o comprador lê como anúncio amador.
+  const gritado = t.split(/\n+/).some((par) => {
+    const letras = par.replace(/[^\p{L}]/gu, "");
+    return letras.length >= 20 && letras === letras.toUpperCase();
+  });
+  if (gritado) erros.push("tem parágrafo todo em maiúsculas");
   return erros;
 }
 

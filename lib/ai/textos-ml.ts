@@ -42,6 +42,8 @@ export type ContextoProduto = {
   outrosTitulos: string[];
   /** Buscas em alta na categoria Peixes do ML. Contexto, não obrigação. */
   tendenciasMl: string[];
+  /** A loja já se apresenta num parágrafo fixo: a IA não repete. */
+  temApresentacaoLoja: boolean;
 };
 
 const VOZ = `Você escreve anúncios para uma loja brasileira de guppy de linhagem (A Marchezi Guppy Farm), em português do Brasil.
@@ -160,7 +162,7 @@ Buscas em alta na categoria Peixes do ML: ${c.tendenciasMl.join(", ") || "(sem d
 // ── Descrição ────────────────────────────────────────────────────────────────
 
 /** Assuntos que são dos blocos fixos: se a IA escrever, sai repetido ou errado. */
-const ASSUNTO_DOS_BLOCOS = /\bfrete\b|\benvi(o|amos|ado)\b|\bentreg|\bprazo\b|\bibama\b|\blicen[cç]a\b|segunda-feira|\bcaixa\b/i;
+const ASSUNTO_DOS_BLOCOS = /\bfrete\b|\benvi(o|amos|ado)\b|\bentreg|\bprazo\b|\bibama\b|\blicen[cç]a\b|segunda-feira|\bcaixa\b|\bgarantia\b/i;
 
 export async function melhorarDescricaoIa(c: ContextoProduto): Promise<string> {
   const sistema = `${VOZ}
@@ -175,15 +177,19 @@ Formato da resposta:
 Conteúdo dos parágrafos, nesta ordem:
 1. O que é: a linhagem e a composição. Use "peixe guppy" e "lebiste" uma vez cada, de forma natural.
 2. Como é o peixe: padrão de cor e cauda, como estão nos dados. NÃO descreva macho e fêmea separadamente, a não ser que os dados digam a diferença com todas as letras.
-3. De onde vem a linhagem e quem cria, se estiver nos dados.
+3. ${
+    c.temApresentacaoLoja
+      ? "De onde vem a linhagem, se estiver nos dados. NÃO fale da loja, da fazenda, de quem cria nem de prêmios: a apresentação da loja já abre a descrição num parágrafo próprio."
+      : "De onde vem a linhagem e quem cria, se estiver nos dados."
+  }
 
 Jeito de escrever:
 - Comece direto pelo peixe ("Trio de peixe guppy Albino Red Silverado…"). Nunca comece com "Este anúncio", "Neste anúncio" ou "Apresentamos".
 - Números em português: vírgula decimal (pH 6,8 a 7,8), temperatura como "22 a 28 °C".
 - Itens de manejo começam com letra maiúscula, sem ponto final ("Temperatura da água de 22 a 28 °C").
-- Pode citar a Marchezi Guppy Farm uma vez, sem elogio.
+${c.temApresentacaoLoja ? "" : "- Pode citar a Marchezi Guppy Farm uma vez, sem elogio."}
 
-NÃO escreva sobre: envio, frete, entrega, prazo, caixa, licença, IBAMA, dia da semana, preço, pagamento, garantia, contato, WhatsApp, redes sociais, links. Esses assuntos já entram depois, escritos pela loja.`;
+NÃO escreva sobre: envio, frete, entrega, prazo, caixa, licença, IBAMA, dia da semana, preço, pagamento, garantia, contato, WhatsApp, redes sociais, links. Esses assuntos já entram em parágrafos próprios, escritos pela loja.`;
 
   let ultimoErro = "";
   for (let tentativa = 0; tentativa < 2; tentativa++) {

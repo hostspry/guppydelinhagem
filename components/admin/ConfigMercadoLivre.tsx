@@ -23,6 +23,7 @@ import {
   ligarAnuncioMl,
   desligarAnuncioMl,
   salvarLicencaIbama,
+  salvarTextosAnuncioMl,
   publicarProdutoNoMl,
   sugerirPrecoMl,
   trocarTipoAnuncioMl,
@@ -78,6 +79,7 @@ export function ConfigMercadoLivre({
   ligacoes,
   produtos,
   licencaIbama,
+  textosAnuncio,
 }: {
   inicial: {
     ativo: boolean;
@@ -94,6 +96,7 @@ export function ConfigMercadoLivre({
   ligacoes: Ligacao[];
   produtos: Produto[];
   licencaIbama: string;
+  textosAnuncio: { apresentacaoLoja: string; garantiaChegada: string };
 }) {
   const router = useRouter();
   const [clientId, setClientId] = useState(inicial.clientId);
@@ -103,6 +106,8 @@ export function ConfigMercadoLivre({
   const [anuncios, setAnuncios] = useState<AnuncioMl[] | null>(null);
   const [escolha, setEscolha] = useState<Record<string, string>>({});
   const [licenca, setLicenca] = useState(licencaIbama);
+  const [apresentacao, setApresentacao] = useState(textosAnuncio.apresentacaoLoja);
+  const [garantia, setGarantia] = useState(textosAnuncio.garantiaChegada);
   const [publProduto, setPublProduto] = useState("");
   const [publComposicao, setPublComposicao] = useState("");
   const [publPreco, setPublPreco] = useState("");
@@ -363,6 +368,66 @@ export function ConfigMercadoLivre({
             Salvar
           </button>
         </div>
+      </div>
+
+      {/* ── Textos de todo anúncio de peixe ── */}
+      <div className="bg-white border border-gray-200 rounded-lg p-5 space-y-3">
+        <h2 className="text-xs font-semibold text-[#07366A] uppercase tracking-wide">
+          Textos de todo anúncio de peixe
+        </h2>
+        <p className="text-xs text-gray-600 leading-relaxed">
+          Escritos uma vez e colocados sozinhos em todo anúncio de peixe: a apresentação abre a
+          descrição e a garantia fecha. A IA e o &quot;usar texto do site&quot; não apagam. Deixe em
+          branco o que não quiser usar.
+        </p>
+        <label className="block">
+          <span className="flex justify-between text-xs text-gray-500 mb-1">
+            <span>Apresentação da loja (primeiro parágrafo)</span>
+            <span>{apresentacao.length}/1500</span>
+          </span>
+          <textarea
+            value={apresentacao}
+            onChange={(e) => setApresentacao(e.target.value)}
+            rows={4}
+            maxLength={1500}
+            placeholder="ex.: Criado na Marchezi Guppy Farm, em Guarapari/ES. Criamos só guppy de linhagem e temos títulos em concursos da [nome oficial da associação] e da Brazilian Guppy Association."
+            className={input}
+          />
+        </label>
+        <label className="block">
+          <span className="flex justify-between text-xs text-gray-500 mb-1">
+            <span>Garantia de chegada (último parágrafo)</span>
+            <span>{garantia.length}/1500</span>
+          </span>
+          <textarea
+            value={garantia}
+            onChange={(e) => setGarantia(e.target.value)}
+            rows={4}
+            maxLength={1500}
+            placeholder="ex.: Garantia de chegada: se algum peixe chegar morto, enviamos outro sem custo. Para isso, grave um vídeo abrindo a caixa, com o saco ainda fechado, e nos avise pelas mensagens do Mercado Livre em até 2 horas depois da entrega."
+            className={input}
+          />
+        </label>
+        <ul className="list-disc ml-4 text-[11px] text-gray-500 space-y-0.5">
+          <li>Sem texto todo em maiúsculas: no ML soa como grito.</li>
+          <li>Título ou prêmio só com o nome oficial, que o comprador consiga conferir.</li>
+          <li>
+            Garantia com as regras (prova, prazo e canal). Contato só pelas mensagens do ML: link,
+            telefone e WhatsApp o ML pune.
+          </li>
+        </ul>
+        <button
+          type="button"
+          disabled={pending}
+          onClick={() =>
+            rodar(() =>
+              salvarTextosAnuncioMl({ apresentacaoLoja: apresentacao, garantiaChegada: garantia }),
+            )
+          }
+          className="px-4 py-2 rounded-md bg-[#07366A] text-white text-sm font-semibold hover:brightness-110 disabled:opacity-60"
+        >
+          Salvar textos
+        </button>
       </div>
 
       {/* ── Publicar anúncio ── */}

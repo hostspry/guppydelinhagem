@@ -676,6 +676,12 @@ model IntegracaoMercadoLivre {
   /// vivo — sem isso o anúncio cai e a conta pode ser suspensa. Fica aqui, e não
   /// no texto de cada produto, para ser impossível esquecer num cadastro novo.
   licencaIbama String?
+  /// Parágrafo que ABRE a descrição de todo anúncio de peixe (quem é a loja).
+  /// Escrito uma vez aqui para a IA e o "usar texto do site" nunca apagarem.
+  apresentacaoLoja String?
+  /// Parágrafo que FECHA a descrição de todo anúncio de peixe (garantia de
+  /// chegada). Compromisso comercial: só entra o que o dono escreveu.
+  garantiaChegada  String?
 
   ultimaSincronizacaoEm DateTime?
   ultimoErro            String?

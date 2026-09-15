@@ -122,6 +122,10 @@ export default async function ConfiguracoesMercadoLivrePage() {
         })),
       }))}
       licencaIbama={cfg?.licencaIbama ?? ""}
+      textosAnuncio={{
+        apresentacaoLoja: cfg?.apresentacaoLoja ?? "",
+        garantiaChegada: cfg?.garantiaChegada ?? "",
+      }}
     />
   );
 }

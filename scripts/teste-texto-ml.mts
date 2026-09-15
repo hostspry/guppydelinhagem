@@ -38,6 +38,15 @@ conferir("whatsapp reprova", problemasDescricao(desc + " Chama no WhatsApp 28 99
 conferir("link reprova", problemasDescricao(desc + " Veja em www.guppydelinhagem.com.br").includes("tem link"));
 conferir("licença IBAMA (7 dígitos) não é telefone", !problemasDescricao(desc + " Licença IBAMA: 6277283.").includes("tem telefone"));
 
+conferir(
+  "parágrafo em maiúsculas reprova",
+  problemasDescricao(desc + "\n\nGARANTIA DE PEIXE CHEGANDO VIVO OU ENVIAREMOS NOVAMENTE!").includes("tem parágrafo todo em maiúsculas"),
+);
+conferir(
+  "sigla curta em maiúsculas passa",
+  !problemasDescricao(desc + "\n\nLicença IBAMA: 6277283.").includes("tem parágrafo todo em maiúsculas"),
+);
+
 conferir("travessão vira vírgula", semTravessao("Guppy — de linhagem") === "Guppy, de linhagem", semTravessao("Guppy — de linhagem"));
 
 const acentos = palavrasReescritas(

@@ -135,4 +135,4 @@ export function rotuloSegunda(d: Date): string {
 
 /** Parágrafo da descrição do anúncio que explica a regra ao comprador. */
 export const TEXTO_ENVIO_SEGUNDA =
-  "Envio somente às segundas-feiras. Assim o peixe viaja no começo da semana e chega antes do fim de semana, sem ficar parado em centro de distribuição fechado. Em semana com feriado nacional o envio passa para a segunda-feira da semana seguinte sem feriado, pelo mesmo motivo: feriado para a transportadora e o peixe não pode ficar dias na caixa. O prazo de entrega começa a contar a partir da segunda-feira do envio.";
+  "Envio somente às segundas-feiras. Assim, o peixe viaja no começo da semana e chega antes do fim de semana, sem ficar parado em centro de distribuição fechado. Em semana com feriado nacional, o envio passa para a segunda-feira da semana seguinte sem feriado, pelo mesmo motivo: feriado para a transportadora e o peixe não pode ficar dias na caixa. O prazo de entrega começa a contar a partir da segunda-feira do envio.";
