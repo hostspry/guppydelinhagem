@@ -22,4 +22,6 @@ export const REMETENTE_GOLLOG = {
   email: "",
   /** Base Gollog onde a caixa é entregue para embarque. */
   aeroportoOrigem: "VIX",
+  /** "Local e data" da autorização: onde a minuta é assinada, no despacho em Vitória. */
+  localAssinatura: "Vitória - ES",
 } as const;

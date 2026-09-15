@@ -184,7 +184,7 @@ export async function gerarMinutaGollog(
   // ── Autorização ──
   const autorizo = form.getFieldMaybe("Autorizacao");
   if (autorizo instanceof PDFCheckBox) autorizo.check();
-  texto("Local_data", `${loja.cidade}/${loja.uf}, ${hojeSp()}`);
+  texto("Local_data", `${loja.localAssinatura}, ${hojeSp()}`);
   texto("Nome_Responsavel", loja.nome);
 
   const primeiroNome = (end.nome || pedido.cliente.nome).split(/\s+/)[0] ?? "cliente";
