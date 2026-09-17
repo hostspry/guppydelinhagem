@@ -18,6 +18,7 @@ import {
   mensagemRastreio,
   whatsappRastreioLink,
   transportadoraLabel,
+  etiquetaCancelada,
 } from "@/lib/tracking";
 import type { OrderStatus, Transportadora } from "@/lib/generated/prisma/client";
 import { EtiquetaBotao } from "./EtiquetaBotao";
@@ -31,6 +32,8 @@ type Props = {
   codigoRastreio: string | null;
   selfTracking: string | null;
   etiquetaUrl: string | null;
+  /** Último status do envio no Melhor Envio (posted/delivered/canceled/…). */
+  rastreioStatus: string | null;
   clienteNome: string;
   clienteTelefone: string | null;
   /** Pedido de marketplace: quem despacha, etiqueta e rastreia é ele. */
@@ -50,6 +53,7 @@ export function EnvioCard({
   codigoRastreio,
   selfTracking,
   etiquetaUrl,
+  rastreioStatus,
   clienteNome,
   clienteTelefone,
   daShopee = false,
@@ -130,6 +134,17 @@ export function EnvioCard({
 
       {enviado ? (
         <>
+          {/* Pedido marcado como enviado e etiqueta cancelada no ME: o código
+              que o cliente tem não vai andar nunca. Melhor dizer aqui do que
+              deixar a loja descobrir pelo cliente cobrando. */}
+          {etiquetaCancelada(rastreioStatus) && (
+            <p className="rounded-md bg-amber-50 border border-amber-200 p-2.5 text-xs text-amber-900 leading-snug">
+              A etiqueta deste envio está <strong>cancelada no Melhor Envio</strong>.
+              O código abaixo não vai andar. Despache de outro jeito e corrija o
+              rastreio em &ldquo;Editar rastreio&rdquo;.
+            </p>
+          )}
+
           <div className="space-y-1">
             <p className="text-gray-600">
               Transportadora:{" "}
@@ -263,6 +278,7 @@ export function EnvioCard({
               <EtiquetaBotao
                 orderId={id}
                 etiquetaUrl={etiquetaUrl}
+                rastreioStatus={rastreioStatus}
                 podeComprar
               />
 

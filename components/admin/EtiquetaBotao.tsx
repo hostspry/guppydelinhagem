@@ -18,10 +18,12 @@ import {
   salvarPacoteDoPedido,
   reenviarRastreio,
   atualizarRastreioDoPedido,
+  liberarNovaEtiqueta,
   type OpcaoEtiqueta,
   type PacoteCotado,
 } from "@/actions/etiqueta";
 import { ImprimirEtiqueta } from "@/components/admin/ImprimirEtiqueta";
+import { etiquetaCancelada } from "@/lib/tracking";
 
 /** Embalagens que a loja usa no dia a dia, para não digitar sempre. */
 const PRESETS = [
@@ -45,12 +47,15 @@ const brl = new Intl.NumberFormat("pt-BR", {
 export function EtiquetaBotao({
   orderId,
   etiquetaUrl,
+  rastreioStatus,
   podeComprar,
   motivo,
 }: {
   orderId: string;
   /** Já comprada: mostra o PDF em vez de oferecer comprar de novo. */
   etiquetaUrl: string | null;
+  /** Último status do envio no Melhor Envio — "canceled" muda tudo aqui. */
+  rastreioStatus?: string | null;
   podeComprar: boolean;
   /** Por que não pode, quando não pode. */
   motivo?: string;
@@ -69,6 +74,51 @@ export function EtiquetaBotao({
     altura: "",
     pesoGramas: "",
   });
+
+  // Etiqueta cancelada no Melhor Envio (greve, endereço errado, serviço
+  // trocado). O PDF antigo ainda abre e não vale nada: postar esse papel é
+  // caixa devolvida. Aqui o caminho é um só — soltar o pedido e comprar outra.
+  if (etiquetaCancelada(rastreioStatus)) {
+    return (
+      <div className="rounded-md border border-amber-300 bg-amber-50 p-3 space-y-2">
+        <p className="flex items-start gap-1.5 text-xs text-amber-900 leading-snug">
+          <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" aria-hidden="true" />
+          <span>
+            A etiqueta deste pedido foi <strong>cancelada no Melhor Envio</strong>.
+            Ela não serve mais para postar. Solte o pedido para comprar outra —
+            o rastreio antigo sai do painel do cliente.
+          </span>
+        </p>
+        <button
+          type="button"
+          onClick={() =>
+            startTransition(async () => {
+              const r = await liberarNovaEtiqueta(orderId);
+              if (!r.success) {
+                toast.error(r.error);
+                return;
+              }
+              toast.success(r.message);
+              router.refresh();
+            })
+          }
+          disabled={isPending}
+          className="inline-flex items-center gap-1.5 bg-[#07366A] text-white text-sm font-medium px-4 py-2 rounded-md hover:brightness-125 transition-all disabled:opacity-60"
+        >
+          {isPending ? (
+            <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
+          ) : (
+            <RefreshCw className="w-4 h-4" aria-hidden="true" />
+          )}
+          Liberar nova etiqueta
+        </button>
+        <p className="text-[11px] text-amber-800 leading-snug">
+          O estorno do que foi pago pela etiqueta acontece no site do Melhor
+          Envio, que devolve ao saldo. Aqui só tiramos a etiqueta morta do pedido.
+        </p>
+      </div>
+    );
+  }
 
   if (etiquetaUrl) {
     // Comprada. O e-mail com o rastreio sai sozinho quando a postagem é

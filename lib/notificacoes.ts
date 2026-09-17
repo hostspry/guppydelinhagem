@@ -315,6 +315,27 @@ export async function notificarRastreioAtualizado(
   );
 }
 
+// ── Etiqueta cancelada (⚠️) — o envio voltou do ME como cancelado ─────────────
+// Sai UMA vez, na virada do status: o poll roda de hora em hora e repetir o
+// aviso a cada rodada treina todo mundo a ignorar o Telegram. O pedido segue
+// PAGO e sem envio — é a loja que precisa agir, não o cliente.
+export async function notificarEtiquetaCancelada(
+  pedidos: { numero: string; cliente: string; servico: string | null; id: string }[],
+): Promise<void> {
+  if (pedidos.length === 0) return;
+  const linhas = pedidos
+    .map((p) => {
+      const servico = p.servico ? ` · ${escapeHtml(p.servico)}` : "";
+      return `• <b>${escapeHtml(p.numero)}</b> — ${escapeHtml(p.cliente)}${servico}\n  <a href="${LINK_ADMIN}/${p.id}#envio">abrir pedido</a>`;
+    })
+    .join("\n");
+  await enviarSeguro(
+    () =>
+      `⚠️ <b>Etiqueta cancelada (${pedidos.length})</b>\n\n${linhas}\n\n` +
+      `A caixa continua aqui e o pedido segue pago. Libere uma etiqueta nova no card de envio e escolha outro serviço.`,
+  );
+}
+
 // ── Checkout abandonado (🕐) — leads que preencheram contato e não pagaram ─────
 export async function notificarLeadsAbandonados(
   leads: { nome: string | null; telefone: string | null; email: string | null }[],

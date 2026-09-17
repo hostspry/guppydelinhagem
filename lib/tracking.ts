@@ -88,3 +88,18 @@ export function whatsappRastreioLink(
   if (!d.startsWith("55")) d = `55${d}`;
   return `https://wa.me/${d}?text=${encodeURIComponent(mensagem)}`;
 }
+
+/**
+ * A etiqueta deste envio ainda vale?
+ *
+ * Cancelada no Melhor Envio (greve, endereço errado, serviço trocado), o
+ * pedido guarda tudo como antes — id do envio, PDF, código — e nada disso
+ * serve: o PDF ainda abre, e postar esse papel é caixa devolvida. Como o
+ * painel, o poll do rastreio e a compra precisam concordar sobre o que é uma
+ * etiqueta morta, a lista mora aqui e não em cada arquivo.
+ */
+const ETIQUETA_MORTA = new Set(["canceled", "cancelled", "expired"]);
+
+export function etiquetaCancelada(status: string | null | undefined): boolean {
+  return ETIQUETA_MORTA.has((status ?? "").trim().toLowerCase());
+}

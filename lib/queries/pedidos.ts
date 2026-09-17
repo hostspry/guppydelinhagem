@@ -5,7 +5,7 @@ import type {
   TipoEntrega,
 } from "../generated/prisma/client";
 import type { EnderecoEntrega } from "../validations/pedido";
-import { buildTrackingUrl, codigoRastreavel } from "../tracking";
+import { buildTrackingUrl, codigoRastreavel, etiquetaCancelada } from "../tracking";
 
 // 48h e não 24h: o QR do Pix vale 24h (PIX_EXPIRACAO_MIN), e cancelar no mesmo
 // prazo criaria a corrida "cliente paga no fim da janela e o pedido já foi
@@ -94,6 +94,7 @@ export async function listPedidos({
       servicoEnvioNome: true,
       etiquetaUrl: true,
       meShipmentId: true,
+      rastreioStatus: true,
       total: true,
       criadoEm: true,
       cliente: { select: { nome: true } },
@@ -123,8 +124,11 @@ export async function listPedidos({
     // tem 3 valores e o catálogo do Melhor Envio muda sozinho.
     servicoEnvioNome: r.servicoEnvioNome,
     // Etiqueta já comprada: a lista mostra "imprimir" em vez de "gerar". O id do
-    // Melhor Envio conta junto porque o PDF salvo pode ter expirado.
-    temEtiqueta: !!(r.etiquetaUrl || r.meShipmentId),
+    // Melhor Envio conta junto porque o PDF salvo pode ter expirado. Cancelada
+    // não conta: oferecer "imprimir" ali é oferecer um papel que a
+    // transportadora recusa — a lista volta a mandar gerar.
+    temEtiqueta:
+      !!(r.etiquetaUrl || r.meShipmentId) && !etiquetaCancelada(r.rastreioStatus),
     total: Number(r.total),
     criadoEm: r.criadoEm,
     clienteNome: r.cliente.nome,
@@ -251,6 +255,7 @@ export async function getPedidoById(id: string) {
     selfTracking: p.selfTracking,
     meShipmentId: p.meShipmentId,
     etiquetaUrl: p.etiquetaUrl,
+    rastreioStatus: p.rastreioStatus,
     enviadoEm: p.enviadoEm,
     observacoes: p.observacoes,
     semanaEnvio: p.semanaEnvio,

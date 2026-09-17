@@ -2,12 +2,13 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { rastrearEnvios, listarEnvios } from "@/lib/melhorenvio";
 import { gravarEnvioTx } from "@/lib/pedido-envio";
-import { buildTrackingUrl } from "@/lib/tracking";
+import { buildTrackingUrl, etiquetaCancelada } from "@/lib/tracking";
 import {
   notificarLoteEnviado,
   notificarPedidoEnviado,
   notificarPedidoEntregue,
   notificarRastreioAtualizado,
+  notificarEtiquetaCancelada,
 } from "@/lib/notificacoes";
 import { emailPedidoEnviado } from "@/lib/emails/pedido";
 
@@ -164,6 +165,8 @@ async function pollStatus(): Promise<{
       meShipmentId: true,
       selfTracking: true,
       codigoRastreio: true,
+      rastreioStatus: true,
+      servicoEnvioNome: true,
       enderecoEntrega: true,
       cliente: { select: { nome: true } },
     },
@@ -189,10 +192,37 @@ async function pollStatus(): Promise<{
   }[] = [];
   let entregues = 0;
   const postados: { id: string; lote: LinhaLote }[] = [];
+  const canceladas: {
+    id: string;
+    numero: string;
+    cliente: string;
+    servico: string | null;
+  }[] = [];
 
   for (const rastreio of r.data) {
     const pedido = porShipment.get(rastreio.meShipmentId);
     if (!pedido) continue;
+
+    // Etiqueta cancelada no painel do ME (greve, endereço errado, serviço
+    // trocado): o envio morreu, mas o pedido continua pago e a caixa em casa.
+    // Marca o status e para por aqui — nada de virar ENVIADO, nem guardar
+    // ocorrência de um envio que não existe mais. Avisa a loja UMA vez, na
+    // virada; quem destrava é o "Liberar nova etiqueta" no painel.
+    if (etiquetaCancelada(rastreio.status)) {
+      if (!etiquetaCancelada(pedido.rastreioStatus)) {
+        await prisma.order.update({
+          where: { id: pedido.id },
+          data: { rastreioStatus: rastreio.status },
+        });
+        canceladas.push({
+          id: pedido.id,
+          numero: pedido.numero,
+          cliente: pedido.cliente.nome,
+          servico: pedido.servicoEnvioNome,
+        });
+      }
+      continue;
+    }
 
     // Ocorrências válidas → grava as novas (skipDuplicates na unique).
     const eventos = rastreio.eventos
@@ -281,6 +311,7 @@ async function pollStatus(): Promise<{
   }
 
   if (avisos.length > 0) await notificarRastreioAtualizado(avisos);
+  if (canceladas.length > 0) await notificarEtiquetaCancelada(canceladas);
 
   // Mesmo acordo do envio em lote do painel: um postado → 🚚 individual (que já
   // manda o e-mail); vários → uma mensagem só para a loja e o e-mail de cada um.

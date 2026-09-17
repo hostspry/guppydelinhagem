@@ -12,7 +12,7 @@ import {
   rastrearEnvios,
   type MeEndereco,
 } from "@/lib/melhorenvio";
-import { buildTrackingUrl } from "@/lib/tracking";
+import { buildTrackingUrl, etiquetaCancelada } from "@/lib/tracking";
 import {
   cotarFreteSeco,
   volumesDoCarrinhoSeco,
@@ -93,6 +93,7 @@ async function carregarPedido(orderId: string) {
       enderecoEntrega: true,
       etiquetaUrl: true,
       meShipmentId: true,
+      rastreioStatus: true,
       servicoEnvioId: true,
       pacoteAltura: true,
       pacoteLargura: true,
@@ -372,6 +373,16 @@ export async function comprarEtiquetaDoPedido(
   const aereoCompra = bloqueioAereo(order);
   if (aereoCompra) return { success: false, error: aereoCompra };
   if (order.etiquetaUrl || order.meShipmentId) {
+    // Etiqueta cancelada não é etiqueta: a caixa continua em casa e o pedido
+    // precisa de uma nova. Mandar "já tem etiqueta" aqui é o que deixava o
+    // operador sem saída quando os Correios entraram em greve.
+    if (etiquetaCancelada(order.rastreioStatus)) {
+      return {
+        success: false,
+        error:
+          "A etiqueta deste pedido está cancelada no Melhor Envio. Use “Liberar nova etiqueta” no card de envio antes de comprar outra.",
+      };
+    }
     return {
       success: false,
       error: "Este pedido já tem etiqueta. Veja o PDF no card de envio.",
@@ -560,6 +571,132 @@ export async function comprarEtiquetaDoPedido(
   };
 }
 
+export type LiberacaoResult =
+  | { success: true; message: string }
+  | { success: false; error: string };
+
+/**
+ * Solta o pedido para comprar uma etiqueta nova, depois da anterior ser
+ * cancelada no Melhor Envio.
+ *
+ * O cenário é comum: greve dos Correios, endereço corrigido, serviço trocado.
+ * A loja cancela lá (é onde o estorno do saldo acontece) e a caixa continua
+ * aqui, num pedido que ainda está PAGO. Sem isto, o pedido ficava preso: o
+ * painel mostrava o PDF de uma etiqueta morta e a compra recusava.
+ *
+ * Confere no Melhor Envio antes de limpar — leitura, não gasta saldo. É o que
+ * impede apagar por engano o rastreio de uma etiqueta boa, que seria perder o
+ * código do cliente sem ter como recuperar. As ocorrências vão junto: são de
+ * um envio que deixou de existir e poluiriam o painel do cliente.
+ */
+export async function liberarNovaEtiqueta(
+  orderId: string,
+): Promise<LiberacaoResult> {
+  const membro = await assertPermissao("pedidos.envio");
+
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    select: {
+      numero: true,
+      status: true,
+      etiquetaUrl: true,
+      meShipmentId: true,
+      codigoRastreio: true,
+      selfTracking: true,
+      rastreioStatus: true,
+      servicoEnvioNome: true,
+    },
+  });
+  if (!order) return { success: false, error: "Pedido não encontrado." };
+
+  if (!order.etiquetaUrl && !order.meShipmentId) {
+    return {
+      success: false,
+      error: `O pedido ${order.numero} não tem etiqueta presa. Pode gerar uma direto.`,
+    };
+  }
+
+  // Pedido já postado tem código na mão do cliente. Se a etiqueta foi cancelada
+  // mesmo assim, o caminho é editar o rastreio — não apagar o que o cliente vê.
+  if (order.status !== "PAGO") {
+    return {
+      success: false,
+      error:
+        "Este pedido já consta como enviado. Se a etiqueta foi cancelada, corrija pelo “Editar rastreio” em vez de liberar outra.",
+    };
+  }
+
+  // Confirma no ME. Se o envio nem existe mais na resposta, também está morto.
+  let statusMe: string | null = order.rastreioStatus;
+  if (order.meShipmentId) {
+    const r = await rastrearEnvios([order.meShipmentId]);
+    if (r.ok) {
+      const dados = r.data.find((e) => e.meShipmentId === order.meShipmentId);
+      statusMe = dados ? dados.status : "canceled";
+    } else if (!etiquetaCancelada(order.rastreioStatus)) {
+      // ME fora do ar e nem o nosso registro diz cancelada: não é hora de
+      // apagar rastreio no chute.
+      return {
+        success: false,
+        error: `Não consegui confirmar no Melhor Envio (${r.error}). Tente de novo daqui a pouco.`,
+      };
+    }
+  }
+
+  if (!etiquetaCancelada(statusMe)) {
+    return {
+      success: false,
+      error: statusMe
+        ? `O Melhor Envio ainda mostra esta etiqueta como “${statusMe}”. Cancele por lá primeiro — é onde o saldo volta.`
+        : "O Melhor Envio não diz que esta etiqueta foi cancelada. Cancele por lá primeiro — é onde o saldo volta.",
+    };
+  }
+
+  const antes = {
+    meShipmentId: order.meShipmentId,
+    etiquetaUrl: order.etiquetaUrl,
+    codigoRastreio: order.codigoRastreio,
+    selfTracking: order.selfTracking,
+    rastreioStatus: order.rastreioStatus,
+    servicoEnvioNome: order.servicoEnvioNome,
+  };
+
+  await prisma.$transaction(async (tx) => {
+    await tx.rastreioEvento.deleteMany({ where: { orderId } });
+    await tx.order.update({
+      where: { id: orderId },
+      data: {
+        etiquetaUrl: null,
+        meShipmentId: null,
+        codigoRastreio: null,
+        selfTracking: null,
+        rastreioStatus: null,
+        // servicoEnvio* e transportadora ficam: é o que o cliente escolheu e
+        // pagou no checkout. A próxima compra sobrescreve com o que for de fato.
+      },
+    });
+  });
+
+  await auditar(membro, {
+    acao: "pedido.envio",
+    entidade: "Order",
+    entidadeId: orderId,
+    descricao: `Liberou etiqueta nova no pedido ${order.numero} (a anterior${
+      order.servicoEnvioNome ? ` — ${order.servicoEnvioNome}` : ""
+    } foi cancelada no Melhor Envio)`,
+    antes,
+    depois: { meShipmentId: null, etiquetaUrl: null, codigoRastreio: null },
+  });
+
+  revalidatePath(`/admin/pedidos/${orderId}`);
+  revalidatePath("/admin/pedidos");
+
+  return {
+    success: true,
+    message: "Etiqueta antiga solta. Pode cotar e comprar a nova.",
+  };
+}
+
 export type PacoteResult = { success: true } | { success: false; error: string };
 
 /**
@@ -721,9 +858,23 @@ export async function imprimirEtiquetaDoPedido(
 
   const order = await prisma.order.findUnique({
     where: { id: orderId },
-    select: { numero: true, meShipmentId: true, etiquetaUrl: true },
+    select: {
+      numero: true,
+      meShipmentId: true,
+      etiquetaUrl: true,
+      rastreioStatus: true,
+    },
   });
   if (!order) return { success: false, error: "Pedido não encontrado." };
+
+  // Etiqueta cancelada ainda abre o PDF antigo (o link do ME não morre na
+  // hora). Postar esse papel é caixa devolvida: a transportadora não aceita.
+  if (etiquetaCancelada(order.rastreioStatus)) {
+    return {
+      success: false,
+      error: `A etiqueta do pedido ${order.numero} foi cancelada no Melhor Envio e não vale mais. Libere uma nova no card de envio.`,
+    };
+  }
 
   if (!order.meShipmentId) {
     // Etiqueta de fora do Melhor Envio (ou nenhuma): só o que estiver salvo.
