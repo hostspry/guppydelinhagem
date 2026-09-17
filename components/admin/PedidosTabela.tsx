@@ -241,7 +241,21 @@ export default function PedidosTabela({
                       <span className="text-xs text-gray-400">—</span>
                     ) : (
                       <div className="flex flex-col gap-0.5">
-                        {p.transporte ? (
+                        {p.etiquetaCancelada ? (
+                          // Etiqueta cancelada no Melhor Envio. Mostrar
+                          // "Correios SEDEX" e o código aqui é dizer que a
+                          // caixa está a caminho — ela está na prateleira, e o
+                          // código não anda mais. O serviço antigo fica em
+                          // letra miúda só para lembrar o que foi cancelado.
+                          <>
+                            <span className="inline-flex w-fit items-center rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-800">
+                              Etiqueta cancelada
+                            </span>
+                            <span className="text-[11px] text-gray-400">
+                              era {p.servicoEnvioNome ?? "Melhor Envio"} · gere outra
+                            </span>
+                          </>
+                        ) : p.transporte ? (
                           <span
                             className={`inline-flex w-fit items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${TRANSPORTE_BADGE[p.transporte].badge}`}
                           >
@@ -262,7 +276,8 @@ export default function PedidosTabela({
                             a definir
                           </span>
                         )}
-                        {p.rastreio &&
+                        {!p.etiquetaCancelada &&
+                          p.rastreio &&
                           (p.rastreioUrl ? (
                             <a
                               href={p.rastreioUrl}

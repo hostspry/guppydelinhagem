@@ -129,6 +129,9 @@ export async function listPedidos({
     // transportadora recusa — a lista volta a mandar gerar.
     temEtiqueta:
       !!(r.etiquetaUrl || r.meShipmentId) && !etiquetaCancelada(r.rastreioStatus),
+    // Cancelada no ME: a coluna de transporte não pode seguir anunciando o
+    // serviço e o código como se a caixa estivesse a caminho.
+    etiquetaCancelada: etiquetaCancelada(r.rastreioStatus),
     total: Number(r.total),
     criadoEm: r.criadoEm,
     clienteNome: r.cliente.nome,
