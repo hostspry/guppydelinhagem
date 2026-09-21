@@ -372,8 +372,10 @@ export async function publicarNoMl(
     // PUT sem reclamar, mas o valor volta null — testado em produção.
     //
     // O Clip também não resolve para peixe vivo, e o motivo não é a API: o ML
-    // marca MLB1098 como `adult_content: true` (todo bicho vivo é marcado
-    // assim), e vídeo é bloqueado nessas categorias. O painel do vendedor diz
+    // marca MLB1098 como `adult_content: true`. Esse campo não quer dizer +18 —
+    // é a marca de "venda restrita" do ML, a mesma de cerveja, vinho e farmácia
+    // (algodão e bandagem estão lá também). Todo bicho vivo é marcado assim, e
+    // vídeo é bloqueado nessas categorias. O painel do vendedor diz
     // na cara: "Este anúncio não está habilitado para enviar vídeos / não pode
     // estar associado às categorias de Adultos, Imóveis ou Serviços" — conferido
     // em 21/09/2026 no anúncio MLB7639105290. No anúncio de acessório
