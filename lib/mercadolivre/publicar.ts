@@ -369,8 +369,16 @@ export async function publicarNoMl(
     pictures: m.fotos.map((url) => ({ source: url })),
     // SEM VÍDEO, e não por esquecimento: o ML desligou o vídeo do YouTube por
     // API em 09/2024. O campo `video_id` continua existindo no item e aceita o
-    // PUT sem reclamar, mas o valor volta null — testado em produção. Hoje o
-    // vídeo entra só como Clip, enviado no painel deles. Não readicionar.
+    // PUT sem reclamar, mas o valor volta null — testado em produção.
+    //
+    // O Clip também não resolve para peixe vivo, e o motivo não é a API: o ML
+    // marca MLB1098 como `adult_content: true` (todo bicho vivo é marcado
+    // assim), e vídeo é bloqueado nessas categorias. O painel do vendedor diz
+    // na cara: "Este anúncio não está habilitado para enviar vídeos / não pode
+    // estar associado às categorias de Adultos, Imóveis ou Serviços" — conferido
+    // em 21/09/2026 no anúncio MLB7639105290. No anúncio de acessório
+    // (MLB434829, criadeira) o mesmo painel oferece "Enviar um vídeo". Então
+    // vídeo aqui só via anúncio de acessório. Não readicionar no item de peixe.
     attributes: atributos,
   };
 
