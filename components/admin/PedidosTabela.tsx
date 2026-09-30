@@ -4,13 +4,14 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Truck, Eye, Pencil, Loader2, Check, X, Tag } from "lucide-react";
+import { Truck, Eye, Pencil, Loader2, Check, X, Tag, PackageCheck } from "lucide-react";
 import { DeletePedidoButton } from "@/components/admin/DeletePedidoButton";
 import { ImprimirEtiqueta } from "@/components/admin/ImprimirEtiqueta";
 import { STATUS_PEDIDO } from "@/lib/pedido-status";
 import { formatBRL } from "@/lib/utils/format";
 import {
   marcarPedidosComoEnviados,
+  marcarPedidosComoEntregues,
   type EnvioResultado,
 } from "@/actions/pedidos";
 import type { PedidoListItem } from "@/lib/queries/pedidos";
@@ -32,6 +33,12 @@ function placeholderCodigo(p: PedidoListItem): string {
   return "Código de rastreio (opcional)";
 }
 
+// Pedido da Shopee fica de fora: quem despacha e informa rastreio é ela, e
+// marcar como enviado aqui só criaria um código nosso que ninguém rastreia.
+function podeEnviar(p: PedidoListItem): boolean {
+  return p.status === "PAGO" && p.origem !== "SHOPEE";
+}
+
 const inputCls =
   "w-full min-h-9 px-2.5 rounded-md border border-gray-300 text-sm text-[#07366A] focus:outline-none focus:border-[#07366A] focus:ring-1 focus:ring-[#07366A]/30";
 
@@ -51,14 +58,18 @@ export default function PedidosTabela({
   const [enviando, setEnviando] = useState(false);
   const [resultados, setResultados] = useState<Record<string, EnvioResultado>>({});
 
-  // Pedido da Shopee fica de fora: quem despacha e informa rastreio é ela, e
-  // marcar como enviado aqui só criaria um código nosso que ninguém rastreia.
-  const enviaveis = useMemo(
-    () => pedidos.filter((p) => p.status === "PAGO" && p.origem !== "SHOPEE"),
+  // Selecionável: PAGO (para despachar) e ENVIADO (para dar baixa, virando
+  // ENTREGUE). Os dois grupos convivem na seleção; cada botão age no seu.
+  const selecionaveis = useMemo(
+    () => pedidos.filter((p) => podeEnviar(p) || p.status === "ENVIADO"),
     [pedidos],
   );
-  const todosSel = enviaveis.length > 0 && enviaveis.every((p) => sel.has(p.id));
-  const selecionados = pedidos.filter((p) => sel.has(p.id));
+  const todosSel =
+    selecionaveis.length > 0 && selecionaveis.every((p) => sel.has(p.id));
+  const selecionados = pedidos.filter((p) => sel.has(p.id) && podeEnviar(p));
+  const selEnviados = pedidos.filter((p) => sel.has(p.id) && p.status === "ENVIADO");
+  const [confirmarBaixa, setConfirmarBaixa] = useState(false);
+  const [baixando, setBaixando] = useState(false);
 
   function toggle(id: string) {
     setSel((s) => {
@@ -67,9 +78,46 @@ export default function PedidosTabela({
       else n.add(id);
       return n;
     });
+    setConfirmarBaixa(false);
   }
   function toggleTodos() {
-    setSel(todosSel ? new Set() : new Set(enviaveis.map((p) => p.id)));
+    setSel(todosSel ? new Set() : new Set(selecionaveis.map((p) => p.id)));
+    setConfirmarBaixa(false);
+  }
+
+  async function darBaixa() {
+    if (baixando || selEnviados.length === 0) return;
+    setBaixando(true);
+    try {
+      const res = await marcarPedidosComoEntregues({
+        pedidoIds: selEnviados.map((p) => p.id),
+      });
+      const ok = res.resultados.filter((r) => r.sucesso);
+      const falhas = res.resultados.filter((r) => !r.sucesso);
+      setSel((s) => {
+        const n = new Set(s);
+        ok.forEach((r) => n.delete(r.pedidoId));
+        return n;
+      });
+      router.refresh();
+      if (falhas.length === 0) {
+        toast.success(
+          ok.length === 1
+            ? "Baixa feita: pedido entregue ✓"
+            : `Baixa feita em ${ok.length} pedidos ✓`,
+        );
+      } else {
+        toast.warning(
+          `${ok.length} com baixa, ${falhas.length} não: ` +
+            falhas.map((f) => `${f.numero} (${f.erro})`).join(", "),
+        );
+      }
+    } catch {
+      toast.error("Não foi possível dar baixa.");
+    } finally {
+      setBaixando(false);
+      setConfirmarBaixa(false);
+    }
   }
   const setCodigo = (id: string, v: string) =>
     setCodigos((c) => ({ ...c, [id]: v }));
@@ -147,18 +195,49 @@ export default function PedidosTabela({
           <span className="text-sm font-medium text-[#07366A]">
             {sel.size} selecionado{sel.size > 1 ? "s" : ""}
           </span>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            {selecionados.length > 0 && (
+              <button
+                type="button"
+                onClick={abrirLote}
+                className="inline-flex items-center gap-1.5 rounded-md bg-[#FF035C] text-white text-sm font-medium px-3 py-1.5 hover:brightness-110 transition-all"
+              >
+                <Truck className="w-4 h-4" aria-hidden="true" />
+                Marcar como enviados ({selecionados.length})
+              </button>
+            )}
+            {selEnviados.length > 0 &&
+              (confirmarBaixa ? (
+                <button
+                  type="button"
+                  onClick={darBaixa}
+                  disabled={baixando}
+                  className="inline-flex items-center gap-1.5 rounded-md bg-emerald-700 text-white text-sm font-medium px-3 py-1.5 hover:brightness-110 transition-all disabled:opacity-50"
+                >
+                  {baixando ? (
+                    <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
+                  ) : (
+                    <Check className="w-4 h-4" aria-hidden="true" />
+                  )}
+                  Confirmar: {selEnviados.length} entregue{selEnviados.length > 1 ? "s" : ""}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setConfirmarBaixa(true)}
+                  title="Os pedidos enviados selecionados passam para Entregue"
+                  className="inline-flex items-center gap-1.5 rounded-md bg-emerald-600 text-white text-sm font-medium px-3 py-1.5 hover:brightness-110 transition-all"
+                >
+                  <PackageCheck className="w-4 h-4" aria-hidden="true" />
+                  Dar baixa: entregues ({selEnviados.length})
+                </button>
+              ))}
             <button
               type="button"
-              onClick={abrirLote}
-              className="inline-flex items-center gap-1.5 rounded-md bg-[#FF035C] text-white text-sm font-medium px-3 py-1.5 hover:brightness-110 transition-all"
-            >
-              <Truck className="w-4 h-4" aria-hidden="true" />
-              Marcar como enviados
-            </button>
-            <button
-              type="button"
-              onClick={() => setSel(new Set())}
+              onClick={() => {
+                setSel(new Set());
+                setConfirmarBaixa(false);
+              }}
               className="text-sm text-gray-500 hover:text-[#07366A] px-2 py-1.5"
             >
               Limpar
@@ -176,8 +255,8 @@ export default function PedidosTabela({
                   type="checkbox"
                   checked={todosSel}
                   onChange={toggleTodos}
-                  disabled={enviaveis.length === 0}
-                  aria-label="Selecionar todos os pagos"
+                  disabled={selecionaveis.length === 0}
+                  aria-label="Selecionar todos os pagos e enviados"
                   className="w-4 h-4 accent-[#07366A] disabled:opacity-30"
                 />
               </th>
@@ -193,7 +272,8 @@ export default function PedidosTabela({
           </thead>
           <tbody className="divide-y divide-gray-100">
             {pedidos.map((p) => {
-              const pode = p.status === "PAGO" && p.origem !== "SHOPEE";
+              const pode = podeEnviar(p);
+              const marcavel = pode || p.status === "ENVIADO";
               return (
                 <tr key={p.id} className="hover:bg-gray-50">
                   <td className="px-3 py-3">
@@ -201,7 +281,7 @@ export default function PedidosTabela({
                       type="checkbox"
                       checked={sel.has(p.id)}
                       onChange={() => toggle(p.id)}
-                      disabled={!pode}
+                      disabled={!marcavel}
                       aria-label={`Selecionar ${p.numero}`}
                       className="w-4 h-4 accent-[#07366A] disabled:opacity-30"
                     />

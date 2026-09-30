@@ -22,6 +22,7 @@ import {
   notificarPedidoCancelado,
   notificarEstorno,
   notificarLoteEnviado,
+  notificarLoteEntregue,
 } from "@/lib/notificacoes";
 import { emailPedidoEnviado } from "@/lib/emails/pedido";
 import { pedirConfirmacaoEnvioAereo } from "@/lib/gollog/confirmacao";
@@ -697,6 +698,72 @@ export async function marcarPedidosComoEnviados(input: {
       );
     }
   }
+
+  revalidatePath("/admin/pedidos");
+  return { ok: true, resultados };
+}
+
+/**
+ * Baixa em LOTE: pedidos ENVIADO viram ENTREGUE. É o fechamento dos envios que
+ * o rastreio automático não acompanha (Gollog, Jadlog à mão, retirada), que de
+ * outro jeito ficam "Enviado" para sempre. Não mexe em estoque nem em dinheiro.
+ * O updateMany com status ENVIADO no where é a trava: clicar 2× não duplica.
+ */
+export async function marcarPedidosComoEntregues(input: {
+  pedidoIds: string[];
+}): Promise<{ ok: boolean; resultados: EnvioResultado[] }> {
+  const membro = await assertPermissao("pedidos.status");
+
+  const parsed = z
+    .object({ pedidoIds: z.array(z.string().min(1)).min(1).max(100) })
+    .safeParse(input);
+  if (!parsed.success) return { ok: false, resultados: [] };
+
+  const orders = await prisma.order.findMany({
+    where: { id: { in: parsed.data.pedidoIds } },
+    select: { id: true, numero: true, status: true, cliente: { select: { nome: true } } },
+  });
+
+  const resultados: EnvioResultado[] = [];
+  const baixados: { id: string; numero: string; cliente: string }[] = [];
+
+  for (const id of parsed.data.pedidoIds) {
+    const order = orders.find((o) => o.id === id);
+    if (!order) {
+      resultados.push({ pedidoId: id, numero: "?", sucesso: false, erro: "Pedido não encontrado." });
+      continue;
+    }
+    if (order.status !== "ENVIADO") {
+      resultados.push({
+        pedidoId: id,
+        numero: order.numero,
+        sucesso: false,
+        erro: `Só pedido enviado recebe baixa (está ${order.status}).`,
+      });
+      continue;
+    }
+    const { count } = await prisma.order.updateMany({
+      where: { id, status: "ENVIADO" },
+      data: { status: "ENTREGUE" },
+    });
+    if (count === 0) {
+      resultados.push({ pedidoId: id, numero: order.numero, sucesso: false, erro: "O status mudou antes da baixa." });
+      continue;
+    }
+    resultados.push({ pedidoId: id, numero: order.numero, sucesso: true });
+    baixados.push({ id, numero: order.numero, cliente: order.cliente.nome });
+    await auditar(membro, {
+      acao: "pedido.status.entregue",
+      entidade: "Order",
+      entidadeId: id,
+      descricao: "Deu baixa no envio (ENVIADO para ENTREGUE) pela lista",
+      antes: { status: "ENVIADO" },
+      depois: { status: "ENTREGUE" },
+    });
+  }
+
+  if (baixados.length === 1) await notificarPedidoEntregue(baixados[0].id);
+  else if (baixados.length >= 2) await notificarLoteEntregue(baixados);
 
   revalidatePath("/admin/pedidos");
   return { ok: true, resultados };

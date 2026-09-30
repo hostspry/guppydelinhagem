@@ -294,6 +294,19 @@ export async function notificarLoteEnviado(
   );
 }
 
+// ── Baixa em lote (✅) — vários pedidos marcados como entregues de uma vez ─────
+export async function notificarLoteEntregue(
+  pedidos: { numero: string; cliente: string }[],
+): Promise<void> {
+  if (pedidos.length === 0) return;
+  const linhas = pedidos
+    .map((p) => `• <b>${escapeHtml(p.numero)}</b> — ${escapeHtml(p.cliente)}`)
+    .join("\n");
+  await enviarSeguro(
+    () => `✅ <b>Baixa de ${pedidos.length} envios</b>\n\n${linhas}`,
+  );
+}
+
 // ── Rastreio atualizado (📦) — ocorrências novas do poll do Melhor Envio ───────
 export async function notificarRastreioAtualizado(
   pedidos: {
