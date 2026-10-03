@@ -66,6 +66,10 @@ enum OrigemVenda {
   WHATSAPP
   SHOPEE
   MERCADO_LIVRE
+  /// Venda no atacado para revendedor. O peixe sai na mão, sem envio nosso, e
+  /// o pagamento costuma vir em parcelas: o que já entrou é caixa confirmado e
+  /// o saldo fica como conta a receber (lib/financeiro/distribuidor.ts).
+  DISTRIBUIDOR
 }
 
 enum ProviderPagamento {

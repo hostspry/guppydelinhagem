@@ -12,6 +12,10 @@ import { GollogCard } from "@/components/admin/GollogCard";
 import { unidadeDaMinuta, unidadesParaCliente } from "@/lib/gollog/unidades";
 import { ehEnvioAereoPendente } from "@/lib/gollog/confirmacao";
 import { podeEditarItens } from "@/lib/pedido-status";
+import { prisma } from "@/lib/prisma";
+import { resumoDistribuidor } from "@/lib/financeiro/distribuidor";
+import { paraInputDate } from "@/lib/financeiro/periodo";
+import { DistribuidorPagamentosCard } from "@/components/admin/DistribuidorPagamentosCard";
 import {
   formatBRL,
   formatTelefone,
@@ -46,6 +50,11 @@ export default async function PedidoDetalhePage({ params }: Props) {
         }),
       ])
     : [null, null];
+
+  const distribuidor =
+    pedido.origem === "DISTRIBUIDOR"
+      ? await resumoDistribuidor(prisma, pedido.id, pedido.total)
+      : null;
 
   // Estorno: pagamento já estornado (estado final) e pagamento PAGO ainda
   // reembolsável (mostra aviso + botão). O valor vem do banco, nunca do client.
@@ -210,6 +219,21 @@ export default async function PedidoDetalhePage({ params }: Props) {
               clienteTelefone={e.telefone}
               daShopee={pedido.origem === "SHOPEE"}
               doMercadoLivre={pedido.origem === "MERCADO_LIVRE"}
+            />
+          )}
+
+          {distribuidor && (
+            <DistribuidorPagamentosCard
+              orderId={pedido.id}
+              total={pedido.total}
+              recebido={distribuidor.recebido}
+              falta={distribuidor.falta}
+              vencimento={distribuidor.vencimento?.toISOString() ?? null}
+              recebimentos={distribuidor.recebimentos.map((r) => ({
+                ...r,
+                data: r.data.toISOString(),
+              }))}
+              hoje={paraInputDate(new Date())}
             />
           )}
 

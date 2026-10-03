@@ -191,8 +191,10 @@ export async function registrarDevolucaoDeVenda(
   tx: Prisma.TransactionClient,
   orderId: string,
 ): Promise<void> {
+  // MANUAL entra por causa do pedido de distribuidor: o saldo a receber dele é
+  // uma linha manual ligada ao pedido (lib/financeiro/distribuidor.ts).
   const entradas = await tx.lancamento.findMany({
-    where: { orderId, origem: "PEDIDO", tipo: "ENTRADA" },
+    where: { orderId, origem: { in: ["PEDIDO", "MANUAL"] }, tipo: "ENTRADA" },
     select: {
       id: true,
       status: true,

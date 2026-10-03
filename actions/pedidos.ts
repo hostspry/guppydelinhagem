@@ -311,7 +311,14 @@ export async function deletePedido(id: string): Promise<ActionResult> {
   });
 
   try {
-    await prisma.order.delete({ where: { id } }); // cascata: itens + pagamentos
+    await prisma.$transaction([
+      // Saldo a receber de distribuidor: sem o pedido, não há mais o que cobrar.
+      // O que já foi recebido fica no caixa, porque o dinheiro entrou.
+      prisma.lancamento.deleteMany({
+        where: { orderId: id, status: "PENDENTE", origem: "MANUAL" },
+      }),
+      prisma.order.delete({ where: { id } }), // cascata: itens + pagamentos
+    ]);
   } catch (e) {
     if (isPrismaError(e) && e.code === "P2025") {
       return { success: false, error: "Pedido não encontrado." };

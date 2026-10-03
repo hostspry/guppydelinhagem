@@ -301,6 +301,11 @@ export default function PedidosTabela({
                         Shopee
                       </span>
                     )}
+                    {p.origem === "DISTRIBUIDOR" && (
+                      <span className="ml-1.5 inline-flex items-center rounded-full bg-teal-50 px-2 py-0.5 text-[11px] font-medium text-teal-700">
+                        Distribuidor
+                      </span>
+                    )}
                   </td>
                   <td className="px-4 py-3">
                     <span

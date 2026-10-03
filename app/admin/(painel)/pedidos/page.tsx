@@ -78,6 +78,13 @@ export default async function PedidosPage({ searchParams }: Props) {
         action={
           <div className="flex gap-2">
             <Link
+              href="/admin/pedidos/distribuidor"
+              className="inline-flex items-center gap-1.5 border border-gray-300 text-sm font-medium text-gray-700 px-4 py-2 rounded-md hover:border-[#07366A] transition-all"
+            >
+              <Plus className="w-4 h-4" aria-hidden="true" />
+              Distribuidor
+            </Link>
+            <Link
               href="/admin/pedidos/novo"
               className="inline-flex items-center gap-1.5 bg-[#FF035C] text-white text-sm font-medium px-4 py-2 rounded-md hover:brightness-110 transition-all"
             >
