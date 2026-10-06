@@ -12,11 +12,16 @@
  * passam por este código.
  */
 export function relatarFalhaCartao(f: {
-  etapa: "SDK" | "FORMULARIO" | "COBRANCA";
+  // ABERTO e ENVIO são funil (formulário apareceu / clicou em Pagar): sem eles
+  // não dá para saber se o cliente nem tentou ou se tentou e travou.
+  etapa: "SDK" | "FORMULARIO" | "COBRANCA" | "VALIDACAO" | "ABERTO" | "ENVIO";
   mensagem: string;
   valor?: number;
+  parcelas?: number;
   email?: string;
   telefone?: string;
+  /** checkout | cobranca */
+  fluxo?: string;
 }): void {
   try {
     fetch("/api/checkout/falha-cartao", {
@@ -27,6 +32,8 @@ export function relatarFalhaCartao(f: {
         etapa: f.etapa,
         mensagem: f.mensagem,
         valor: f.valor,
+        parcelas: f.parcelas,
+        fluxo: f.fluxo,
         // Fingerprint do antifraude: "chegou ou não" é o que explica recusa de
         // cartão bom, e é o primeiro dado que a gente quer ver no relatório.
         deviceOk:

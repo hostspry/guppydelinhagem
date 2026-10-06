@@ -35,12 +35,18 @@ export type FalhaCartao = {
   email?: string | null;
   telefone?: string | null;
   userAgent?: string | null;
+  /** checkout | cobranca | checkout-pro | pagbank */
+  fluxo?: string | null;
+  /** Id do pagamento no gateway, quando ele chegou a existir (dedupe). */
+  pagamentoExternoId?: string | null;
 };
 
 // Recusa e falha de cobrança são raras e cada uma é uma venda escapando: avisam
 // sempre. SDK e formulário podem repetir (cliente digitando errado), então
 // avisam no máximo uma vez por janela — o resto fica só no banco.
 const AVISA_SEMPRE: EtapaCartao[] = ["RECUSA", "COBRANCA"];
+// Funil (formulário apareceu, cliente clicou em Pagar): só conta, nunca avisa.
+const SO_FUNIL: EtapaCartao[] = ["ABERTO", "ENVIO"];
 const JANELA_AVISO_MS = 30 * 60 * 1000;
 
 const corta = (s: string | null | undefined, max: number): string | null =>
@@ -52,6 +58,20 @@ const corta = (s: string | null | undefined, max: number): string | null =>
  */
 export async function registrarFalhaCartao(f: FalhaCartao): Promise<void> {
   const mensagem = corta(f.mensagem, 500) ?? "(sem mensagem)";
+  const externo = corta(f.pagamentoExternoId, 60);
+  try {
+    // A mesma recusa chega pela action e pelo webhook (e pelo retorno do 3DS).
+    // Já registrada → nada de linha nem aviso repetido.
+    if (externo) {
+      const ja = await prisma.tentativaCartao.findFirst({
+        where: { pagamentoExternoId: externo },
+        select: { id: true },
+      });
+      if (ja) return;
+    }
+  } catch (e) {
+    console.error("[tentativa-cartao] dedupe", e);
+  }
   try {
     await prisma.tentativaCartao.create({
       data: {
@@ -67,12 +87,16 @@ export async function registrarFalhaCartao(f: FalhaCartao): Promise<void> {
         email: corta(f.email, 200),
         telefone: corta(f.telefone, 40),
         userAgent: corta(f.userAgent, 300),
+        fluxo: corta(f.fluxo, 30),
+        pagamentoExternoId: externo,
       },
     });
   } catch (e) {
     // Banco fora do ar não pode calar o aviso: segue para o Telegram mesmo assim.
     console.error("[tentativa-cartao] gravar", e);
   }
+
+  if (SO_FUNIL.includes(f.etapa)) return;
 
   try {
     if (!AVISA_SEMPRE.includes(f.etapa)) {

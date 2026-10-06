@@ -444,6 +444,7 @@ export const mercadoPagoProvider: PaymentProvider = {
       metodo: metodoDoTipoPagamento(data.payment_type_id),
       parcelas: data.installments ?? null,
       bandeira: data.payment_method_id ?? null,
+      statusDetail: data.status_detail ?? null,
     };
   },
 

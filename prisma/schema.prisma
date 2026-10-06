@@ -758,6 +758,9 @@ enum EtapaCartao {
   FORMULARIO // o Brick recusou os dados antes de gerar o token (não virou pagamento)
   COBRANCA // falhamos ao criar o pagamento no gateway (rede, 4xx, timeout)
   RECUSA // o gateway criou o pagamento e recusou
+  VALIDACAO // o site barrou antes de cobrar (campo inválido, frete, limite, pedido)
+  ABERTO // funil: o formulário de cartão apareceu pronto para o cliente
+  ENVIO // funil: o cliente clicou em Pagar no cartão
 }
 
 /// Tentativa de cartão que NÃO virou uma linha de Pagamento.
@@ -783,10 +786,16 @@ model TentativaCartao {
   email        String? // p/ chamar o cliente de volta
   telefone     String?
   userAgent    String?
+  /// Onde aconteceu: checkout | cobranca | checkout-pro | pagbank.
+  fluxo        String?
+  /// Id do pagamento no gateway. A mesma recusa chega pela action e pelo
+  /// webhook; com o id, a segunda vira no-op em vez de linha e aviso repetidos.
+  pagamentoExternoId String?
   criadoEm     DateTime           @default(now())
 
   @@index([criadoEm])
   @@index([etapa, criadoEm])
+  @@index([pagamentoExternoId])
 }
 
 // ─────────────────────────────────────────────

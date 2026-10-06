@@ -84,6 +84,7 @@ export default function CardPaymentBrick({
   payerTelefone,
   onPagar,
   onErro,
+  fluxo = "checkout",
 }: {
   publicKey: string;
   amount: number;
@@ -92,6 +93,8 @@ export default function CardPaymentBrick({
   payerTelefone?: string;
   onPagar: (cartao: CartaoInput) => Promise<void>;
   onErro?: (msg: string) => void;
+  /** Onde o formulário está (checkout ou link de cobrança), para o registro. */
+  fluxo?: "checkout" | "cobranca";
 }) {
   // Refs com os callbacks/email mais recentes — evita re-montar o Brick (e perder
   // o que o cliente digitou) a cada render/keystroke.
@@ -111,15 +114,26 @@ export default function CardPaymentBrick({
   // Falha aqui não chega ao gateway e não cria pedido: sem este registro, a
   // tentativa some e o dono só descobre se o cliente contar. Nunca manda dado de
   // cartão — o número e o CVV ficam no iframe do gateway e nem passam por aqui.
-  function relatar(etapa: "SDK" | "FORMULARIO", mensagem: string) {
+  function relatar(
+    etapa: "SDK" | "FORMULARIO" | "ABERTO" | "ENVIO",
+    mensagem: string,
+    parcelas?: number,
+  ) {
     relatarFalhaCartao({
       etapa,
       mensagem,
       valor: amountRef.current,
+      parcelas,
       email: emailRef.current,
       telefone: telefoneRef.current,
+      fluxo,
     });
   }
+
+  // Funil: conta UMA abertura por visita, mesmo que o Brick re-monte ao trocar
+  // o frete. Sem isso não dá para saber se ninguém tenta o cartão ou se tenta
+  // e trava.
+  const abriu = useRef(false);
 
   const carregando = useRef<HTMLDivElement>(null);
 
@@ -154,14 +168,23 @@ export default function CardPaymentBrick({
           callbacks: {
             onReady: () => {
               if (carregando.current) carregando.current.style.display = "none";
+              if (!abriu.current) {
+                abriu.current = true;
+                relatar("ABERTO", "formulário de cartão pronto");
+              }
             },
             onError: (err: { message?: string }) => {
               const msg = err?.message ?? "Erro no formulário de cartão.";
               relatar("FORMULARIO", msg);
               onErroRef.current?.(msg);
             },
-            onSubmit: async (formData: CardBrickFormData) =>
-              onPagarRef.current({
+            onSubmit: async (formData: CardBrickFormData) => {
+              relatar(
+                "ENVIO",
+                `clicou em Pagar (${formData.payment_method_id ?? "?"})`,
+                Number(formData.installments) || undefined,
+              );
+              return onPagarRef.current({
                 token: formData.token,
                 paymentMethodId: formData.payment_method_id,
                 issuerId:
@@ -183,7 +206,8 @@ export default function CardPaymentBrick({
                         : null,
                     }
                   : null,
-              }),
+              });
+            },
           },
         });
       } catch (e) {

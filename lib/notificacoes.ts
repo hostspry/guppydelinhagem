@@ -163,6 +163,7 @@ const ETAPA_CARTAO_ROTULO: Record<string, string> = {
   FORMULARIO: "o formulário recusou os dados antes de cobrar",
   COBRANCA: "falhamos ao criar a cobrança no gateway",
   RECUSA: "o gateway recusou o cartão",
+  VALIDACAO: "o site barrou o pagamento antes de cobrar",
 };
 
 export async function notificarFalhaCartao(f: {

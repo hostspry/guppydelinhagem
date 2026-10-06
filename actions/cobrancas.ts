@@ -20,6 +20,7 @@ import {
 } from "@/lib/generated/prisma/enums";
 import { transicionarParaPago } from "@/lib/pedido-baixa";
 import { mensagemRecusa } from "@/lib/payments/mercadopago";
+import { registrarFalhaCartao } from "@/lib/pagamento-tentativas";
 import type { CartaoInput, CartaoDesfecho } from "@/actions/checkout";
 import type { Prisma } from "@/lib/generated/prisma/client";
 import { type ActionResult } from "@/lib/utils/action-result";
@@ -434,17 +435,43 @@ export async function pagarCobrancaCartao(
   token: string,
   cartao: CartaoInput,
 ): Promise<CartaoDesfecho> {
+  // Toda saída sem cobrança deixa rastro no registro de tentativas: o link de
+  // cobrança não registrava nada, nem a recusa.
+  const barrado = async (
+    motivo: string,
+    mensagem: string,
+    ctx?: { orderId?: string; numero?: string; email?: string | null; telefone?: string | null; valor?: number },
+  ) => {
+    await registrarFalhaCartao({
+      etapa: "VALIDACAO",
+      provider: ProviderPagamento.MERCADO_PAGO,
+      mensagem: `${motivo}: ${mensagem}`,
+      parcelas: Number(cartao?.installments) || null,
+      deviceOk: !!cartao?.deviceId,
+      orderId: ctx?.orderId ?? null,
+      numero: ctx?.numero ?? null,
+      email: ctx?.email ?? null,
+      telefone: ctx?.telefone ?? null,
+      valor: ctx?.valor ?? null,
+      fluxo: "cobranca",
+    });
+    return { resultado: "erro" as const, mensagem };
+  };
+
   const ip = clientIp(await headers());
   const limite = rateLimit(`cobranca-cartao:${ip}`, 8, 60_000);
   if (!limite.ok) {
-    return {
-      resultado: "erro",
-      mensagem: `Muitas tentativas. Tente de novo em ${limite.retryAfter}s.`,
-    };
+    return barrado(
+      "limite de tentativas",
+      `Muitas tentativas. Tente de novo em ${limite.retryAfter}s.`,
+    );
   }
 
   if (!cartao?.token || !cartao?.paymentMethodId) {
-    return { resultado: "erro", mensagem: "Dados do cartão incompletos." };
+    return barrado(
+      `token ${cartao?.token ? "ok" : "vazio"}, bandeira ${cartao?.paymentMethodId || "vazia"}`,
+      "Dados do cartão incompletos.",
+    );
   }
 
   const cob = await prisma.order.findFirst({
@@ -473,27 +500,39 @@ export async function pagarCobrancaCartao(
       },
     },
   });
-  if (!cob) return { resultado: "erro", mensagem: "Cobrança não encontrada." };
+  if (!cob) return barrado("link sem cobrança", "Cobrança não encontrada.");
 
+  const ctx = {
+    orderId: cob.id,
+    numero: cob.numero,
+    email: cob.cliente?.email ?? null,
+    telefone: cob.cliente?.telefone ?? null,
+    valor: round2(Number(cob.total)),
+  };
   const situacao = situacaoDaCobranca(cob);
   if (situacao === "PAGA") {
-    return { resultado: "erro", mensagem: "Esta cobrança já foi paga." };
+    return barrado("cobrança já paga", "Esta cobrança já foi paga.", ctx);
   }
   if (situacao === "CANCELADA") {
-    return { resultado: "erro", mensagem: "Esta cobrança foi cancelada." };
+    return barrado("cobrança cancelada", "Esta cobrança foi cancelada.", ctx);
   }
   if (situacao === "EXPIRADA") {
-    return {
-      resultado: "erro",
-      mensagem: "Este link de pagamento venceu. Peça um novo à loja.",
-    };
+    return barrado(
+      "link vencido",
+      "Este link de pagamento venceu. Peça um novo à loja.",
+      ctx,
+    );
   }
 
   // Parcelamento sai do banco (anti-tamper): o navegador não define o teto.
   const teto = cob.maxParcelas ?? 12;
   const parcelas = Number(cartao.installments);
   if (!Number.isInteger(parcelas) || parcelas < 1 || parcelas > teto) {
-    return { resultado: "erro", mensagem: "Opção de parcelamento inválida." };
+    return barrado(
+      `parcelas ${cartao.installments} fora do teto ${teto}`,
+      "Opção de parcelamento inválida.",
+      ctx,
+    );
   }
 
   const end = cob.enderecoEntrega as unknown as EnderecoEntrega;
@@ -570,6 +609,19 @@ export async function pagarCobrancaCartao(
     });
   } catch (e) {
     console.error("[cobranca] cartão", e);
+    await registrarFalhaCartao({
+      etapa: "COBRANCA",
+      provider: ProviderPagamento.MERCADO_PAGO,
+      mensagem: e instanceof Error ? e.message : String(e),
+      valor,
+      parcelas,
+      deviceOk: !!cartao.deviceId,
+      orderId: cob.id,
+      numero: cob.numero,
+      email: emailPagador || null,
+      telefone: cob.cliente?.telefone ?? null,
+      fluxo: "cobranca",
+    });
     return {
       resultado: "erro",
       mensagem:
@@ -628,6 +680,21 @@ export async function pagarCobrancaCartao(
     return { resultado: "analise", numero: cob.numero };
   }
 
+  await registrarFalhaCartao({
+    etapa: "RECUSA",
+    provider: ProviderPagamento.MERCADO_PAGO,
+    mensagem: mensagemRecusa(pago.statusDetail),
+    statusDetail: pago.statusDetail,
+    valor,
+    parcelas: pago.parcelas,
+    deviceOk: !!cartao.deviceId,
+    orderId: cob.id,
+    numero: cob.numero,
+    email: emailPagador || null,
+    telefone: cob.cliente?.telefone ?? null,
+    fluxo: "cobranca",
+    pagamentoExternoId: pago.externalId,
+  });
   return { resultado: "recusado", mensagem: mensagemRecusa(pago.statusDetail) };
 }
 

@@ -6,6 +6,7 @@ import { getPaymentProvider } from "@/lib/payments/registry";
 import { transicionarParaPago } from "@/lib/pedido-baixa";
 import { empurrarEstoqueDoPedido } from "@/lib/shopee/estoque";
 import { aplicarEstornoPedido } from "@/lib/pagamento-estorno";
+import { registrarFalhaCartao } from "@/lib/pagamento-tentativas";
 import {
   notificarPedidoPago,
   notificarPagamentoRecusado,
@@ -145,6 +146,8 @@ export async function POST(request: Request) {
   let mudouEstoque = false;
   let confirmouPago = false;
   let recusouAgora = false;
+  // Pagamento que nasceu no MP (Checkout Pro): não havia linha local antes.
+  let nasceuNoMp = false;
   try {
     const res = await prisma.$transaction(async (tx) => {
       // Atualiza a linha Pagamento deste id — ou CRIA, se não existir. No Checkout
@@ -155,6 +158,7 @@ export async function POST(request: Request) {
         select: { id: true, status: true },
       });
       const statusAnterior = existente?.status ?? null;
+      nasceuNoMp = !existente;
       // Transição → recusado (cliente tentou e o cartão negou): lead quente. Só na
       // TRANSIÇÃO — reenvio do mesmo recusado não re-notifica.
       if (
@@ -243,7 +247,41 @@ export async function POST(request: Request) {
       metodo: consulta.metodo ?? null,
     });
   }
-  if (recusouAgora) {
+  if (recusouAgora && consulta.metodo === MetodoPagamento.CARTAO) {
+    // Cartão recusado que só aparece aqui (link de cobrança, Checkout Pro, 3DS):
+    // vai para o registro de tentativas com o motivo do MP. O registro também
+    // avisa no Telegram, e o id do pagamento evita repetir o que a action já
+    // registrou.
+    const pedido = await prisma.order
+      .findUnique({
+        where: { id: orderId },
+        select: {
+          numero: true,
+          tipo: true,
+          cliente: { select: { email: true, telefone: true } },
+        },
+      })
+      .catch(() => null);
+    await registrarFalhaCartao({
+      etapa: "RECUSA",
+      provider: ProviderPagamento.MERCADO_PAGO,
+      mensagem: "recusado pelo Mercado Pago (aviso do webhook)",
+      statusDetail: consulta.statusDetail ?? null,
+      valor: consulta.valor ?? null,
+      parcelas: consulta.parcelas ?? null,
+      orderId,
+      numero: pedido?.numero ?? null,
+      email: pedido?.cliente?.email ?? null,
+      telefone: pedido?.cliente?.telefone ?? null,
+      fluxo:
+        pedido?.tipo === "COBRANCA"
+          ? "cobranca"
+          : nasceuNoMp
+            ? "checkout-pro"
+            : "checkout",
+      pagamentoExternoId: consulta.externalId,
+    });
+  } else if (recusouAgora) {
     await notificarPagamentoRecusado(orderId);
   }
 

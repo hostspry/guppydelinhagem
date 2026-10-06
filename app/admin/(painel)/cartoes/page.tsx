@@ -11,6 +11,7 @@ export const dynamic = "force-dynamic";
 
 const ETAPAS = [
   { valor: "RECUSA", label: "Recusado pelo banco" },
+  { valor: "VALIDACAO", label: "Barrado pelo site" },
   { valor: "FORMULARIO", label: "Erro no formulário" },
   { valor: "COBRANCA", label: "Falha na cobrança" },
   { valor: "SDK", label: "Formulário não carregou" },
@@ -33,11 +34,24 @@ const BADGE: Record<string, { label: string; classe: string; ajuda: string }> = 
     classe: "bg-violet-100 text-violet-700",
     ajuda: "A cobrança não saiu (rede, gateway fora, erro nosso). Se repetir, é defeito.",
   },
+  VALIDACAO: {
+    label: "Barrado pelo site",
+    classe: "bg-sky-100 text-sky-800",
+    ajuda:
+      "O site parou o pagamento antes de cobrar: campo inválido no checkout, frete sem calcular, limite de tentativas ou pedido que não fechou. Motivo que se repete é ajuste nosso.",
+  },
   SDK: {
     label: "Formulário não carregou",
     classe: "bg-gray-200 text-gray-700",
     ajuda: "O cliente nem viu os campos do cartão. Se repetir, é defeito nosso.",
   },
+};
+
+const FLUXO: Record<string, string> = {
+  checkout: "checkout da loja",
+  cobranca: "link de cobrança",
+  "checkout-pro": "Checkout Pro (Mercado Pago)",
+  pagbank: "PagBank",
 };
 
 const moeda = new Intl.NumberFormat("pt-BR", {
@@ -58,7 +72,18 @@ export default async function CartoesPage({ searchParams }: Props) {
   const sp = await searchParams;
   const etapaFiltro = ETAPAS.find((e) => e.valor === sp.etapa)?.valor;
 
-  const { linhas, contagem, total } = await listarTentativasCartao(etapaFiltro);
+  const { linhas, contagem, total, funil } =
+    await listarTentativasCartao(etapaFiltro);
+
+  // Do formulário aberto até o aprovado. Mostra onde o cliente para: se ninguém
+  // abre o cartão, se abre e não clica, ou se clica e trava.
+  const passos = [
+    { label: "Abriram o cartão", valor: funil.abertos },
+    { label: "Clicaram em Pagar", valor: funil.envios },
+    { label: "Barrados antes de cobrar", valor: funil.barrados },
+    { label: "Recusados", valor: funil.recusados },
+    { label: "Aprovados", valor: funil.aprovados },
+  ];
 
   return (
     <div>
@@ -67,6 +92,22 @@ export default async function CartoesPage({ searchParams }: Props) {
         description="Toda tentativa de cartão que não virou venda, com o motivo técnico. Serve para separar cartão do cliente de defeito nosso."
         breadcrumb={[{ label: "Admin", href: "/admin" }, { label: "Cartões" }]}
       />
+
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mb-2">
+        {passos.map((p) => (
+          <div
+            key={p.label}
+            className="bg-white border border-gray-200 rounded-lg px-3 py-2"
+          >
+            <p className="text-[11px] text-gray-500 leading-tight">{p.label}</p>
+            <p className="text-lg font-semibold text-[#07366A]">{p.valor}</p>
+          </div>
+        ))}
+      </div>
+      <p className="text-[11px] text-gray-400 mb-4">
+        Últimos 30 dias. Abertura e clique contam a partir de 06/10/2026, quando o
+        funil começou a ser registrado.
+      </p>
 
       <div className="flex flex-wrap gap-1.5 mb-4">
         <Link
@@ -127,6 +168,11 @@ export default async function CartoesPage({ searchParams }: Props) {
                   {l.numero && (
                     <span className="text-xs text-gray-600">
                       pedido {l.numero}
+                    </span>
+                  )}
+                  {l.fluxo && (
+                    <span className="text-[11px] text-gray-400">
+                      {FLUXO[l.fluxo] ?? l.fluxo}
                     </span>
                   )}
                 </div>

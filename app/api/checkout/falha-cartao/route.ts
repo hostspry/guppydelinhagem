@@ -18,7 +18,9 @@ export const dynamic = "force-dynamic";
 export async function POST(req: Request) {
   // Público (o checkout é guest). Limite folgado para gente e apertado para
   // script: ninguém erra o cartão 15 vezes em um minuto.
-  const rl = rateLimit(`falha-cartao:${clientIp(req.headers)}`, 15, 60_000);
+  // 30 porque o funil também passa aqui (o formulário re-monta quando o frete
+  // muda, e cada montagem pronta conta uma abertura).
+  const rl = rateLimit(`falha-cartao:${clientIp(req.headers)}`, 30, 60_000);
   if (!rl.ok) {
     return NextResponse.json({ ok: false }, { status: 429 });
   }
@@ -27,6 +29,8 @@ export async function POST(req: Request) {
     etapa?: string;
     mensagem?: string;
     valor?: number;
+    parcelas?: number;
+    fluxo?: string;
     deviceOk?: boolean;
     email?: string;
     telefone?: string;
@@ -40,19 +44,20 @@ export async function POST(req: Request) {
   // A etapa vem do cliente: normaliza para os valores possíveis em vez de
   // confiar no que chegou. COBRANCA aqui é a cobrança que nem chegou a rodar no
   // servidor (a chamada morreu antes de responder).
+  const ETAPAS = ["SDK", "FORMULARIO", "COBRANCA", "VALIDACAO", "ABERTO", "ENVIO"] as const;
   const etapa =
-    body.etapa === "SDK"
-      ? "SDK"
-      : body.etapa === "COBRANCA"
-        ? "COBRANCA"
-        : "FORMULARIO";
+    ETAPAS.find((e) => e === body.etapa) ?? ("FORMULARIO" as const);
+  const fluxo = body.fluxo === "cobranca" ? "cobranca" : "checkout";
   const valor = Number(body.valor);
+  const parcelas = Number(body.parcelas);
 
   await registrarFalhaCartao({
     etapa,
     provider: "MERCADO_PAGO",
     mensagem: String(body.mensagem ?? "(sem mensagem)"),
     valor: Number.isFinite(valor) && valor > 0 ? valor : null,
+    parcelas: Number.isInteger(parcelas) && parcelas > 0 ? parcelas : null,
+    fluxo,
     deviceOk: body.deviceOk === true,
     email: typeof body.email === "string" ? body.email : null,
     telefone: typeof body.telefone === "string" ? body.telefone : null,

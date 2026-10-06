@@ -629,14 +629,28 @@ export default function CheckoutClient({
     setErro(null);
     setRecusa(null);
 
+    // Barrado aqui o cartão nem chega ao gateway. Registra QUAIS campos (só o
+    // nome, nunca o valor): campo que trava todo mundo é defeito nosso.
+    const barrar = (motivo: string) =>
+      relatarFalhaCartao({
+        etapa: "VALIDACAO",
+        mensagem: motivo,
+        valor: totalCartao,
+        parcelas: cartao.installments,
+        email: getValues("email"),
+        telefone: getValues("telefone"),
+      });
+
     const valido = await trigger();
     if (!valido) {
-      const primeiro = FIELD_ORDER.find((f) => getFieldState(f).invalid);
-      if (primeiro) focarCampo(primeiro);
+      const invalidos = FIELD_ORDER.filter((f) => getFieldState(f).invalid);
+      if (invalidos[0]) focarCampo(invalidos[0]);
+      barrar(`checkout com campo inválido: ${invalidos.join(", ") || "?"}`);
       throw new Error("Revise os campos destacados.");
     }
     if (!isRetirada && (excedeCaixa || freteValor == null)) {
       focarCampo("cep");
+      barrar(excedeCaixa ? "acima do limite de peixes por caixa" : "frete não calculado");
       throw new Error("Calcule o frete pelo seu CEP para continuar.");
     }
 

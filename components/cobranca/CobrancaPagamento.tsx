@@ -6,6 +6,7 @@ import { CreditCard, QrCode } from "lucide-react";
 import CardPaymentBrick from "@/components/checkout/CardPaymentBrick";
 import ThreeDsChallenge from "@/components/checkout/ThreeDsChallenge";
 import { carregarDeviceMp } from "@/lib/mp-device";
+import { relatarFalhaCartao } from "@/lib/falha-cartao";
 import { pagarCobranca, pagarCobrancaCartao } from "@/actions/cobrancas";
 import { finalizarDesafio3ds, type CartaoInput } from "@/actions/checkout";
 
@@ -74,7 +75,22 @@ export default function CobrancaPagamento({
   async function onCartao(cartao: CartaoInput) {
     setErro(null);
     setRecusa(null);
-    const res = await pagarCobrancaCartao(token, cartao);
+    let res;
+    try {
+      res = await pagarCobrancaCartao(token, cartao);
+    } catch (e) {
+      // A chamada morreu (rede, deploy no meio). Sem isto a tentativa sumia.
+      relatarFalhaCartao({
+        etapa: "COBRANCA",
+        mensagem: `chamada da cobrança falhou: ${e instanceof Error ? e.message : String(e)}`,
+        valor: total,
+        parcelas: cartao.installments,
+        email: clienteEmail ?? undefined,
+        fluxo: "cobranca",
+      });
+      setErro("A conexão caiu antes de concluir o pagamento. Tente de novo ou pague no Pix.");
+      throw e;
+    }
     tratar(res);
     // O Brick espera um throw para reabilitar o formulário numa recusa.
     if (res.resultado === "recusado") throw new Error(res.mensagem);
@@ -157,6 +173,7 @@ export default function CobrancaPagamento({
               payerEmail={clienteEmail ?? undefined}
               onPagar={onCartao}
               onErro={(m) => setErro(m)}
+              fluxo="cobranca"
             />
           </>
         ) : (

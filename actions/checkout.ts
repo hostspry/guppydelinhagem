@@ -1456,6 +1456,16 @@ export async function iniciarCheckoutPro(
     });
     if (!pref.initPoint) {
       // Sem init_point não há pra onde mandar o cliente → remove o órfão recém-criado.
+      await registrarFalhaCartao({
+        etapa: "COBRANCA",
+        provider: ProviderPagamento.MERCADO_PAGO,
+        mensagem: "Mercado Pago não devolveu o link do checkout",
+        valor: order.data.valorCartao,
+        numero,
+        email: input.email ?? null,
+        telefone: input.telefone ?? null,
+        fluxo: "checkout-pro",
+      });
       if (!order.data.reused) {
         await prisma.order.delete({ where: { id: orderId } }).catch(() => {});
       }
@@ -1470,6 +1480,17 @@ export async function iniciarCheckoutPro(
     return { ok: true, initPoint: pref.initPoint, numero };
   } catch (e) {
     console.error("[checkout] checkout pro", e);
+    // Sem orderId: o pedido recém-criado é apagado logo abaixo.
+    await registrarFalhaCartao({
+      etapa: "COBRANCA",
+      provider: ProviderPagamento.MERCADO_PAGO,
+      mensagem: e instanceof Error ? e.message : String(e),
+      valor: order.data.valorCartao,
+      numero,
+      email: input.email ?? null,
+      telefone: input.telefone ?? null,
+      fluxo: "checkout-pro",
+    });
     if (!order.data.reused) {
       await prisma.order.delete({ where: { id: orderId } }).catch(() => {});
     }
@@ -1708,8 +1729,24 @@ export async function pagarComCartao(
   // 6 tentativas por minuto: recusa legítima o cliente repete uma ou duas vezes,
   // fraudador testando lista de cartões precisa de muito mais. É a trava que
   // impede a loja de virar validador de cartão roubado.
+  // Toda saída antes de cobrar deixa rastro: o cliente vê o erro, mas sem
+  // isto o dono não via nada (e "o cartão não funciona" ficava sem explicação).
+  const barrado = async (motivo: string, mensagem: string) => {
+    await registrarFalhaCartao({
+      etapa: "VALIDACAO",
+      provider: ProviderPagamento.MERCADO_PAGO,
+      mensagem: motivo === mensagem ? motivo : `${motivo}: ${mensagem}`,
+      parcelas: Number(cartao.installments) || null,
+      deviceOk: !!cartao.deviceId,
+      email: input.email ?? null,
+      telefone: input.telefone ?? null,
+      fluxo: "checkout",
+    });
+    return { resultado: "erro" as const, mensagem };
+  };
+
   const trava = await travaCheckout("cartao", 6, 60_000);
-  if (!trava.ok) return { resultado: "erro", mensagem: trava.erro };
+  if (!trava.ok) return barrado("limite de tentativas", trava.erro);
 
   // Valida o parcelamento ANTES de criar o pedido (anti-tamper, evita órfão).
   const parcelas = Number(cartao.installments);
@@ -1717,14 +1754,25 @@ export async function pagarComCartao(
     (input.itens ?? []).map((i) => i.produtoId),
   );
   if (!Number.isInteger(parcelas) || parcelas < 1 || parcelas > teto) {
-    return { resultado: "erro", mensagem: "Opção de parcelamento inválida." };
+    return barrado(
+      `parcelas ${cartao.installments} fora do teto ${teto}`,
+      "Opção de parcelamento inválida.",
+    );
   }
   if (!cartao.token || !cartao.paymentMethodId) {
-    return { resultado: "erro", mensagem: "Dados do cartão incompletos." };
+    return barrado(
+      `token ${cartao.token ? "ok" : "vazio"}, bandeira ${cartao.paymentMethodId || "vazia"}`,
+      "Dados do cartão incompletos.",
+    );
   }
 
   const order = await criarOrderDoCheckout(input);
   if (!order.ok) {
+    const campos = Object.keys(order.fieldErrors ?? {});
+    await barrado(
+      `pedido não criado${campos.length ? ` (campos: ${campos.join(", ")})` : ""}`,
+      order.error,
+    );
     return {
       resultado: "erro",
       mensagem: order.error,
@@ -1832,6 +1880,7 @@ export async function pagarComCartao(
       numero,
       email: emailPagador,
       telefone: order.data.telefone,
+      fluxo: "checkout",
     });
     // Erro de comunicação → sem pagamento. Remove só se foi recém-criado; pedido
     // REUSADO (com tentativas anteriores) não se apaga — a varredura limpa depois.
@@ -1935,6 +1984,8 @@ export async function pagarComCartao(
     numero,
     email: emailPagador,
     telefone: order.data.telefone,
+    fluxo: "checkout",
+    pagamentoExternoId: pago.externalId,
   });
   return { resultado: "recusado", mensagem: mensagemRecusa(pago.statusDetail) };
 }
@@ -1960,6 +2011,11 @@ export async function finalizarDesafio3ds(
     consulta = await provider.consultarPagamento(id);
   } catch (e) {
     console.error("[checkout] consultar 3ds", e);
+    await registrarFalhaCartao({
+      etapa: "COBRANCA",
+      provider: ProviderPagamento.MERCADO_PAGO,
+      mensagem: `consulta após o 3DS falhou: ${e instanceof Error ? e.message : String(e)}`,
+    });
     return {
       resultado: "erro",
       mensagem: "Não conseguimos confirmar o pagamento. Aguarde alguns instantes.",
@@ -1973,7 +2029,12 @@ export async function finalizarDesafio3ds(
 
   const pedido = await prisma.order.findUnique({
     where: { id: orderId },
-    select: { numero: true, publicToken: true },
+    select: {
+      numero: true,
+      publicToken: true,
+      tipo: true,
+      cliente: { select: { email: true, telefone: true } },
+    },
   });
   const numero = pedido?.numero ?? "";
   const publicToken = pedido?.publicToken ?? undefined;
@@ -2017,6 +2078,32 @@ export async function finalizarDesafio3ds(
     return { resultado: "analise", numero, token: publicToken };
   }
 
+  // Recusado depois do desafio. O webhook registra o mesmo pagamento; o id
+  // do gateway faz a segunda chamada virar no-op.
+  await registrarFalhaCartao({
+    etapa: "RECUSA",
+    provider: ProviderPagamento.MERCADO_PAGO,
+    mensagem: "recusado depois da autenticação 3DS",
+    statusDetail: consulta.statusDetail ?? null,
+    valor: consulta.valor ?? null,
+    parcelas: consulta.parcelas ?? null,
+    // A action gravou no Pagamento se o fingerprint chegou ("ok"/"vazio").
+    deviceOk: await prisma.pagamento
+      .findFirst({
+        where: { externalId: consulta.externalId },
+        select: { payloadRaw: true },
+      })
+      .then(
+        (p) => (p?.payloadRaw as { deviceId?: string } | null)?.deviceId === "ok",
+      )
+      .catch(() => false),
+    orderId,
+    numero: numero || null,
+    email: pedido?.cliente?.email ?? null,
+    telefone: pedido?.cliente?.telefone ?? null,
+    fluxo: pedido?.tipo === "COBRANCA" ? "cobranca" : "checkout",
+    pagamentoExternoId: consulta.externalId,
+  });
   return {
     resultado: "recusado",
     mensagem: "A autenticação com o banco não foi concluída. Tente de novo ou use o Pix.",
@@ -2086,6 +2173,16 @@ export async function iniciarCheckoutPagbank(
     });
     if (!pref.initPoint) {
       // Sem link não há pra onde mandar o cliente → remove o órfão recém-criado.
+      await registrarFalhaCartao({
+        etapa: "COBRANCA",
+        provider: ProviderPagamento.PAGBANK,
+        mensagem: "PagBank não devolveu o link do checkout",
+        valor: order.data.valorCartao,
+        numero,
+        email: input.email ?? null,
+        telefone: input.telefone ?? null,
+        fluxo: "pagbank",
+      });
       if (!order.data.reused) {
         await prisma.order.delete({ where: { id: orderId } }).catch(() => {});
       }
@@ -2100,6 +2197,16 @@ export async function iniciarCheckoutPagbank(
     return { ok: true, initPoint: pref.initPoint, numero };
   } catch (e) {
     console.error("[checkout] checkout pagbank", e);
+    await registrarFalhaCartao({
+      etapa: "COBRANCA",
+      provider: ProviderPagamento.PAGBANK,
+      mensagem: e instanceof Error ? e.message : String(e),
+      valor: order.data.valorCartao,
+      numero,
+      email: input.email ?? null,
+      telefone: input.telefone ?? null,
+      fluxo: "pagbank",
+    });
     if (!order.data.reused) {
       await prisma.order.delete({ where: { id: orderId } }).catch(() => {});
     }

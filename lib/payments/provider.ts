@@ -43,6 +43,8 @@ export interface PixConsulta {
   metodo?: MetodoPagamento | null;
   parcelas?: number | null;
   bandeira?: string | null;
+  /** Motivo do gateway (cc_rejected_high_risk…). Só diagnóstico. */
+  statusDetail?: string | null;
 }
 
 // ── Cartão de crédito (token gerado no NAVEGADOR pelo Card Brick) ─────────────
