@@ -63,6 +63,13 @@ function carregarSdk(): Promise<void> {
   return sdkPromise;
 }
 
+// Fila de montagem. O Brick re-monta quando o valor muda (trocar o frete muda o
+// total), e bricks.create é assíncrono: se o cleanup rodasse antes do create
+// resolver, o Brick antigo nunca era desmontado e dois ficavam no mesmo
+// container, com os campos seguros brigando ("The integration with Secure
+// Fields failed"). Cada montagem só começa depois que a anterior saiu.
+let filaBrick: Promise<void> = Promise.resolve();
+
 /**
  * Card Payment Brick (campos seguros do MP em iframe). Tokeniza o cartão no
  * NAVEGADOR e entrega ao pai só o token + bandeira + parcelas via onPagar. O pai
@@ -117,19 +124,25 @@ export default function CardPaymentBrick({
   const carregando = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    let controller: MpBrickController | null = null;
     let cancelado = false;
+    const anterior = filaBrick;
+    let liberar!: () => void;
+    filaBrick = new Promise<void>((r) => (liberar = r));
 
-    (async () => {
+    // Resolve com o Brick montado (ou null). Mesmo cancelado no meio, devolve o
+    // controller para o cleanup desmontar: um Brick nunca fica órfão.
+    const montagem = (async (): Promise<MpBrickController | null> => {
       try {
         // Fingerprint em paralelo ao SDK: a coleta é assíncrona e queremos que
         // esteja pronta quando o cliente terminar de digitar o cartão.
         carregarDeviceMp("checkout");
+        await anterior;
         await carregarSdk();
-        if (cancelado || !window.MercadoPago) return;
+        if (cancelado || !window.MercadoPago) return null;
+        if (carregando.current) carregando.current.style.display = "";
         const mp = new window.MercadoPago(publicKey, { locale: "pt-BR" });
         const bricks = mp.bricks();
-        controller = await bricks.create("cardPayment", CONTAINER_ID, {
+        return await bricks.create("cardPayment", CONTAINER_ID, {
           initialization: {
             amount,
             ...(emailRef.current ? { payer: { email: emailRef.current } } : {}),
@@ -179,12 +192,16 @@ export default function CardPaymentBrick({
           relatar("SDK", msg);
           onErroRef.current?.(msg);
         }
+        return null;
       }
     })();
 
     return () => {
       cancelado = true;
-      controller?.unmount();
+      montagem
+        .then((controller) => controller?.unmount())
+        .catch(() => {})
+        .finally(liberar);
     };
   }, [publicKey, amount, maxInstallments]);
 
