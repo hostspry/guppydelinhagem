@@ -874,7 +874,11 @@ function normalizarCodigo(s: string): string {
  * O cliente pede para verificar um número. Devolve o código que ele vai mandar
  * do próprio WhatsApp para o da loja.
  */
-export async function solicitarVerificacao(userId: string, telefoneBruto: string) {
+export async function solicitarVerificacao(
+  userId: string,
+  telefoneBruto: string,
+  opcoes: { reaproveitar?: boolean } = {},
+) {
   const tel = chaveTelefone(telefoneBruto);
   if (!tel) throw new ErroSorteio("Número não reconhecido. Confira o DDD (e o DDI, se for de fora do Brasil).");
 
@@ -883,27 +887,38 @@ export async function solicitarVerificacao(userId: string, telefoneBruto: string
   if (dono) {
     throw new ErroSorteio("Este número já está verificado em outra conta. Fale com a gente pelo WhatsApp para resolver.");
   }
-  const hoje = await prisma.verificacaoTelefone.count({
-    where: { userId, criadoEm: { gte: new Date(Date.now() - 24 * 3600_000) } },
-  });
-  if (hoje >= 6) throw new ErroSorteio("Muitos pedidos de verificação hoje. Tente amanhã.");
+  // Trava por usuário: duas abas (ou a página carregando duas vezes logo depois
+  // do cadastro) não podem gerar dois códigos. Com dois pendentes, o cliente
+  // mandaria um e a equipe digitaria o outro.
+  return prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${"verif-user:" + userId}))`;
+    if (opcoes.reaproveitar) {
+      const pendente = await tx.verificacaoTelefone.findFirst({
+        where: { userId, telefone: tel, status: "PENDENTE", expiraEm: { gt: new Date() } },
+        orderBy: { criadoEm: "desc" },
+      });
+      if (pendente) return { telefone: tel, codigo: descriptografar(pendente.codigoCifrado) };
+    }
+    const hoje = await tx.verificacaoTelefone.count({
+      where: { userId, criadoEm: { gte: new Date(Date.now() - 24 * 3600_000) } },
+    });
+    if (hoje >= 6) throw new ErroSorteio("Muitos pedidos de verificação hoje. Tente amanhã.");
 
-  const codigo = gerarCodigo();
-  await prisma.$transaction([
-    prisma.verificacaoTelefone.updateMany({
+    const codigo = gerarCodigo();
+    await tx.verificacaoTelefone.updateMany({
       where: { userId, telefone: tel, status: "PENDENTE" },
       data: { status: "CANCELADA" },
-    }),
-    prisma.verificacaoTelefone.create({
+    });
+    await tx.verificacaoTelefone.create({
       data: {
         userId,
         telefone: tel,
         codigoCifrado: criptografar(codigo),
         expiraEm: new Date(Date.now() + VALIDADE_DIAS * 24 * 3600_000),
       },
-    }),
-  ]);
-  return { telefone: tel, codigo };
+    });
+    return { telefone: tel, codigo };
+  });
 }
 
 /** Código de uma verificação pendente do PRÓPRIO usuário (para rever na tela). */

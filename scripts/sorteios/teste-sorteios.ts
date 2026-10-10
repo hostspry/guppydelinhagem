@@ -198,6 +198,16 @@ async function main() {
     assert.equal(p.userId, bruno.id);
     assert.equal(p.vinculoOrigem, "TELEFONE_VERIFICADO");
   });
+  await caso("página carregando duas vezes ao mesmo tempo gera UM código só", async () => {
+    const tel = "+55 31 98888-0011";
+    const [r1, r2] = await Promise.all([
+      S.solicitarVerificacao(carla.id, tel, { reaproveitar: true }),
+      S.solicitarVerificacao(carla.id, tel, { reaproveitar: true }),
+    ]);
+    assert.equal(r1.codigo, r2.codigo);
+    assert.equal(await prisma.verificacaoTelefone.count({ where: { userId: carla.id, telefone: "5531988880011", status: "PENDENTE" } }), 1);
+    await prisma.verificacaoTelefone.deleteMany({ where: { userId: carla.id, telefone: "5531988880011" } });
+  });
   await caso("segurança: outra conta não consegue pedir o número já verificado", async () => {
     await lanca(() => S.solicitarVerificacao(intruso.id, "+55 11 92222-0002"), /outra conta/);
   });

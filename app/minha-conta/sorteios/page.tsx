@@ -35,7 +35,7 @@ async function codigoParaTelefoneDoCadastro(userId: string) {
       }),
     ]);
     if (verificado || pendente) return;
-    await solicitarVerificacao(userId, chave);
+    await solicitarVerificacao(userId, chave, { reaproveitar: true });
   } catch {
     // segue sem código pronto; o cliente gera na mão
   }
