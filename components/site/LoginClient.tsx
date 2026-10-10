@@ -48,6 +48,11 @@ export default function LoginClient({
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
   const [erroSenha, setErroSenha] = useState<string | null>(null);
+  // Veio pelo link do sorteio: quem chega é participante do leilão, quase
+  // sempre sem conta. A tela fala do sorteio, deixa claro que a conta nasce no
+  // clique do Google e esconde a senha (que só existe em venda direta).
+  const sorteio = callbackUrl.startsWith("/minha-conta/sorteios");
+  const [mostrarSenha, setMostrarSenha] = useState(!sorteio);
   const mensagemErro = error
     ? (MENSAGENS_ERRO[error] ?? "Não foi possível entrar. Tente novamente.")
     : null;
@@ -105,9 +110,13 @@ export default function LoginClient({
 
         <div className="bg-white rounded-2xl shadow-sm border border-black/5 p-6 md:p-7 space-y-5">
           <div className="space-y-1">
-            <h1 className="text-xl font-bold text-[#07366A]">Entrar</h1>
+            <h1 className="text-xl font-bold text-[#07366A]">
+              {sorteio ? "Veja suas chances no sorteio" : "Entrar ou criar conta"}
+            </h1>
             <p className="text-sm text-gray-500">
-              Acesse sua conta para acompanhar seus pedidos.
+              {sorteio
+                ? "Entre com sua conta do Google. Se for sua primeira vez aqui, a conta é criada na hora, sem senha e sem formulário."
+                : "Primeira vez aqui? Continue com o Google e a conta é criada na hora, sem senha e sem formulário."}
             </p>
           </div>
 
@@ -132,7 +141,7 @@ export default function LoginClient({
               ) : (
                 <GoogleLogo />
               )}
-              Continuar com Google
+              {sorteio ? "Criar conta ou entrar com Google" : "Continuar com Google"}
             </button>
 
             {facebookEnabled && (
@@ -152,7 +161,19 @@ export default function LoginClient({
             )}
           </div>
 
+          {!mostrarSenha && (
+            <button
+              type="button"
+              onClick={() => setMostrarSenha(true)}
+              className="block w-full text-center text-xs text-gray-400 hover:text-[#FF035C]"
+            >
+              Recebi uma senha da loja
+            </button>
+          )}
+
           {/* Separador + entrada por senha (conta criada pela loja). */}
+          {mostrarSenha && (
+          <>
           <div className="flex items-center gap-3">
             <span className="h-px flex-1 bg-gray-200" />
             <span className="text-[11px] uppercase tracking-wide text-gray-400">
@@ -223,10 +244,13 @@ export default function LoginClient({
               </Link>
             </div>
           </form>
+          </>
+          )}
 
           <p className="text-xs text-gray-400 leading-relaxed">
-            Ao entrar, você concorda em criar uma conta de cliente para acompanhar
-            seus pedidos.
+            {sorteio
+              ? "Ao entrar, você concorda em criar uma conta de cliente para acompanhar suas chances e seus pedidos."
+              : "Ao entrar, você concorda em criar uma conta de cliente para acompanhar seus pedidos."}
           </p>
         </div>
 

@@ -75,7 +75,7 @@ export default async function SorteioPublicoPage({ params }: { params: Promise<{
                     <PlayCircle className="h-4 w-4" aria-hidden="true" /> Transmissão
                   </a>
                 )}
-                <Link href="/minha-conta/sorteios" className="text-center text-sm font-medium text-secondary hover:underline">
+                <Link href="/login?callbackUrl=/minha-conta/sorteios" className="text-center text-sm font-medium text-secondary hover:underline">
                   Ver minhas chances
                 </Link>
               </div>

@@ -30,7 +30,7 @@ export default async function SorteiosPublicosPage() {
           {encerrados.length > 0 && <Lista titulo="Resultados" itens={encerrados} />}
           <p className="text-center text-sm font-light text-text">
             Participou de um leilão?{" "}
-            <Link href="/minha-conta/sorteios" className="font-medium text-secondary hover:underline">
+            <Link href="/login?callbackUrl=/minha-conta/sorteios" className="font-medium text-secondary hover:underline">
               Veja suas chances na sua conta
             </Link>
             .
