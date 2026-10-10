@@ -27,7 +27,7 @@ export default async function MinhaContaLayout({
     <>
       <Navbar />
       <main className="bg-gray-50">
-        <div className="container-site py-8 grid gap-6 lg:grid-cols-[220px_minmax(0,1fr)] lg:gap-8">
+        <div className="container-site py-8 grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[220px_minmax(0,1fr)] lg:gap-8">
           <PainelNav
             nome={session.user.name}
             email={session.user.email}

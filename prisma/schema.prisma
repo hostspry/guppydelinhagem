@@ -190,6 +190,10 @@ model User {
   lancamentos  Lancamento[]
   auditorias   AuditoriaAdmin[]
   visitas      Visitante[]
+
+  telefonesVerificados TelefoneVerificado[]
+  verificacoesTelefone VerificacaoTelefone[]
+  participacoesSorteio ParticipanteSorteio[]
 }
 
 /// Cargo: o conjunto de permissões que o dono monta no painel.
@@ -1529,4 +1533,242 @@ model ShopeeAnuncio {
 
   @@unique([itemId, modelId])
   @@index([productId])
+}
+
+// ─────────────────────────────────────────────
+// Sorteios
+//
+// Módulo à parte da loja: os "créditos" daqui são bilhetes de um sorteio
+// específico, nunca saldo nem desconto. Cada lance válido de um leilão vira um
+// bilhete, guardado em nome do WhatsApp que deu o lance.
+//
+// O vínculo com a conta só acontece por TELEFONE VERIFICADO (TelefoneVerificado).
+// Digitar o número de alguém não basta: a pessoa precisa mandar o código de
+// dentro do próprio WhatsApp (ver lib/sorteios/vinculo.ts).
+//
+// Depois da homologação a lista de bilhetes é congelada com um hash SHA-256; o
+// sorteio recalcula o hash antes de sortear e recusa se algo mudou. Toda mudança
+// fica em EventoSorteio, encadeado por hash (um evento apagado ou editado quebra
+// a corrente e a tela de auditoria acusa).
+// ─────────────────────────────────────────────
+
+enum StatusSorteio {
+  /// Importando e conferindo. Toda correção pede justificativa.
+  CONFERENCIA
+  /// Lista congelada (hash gravado). Só sai daqui sorteando ou retificando.
+  HOMOLOGADO
+  REALIZADO
+  CANCELADO
+}
+
+enum ClassificacaoLance {
+  VALIDO
+  INVALIDO
+  /// O motor de regras não decide sozinho (Xeque-Mate, Mestre Criador,
+  /// divergência com a planilha, dado faltando). Espera a conferência.
+  REVISAR
+}
+
+enum TipoLance {
+  NORMAL
+  XEQUE_MATE
+  MESTRE_CRIADOR
+}
+
+model Sorteio {
+  id             String        @id @default(cuid())
+  slug           String        @unique
+  nome           String
+  organizador    String
+  eventoOrigem   String?
+  dataEvento     DateTime?
+  premio         String
+  descricao      String?
+  regras         String?
+  imagemUrl      String?
+  transmissaoUrl String?
+  /// Data e hora previstas do sorteio (agendamento).
+  dataSorteio    DateTime?
+  status         StatusSorteio @default(CONFERENCIA)
+  /// Aparece em /sorteios. Os bilhetes de cada um continuam privados.
+  publico        Boolean       @default(false)
+
+  // Congelamento (homologação)
+  homologadoEm      DateTime?
+  homologadoPorNome String?
+  totalBilhetes     Int?
+  /// SHA-256 da lista canônica (lib/sorteios/bilhetes.ts → listaCanonica).
+  hashLista         String?
+  /// A lista canônica em texto, exatamente como entrou no hash.
+  listaCongelada    String?
+
+  /// "ELETRONICO" (CSPRNG no servidor) ou "LOTERIA_FEDERAL" (bilhete tirado do
+  /// resultado oficial; é o que a SPA/MF aceita em promoção autorizada).
+  modoSorteio     String   @default("ELETRONICO")
+  /// Concurso da Loteria Federal, fixado ANTES (entra no hash da lista).
+  concursoLoteria String?
+  /// Os 5 prêmios do concurso, como publicados pela Caixa.
+  premiosLoteria  String[] @default([])
+
+  // Resultado
+  realizadoEm            DateTime?
+  realizadoPorNome       String?
+  realizadoPorId         String?
+  metodoSorteio          String?
+  bilheteVencedor        Int?
+  participanteVencedorId String?
+  /// Nome público do vencedor no momento do sorteio (snapshot).
+  vencedorPublico        String?
+
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  participantes ParticipanteSorteio[]
+  lances        LanceSorteio[]
+  eventos       EventoSorteio[]
+
+  @@index([status])
+  @@index([publico, dataSorteio])
+}
+
+model ParticipanteSorteio {
+  id        String  @id @default(cuid())
+  sorteioId String
+  sorteio   Sorteio @relation(fields: [sorteioId], references: [id], onDelete: Cascade)
+
+  /// Chave de idempotência da importação: "tel:<telefone canônico>" ou
+  /// "nome:<nome normalizado>". Reimportar a mesma pessoa atualiza, não duplica.
+  chave      String
+  /// Como apareceu na fonte (nome do contato no WhatsApp, número formatado).
+  nomeOrigem String
+  /// Telefone canônico, só dígitos com DDI. Nulo = só nome, aguarda número.
+  telefone   String?
+  /// Ordem na lista — define a numeração dos bilhetes.
+  ordem      Int
+  chances    Int
+
+  /// Faixa de bilhetes, fixada na homologação. Antes disso a faixa é calculada
+  /// na hora pela ordem e mostrada como provisória.
+  bilheteInicio Int?
+  bilheteFim    Int?
+
+  userId        String?
+  user          User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  vinculadoEm   DateTime?
+  /// "TELEFONE_VERIFICADO" ou "ADMIN" (com justificativa no evento).
+  vinculoOrigem String?
+  /// Quando o cliente viu o aviso "Parabéns, identificamos N chances".
+  avisoVistoEm  DateTime?
+
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  lances LanceSorteio[]
+
+  @@unique([sorteioId, chave])
+  @@index([telefone])
+  @@index([userId])
+}
+
+model LanceSorteio {
+  id        String  @id @default(cuid())
+  sorteioId String
+  sorteio   Sorteio @relation(fields: [sorteioId], references: [id], onDelete: Cascade)
+
+  /// ID interno único do lote. A numeração pública se repetiu no leilão, então
+  /// ela vai em `loteRotulo` e não serve de chave.
+  loteId        String
+  loteRotulo    String?
+  /// Posição do lance dentro do lote (ordem das mensagens).
+  sequencia     Int
+  horario       DateTime?
+  /// Horário de encerramento do lote, quando a planilha informa.
+  encerramento  DateTime?
+  autor         String
+  telefone      String?
+  valor         Decimal?  @db.Decimal(10, 2)
+  tipo          TipoLance @default(NORMAL)
+  textoOriginal String?
+
+  /// O que o motor de regras concluiu, o que a planilha dizia e o que vale.
+  classificacaoMotor    ClassificacaoLance
+  classificacaoPlanilha ClassificacaoLance?
+  classificacao         ClassificacaoLance
+  motivo                String?
+  decididoPorNome       String?
+  decididoEm            DateTime?
+
+  participanteId String?
+  participante   ParticipanteSorteio? @relation(fields: [participanteId], references: [id], onDelete: SetNull)
+
+  /// Impressão digital da linha importada; reimportar não duplica.
+  chaveImportacao String
+
+  criadoEm DateTime @default(now())
+
+  @@unique([sorteioId, chaveImportacao])
+  @@index([sorteioId, loteId, sequencia])
+  @@index([participanteId])
+}
+
+/// Histórico próprio do sorteio, só de inclusão. Cada evento carrega o hash do
+/// anterior: editar ou apagar um evento no banco quebra a corrente.
+model EventoSorteio {
+  id            String   @id @default(cuid())
+  sorteioId     String
+  sorteio       Sorteio  @relation(fields: [sorteioId], references: [id], onDelete: Cascade)
+  tipo          String
+  descricao     String
+  justificativa String?
+  dados         Json?
+  atorId        String?
+  atorNome      String
+  hashAnterior  String?
+  hash          String
+  ocorridoEm    DateTime @default(now())
+
+  @@index([sorteioId, ocorridoEm])
+}
+
+/// Telefone que a pessoa provou ser dela. Um número só tem um dono.
+model TelefoneVerificado {
+  id                String   @id @default(cuid())
+  userId            String
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// Canônico (lib/sorteios/telefone.ts → chaveTelefone).
+  telefone          String   @unique
+  verificadoEm      DateTime @default(now())
+  /// "WHATSAPP_REVERSO" (cliente mandou o código) ou "ADMIN".
+  metodo            String
+  confirmadoPorNome String?
+
+  @@index([userId])
+}
+
+enum StatusVerificacaoTelefone {
+  PENDENTE
+  CONFIRMADA
+  EXPIRADA
+  CANCELADA
+}
+
+/// Pedido de verificação: o cliente recebe um código e manda DO PRÓPRIO
+/// WhatsApp para o da loja. O código fica cifrado (lib/cripto.ts): o cliente
+/// pode rever o dele, e o painel nunca o mostra; a equipe digita o que chegou.
+model VerificacaoTelefone {
+  id                String                    @id @default(cuid())
+  userId            String
+  user              User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  telefone          String
+  codigoCifrado        String
+  status            StatusVerificacaoTelefone @default(PENDENTE)
+  tentativas        Int                       @default(0)
+  expiraEm          DateTime
+  confirmadaEm      DateTime?
+  confirmadaPorNome String?
+  criadoEm          DateTime                  @default(now())
+
+  @@index([status, criadoEm])
+  @@index([userId])
+  @@index([telefone])
 }

@@ -21,6 +21,7 @@ import {
   CreditCard,
   Megaphone,
   ShieldCheck,
+  Gift,
 } from "lucide-react";
 import type { Permissao } from "@/lib/permissoes";
 
@@ -118,6 +119,12 @@ const NAV_SECTIONS: NavSection[] = [
         label: "Financeiro",
         icon: Wallet,
         permissao: "financeiro.gerenciar",
+      },
+      {
+        href: "/admin/sorteios",
+        label: "Sorteios",
+        icon: Gift,
+        permissao: "sorteios.gerenciar",
       },
     ],
   },

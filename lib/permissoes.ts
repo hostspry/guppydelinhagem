@@ -31,6 +31,8 @@ export type Permissao =
   | "clientes.excluir"
   // Dinheiro da loja (caixa, contas, relatórios)
   | "financeiro.gerenciar"
+  // Sorteios (importar, conferir, homologar e sortear)
+  | "sorteios.gerenciar"
   // Sistema
   | "auditoria.ver"
   | "config.editar"
@@ -56,6 +58,7 @@ export const PERMISSOES_TODAS: readonly Permissao[] = [
   "clientes.editar",
   "clientes.excluir",
   "financeiro.gerenciar",
+  "sorteios.gerenciar",
   "auditoria.ver",
   "config.editar",
   "equipe.gerenciar",
@@ -79,6 +82,7 @@ export const PERMISSAO_LABEL: Record<Permissao, string> = {
   "clientes.editar": "Editar clientes",
   "clientes.excluir": "Excluir clientes",
   "financeiro.gerenciar": "Mexer no caixa",
+  "sorteios.gerenciar": "Gerenciar e realizar sorteios",
   "auditoria.ver": "Ver o histórico da equipe",
   "config.editar": "Mudar as configurações da loja",
   "equipe.gerenciar": "Gerenciar a equipe e os cargos",
@@ -104,6 +108,7 @@ export const GRUPOS_PERMISSAO: { titulo: string; itens: Permissao[] }[] = [
     ],
   },
   { titulo: "Dinheiro", itens: ["financeiro.gerenciar"] },
+  { titulo: "Sorteios", itens: ["sorteios.gerenciar"] },
   {
     titulo: "Sistema",
     itens: ["auditoria.ver", "config.editar", "equipe.gerenciar"],
@@ -150,6 +155,9 @@ export const PERMISSOES_POR_PAPEL: Record<PapelEquipe, readonly Permissao[]> = {
     ...CATALOGO,
     ...VENDAS,
     "pedidos.excluir",
+    // Sortear mexe com prêmio e com a confiança de quem participou: fica com o
+    // dono, que pode dar a permissão a um cargo na tela de cargos.
+    "sorteios.gerenciar",
     // O histórico de quem fez o quê é do dono: é ele quem precisa auditar a
     // equipe, e não faria sentido a pessoa auditada controlar o próprio registro.
     "auditoria.ver",

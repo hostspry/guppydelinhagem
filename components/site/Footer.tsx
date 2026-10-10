@@ -5,6 +5,7 @@ import { WhatsAppIcon } from "@/components/icons/WhatsAppIcon";
 import { WHATSAPP_URL, WHATSAPP_DISPLAY } from "@/lib/constants";
 import { REDES } from "@/lib/sobre-content";
 import WaveDivider from "./WaveDivider";
+import { existeSorteioPublico } from "@/lib/queries/sorteios";
 
 function IconInstagram({ size = 20 }: { size?: number }) {
   return (
@@ -50,7 +51,14 @@ const SOCIAL = [
   { href: REDES.youtube, label: "YouTube", Icon: IconYoutube },
 ];
 
-export default function Footer() {
+export default async function Footer() {
+  // "Sorteios" só aparece quando há sorteio publicado: link para página vazia
+  // não ajuda, e sorteio só vai a público depois de autorizado.
+  const temSorteio = await existeSorteioPublico();
+  const linksUteis = temSorteio
+    ? [...LINKS_UTEIS, { href: "/sorteios", label: "Sorteios" }]
+    : LINKS_UTEIS;
+
   return (
     <footer>
       <WaveDivider fill="#07366A" />
@@ -106,7 +114,7 @@ export default function Footer() {
             <div className="space-y-4">
               <h4 className="text-accent font-semibold text-base">Links Úteis</h4>
               <ul className="space-y-2">
-                {LINKS_UTEIS.map((item) => (
+                {linksUteis.map((item) => (
                   <li key={item.href}>
                     <Link
                       href={item.href}
