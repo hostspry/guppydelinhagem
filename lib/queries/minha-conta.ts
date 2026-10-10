@@ -2,6 +2,10 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@/lib/generated/prisma/client";
 import type { EnderecoEntrega } from "@/lib/validations/pedido";
+import { chaveTelefone } from "@/lib/sorteios/telefone";
+
+/** Chave canônica do telefone (com o 9 do celular), ou o próprio texto. */
+const chaveCelular = (t: string) => chaveTelefone(t) ?? t;
 
 // Queries do painel do cliente (/minha-conta). Posse é SEMPRE checada: pedidos e
 // esperas do usuário logado, casados por Cliente.userId (fonte de verdade) com
@@ -14,8 +18,9 @@ import type { EnderecoEntrega } from "@/lib/validations/pedido";
  */
 export async function vincularClientesAoUsuario(
   userId: string,
-  email: string | null | undefined,
+  emailSessao: string | null | undefined,
 ): Promise<void> {
+  const email = await emailConfiavel(userId, emailSessao);
   if (!email) return;
   try {
     await prisma.cliente.updateMany({
@@ -25,6 +30,26 @@ export async function vincularClientesAoUsuario(
   } catch (e) {
     console.error("[minha-conta] auto-link falhou", e);
   }
+}
+
+/**
+ * O e-mail da sessão só serve para achar pedidos e cadastros antigos quando a
+ * gente sabe que ele é da pessoa: veio do Google (emailVerified), ou a conta foi
+ * criada pela loja. Conta aberta no formulário /cadastro digitou o e-mail sem
+ * confirmar; se valesse, bastaria cadastrar o e-mail de outro cliente para ver
+ * os pedidos dele. Essas contas ficam só com o que é delas pelo userId.
+ */
+async function emailConfiavel(
+  userId: string,
+  email: string | null | undefined,
+): Promise<string | null> {
+  if (!email) return null;
+  const u = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { cadastroSiteEm: true, emailVerified: true },
+  });
+  if (!u) return null;
+  return u.cadastroSiteEm && !u.emailVerified ? null : email;
 }
 
 // Filtro de posse reutilizável: clientes do usuário (por userId OU e-mail).
@@ -38,8 +63,9 @@ function clienteDoUsuario(
 // ── Lista de pedidos ──────────────────────────────────────────────────────────
 export async function listPedidosDoUsuario(
   userId: string,
-  email: string | null | undefined,
+  emailSessao: string | null | undefined,
 ) {
+  const email = await emailConfiavel(userId, emailSessao);
   const rows = await prisma.order.findMany({
     where: {
       tipo: "PEDIDO", // cobrança avulsa não entra no histórico de compras
@@ -73,8 +99,9 @@ export type PedidoUsuarioLista = Awaited<
 export async function getPedidoDoUsuario(
   numeroRaw: string,
   userId: string,
-  email: string | null | undefined,
+  emailSessao: string | null | undefined,
 ) {
+  const email = await emailConfiavel(userId, emailSessao);
   const limpo = numeroRaw.replace(/^#/, "").trim();
   const p = await prisma.order.findFirst({
     where: {
@@ -148,7 +175,18 @@ export async function listEsperasDoUsuario(
   userId: string,
   whatsapp: string | null | undefined,
 ) {
-  const wa = (whatsapp ?? "").replace(/\D/g, "");
+  let wa = (whatsapp ?? "").replace(/\D/g, "");
+  // Mesmo raciocínio do e-mail: telefone digitado no /cadastro não prova nada
+  // até ser verificado pelo WhatsApp. Sem isso, cadastrar o número de outra
+  // pessoa mostraria a lista de espera dela.
+  if (wa) {
+    const u = await prisma.user.findUnique({ where: { id: userId }, select: { cadastroSiteEm: true } });
+    if (u?.cadastroSiteEm) {
+      const chave = wa.length <= 11 ? `55${wa}` : wa;
+      const ok = await prisma.telefoneVerificado.count({ where: { userId, telefone: { in: [chave, chaveCelular(chave)] } } });
+      if (!ok) wa = "";
+    }
+  }
   const rows = await prisma.waitlistEntry.findMany({
     where: {
       notificado: false,
@@ -190,8 +228,9 @@ export async function listEsperasDoUsuario(
 // cpf). E-mail é somente leitura (vem do login social).
 export async function getDadosPerfil(
   userId: string,
-  email: string | null | undefined,
+  emailSessao: string | null | undefined,
 ) {
+  const email = await emailConfiavel(userId, emailSessao);
   const [user, cliente] = await Promise.all([
     prisma.user.findUnique({
       where: { id: userId },

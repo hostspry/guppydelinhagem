@@ -14,15 +14,46 @@ import { rastrearNaConta } from "./rastreio/conta";
 import { auditar } from "./auditoria";
 import { ehPapelEquipe } from "./permissoes";
 import { EVENTOS } from "./rastreio/eventos";
+import { chaveTelefone } from "./sorteios/telefone";
 
 // Config COMPLETA (Node runtime): providers reais + Prisma + bcrypt + adapter.
 // Sessão continua JWT (auth.config.ts trava strategy). O adapter entra só para
 // persistir User/Account do OAuth — não para sessão em banco.
 
+// O campo se chama "email" por compatibilidade, mas aceita também o WhatsApp:
+// quem criou a conta no /cadastro entra com o número que usa todo dia.
 const loginSchema = z.object({
-  email: z.string().email(),
+  email: z.string().trim().min(5).max(200),
   password: z.string().min(6),
 });
+
+const CAMPOS_LOGIN = {
+  id: true,
+  email: true,
+  nome: true,
+  role: true,
+  senhaHash: true,
+  senhaPrecisaTroca: true,
+} as const;
+
+/** Acha a conta pelo e-mail ou pelo WhatsApp. Número em mais de uma conta não entra. */
+async function contaDoLogin(identificador: string) {
+  if (identificador.includes("@")) {
+    return prisma.user.findUnique({
+      where: { email: identificador.toLowerCase() },
+      select: CAMPOS_LOGIN,
+    });
+  }
+  const chave = chaveTelefone(identificador);
+  if (!chave) return null;
+  const candidatos = await prisma.user.findMany({
+    where: { telefone: { endsWith: chave.slice(-8) }, senhaHash: { not: null } },
+    select: { ...CAMPOS_LOGIN, telefone: true },
+    take: 20,
+  });
+  const iguais = candidatos.filter((u) => u.telefone && chaveTelefone(u.telefone) === chave);
+  return iguais.length === 1 ? iguais[0] : null;
+}
 
 // Adapter customizado: o PrismaAdapter cria o User com { name, email,
 // emailVerified, image }, mas nosso model exige `nome` (obrigatório) — a fonte de
@@ -66,19 +97,10 @@ const providers = [
       const parsed = loginSchema.safeParse(credentials);
       if (!parsed.success) return null;
 
-      const { email, password } = parsed.data;
+      const { email: identificador, password } = parsed.data;
+      if (!rateLimit(`login-id:${identificador.toLowerCase()}`, 10, 15 * 60_000).ok) return null;
 
-      const user = await prisma.user.findUnique({
-        where: { email },
-        select: {
-          id: true,
-          email: true,
-          nome: true,
-          role: true,
-          senhaHash: true,
-          senhaPrecisaTroca: true,
-        },
-      });
+      const user = await contaDoLogin(identificador);
 
       if (!user?.senhaHash) return null;
 
@@ -112,6 +134,24 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
   ...authConfig,
   adapter,
   providers,
+  events: {
+    // O Google liga a conta pelo e-mail (allowDangerousEmailAccountLinking).
+    // Se a conta tinha sido aberta no /cadastro com esse e-mail, quem digitou a
+    // senha não provou ser o dono do e-mail; o Google provou. A senha antiga é
+    // apagada (o dono cria outra em "esqueci a senha" se quiser) e o e-mail
+    // passa a valer como confirmado.
+    linkAccount: async ({ user, account }) => {
+      if (account.provider !== "google" || !user.id) return;
+      try {
+        await prisma.user.updateMany({
+          where: { id: user.id, cadastroSiteEm: { not: null }, emailVerified: null },
+          data: { senhaHash: null, emailVerified: new Date() },
+        });
+      } catch (e) {
+        console.error("[auth] linkAccount", e);
+      }
+    },
+  },
   callbacks: {
     ...authConfig.callbacks,
     jwt: async ({ token, user }) => {

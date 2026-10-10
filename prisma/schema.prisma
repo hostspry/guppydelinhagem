@@ -156,6 +156,10 @@ model User {
   role              UserRole  @default(CUSTOMER)
   senhaPrecisaTroca Boolean   @default(false)
   ultimoLogin       DateTime?
+  /// Conta criada pelo próprio cliente no formulário /cadastro (e-mail e senha).
+  /// O e-mail dela NÃO foi confirmado: enquanto emailVerified for nulo, nada é
+  /// ligado a ela só porque o e-mail bate (pedidos antigos, cadastro da loja).
+  cadastroSiteEm    DateTime?
   criadoEm          DateTime  @default(now())
 
   // Limites operacionais do membro da equipe. O papel (role) diz em QUE áreas ele

@@ -48,20 +48,16 @@ export default function LoginClient({
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
   const [erroSenha, setErroSenha] = useState<string | null>(null);
-  // Veio pelo link do sorteio: quem chega é participante do leilão, quase
-  // sempre sem conta. A tela fala do sorteio, deixa claro que a conta nasce no
-  // clique do Google e esconde a senha (que só existe em venda direta).
+  // Veio pelo link do sorteio: a tela fala do sorteio. O resto é igual.
   const sorteio = callbackUrl.startsWith("/minha-conta/sorteios");
-  const [mostrarSenha, setMostrarSenha] = useState(!sorteio);
+  const criarHref = `/criar-conta?callbackUrl=${encodeURIComponent(callbackUrl)}`;
   const mensagemErro = error
     ? (MENSAGENS_ERRO[error] ?? "Não foi possível entrar. Tente novamente.")
     : null;
 
   /**
-   * Entrada por e-mail e senha. Existe para o cliente da VENDA DIRETA: a loja
-   * cria a conta dele e manda uma senha temporária, então ele não tem conta
-   * Google vinculada. Depois do primeiro login o site pede para ele criar a
-   * senha dele.
+   * Entrada por WhatsApp (ou e-mail) e senha. Serve a quem criou a conta no
+   * /criar-conta e ao cliente da venda direta, que recebe uma senha da loja.
    */
   async function entrarComSenha(e: React.FormEvent) {
     e.preventDefault();
@@ -75,7 +71,7 @@ export default function LoginClient({
         redirect: false,
       });
       if (!res || res.error) {
-        setErroSenha("E-mail ou senha incorretos.");
+        setErroSenha("WhatsApp, e-mail ou senha não conferem. Confira e tente de novo.");
         setCarregando(null);
         return;
       }
@@ -94,6 +90,9 @@ export default function LoginClient({
     void signIn(provider, { redirectTo: callbackUrl });
   }
 
+  const inputCls =
+    "w-full h-12 px-3 rounded-lg border border-gray-300 text-base focus:outline-none focus:border-[#FF035C] focus:ring-1 focus:ring-[#FF035C]";
+
   return (
     <main className="min-h-screen bg-gray-50 flex flex-col items-center justify-center px-4 py-8">
       <div className="w-full max-w-sm space-y-6">
@@ -108,102 +107,52 @@ export default function LoginClient({
           />
         </Link>
 
-        <div className="bg-white rounded-2xl shadow-sm border border-black/5 p-6 md:p-7 space-y-5">
-          <div className="space-y-1">
-            <h1 className="text-xl font-bold text-[#07366A]">
-              {sorteio ? "Veja suas chances no sorteio" : "Entrar ou criar conta"}
-            </h1>
-            <p className="text-sm text-gray-500">
-              {sorteio
-                ? "Entre com sua conta do Google. Se for sua primeira vez aqui, a conta é criada na hora, sem senha e sem formulário."
-                : "Primeira vez aqui? Continue com o Google e a conta é criada na hora, sem senha e sem formulário."}
-            </p>
+        <h1 className="text-center text-2xl font-bold text-[#07366A]">
+          {sorteio ? "Veja suas chances no sorteio" : "Entrar ou criar conta"}
+        </h1>
+
+        {mensagemErro && (
+          <div role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            {mensagemErro}
           </div>
+        )}
 
-          {mensagemErro && (
-            <div
-              role="alert"
-              className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
-            >
-              {mensagemErro}
-            </div>
-          )}
+        {/* 1. Primeira vez */}
+        <section className="bg-white rounded-2xl shadow-sm border border-black/5 p-5 space-y-3">
+          <h2 className="text-lg font-bold text-[#07366A]">Primeira vez aqui?</h2>
+          <p className="text-sm text-gray-600">
+            {sorteio
+              ? "Crie sua conta com seus dados. Leva uns 2 minutos, e depois você vê suas chances."
+              : "Crie sua conta com seus dados. Leva uns 2 minutos."}
+          </p>
+          <Link
+            href={criarHref}
+            className="flex w-full h-12 items-center justify-center rounded-lg bg-[#FF035C] text-base font-semibold text-white hover:brightness-110"
+          >
+            Criar minha conta
+          </Link>
+        </section>
 
-          <div className="space-y-3">
-            <button
-              type="button"
-              onClick={() => entrar("google")}
-              disabled={carregando !== null}
-              className="inline-flex items-center justify-center gap-3 w-full h-11 rounded-lg border border-gray-300 bg-white text-sm font-semibold text-[#07366A] hover:bg-gray-50 disabled:opacity-60 disabled:cursor-not-allowed transition-all"
-            >
-              {carregando === "google" ? (
-                <Loader2 size={18} className="animate-spin" aria-hidden="true" />
-              ) : (
-                <GoogleLogo />
-              )}
-              {sorteio ? "Criar conta ou entrar com Google" : "Continuar com Google"}
-            </button>
-
-            {facebookEnabled && (
-              <button
-                type="button"
-                onClick={() => entrar("facebook")}
-                disabled={carregando !== null}
-                className="inline-flex items-center justify-center gap-3 w-full h-11 rounded-lg bg-[#1877F2] text-sm font-semibold text-white hover:brightness-110 disabled:opacity-60 disabled:cursor-not-allowed transition-all"
-              >
-                {carregando === "facebook" ? (
-                  <Loader2 size={18} className="animate-spin" aria-hidden="true" />
-                ) : (
-                  <FacebookLogo />
-                )}
-                Continuar com Facebook
-              </button>
-            )}
-          </div>
-
-          {!mostrarSenha && (
-            <button
-              type="button"
-              onClick={() => setMostrarSenha(true)}
-              className="block w-full text-center text-xs text-gray-400 hover:text-[#FF035C]"
-            >
-              Recebi uma senha da loja
-            </button>
-          )}
-
-          {/* Separador + entrada por senha (conta criada pela loja). */}
-          {mostrarSenha && (
-          <>
-          <div className="flex items-center gap-3">
-            <span className="h-px flex-1 bg-gray-200" />
-            <span className="text-[11px] uppercase tracking-wide text-gray-400">
-              ou com e-mail
-            </span>
-            <span className="h-px flex-1 bg-gray-200" />
-          </div>
-
+        {/* 2. Já tem conta */}
+        <section className="bg-white rounded-2xl shadow-sm border border-black/5 p-5 space-y-3">
+          <h2 className="text-lg font-bold text-[#07366A]">Já tenho conta</h2>
           <form onSubmit={entrarComSenha} className="space-y-3">
             <div>
-              <label
-                htmlFor="email"
-                className="block text-xs font-medium text-[#07366A] mb-1"
-              >
-                E-mail
+              <label htmlFor="email" className="block text-sm font-medium text-[#07366A] mb-1">
+                WhatsApp ou e-mail
               </label>
               <input
                 id="email"
-                type="email"
-                autoComplete="email"
+                type="text"
+                autoComplete="username"
                 value={email}
                 onChange={(ev) => setEmail(ev.target.value)}
-                className="w-full h-11 px-3 rounded-lg border border-gray-300 text-sm focus:outline-none focus:border-[#FF035C] focus:ring-1 focus:ring-[#FF035C]"
+                placeholder="(21) 99999-9999"
+                className={inputCls}
               />
             </div>
             <div>
-              <label
-                htmlFor="senha"
-                className="block text-xs font-medium text-[#07366A] mb-1"
-              >
+              <label htmlFor="senha" className="block text-sm font-medium text-[#07366A] mb-1">
                 Senha
               </label>
               <input
@@ -212,7 +161,7 @@ export default function LoginClient({
                 autoComplete="current-password"
                 value={senha}
                 onChange={(ev) => setSenha(ev.target.value)}
-                className="w-full h-11 px-3 rounded-lg border border-gray-300 text-sm focus:outline-none focus:border-[#FF035C] focus:ring-1 focus:ring-[#FF035C]"
+                className={inputCls}
               />
             </div>
 
@@ -225,34 +174,57 @@ export default function LoginClient({
             <button
               type="submit"
               disabled={carregando !== null || !email || !senha}
-              className="inline-flex items-center justify-center gap-2 w-full h-11 rounded-lg bg-[#FF035C] text-sm font-semibold text-white hover:brightness-110 disabled:opacity-60 disabled:cursor-not-allowed transition-all"
+              className="inline-flex items-center justify-center gap-2 w-full h-12 rounded-lg bg-[#07366A] text-base font-semibold text-white hover:bg-[#0E4C8F] disabled:opacity-60 disabled:cursor-not-allowed transition-all"
             >
-              {carregando === "senha" && (
-                <Loader2 size={18} className="animate-spin" aria-hidden="true" />
-              )}
+              {carregando === "senha" && <Loader2 size={18} className="animate-spin" aria-hidden="true" />}
               Entrar
             </button>
-            <div className="flex items-center justify-between gap-2">
-              <p className="text-[11px] text-gray-400">
-                Comprou pelo WhatsApp e recebeu uma senha da loja? Entre por aqui.
-              </p>
-              <Link
-                href="/esqueci-senha"
-                className="shrink-0 text-[11px] text-[#FF035C] hover:underline"
-              >
-                Esqueci a senha
-              </Link>
-            </div>
+            <Link href="/esqueci-senha" className="block text-center text-sm text-[#FF035C] hover:underline">
+              Esqueci a senha
+            </Link>
           </form>
-          </>
-          )}
+        </section>
 
-          <p className="text-xs text-gray-400 leading-relaxed">
-            {sorteio
-              ? "Ao entrar, você concorda em criar uma conta de cliente para acompanhar suas chances e seus pedidos."
-              : "Ao entrar, você concorda em criar uma conta de cliente para acompanhar seus pedidos."}
+        {/* 3. Google */}
+        <section className="space-y-3">
+          <div className="flex items-center gap-3">
+            <span className="h-px flex-1 bg-gray-200" />
+            <span className="text-xs text-gray-500">ou, se preferir</span>
+            <span className="h-px flex-1 bg-gray-200" />
+          </div>
+          <button
+            type="button"
+            onClick={() => entrar("google")}
+            disabled={carregando !== null}
+            className="inline-flex items-center justify-center gap-3 w-full h-12 rounded-lg border border-gray-300 bg-white text-base font-semibold text-[#07366A] hover:bg-gray-50 disabled:opacity-60 disabled:cursor-not-allowed transition-all"
+          >
+            {carregando === "google" ? (
+              <Loader2 size={18} className="animate-spin" aria-hidden="true" />
+            ) : (
+              <GoogleLogo />
+            )}
+            Entrar com a conta Google
+          </button>
+          <p className="text-center text-xs text-gray-500">
+            Para quem já tem Gmail. Não precisa preencher nada.
           </p>
-        </div>
+
+          {facebookEnabled && (
+            <button
+              type="button"
+              onClick={() => entrar("facebook")}
+              disabled={carregando !== null}
+              className="inline-flex items-center justify-center gap-3 w-full h-12 rounded-lg bg-[#1877F2] text-base font-semibold text-white hover:brightness-110 disabled:opacity-60 disabled:cursor-not-allowed transition-all"
+            >
+              {carregando === "facebook" ? (
+                <Loader2 size={18} className="animate-spin" aria-hidden="true" />
+              ) : (
+                <FacebookLogo />
+              )}
+              Entrar com Facebook
+            </button>
+          )}
+        </section>
 
         <p className="text-center text-xs text-gray-400">
           <Link href="/" className="hover:text-[#FF035C]">

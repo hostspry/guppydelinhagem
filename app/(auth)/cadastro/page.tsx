@@ -1,7 +1,7 @@
-import { permanentRedirect } from "next/navigation";
+import { redirect } from "next/navigation";
 
-// Cadastro de cliente é social-only por enquanto (sem fluxo de senha). Redireciona
-// permanente (308) para o /login, que oferece Google/Facebook.
+// O cadastro com formulário fica em /criar-conta. Aqui é redirect TEMPORÁRIO:
+// este endereço já respondeu com 308 (permanente) e não deve voltar a responder.
 export default function CadastroPage() {
-  permanentRedirect("/login");
+  redirect("/criar-conta");
 }

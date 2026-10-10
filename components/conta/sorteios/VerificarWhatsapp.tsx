@@ -133,7 +133,11 @@ export function VerificarWhatsapp({
         </div>
       ) : (
         <button type="button" onClick={() => setAberto(true)} className="text-sm font-semibold text-[#FF035C] hover:underline">
-          {verificados.length ? "+ Adicionar outro WhatsApp" : "Confirmar meu WhatsApp"}
+          {verificados.length
+            ? "+ Adicionar outro WhatsApp"
+            : novo || aguardando.length
+              ? "Usei outro número no leilão"
+              : "Confirmar meu WhatsApp"}
         </button>
       )}
     </div>
