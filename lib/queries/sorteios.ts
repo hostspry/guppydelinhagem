@@ -100,7 +100,7 @@ export async function getSorteioAdmin(id: string) {
     const [clientes, usuarios] = await Promise.all([
       prisma.cliente.findMany({
         where: { telefone: { not: null } },
-        select: { nome: true, telefone: true, userId: true },
+        select: { nome: true, telefone: true, userId: true, cadastroProprioEm: true },
       }),
       prisma.user.findMany({
         where: { telefone: { not: null }, role: "CUSTOMER" },
@@ -111,7 +111,13 @@ export async function getSorteioAdmin(id: string) {
       const achados = [
         ...clientes
           .filter((c) => chaveTelefone(c.telefone!) === p.telefone)
-          .map((c) => ({ nome: c.nome, userId: c.userId, origem: "Cliente (cadastro da loja)" })),
+          .map((c) => ({
+            nome: c.nome,
+            userId: c.userId,
+            origem: c.cadastroProprioEm
+              ? "cadastro preenchido pelo cliente: precisa confirmar o WhatsApp"
+              : "cliente da loja: as chances entram sozinhas quando ele entrar no site",
+          })),
         ...usuarios
           .filter((u) => chaveTelefone(u.telefone!) === p.telefone)
           .map((u) => ({ nome: u.nome, userId: u.id, origem: "Conta do site (telefone não verificado)" })),

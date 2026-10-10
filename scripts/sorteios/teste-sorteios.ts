@@ -43,8 +43,12 @@ async function lanca(fn: () => Promise<unknown>, trecho: RegExp) {
   assert.fail(`deveria ter recusado (${trecho})`);
 }
 
+/** CSV de um participante só (os testes de cadastro importam um por vez). */
+const csvUm = (tel: string, chances: number) => ["participante;chances", `${tel};${chances}`].join("\n");
+
 async function limpar() {
   await prisma.sorteio.deleteMany({ where: { slug: { startsWith: "teste-" } } });
+  await prisma.cliente.deleteMany({ where: { telefone: { startsWith: "319777700" } } });
   await prisma.user.deleteMany({ where: { email: { endsWith: "@teste.invalid" } } });
 }
 
@@ -227,6 +231,54 @@ async function main() {
     assert.equal(depois.telefone, "5531944440005");
     assert.equal(depois.userId, null);
   });
+
+  await caso("cadastro da loja: cliente digitado pela equipe recebe as chances ao entrar", async () => {
+    const dani = await prisma.user.create({ data: { email: "dani@teste.invalid", nome: "Dani Teste", role: "CUSTOMER" } });
+    await prisma.cliente.create({ data: { nome: "Dani", telefone: "31977770006", userId: dani.id } });
+    await S.importarParticipantes(id, lerCsv(csvUm("+55 31 97777-0006", 3)).linhas, ator, "teste do cadastro da loja");
+    // A importação já liga (cliente com conta), e entrar de novo não duplica.
+    const p = await prisma.participanteSorteio.findFirstOrThrow({ where: { sorteioId: id, telefone: "5531977770006" } });
+    assert.equal(p.userId, dani.id);
+    assert.equal(p.vinculoOrigem, "CADASTRO_LOJA");
+    assert.equal(await S.vincularPeloCadastroDoUsuario(dani.id), 0);
+  });
+  await caso("cadastro da loja: ficha alterada pelo formulário público NÃO vale como prova", async () => {
+    const eva = await prisma.user.create({ data: { email: "eva@teste.invalid", nome: "Eva Teste", role: "CUSTOMER" } });
+    await prisma.cliente.create({ data: { nome: "Eva", telefone: "31977770007", userId: eva.id, cadastroProprioEm: new Date() } });
+    await S.importarParticipantes(id, lerCsv(csvUm("+55 31 97777-0007", 2)).linhas, ator, "teste do formulário público");
+    assert.equal(await S.vincularPeloCadastroDoUsuario(eva.id), 0);
+    const p = await prisma.participanteSorteio.findFirstOrThrow({ where: { sorteioId: id, telefone: "5531977770007" } });
+    assert.equal(p.userId, null);
+  });
+  await caso("cadastro da loja: número em duas contas fica pendente (ambíguo)", async () => {
+    const [f1, f2] = await Promise.all(["f1", "f2"].map((n) => prisma.user.create({ data: { email: `${n}@teste.invalid`, nome: n, role: "CUSTOMER" } })));
+    await prisma.cliente.createMany({ data: [{ nome: "F1", telefone: "31977770008", userId: f1.id }, { nome: "F2", telefone: "31977770008", userId: f2.id }] });
+    await S.importarParticipantes(id, lerCsv(csvUm("+55 31 97777-0008", 1)).linhas, ator, "teste ambíguo");
+    assert.equal(await S.vincularPeloCadastroDoUsuario(f1.id), 0);
+    const p = await prisma.participanteSorteio.findFirstOrThrow({ where: { sorteioId: id, telefone: "5531977770008" } });
+    assert.equal(p.userId, null);
+  });
+  await caso("cadastro da loja: telefone verificado por outra conta tem prioridade", async () => {
+    const [g1, g2] = await Promise.all(["g1", "g2"].map((n) => prisma.user.create({ data: { email: `${n}@teste.invalid`, nome: n, role: "CUSTOMER" } })));
+    await prisma.telefoneVerificado.create({ data: { userId: g2.id, telefone: "5531977770009", metodo: "ADMIN" } });
+    await prisma.cliente.create({ data: { nome: "G1", telefone: "31977770009", userId: g1.id } });
+    await S.importarParticipantes(id, lerCsv(csvUm("+55 31 97777-0009", 1)).linhas, ator, "teste prioridade");
+    const p = await prisma.participanteSorteio.findFirstOrThrow({ where: { sorteioId: id, telefone: "5531977770009" } });
+    assert.equal(p.userId, g2.id);
+    assert.equal(p.vinculoOrigem, "TELEFONE_VERIFICADO");
+  });
+  await caso("cadastro da loja: cliente sem conta liga quando a conta aparece", async () => {
+    const h = await prisma.user.create({ data: { email: "h@teste.invalid", nome: "H Teste", role: "CUSTOMER" } });
+    const c = await prisma.cliente.create({ data: { nome: "H", telefone: "31977770010" } });
+    await S.importarParticipantes(id, lerCsv(csvUm("+55 31 97777-0010", 4)).linhas, ator, "teste sem conta");
+    assert.equal((await prisma.participanteSorteio.findFirstOrThrow({ where: { sorteioId: id, telefone: "5531977770010" } })).userId, null);
+    await prisma.cliente.update({ where: { id: c.id }, data: { userId: h.id } }); // o que o login faz pelo e-mail
+    assert.equal(await S.vincularPeloCadastroDoUsuario(h.id), 1);
+  });
+  // Os testes de cadastro somaram 11 chances; voltam a zero para a contagem abaixo.
+  for (const tel of ["5531977770006", "5531977770007", "5531977770008", "5531977770009", "5531977770010"]) {
+    await prisma.participanteSorteio.deleteMany({ where: { sorteioId: id, telefone: tel } });
+  }
 
   await caso("lances: importa, classifica e reimporta sem duplicar", async () => {
     const lancesCsv = [

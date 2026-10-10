@@ -139,7 +139,7 @@ function SituacaoVinculo({ p }: { p: SorteioAdmin["participantes"][number] }) {
     return (
       <span className="inline-flex flex-col">
         <span className="font-medium text-green-700">{p.user.nome}</span>
-        <span className="text-xs text-gray-400">{p.vinculoOrigem === "ADMIN" ? "vínculo manual" : "WhatsApp verificado"}</span>
+        <span className="text-xs text-gray-400">{p.vinculoOrigem === "ADMIN" ? "vínculo manual" : p.vinculoOrigem === "CADASTRO_LOJA" ? "telefone do cadastro da loja" : "WhatsApp verificado"}</span>
       </span>
     );
   }

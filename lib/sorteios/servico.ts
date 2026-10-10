@@ -673,31 +673,113 @@ export async function informarTelefone(
  * Liga os participantes sem conta a quem tem o telefone verificado. Única porta
  * de vínculo automático: telefone sem verificação nunca liga nada.
  */
-async function vincularSorteio(tx: Tx, sorteioId: string, ator: Ator): Promise<number> {
+/**
+ * Telefones do cadastro da LOJA ligados a uma conta: Cliente com userId,
+ * telefone, e que a equipe digitou (cadastroProprioEm nulo).
+ *
+ * O formulário público /meus-dados não entra: ele não exige login e acha o
+ * cliente pelo telefone, então qualquer um conseguiria pôr o próprio e-mail no
+ * cadastro de outra pessoa. Telefone só vale como prova quando veio da equipe.
+ * Número que aparece em mais de uma conta fica de fora (ambíguo).
+ */
+async function telefonesDoCadastroDaLoja(tx: Tx, telefones: string[]): Promise<Map<string, string>> {
+  // Sempre olha TODAS as contas: filtrar só a do usuário esconderia que o
+  // mesmo número também está no cadastro de outra pessoa.
+  const clientes = await tx.cliente.findMany({
+    where: {
+      userId: { not: null },
+      cadastroProprioEm: null,
+      telefone: { not: null },
+    },
+    select: { telefone: true, userId: true },
+  });
+  const donos = new Map<string, Set<string>>();
+  for (const c of clientes) {
+    const chave = chaveTelefone(c.telefone!);
+    if (!chave || !telefones.includes(chave)) continue;
+    if (!donos.has(chave)) donos.set(chave, new Set());
+    donos.get(chave)!.add(c.userId!);
+  }
+  const unicos = new Map<string, string>();
+  for (const [tel, contas] of donos) if (contas.size === 1) unicos.set(tel, [...contas][0]);
+  return unicos;
+}
+
+/**
+ * Liga os participantes sem conta. Duas provas valem, nesta ordem:
+ *  1. telefone verificado pela própria pessoa (WhatsApp reverso);
+ *  2. telefone que a equipe cadastrou para um cliente que tem conta.
+ * Telefone digitado pelo cliente sem verificação nunca liga nada.
+ */
+async function vincularSorteio(tx: Tx, sorteioId: string, ator: Ator, soDoUsuario?: string): Promise<number> {
   const soltos = await tx.participanteSorteio.findMany({
     where: { sorteioId, userId: null, telefone: { not: null } },
     select: { id: true, telefone: true, nomeOrigem: true, chances: true },
   });
   if (soltos.length === 0) return 0;
+  const telefones = soltos.map((s) => s.telefone!);
   const verificados = await tx.telefoneVerificado.findMany({
-    where: { telefone: { in: soltos.map((s) => s.telefone!) } },
+    where: { telefone: { in: telefones } },
     select: { telefone: true, userId: true },
   });
+  const porVerificado = new Map(verificados.map((v) => [v.telefone, v.userId]));
+  const porCadastro = await telefonesDoCadastroDaLoja(tx, telefones);
+
   let n = 0;
-  for (const v of verificados) {
-    const p = soltos.find((s) => s.telefone === v.telefone)!;
+  for (const p of soltos) {
+    const tel = p.telefone!;
+    // Verificado manda: se o número foi provado por uma conta, o cadastro da
+    // loja não pode mandar os créditos para outra.
+    const verificadoPor = porVerificado.get(tel);
+    const userId = verificadoPor ?? porCadastro.get(tel);
+    if (!userId || (soDoUsuario && userId !== soDoUsuario)) continue;
+    const origem = verificadoPor ? "TELEFONE_VERIFICADO" : "CADASTRO_LOJA";
     await tx.participanteSorteio.update({
       where: { id: p.id },
-      data: { userId: v.userId, vinculadoEm: new Date(), vinculoOrigem: "TELEFONE_VERIFICADO" },
+      data: { userId, vinculadoEm: new Date(), vinculoOrigem: origem },
     });
     await registrarEvento(tx, sorteioId, ator, {
       tipo: "vinculo.automatico",
-      descricao: `${p.nomeOrigem} (${p.chances} chances) ligado à conta pelo telefone verificado.`,
-      dados: { participanteId: p.id, userId: v.userId },
+      descricao: `${p.nomeOrigem} (${p.chances} chances) ligado à conta pelo ${
+        verificadoPor ? "telefone verificado" : "telefone do cadastro da loja"
+      }.`,
+      dados: { participanteId: p.id, userId, origem },
     });
     n++;
   }
   return n;
+}
+
+/**
+ * Liga os créditos do usuário pelo cadastro da loja. Roda quando ele abre
+ * Meus Sorteios: o cliente que a equipe cadastrou só ganha conta (e o vínculo
+ * Cliente → User por e-mail) quando entra pela primeira vez.
+ */
+export async function vincularPeloCadastroDoUsuario(userId: string): Promise<number> {
+  const clientes = await prisma.cliente.findMany({
+    where: { userId, cadastroProprioEm: null, telefone: { not: null } },
+    select: { telefone: true },
+  });
+  const telefones = clientes.flatMap((c) => {
+    const k = chaveTelefone(c.telefone!);
+    return k ? [k] : [];
+  });
+  if (telefones.length === 0) return 0;
+  const sorteios = await prisma.participanteSorteio.findMany({
+    where: { telefone: { in: telefones }, userId: null },
+    select: { sorteioId: true },
+    distinct: ["sorteioId"],
+  });
+  if (sorteios.length === 0) return 0;
+  const ator = { id: null, nome: "Sistema (cadastro da loja)" };
+  return prisma.$transaction(async (tx) => {
+    let n = 0;
+    for (const { sorteioId } of sorteios) {
+      await travar(tx, sorteioId);
+      n += await vincularSorteio(tx, sorteioId, ator, userId);
+    }
+    return n;
+  });
 }
 
 /** Depois de verificar um telefone: liga os créditos dele em todos os sorteios. */

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { CalendarDays, Gift, PlayCircle, Ticket, Trophy } from "lucide-react";
 import { exigirSessao } from "@/lib/auth";
 import { getMeusSorteios, getTelefonesDoUsuario, type MeuSorteio } from "@/lib/queries/sorteios";
+import { vincularPeloCadastroDoUsuario } from "@/lib/sorteios/servico";
 import { formatarBilhete, formatarFaixa } from "@/lib/sorteios/bilhetes";
 import { dataBR, dataHoraBR, STATUS_CLIENTE } from "@/lib/sorteios/formato";
 import { VerificarWhatsapp } from "@/components/conta/sorteios/VerificarWhatsapp";
@@ -16,6 +17,9 @@ export const metadata: Metadata = {
 // Só o que é do usuário logado: getMeusSorteios filtra por userId da sessão.
 export default async function MeusSorteiosPage() {
   const user = await exigirSessao("/minha-conta/sorteios");
+  // Cliente que a equipe já tinha cadastrado com este WhatsApp: os créditos
+  // entram sem pedir verificação. Acessório: se falhar, a página abre igual.
+  await vincularPeloCadastroDoUsuario(user.id).catch((e) => console.error("[sorteios] vínculo pelo cadastro", e));
   const [sorteios, telefones] = await Promise.all([getMeusSorteios(user.id), getTelefonesDoUsuario(user.id)]);
   const avisos = sorteios
     .filter((s) => s.avisoNovo && s.chances > 0)
