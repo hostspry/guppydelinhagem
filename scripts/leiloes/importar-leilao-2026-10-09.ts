@@ -40,6 +40,18 @@ const PEIXES: Record<Lance, number> = {
 };
 // Sem prazo no link: o "pagar em até 48h" é combinado, não trava (dono, 11/10).
 
+// "Misto" é o Kit Guppy Pet Premium da loja (8 machos + 2 fêmeas), não 2 casais
+// (correção do dono, 11/10). No Xeque-Mate continua a criadeira de brinde.
+const KIT_PET = "Kit Pet Premium: 8 machos + 2 fêmeas";
+function nomeDoLote(genetica: string, lance: Lance): string {
+  if (genetica !== "Misto") return genetica + SUFIXO[lance];
+  if (lance === "XEQUE_MATE") return `Misto (${KIT_PET}; Xeque-Mate + 1 criadeira MGV16 de brinde)`;
+  if (lance === "CONVENCIONAL") return `Misto (${KIT_PET})`;
+  throw new Error("Mestre Criador em lote Misto: definir com o dono.");
+}
+const peixesDoLote = (genetica: string, lance: Lance) =>
+  genetica === "Misto" ? 10 : PEIXES[lance];
+
 // Arrematante: nome da relação e o WhatsApp. Vinicius e Felipe vieram "a
 // confirmar"; o número é o que eles mesmos verificaram no site (sorteio).
 const PESSOAS = {
@@ -122,7 +134,7 @@ async function main() {
         ...LOTES.map(([, genetica, lance], i) =>
           prisma.loteLeilao.update({
             where: { id: existentes[i].id },
-            data: { nome: genetica + SUFIXO[lance], qtdPeixes: PEIXES[lance] },
+            data: { nome: nomeDoLote(genetica, lance), qtdPeixes: peixesDoLote(genetica, lance) },
           }),
         ),
       ]);
@@ -134,12 +146,12 @@ async function main() {
           acao: "leilao.lote.editar",
           entidade: "Leilao",
           entidadeId: leilao.id,
-          descricao: "Aplicou as regras do leilão de 09/10 aos 24 lotes (casais, brindes e peixes por lote)",
+          descricao: "Aplicou as regras do leilão de 09/10 aos 24 lotes (casais, brindes, Kit Pet Premium nos Mistos e peixes por lote)",
         },
       });
       console.log("Lotes atualizados com as regras.");
       LOTES.forEach(([numero, genetica, lance]) =>
-        console.log(`  ${rotuloLote({ numero, nome: genetica + SUFIXO[lance] })} · ${PEIXES[lance]} peixes`),
+        console.log(`  ${rotuloLote({ numero, nome: nomeDoLote(genetica, lance) })} · ${peixesDoLote(genetica, lance)} peixes`),
       );
       return;
     }
@@ -177,8 +189,8 @@ async function main() {
         data: {
           leilaoId: leilao!.id,
           numero,
-          nome: genetica + SUFIXO[lance],
-          qtdPeixes: PEIXES[lance],
+          nome: nomeDoLote(genetica, lance),
+          qtdPeixes: peixesDoLote(genetica, lance),
           valor,
           clienteId: clientes.get(pessoa)!,
           ordem: i + 1,

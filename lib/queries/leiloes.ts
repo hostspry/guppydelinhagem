@@ -82,6 +82,7 @@ export async function getLeilaoAdmin(id: string) {
               status: true,
               expiraEm: true,
               entregaEscolhidaEm: true,
+              frete: true,
             },
           },
         },
@@ -136,7 +137,12 @@ export async function getLeilaoAdmin(id: string) {
     cliente: x.cliente,
     orderId: x.orderId,
     cobranca: x.order
-      ? { numero: x.order.numero, situacao: situacaoDoArremate(x.order) }
+      ? {
+          numero: x.order.numero,
+          situacao: situacaoDoArremate(x.order),
+          // Frete que o cliente já escolheu no link (nulo = ainda não escolheu).
+          freteEscolhido: x.order.entregaEscolhidaEm ? Number(x.order.frete) : null,
+        }
       : null,
   }));
 

@@ -15,14 +15,15 @@ import {
 import {
   cancelarCobrancaLeilao,
   registrarPagamentoForaLeilao,
-  type FormaPagamentoFora,
 } from "@/actions/leiloes";
+import { BaixaManualForm } from "@/components/admin/leiloes/BaixaManual";
 import {
   SITUACAO_ARREMATE,
   arremateAberto,
   type SituacaoArremate,
 } from "@/lib/leiloes/situacao";
 import { formatTelefone } from "@/lib/utils/format";
+import { mensagemCobrancaLeilao } from "@/lib/leiloes/mensagem";
 
 export type CobrancaLinha = {
   id: string;
@@ -75,21 +76,6 @@ function entregaTexto(c: CobrancaLinha): string {
   return `${modo}${c.destino ? ` para ${c.destino}` : ""} · ${moeda(c.frete)}`;
 }
 
-/** Mensagem pronta para o WhatsApp: o dono só confere e aperta enviar. */
-function mensagem(c: CobrancaLinha, dataLeilao: string): string {
-  const primeiro = c.cliente.nome.trim().split(/\s+/)[0] ?? "";
-  const ola = /^\+?\d[\d\s()-]+$/.test(primeiro) ? "Oi" : `Oi ${primeiro}`;
-  const lotes = c.itens.map((i) => `${i.nome} (${moeda(i.valor)})`).join("\n");
-  const titulo =
-    c.itens.length === 1
-      ? `Parabéns pelo lote arrematado no leilão de ${dataLeilao}!`
-      : `Parabéns pelos ${c.itens.length} lotes arrematados no leilão de ${dataLeilao}!`;
-  return (
-    `${ola}, tudo bem? ${titulo}\n\n${lotes}\n\nTotal dos lotes: ${moeda(c.subtotal)}\n\n` +
-    `Neste link você escolhe o frete e paga no Pix ou no cartão.\n${c.link ?? ""}`
-  );
-}
-
 export function CobrancasLeilao({
   cobrancas,
   dataLeilao,
@@ -133,11 +119,16 @@ function CartaoCobranca({ c, dataLeilao }: { c: CobrancaLinha; dataLeilao: strin
   const [isPending, startTransition] = useTransition();
   const [copiado, setCopiado] = useState<"link" | "msg" | null>(null);
   const [foraAberto, setForaAberto] = useState(false);
-  const [forma, setForma] = useState<FormaPagamentoFora>("PIX");
-  const [freteFora, setFreteFora] = useState("");
   const s = SITUACAO_ARREMATE[c.situacao];
   const aberta = arremateAberto(c.situacao);
-  const texto = mensagem(c, dataLeilao);
+  // Mensagem pronta para o WhatsApp: o dono só confere e aperta enviar.
+  const texto = mensagemCobrancaLeilao({
+    clienteNome: c.cliente.nome,
+    dataLeilao,
+    itens: c.itens,
+    subtotal: c.subtotal,
+    link: c.link,
+  });
 
   const digitos = (c.cliente.telefone ?? "").replace(/\D/g, "");
   const comDdi = digitos ? (digitos.length <= 11 ? `55${digitos}` : digitos) : "";
@@ -267,7 +258,7 @@ function CartaoCobranca({ c, dataLeilao }: { c: CobrancaLinha; dataLeilao: strin
                 className="inline-flex items-center gap-1.5 text-xs text-green-700 px-2 py-1.5 rounded-md hover:bg-green-50 disabled:opacity-60"
               >
                 <BadgeCheck className="w-3.5 h-3.5" aria-hidden="true" />
-                Pago por fora
+                Baixa manual
               </button>
               <button
                 type="button"
@@ -287,56 +278,19 @@ function CartaoCobranca({ c, dataLeilao }: { c: CobrancaLinha; dataLeilao: strin
       )}
 
       {foraAberto && c.situacao !== "PAGA" && c.situacao !== "CANCELADA" && (
-        <div className="mt-3 rounded-md border border-green-200 bg-green-50/60 p-3 text-xs space-y-2">
-          <p className="text-gray-700">
-            Para quem pagou direto no Pix ou no PicPay. A cobrança vira paga e o link para de
-            aceitar pagamento.
-          </p>
-          <div className="flex flex-wrap items-end gap-2">
-            <label className="space-y-1">
-              <span className="block text-gray-500">Como pagou</span>
-              <select
-                value={forma}
-                onChange={(e) => setForma(e.target.value as FormaPagamentoFora)}
-                className="border border-gray-300 rounded-md px-2 py-1.5 bg-white"
-              >
-                <option value="PIX">Pix direto</option>
-                <option value="PICPAY">PicPay</option>
-                <option value="OUTRO">Outro</option>
-              </select>
-            </label>
-            {!c.entregaEscolhida ? (
-              <label className="space-y-1">
-                <span className="block text-gray-500">Frete pago junto (R$)</span>
-                <input
-                  value={freteFora}
-                  onChange={(e) => setFreteFora(e.target.value)}
-                  inputMode="decimal"
-                  placeholder="0,00"
-                  className="w-24 border border-gray-300 rounded-md px-2 py-1.5 bg-white"
-                />
-              </label>
-            ) : (
-              <span className="text-gray-500 pb-1.5">Frete escolhido no link: {moeda(c.frete)}</span>
-            )}
-            <button
-              type="button"
-              disabled={isPending}
-              onClick={() => {
-                const frete = Number((freteFora || "0").replace(/\./g, "").replace(",", "."));
-                if (!Number.isFinite(frete) || frete < 0) {
-                  toast.error("Frete inválido.");
-                  return;
-                }
-                if (!confirm(`Marcar a cobrança de ${c.cliente.nome} como paga por fora?`)) return;
-                rodar(() => registrarPagamentoForaLeilao(c.id, { forma, frete }));
-                setForaAberto(false);
-              }}
-              className="bg-green-600 text-white font-medium px-3 py-1.5 rounded-md hover:brightness-110 disabled:opacity-60"
-            >
-              Confirmar pagamento
-            </button>
-          </div>
+        <div className="mt-3">
+          <BaixaManualForm
+            titulo={c.cliente.nome}
+            lotes={c.itens}
+            subtotal={c.subtotal}
+            freteDoLink={c.entregaEscolhida ? c.frete : null}
+            onConfirmar={async (input) => {
+              const r = await registrarPagamentoForaLeilao(c.id, input);
+              if (r.success) router.refresh();
+              return r;
+            }}
+            onFechar={() => setForaAberto(false)}
+          />
         </div>
       )}
     </div>

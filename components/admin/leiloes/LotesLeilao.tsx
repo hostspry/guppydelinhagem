@@ -3,9 +3,10 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { ClipboardPaste, Pencil, Plus, Send, Trash2, X } from "lucide-react";
+import { BadgeCheck, ClipboardPaste, Pencil, Plus, Send, Trash2, X } from "lucide-react";
 import { FormField } from "@/components/admin/FormField";
 import {
+  baixaManualArrematante,
   buscarArrematantes,
   cobrarArrematantes,
   excluirLote,
@@ -15,6 +16,7 @@ import {
 import { SITUACAO_ARREMATE, type SituacaoArremate } from "@/lib/leiloes/situacao";
 import { formatTelefone } from "@/lib/utils/format";
 import { PEIXES_POR_LOTE } from "@/lib/validations/leilao";
+import { BaixaManualForm } from "@/components/admin/leiloes/BaixaManual";
 
 export type LoteLinha = {
   id: string;
@@ -23,7 +25,7 @@ export type LoteLinha = {
   qtdPeixes: number;
   valor: number;
   cliente: { id: string; nome: string; telefone: string | null };
-  cobranca: { numero: string; situacao: SituacaoArremate } | null;
+  cobranca: { numero: string; situacao: SituacaoArremate; freteEscolhido: number | null } | null;
 };
 
 const input =
@@ -48,7 +50,19 @@ export function LotesLeilao({
   const router = useRouter();
   const [painel, setPainel] = useState<"novo" | "colar" | null>(lotes.length ? null : "colar");
   const [editando, setEditando] = useState<LoteLinha | null>(null);
+  const [baixaDe, setBaixaDe] = useState<Cliente | null>(null);
   const [isPending, startTransition] = useTransition();
+
+  // Lotes ainda não pagos do arrematante da baixa manual. O frete do link só
+  // vale se tudo dele já estiver na cobrança com entrega escolhida: lote sem
+  // cobrança entra nela e zera a escolha (o servidor pede o frete de novo).
+  const lotesDaBaixa = baixaDe
+    ? lotes.filter((l) => l.cliente.id === baixaDe.id && l.cobranca?.situacao !== "PAGA")
+    : [];
+  const freteDoLinkDaBaixa =
+    lotesDaBaixa.length > 0 && lotesDaBaixa.every((l) => l.cobranca?.freteEscolhido != null)
+      ? (lotesDaBaixa[0].cobranca?.freteEscolhido ?? null)
+      : null;
   const semCobranca = lotes.filter((l) => !l.cobranca || l.cobranca.situacao === "CANCELADA").length;
 
   function cobrar() {
@@ -127,6 +141,26 @@ export function LotesLeilao({
       {painel === "colar" && !editando && (
         <ColarLista leilaoId={leilaoId} onFechar={() => setPainel(null)} />
       )}
+      {baixaDe && lotesDaBaixa.length > 0 && (
+        <div className="px-5 py-4 border-b border-gray-100">
+          <BaixaManualForm
+            key={baixaDe.id}
+            titulo={baixaDe.nome}
+            lotes={lotesDaBaixa.map((l) => ({
+              nome: l.numero ? `Lote ${l.numero} · ${l.nome}` : l.nome,
+              valor: l.valor,
+            }))}
+            subtotal={lotesDaBaixa.reduce((a, l) => a + l.valor, 0)}
+            freteDoLink={freteDoLinkDaBaixa}
+            onConfirmar={async (input) => {
+              const r = await baixaManualArrematante(leilaoId, baixaDe.id, input);
+              if (r.success) router.refresh();
+              return r;
+            }}
+            onFechar={() => setBaixaDe(null)}
+          />
+        </div>
+      )}
 
       {lotes.length === 0 ? (
         <p className="px-5 py-8 text-sm text-gray-500 text-center">
@@ -143,7 +177,7 @@ export function LotesLeilao({
                 <th className="px-4 py-2.5 text-center">Peixes</th>
                 <th className="px-4 py-2.5 text-right">Valor</th>
                 <th className="px-4 py-2.5">Cobrança</th>
-                <th className="px-4 py-2.5 w-20" />
+                <th className="px-4 py-2.5 w-36" />
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -178,6 +212,20 @@ export function LotesLeilao({
                             type="button"
                             onClick={() => {
                               setPainel(null);
+                              setEditando(null);
+                              setBaixaDe(l.cliente);
+                            }}
+                            className="inline-flex items-center gap-1 px-2 py-1 mr-1 rounded-md text-xs font-medium text-green-700 hover:bg-green-50"
+                            title="Pagou direto no Pix ou PicPay: dá baixa em todos os lotes deste arrematante"
+                          >
+                            <BadgeCheck className="w-3.5 h-3.5" aria-hidden="true" />
+                            Baixa
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setPainel(null);
+                              setBaixaDe(null);
                               setEditando(l);
                             }}
                             className="p-1.5 text-gray-400 hover:text-[#07366A]"

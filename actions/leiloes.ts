@@ -426,6 +426,112 @@ export async function importarLotes(
 
 // ── Cobrar ───────────────────────────────────────────────────────────────────
 
+type LeilaoParaCobrar = { id: string; nome: string; maxParcelas: number };
+
+/**
+ * Cobra os lotes de UM arrematante: entram na cobrança dele que ainda está em
+ * aberto neste leilão, ou nasce uma cobrança nova. Usado pelo "Cobrar todos"
+ * e pela baixa manual (que precisa do pedido para registrar o pagamento).
+ */
+async function cobrarGrupo(
+  leilao: LeilaoParaCobrar,
+  clienteId: string,
+  loteIds: string[],
+): Promise<"criada" | "somada"> {
+  const leilaoId = leilao.id;
+  return prisma.$transaction(async (tx) => {
+    const aberta = await tx.order.findFirst({
+      where: {
+        leilaoId,
+        clienteId,
+        origem: "LEILAO",
+        status: "AGUARDANDO_PAGAMENTO",
+        pagamentos: { none: { status: { in: ["PAGO", "EM_ANALISE"] } } },
+      },
+      orderBy: { criadoEm: "desc" },
+      select: { id: true },
+    });
+    if (aberta) {
+      await tx.loteLeilao.updateMany({
+        where: { id: { in: loteIds } },
+        data: { orderId: aberta.id },
+      });
+      await refazerCobranca(tx, aberta.id);
+      return "somada" as const;
+    }
+
+    const cliente = await tx.cliente.findUniqueOrThrow({ where: { id: clienteId } });
+    const lotes = await tx.loteLeilao.findMany({
+      where: { id: { in: loteIds } },
+      orderBy: [{ ordem: "asc" }, { criadoEm: "asc" }],
+      select: { numero: true, nome: true, valor: true },
+    });
+    const subtotal = round2(lotes.reduce((a, l) => a + Number(l.valor), 0));
+    // Snapshot do cadastro como ponto de partida; o cliente completa e
+    // confirma tudo na página antes de pagar.
+    const endereco: EnderecoEntrega = {
+      nome: cliente.nome,
+      cpfCnpj: cliente.cpfCnpj,
+      telefone: cliente.telefone,
+      email: cliente.email,
+      cep: cliente.cep,
+      logradouro: cliente.logradouro,
+      numero: cliente.numero,
+      complemento: cliente.complemento,
+      bairro: cliente.bairro,
+      cidade: cliente.cidade,
+      uf: cliente.uf,
+    };
+
+    const ano = new Date().getFullYear();
+    const ultimo = await tx.order.findFirst({
+      where: { ano },
+      orderBy: { sequencia: "desc" },
+      select: { sequencia: true },
+    });
+    const sequencia = (ultimo?.sequencia ?? 0) + 1;
+    const pedido = await tx.order.create({
+      data: {
+        numero: `#${ano}-${String(sequencia).padStart(4, "0")}`,
+        ano,
+        sequencia,
+        tipo: "PEDIDO",
+        origem: "LEILAO",
+        status: "AGUARDANDO_PAGAMENTO",
+        tipoEntrega: "ENVIO",
+        clienteId,
+        userId: cliente.userId,
+        leilaoId,
+        enderecoEntrega: endereco as unknown as Prisma.InputJsonValue,
+        subtotal,
+        frete: 0,
+        desconto: 0,
+        total: subtotal,
+        // 128 bits: o número do pedido é sequencial, o link não pode ser.
+        publicToken: randomBytes(16).toString("hex"),
+        // Sem validade: o link do leilão não vence (decisão do dono). O
+        // combinado de pagar em 48h é conversa, não trava.
+        maxParcelas: leilao.maxParcelas,
+        observacoes: `Arremate: ${leilao.nome}`,
+        items: {
+          create: lotes.map((l) => ({
+            productId: null,
+            nomeProduto: rotuloLote(l),
+            quantidade: 1,
+            precoUnitario: l.valor,
+          })),
+        },
+      },
+      select: { id: true },
+    });
+    await tx.loteLeilao.updateMany({
+      where: { id: { in: loteIds } },
+      data: { orderId: pedido.id },
+    });
+    return "criada" as const;
+  });
+}
+
 /**
  * Gera as cobranças dos lotes ainda não cobrados: uma por arrematante, com
  * todos os lotes dele. Se o arrematante já tem cobrança em aberto neste leilão
@@ -458,97 +564,7 @@ export async function cobrarArrematantes(leilaoId: string): Promise<ActionResult
 
   for (const [clienteId, loteIds] of grupos) {
     try {
-      const r = await prisma.$transaction(async (tx) => {
-        const aberta = await tx.order.findFirst({
-          where: {
-            leilaoId,
-            clienteId,
-            origem: "LEILAO",
-            status: "AGUARDANDO_PAGAMENTO",
-            pagamentos: { none: { status: { in: ["PAGO", "EM_ANALISE"] } } },
-          },
-          orderBy: { criadoEm: "desc" },
-          select: { id: true },
-        });
-        if (aberta) {
-          await tx.loteLeilao.updateMany({
-            where: { id: { in: loteIds } },
-            data: { orderId: aberta.id },
-          });
-          await refazerCobranca(tx, aberta.id);
-          return "somada" as const;
-        }
-
-        const cliente = await tx.cliente.findUniqueOrThrow({ where: { id: clienteId } });
-        const lotes = await tx.loteLeilao.findMany({
-          where: { id: { in: loteIds } },
-          orderBy: [{ ordem: "asc" }, { criadoEm: "asc" }],
-          select: { numero: true, nome: true, valor: true },
-        });
-        const subtotal = round2(lotes.reduce((a, l) => a + Number(l.valor), 0));
-        // Snapshot do cadastro como ponto de partida; o cliente completa e
-        // confirma tudo na página antes de pagar.
-        const endereco: EnderecoEntrega = {
-          nome: cliente.nome,
-          cpfCnpj: cliente.cpfCnpj,
-          telefone: cliente.telefone,
-          email: cliente.email,
-          cep: cliente.cep,
-          logradouro: cliente.logradouro,
-          numero: cliente.numero,
-          complemento: cliente.complemento,
-          bairro: cliente.bairro,
-          cidade: cliente.cidade,
-          uf: cliente.uf,
-        };
-
-        const ano = new Date().getFullYear();
-        const ultimo = await tx.order.findFirst({
-          where: { ano },
-          orderBy: { sequencia: "desc" },
-          select: { sequencia: true },
-        });
-        const sequencia = (ultimo?.sequencia ?? 0) + 1;
-        const pedido = await tx.order.create({
-          data: {
-            numero: `#${ano}-${String(sequencia).padStart(4, "0")}`,
-            ano,
-            sequencia,
-            tipo: "PEDIDO",
-            origem: "LEILAO",
-            status: "AGUARDANDO_PAGAMENTO",
-            tipoEntrega: "ENVIO",
-            clienteId,
-            userId: cliente.userId,
-            leilaoId,
-            enderecoEntrega: endereco as unknown as Prisma.InputJsonValue,
-            subtotal,
-            frete: 0,
-            desconto: 0,
-            total: subtotal,
-            // 128 bits: o número do pedido é sequencial, o link não pode ser.
-            publicToken: randomBytes(16).toString("hex"),
-            // Sem validade: o link do leilão não vence (decisão do dono). O
-            // combinado de pagar em 48h é conversa, não trava.
-            maxParcelas: leilao.maxParcelas,
-            observacoes: `Arremate: ${leilao.nome}`,
-            items: {
-              create: lotes.map((l) => ({
-                productId: null,
-                nomeProduto: rotuloLote(l),
-                quantidade: 1,
-                precoUnitario: l.valor,
-              })),
-            },
-          },
-          select: { id: true },
-        });
-        await tx.loteLeilao.updateMany({
-          where: { id: { in: loteIds } },
-          data: { orderId: pedido.id },
-        });
-        return "criada" as const;
-      });
+      const r = await cobrarGrupo(leilao, clienteId, loteIds);
       if (r === "criada") criadas++;
       else somadas++;
     } catch (e) {
@@ -637,18 +653,23 @@ const FORMAS_FORA = {
 } as const;
 export type FormaPagamentoFora = keyof typeof FORMAS_FORA;
 
+/** Como sai o envio de quem pagou por fora (combinado no WhatsApp). */
+export type EnvioFora = "TERRESTRE" | "AEREO" | "RETIRADA" | "COMBINAR";
+
 /**
  * O leilão também aceita Pix direto e PicPay, fora do site. Quem pagou assim
  * não pode continuar com a cobrança em aberto (pagaria de novo pelo link):
  * aqui a cobrança vira PAGA pelo mesmo caminho do painel (baixa, caixa) e o
  * link passa a mostrar "pagamento confirmado".
  *
- * Frete: se o cliente já escolheu no link, vale o que ele escolheu. Se não,
- * entra o frete informado aqui (o combinado no WhatsApp; 0 se ainda não houver).
+ * Frete e envio: se o cliente já escolheu no link, vale o que ele escolheu. Se
+ * não, entram o frete e o envio informados aqui (o combinado no WhatsApp). O
+ * endereço é o do cadastro; dá para ajustar na tela do pedido, como em qualquer
+ * venda pelo WhatsApp.
  */
 export async function registrarPagamentoForaLeilao(
   orderId: string,
-  input: { forma: FormaPagamentoFora; frete: number },
+  input: { forma: FormaPagamentoFora; frete: number; envio?: EnvioFora },
 ): Promise<ActionResult> {
   const membro = await assertPermissao("pedidos.status");
   const f = FORMAS_FORA[input.forma];
@@ -684,6 +705,20 @@ export async function registrarPagamentoForaLeilao(
   const total = round2(Number(o.subtotal) + frete);
   const nota = `Pago por fora (${f.rotulo}), registrado por ${membro.nome}.`;
 
+  // Envio combinado por fora vira a entrega do pedido (é o que a tela de
+  // pedido usa para oferecer minuta Gollog ou etiqueta). "Combinar" deixa em
+  // aberto para resolver depois, na tela do pedido.
+  const envio = !o.entregaEscolhidaEm && input.envio && input.envio !== "COMBINAR" ? input.envio : null;
+  const entrega = envio
+    ? {
+        entregaEscolhidaEm: new Date(),
+        tipoEntrega: envio === "RETIRADA" ? ("RETIRADA" as const) : ("ENVIO" as const),
+        transportadora: envio === "AEREO" ? ("GOLLOG" as const) : envio === "TERRESTRE" ? ("JADLOG" as const) : null,
+        modalidadeFrete: envio === "RETIRADA" ? null : envio,
+      }
+    : {};
+  const aereo = envio ? envio === "AEREO" : o.modalidadeFrete === "AEREO";
+
   try {
     await prisma.$transaction(async (tx) => {
       await tx.order.update({
@@ -692,6 +727,7 @@ export async function registrarPagamentoForaLeilao(
           formaPagamento: f.forma,
           frete,
           total,
+          ...entrega,
           observacoes: [o.observacoes, nota].filter(Boolean).join("\n"),
         },
       });
@@ -707,7 +743,7 @@ export async function registrarPagamentoForaLeilao(
     return { success: false, error: "Não consegui registrar o pagamento." };
   }
 
-  if (o.modalidadeFrete === "AEREO") void pedirConfirmacaoEnvioAereo(o.id);
+  if (aereo) void pedirConfirmacaoEnvioAereo(o.id);
 
   await auditar(membro, {
     acao: "leilao.cobranca.pago_fora",
@@ -715,9 +751,51 @@ export async function registrarPagamentoForaLeilao(
     entidadeId: o.id,
     descricao: `Registrou a cobrança ${o.numero} como paga por fora (${f.rotulo}), R$ ${total.toFixed(2)}`,
     antes: { status: o.status, frete: Number(o.frete) },
-    depois: { status: "PAGO", frete, total, forma: f.rotulo },
+    depois: { status: "PAGO", frete, total, forma: f.rotulo, envio: envio ?? "como estava" },
   });
   if (o.leilaoId) revalidar(o.leilaoId);
   revalidatePath(`/admin/pedidos/${o.id}`);
   return { success: true, message: `Cobrança ${o.numero} marcada como paga (${f.rotulo}).` };
+}
+
+/**
+ * Baixa manual direto da lista de lotes: o arrematante pagou no Pix direto (ou
+ * PicPay) e ainda nem tem cobrança. Os lotes dele entram numa cobrança (como no
+ * "Cobrar todos", mas só dele) e ela já nasce paga, sem link nenhum sair.
+ * Quita todos os lotes do arrematante neste leilão.
+ */
+export async function baixaManualArrematante(
+  leilaoId: string,
+  clienteId: string,
+  input: { forma: FormaPagamentoFora; frete: number; envio: EnvioFora },
+): Promise<ActionResult> {
+  await assertPermissao("pedidos.editar");
+  const leilao = await prisma.leilao.findUnique({
+    where: { id: leilaoId },
+    select: { id: true, nome: true, maxParcelas: true },
+  });
+  if (!leilao) return { success: false, error: "Leilão não encontrado." };
+
+  const semCobranca = await prisma.loteLeilao.findMany({
+    where: { leilaoId, clienteId, orderId: null },
+    select: { id: true },
+  });
+  if (semCobranca.length) {
+    try {
+      await cobrarGrupo(leilao, clienteId, semCobranca.map((l) => l.id));
+    } catch (e) {
+      console.error("[leilao] baixa manual: cobrar", e);
+      return { success: false, error: "Não consegui montar o pedido deste arrematante." };
+    }
+  }
+
+  const aberta = await prisma.order.findFirst({
+    where: { leilaoId, clienteId, origem: "LEILAO", status: "AGUARDANDO_PAGAMENTO" },
+    orderBy: { criadoEm: "desc" },
+    select: { id: true },
+  });
+  if (!aberta) {
+    return { success: false, error: "Este arrematante não tem nada em aberto neste leilão." };
+  }
+  return registrarPagamentoForaLeilao(aberta.id, input);
 }
