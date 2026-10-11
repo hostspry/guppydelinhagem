@@ -33,12 +33,18 @@ const R = 470;
 // Duas fases: o giro, que desacelera até quase parar no vizinho do vencedor, e
 // o rastejo final, em que a roda escorrega devagar até o bilhete sorteado. O
 // movimento nunca para no meio: velocidade contínua, só zera no fim.
-/** Do primeiro movimento até parar: 30 s (giro + rastejo). */
-const GIRO_TOTAL_MS = 30_000;
+/** Do primeiro movimento até parar: 60 s. */
+const GIRO_TOTAL_MS = 60_000;
+/** Velocidade cheia até aqui; daí em diante só perde velocidade. */
+const CHEIA_MS = 15_000;
+/** Arrancada no começo, de parado até a velocidade cheia. */
+const ARRANCADA_MS = 1_200;
+/** Curva da frenagem: maior = freia mais no começo e arrasta mais no fim. */
+const FRENAGEM_K = 2.5;
 const RASTEJO_MIN_MS = 5_000;
 const RASTEJO_MAX_MS = 8_000;
 const PAUSA_REVELAR_MS = 1_100;
-const VOLTAS = 16;
+const VOLTAS = 38;
 
 function ponto(angulo: number, raio: number) {
   const a = (angulo * Math.PI) / 180;
@@ -57,13 +63,7 @@ function arco(a0: number, a1: number, raio: number) {
   return `M ${C} ${C} L ${x0} ${y0} A ${raio} ${raio} 0 ${grande} 1 ${x1} ${y1} Z`;
 }
 
-/**
- * Desaceleração do giro que termina com a inclinação `a` (velocidade final
- * normalizada), para emendar no rastejo sem tranco.
- */
-function suavizar(u: number, a: number) {
-  return (1 - a) * (1 - Math.pow(1 - u, 3.4)) + a * u;
-}
+
 
 function largura(total: number) {
   return Math.max(3, String(total).length);
@@ -360,11 +360,19 @@ export function Roleta({
         // grau não), para começar sempre no vizinho e o nome não sair cedo.
         const rastejo = Math.min(divisa - phiAlvo + entrada, 75);
         const RASTEJO_MS = Math.min(RASTEJO_MAX_MS, Math.max(RASTEJO_MIN_MS, 3_400 + rastejo * 62));
-        const GIRO_MS = GIRO_TOTAL_MS - RASTEJO_MS;
+        // Fases: arrancada + velocidade cheia até CHEIA_MS, frenagem até o
+        // rastejo, rastejo até parar. Velocidade contínua nas emendas.
+        const FREIO_MS = GIRO_TOTAL_MS - CHEIA_MS - RASTEJO_MS;
+        const GIRO_MS = CHEIA_MS + FREIO_MS;
 
         const fimGiro = ate - rastejo;
         const vFinal = (2 * rastejo) / RASTEJO_MS; // graus/ms na emenda
-        const inclinacao = Math.min(0.9, (vFinal * GIRO_MS) / (fimGiro - de));
+        // Velocidade cheia que fecha a conta da distância total.
+        const k1 = FRENAGEM_K + 1;
+        const vCheia =
+          (fimGiro - de - vFinal * FREIO_MS + (vFinal * FREIO_MS) / k1) /
+          (CHEIA_MS - ARRANCADA_MS / 2 + FREIO_MS / k1);
+        const fimCheia = de + vCheia * (CHEIA_MS - ARRANCADA_MS / 2);
 
         await new Promise<void>((ok) => {
           const t0 = performance.now();
@@ -372,9 +380,15 @@ export function Roleta({
           const quadro = (agora: number) => {
             const dt = agora - t0;
             let rot: number;
-            if (dt < GIRO_MS) {
-              const u = dt / GIRO_MS;
-              rot = de + (fimGiro - de) * suavizar(u, inclinacao);
+            if (dt < ARRANCADA_MS) {
+              rot = de + (0.5 * vCheia * dt * dt) / ARRANCADA_MS;
+            } else if (dt < CHEIA_MS) {
+              rot = de + vCheia * (dt - ARRANCADA_MS / 2);
+            } else if (dt < GIRO_MS) {
+              // v(t) = vFinal + (vCheia - vFinal)·(1 - t/T)^k, integrada.
+              const t = dt - CHEIA_MS;
+              const resto = 1 - Math.pow(1 - t / FREIO_MS, k1);
+              rot = fimCheia + vFinal * t + ((vCheia - vFinal) * FREIO_MS * resto) / k1;
               if (!entrouNoFinal && dt > GIRO_MS - 3_000) {
                 entrouNoFinal = true;
                 setFinal(true);
