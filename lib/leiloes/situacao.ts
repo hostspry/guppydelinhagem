@@ -36,9 +36,11 @@ export const SITUACAO_ARREMATE: Record<
   SituacaoArremate,
   { label: string; badge: string }
 > = {
+  // O frete não é pendência: o cliente vê pelo CEP e escolhe na mesma tela em
+  // que paga. Para quem olha o painel, é só uma cobrança esperando pagamento.
   ESCOLHER_ENTREGA: {
-    label: "Falta escolher o frete",
-    badge: "bg-amber-100 text-amber-800",
+    label: "Aguardando pagamento",
+    badge: "bg-blue-100 text-blue-700",
   },
   AGUARDANDO_PAGAMENTO: {
     label: "Aguardando pagamento",

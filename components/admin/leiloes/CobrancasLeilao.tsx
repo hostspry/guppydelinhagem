@@ -68,7 +68,7 @@ const STATUS_PAG: Record<string, string> = {
 
 function entregaTexto(c: CobrancaLinha): string {
   if (!c.entregaEscolhida) {
-    if (c.situacao !== "PAGA") return "Cliente ainda não escolheu";
+    if (c.situacao !== "PAGA") return "o cliente vê pelo CEP e escolhe ao pagar";
     return c.frete > 0 ? `Combinada por fora · ${moeda(c.frete)}` : "Combinada por fora";
   }
   if (c.tipoEntrega === "RETIRADA") return "Retirada em Guarapari";
