@@ -93,8 +93,8 @@ export default function CardPaymentBrick({
   payerTelefone?: string;
   onPagar: (cartao: CartaoInput) => Promise<void>;
   onErro?: (msg: string) => void;
-  /** Onde o formulário está (checkout ou link de cobrança), para o registro. */
-  fluxo?: "checkout" | "cobranca";
+  /** Onde o formulário está (checkout, link de cobrança ou de leilão), para o registro. */
+  fluxo?: "checkout" | "cobranca" | "leilao";
 }) {
   // Refs com os callbacks/email mais recentes — evita re-montar o Brick (e perder
   // o que o cliente digitou) a cada render/keystroke.

@@ -27,9 +27,12 @@ function linkCodigo(codigo: string) {
 export function VerificarWhatsapp({
   verificados,
   pendentes,
+  explicacao = "As chances do leilão ficam guardadas no número que deu o lance. Confirme o seu número para elas aparecerem aqui.",
 }: {
   verificados: { telefone: string }[];
   pendentes: { id: string; telefone: string; codigo: string | null }[];
+  /** O mesmo número serve aos sorteios e aos arremates; muda só o porquê. */
+  explicacao?: string;
 }) {
   const router = useRouter();
   const [pais, setPais] = useState(PAISES[0]);
@@ -61,7 +64,7 @@ export function VerificarWhatsapp({
           <WhatsAppIcon className="h-5 w-5 text-[#25D366]" />
           Seus WhatsApp
         </h2>
-        <p className="text-sm text-gray-500">As chances do leilão ficam guardadas no número que deu o lance. Confirme o seu número para elas aparecerem aqui.</p>
+        <p className="text-sm text-gray-500">{explicacao}</p>
       </div>
 
       {verificados.length > 0 && (

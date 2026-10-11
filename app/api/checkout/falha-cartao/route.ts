@@ -47,7 +47,8 @@ export async function POST(req: Request) {
   const ETAPAS = ["SDK", "FORMULARIO", "COBRANCA", "VALIDACAO", "ABERTO", "ENVIO"] as const;
   const etapa =
     ETAPAS.find((e) => e === body.etapa) ?? ("FORMULARIO" as const);
-  const fluxo = body.fluxo === "cobranca" ? "cobranca" : "checkout";
+  const fluxo =
+    body.fluxo === "cobranca" || body.fluxo === "leilao" ? body.fluxo : "checkout";
   const valor = Number(body.valor);
   const parcelas = Number(body.parcelas);
 

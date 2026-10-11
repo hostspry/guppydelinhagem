@@ -50,6 +50,7 @@ const BADGE: Record<string, { label: string; classe: string; ajuda: string }> = 
 const FLUXO: Record<string, string> = {
   checkout: "checkout da loja",
   cobranca: "link de cobrança",
+  leilao: "cobrança de leilão",
   "checkout-pro": "Checkout Pro (Mercado Pago)",
   pagbank: "PagBank",
 };

@@ -22,6 +22,7 @@ import {
   Megaphone,
   ShieldCheck,
   Gift,
+  Gavel,
 } from "lucide-react";
 import type { Permissao } from "@/lib/permissoes";
 
@@ -89,6 +90,12 @@ const NAV_SECTIONS: NavSection[] = [
         href: "/admin/cobrancas",
         label: "Cobranças",
         icon: Receipt,
+        permissao: "pedidos.ver",
+      },
+      {
+        href: "/admin/leiloes",
+        label: "Leilões",
+        icon: Gavel,
         permissao: "pedidos.ver",
       },
       {

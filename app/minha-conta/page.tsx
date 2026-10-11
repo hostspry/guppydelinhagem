@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Package, Clock, ArrowRight, Truck } from "lucide-react";
+import { Package, Clock, ArrowRight, Truck, Gavel } from "lucide-react";
 import { exigirSessao } from "@/lib/auth";
 import {
   listPedidosDoUsuario,
   listEsperasDoUsuario,
+  listArrematesDoUsuario,
 } from "@/lib/queries/minha-conta";
+import { arremateAberto, dataLeilaoBR } from "@/lib/leiloes/situacao";
 import { STATUS_PEDIDO } from "@/lib/pedido-status";
 import { formatBRL } from "@/lib/utils/format";
 
@@ -20,10 +22,12 @@ function pedidoHref(numero: string): string {
 
 export default async function VisaoGeralPage() {
   const user = await exigirSessao("/minha-conta");
-  const [pedidos, esperas] = await Promise.all([
+  const [pedidos, esperas, arremates] = await Promise.all([
     listPedidosDoUsuario(user.id, user.email),
     listEsperasDoUsuario(user.id, null),
+    listArrematesDoUsuario(user.id, user.email),
   ]);
+  const arremateAPagar = arremates.find((a) => arremateAberto(a.situacao)) ?? null;
 
   const ultimo = pedidos[0] ?? null;
   const primeiro = (user.name ?? "").trim().split(/\s+/)[0];
@@ -40,6 +44,29 @@ export default async function VisaoGeralPage() {
           Aqui você acompanha seus pedidos e sua conta.
         </p>
       </div>
+
+      {/* Arremate esperando frete/pagamento: é o que mais pede ação do cliente */}
+      {arremateAPagar && (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 space-y-2">
+          <p className="flex items-center gap-2 font-semibold text-amber-900">
+            <Gavel size={18} aria-hidden="true" />
+            {arremateAPagar.lotes.length === 1
+              ? "Você arrematou 1 lote"
+              : `Você arrematou ${arremateAPagar.lotes.length} lotes`}
+            {arremateAPagar.leilao
+              ? ` no leilão de ${dataLeilaoBR(arremateAPagar.leilao.dataLeilao)}`
+              : ""}
+          </p>
+          <p className="text-sm text-amber-900/80">{arremateAPagar.lotes.join(", ")}</p>
+          <Link
+            href="/minha-conta/leiloes"
+            className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#FF035C] hover:underline"
+          >
+            Escolher o frete e pagar
+            <ArrowRight size={15} aria-hidden="true" />
+          </Link>
+        </div>
+      )}
 
       {/* Rastreio em destaque quando o último pedido saiu pra entrega */}
       {ultimo && enviado && ultimo.codigoRastreio && (

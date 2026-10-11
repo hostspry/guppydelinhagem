@@ -25,8 +25,9 @@ export async function cancelarPedidosAguardandoExpirados(): Promise<number> {
     where: {
       tipo: "PEDIDO", // cobrança avulsa tem validade própria (Order.expiraEm)
       // Venda combinada no WhatsApp não tem Pix com prazo: o cliente paga quando
-      // combinou, e quem cancela é o dono.
-      origem: { not: "WHATSAPP" },
+      // combinou, e quem cancela é o dono. Arremate de leilão tem prazo próprio
+      // (Order.expiraEm) e quem cancela também é o dono, na tela do leilão.
+      origem: { notIn: ["WHATSAPP", "LEILAO"] },
       status: "AGUARDANDO_PAGAMENTO",
       criadoEm: { lt: limite },
       pagamentos: { none: { status: { in: ["PAGO", "EM_ANALISE"] } } },

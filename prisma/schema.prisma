@@ -70,6 +70,10 @@ enum OrigemVenda {
   /// o pagamento costuma vir em parcelas: o que já entrou é caixa confirmado e
   /// o saldo fica como conta a receber (lib/financeiro/distribuidor.ts).
   DISTRIBUIDOR
+  /// Lotes arrematados no leilão ao vivo do WhatsApp. O pedido nasce na hora
+  /// de cobrar, com os lotes como itens; o frete quem escolhe é o arrematante,
+  /// na página da cobrança (Order.entregaEscolhidaEm).
+  LEILAO
 }
 
 enum ProviderPagamento {
@@ -302,6 +306,7 @@ model Cliente {
   pedidos      Order[]
   notificacoes Notificacao[]
   visitas      Visitante[]
+  lotesLeilao  LoteLeilao[]
   criadoEm     DateTime      @default(now())
 
   @@index([nome])
@@ -542,6 +547,13 @@ model Order {
   expiraEm    DateTime?
   maxParcelas Int?
 
+  /// Cobrança de leilão (origem LEILAO): o leilão de onde vieram os lotes.
+  leilaoId           String?
+  leilao             Leilao?   @relation(fields: [leilaoId], references: [id], onDelete: SetNull)
+  /// Quando o arrematante escolheu entrega e frete na página da cobrança.
+  /// Nulo = ainda não escolheu, e o total ainda é só a soma dos lotes.
+  entregaEscolhidaEm DateTime?
+
   // Scaffold de checkout/integrações — dormente (reconciliado nas fases
   // Pagamentos/Envio; não usar/não apagar). parcelas: parcelamento de cartão.
   parcelas       Int?
@@ -558,6 +570,7 @@ model Order {
   rastreioEventos RastreioEvento[]
   notificacoes    Notificacao[]
   lancamentos     Lancamento[]
+  lotesLeilao     LoteLeilao[]
 
   @@unique([ano, sequencia])
   @@unique([origem, origemPedidoId])
@@ -566,6 +579,7 @@ model Order {
   @@index([tipo])
   @@index([semanaEnvio])
   @@index([origem, status])
+  @@index([leilaoId])
 }
 
 // Histórico de rastreio de um pedido (uma linha por ocorrência do Melhor Envio).
@@ -1775,4 +1789,58 @@ model VerificacaoTelefone {
   @@index([status, criadoEm])
   @@index([userId])
   @@index([telefone])
+}
+
+// ─────────────────────────────────────────────
+// Leilões (cobrança dos arrematantes)
+//
+// O leilão acontece ao vivo no WhatsApp; aqui só entra o resultado: cada lote,
+// quem arrematou e por quanto. "Cobrar" junta os lotes de cada arrematante num
+// pedido (origem LEILAO) com link próprio. Na página do link (ou na área do
+// cliente) ele escolhe o frete e paga no Pix ou no cartão — e daí em diante é
+// um pedido como outro qualquer: webhook, estoque do caixa, etiqueta, rastreio.
+// ─────────────────────────────────────────────
+
+model Leilao {
+  id                 String   @id @default(cuid())
+  nome               String
+  /// Dia do leilão ao vivo. É a data que o arrematante vê na conta.
+  dataLeilao         DateTime
+  /// Prazo para pagar, contado de quando a cobrança é gerada.
+  prazoPagamentoDias Int      @default(3)
+  /// Teto de parcelas no cartão das cobranças deste leilão.
+  maxParcelas        Int      @default(12)
+  observacoes        String?
+  criadoEm           DateTime @default(now())
+  atualizadoEm       DateTime @updatedAt
+
+  lotes   LoteLeilao[]
+  pedidos Order[]
+
+  @@index([dataLeilao])
+}
+
+model LoteLeilao {
+  id        String   @id @default(cuid())
+  leilaoId  String
+  leilao    Leilao   @relation(fields: [leilaoId], references: [id], onDelete: Cascade)
+  /// Número do lote como foi anunciado ("3", "3A"). Texto porque a numeração
+  /// do grupo já se repetiu.
+  numero    String?
+  nome      String
+  /// Peixes no lote: entra no seguro do frete e no limite de peixes por caixa.
+  qtdPeixes Int      @default(3)
+  valor     Decimal  @db.Decimal(10, 2)
+  /// Arrematante. Sempre um cliente: é ele que paga, recebe e aparece na conta.
+  clienteId String
+  cliente   Cliente  @relation(fields: [clienteId], references: [id])
+  /// Pedido em que o lote foi cobrado. Nulo = ainda não cobrado.
+  orderId   String?
+  order     Order?   @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  ordem     Int      @default(0)
+  criadoEm  DateTime @default(now())
+
+  @@index([leilaoId, ordem])
+  @@index([clienteId])
+  @@index([orderId])
 }

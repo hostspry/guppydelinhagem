@@ -306,6 +306,14 @@ export default function PedidosTabela({
                         Distribuidor
                       </span>
                     )}
+                    {p.origem === "LEILAO" && (
+                      <span
+                        className="ml-1.5 inline-flex items-center rounded-full bg-violet-50 px-2 py-0.5 text-[11px] font-medium text-violet-700"
+                        title="Lotes arrematados no leilão. O frete é o cliente quem escolhe no link da cobrança."
+                      >
+                        Leilão
+                      </span>
+                    )}
                   </td>
                   <td className="px-4 py-3">
                     <span

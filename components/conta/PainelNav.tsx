@@ -11,12 +11,14 @@ import {
   MapPin,
   LogOut,
   Gift,
+  Gavel,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 const ITENS: { href: string; label: string; Icon: LucideIcon }[] = [
   { href: "/minha-conta", label: "Visão geral", Icon: LayoutDashboard },
   { href: "/minha-conta/pedidos", label: "Pedidos", Icon: Package },
+  { href: "/minha-conta/leiloes", label: "Meus Leilões", Icon: Gavel },
   { href: "/minha-conta/espera", label: "Lista de espera", Icon: Clock },
   { href: "/minha-conta/sorteios", label: "Meus Sorteios", Icon: Gift },
   { href: "/minha-conta/perfil", label: "Perfil", Icon: User },

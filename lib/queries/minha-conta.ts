@@ -3,6 +3,8 @@ import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@/lib/generated/prisma/client";
 import type { EnderecoEntrega } from "@/lib/validations/pedido";
 import { chaveTelefone } from "@/lib/sorteios/telefone";
+import { variantesTelefone } from "@/lib/leiloes/telefone";
+import { situacaoDoArremate } from "@/lib/leiloes/situacao";
 
 /** Chave canônica do telefone (com o 9 do celular), ou o próprio texto. */
 const chaveCelular = (t: string) => chaveTelefone(t) ?? t;
@@ -222,6 +224,70 @@ export async function listEsperasDoUsuario(
       r.product.videos[0]?.thumbnailUrl ?? r.product.imagens[0]?.url ?? null,
   }));
 }
+
+// ── Arremates de leilão ───────────────────────────────────────────────────────
+/**
+ * Cobranças de leilão do usuário, do leilão mais recente para o mais antigo.
+ *
+ * O arrematante quase sempre entra pelo WhatsApp (a loja cadastra o número do
+ * lance), então além do vínculo de sempre (userId/e-mail confiável) vale o
+ * telefone que a pessoa PROVOU ser dela (TelefoneVerificado). Número só
+ * digitado no perfil não conta: bastaria digitar o de outro arrematante.
+ */
+export async function listArrematesDoUsuario(
+  userId: string,
+  emailSessao: string | null | undefined,
+) {
+  const [email, verificados] = await Promise.all([
+    emailConfiavel(userId, emailSessao),
+    prisma.telefoneVerificado.findMany({
+      where: { userId },
+      select: { telefone: true },
+    }),
+  ]);
+  const telefones = verificados.flatMap((v) => variantesTelefone(v.telefone));
+
+  const rows = await prisma.order.findMany({
+    where: {
+      origem: "LEILAO",
+      status: { not: "RASCUNHO" },
+      cliente: {
+        OR: [
+          clienteDoUsuario(userId, email),
+          ...(telefones.length ? [{ telefone: { in: telefones } }] : []),
+        ],
+      },
+    },
+    orderBy: [{ leilao: { dataLeilao: "desc" } }, { criadoEm: "desc" }],
+    select: {
+      id: true,
+      numero: true,
+      status: true,
+      total: true,
+      expiraEm: true,
+      entregaEscolhidaEm: true,
+      publicToken: true,
+      criadoEm: true,
+      leilao: { select: { id: true, nome: true, dataLeilao: true } },
+      items: { orderBy: { id: "asc" }, select: { nomeProduto: true } },
+    },
+  });
+
+  return rows.map((o) => ({
+    id: o.id,
+    numero: o.numero,
+    token: o.publicToken,
+    total: Number(o.total),
+    expiraEm: o.expiraEm,
+    situacao: situacaoDoArremate(o),
+    leilao: o.leilao,
+    lotes: o.items.map((i) => i.nomeProduto),
+  }));
+}
+
+export type ArremateUsuario = Awaited<
+  ReturnType<typeof listArrematesDoUsuario>
+>[number];
 
 // ── Perfil e endereços ────────────────────────────────────────────────────────
 // Dados do perfil: User (fonte do login) + espelho no Cliente vinculado (telefone,
