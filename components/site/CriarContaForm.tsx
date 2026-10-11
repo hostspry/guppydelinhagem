@@ -143,9 +143,14 @@ export function CriarContaForm({ callbackUrl }: { callbackUrl: string }) {
         <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
           {aviso}
           {jaTemConta && (
-            <Link href={loginHref} className="mt-2 block font-semibold text-secondary underline">
-              Ir para Entrar
-            </Link>
+            <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1">
+              <Link href={loginHref} className="font-semibold text-secondary underline">
+                Ir para Entrar
+              </Link>
+              <Link href="/esqueci-senha" className="font-semibold text-secondary underline">
+                Esqueci a senha
+              </Link>
+            </div>
           )}
         </div>
       )}

@@ -23,7 +23,9 @@ export type CadastroContaResult =
  *
  * O cadastro da loja (Cliente) é sempre um registro NOVO, marcado como
  * preenchido pelo próprio cliente. Nunca reaproveita uma ficha existente pelo
- * telefone ou CPF: seria o mesmo buraco do formulário público.
+ * telefone ou CPF: seria o mesmo buraco do formulário público. Se já existe
+ * ficha da loja com o mesmo e-mail, WhatsApp ou CPF, o cadastro para e manda
+ * para o "Esqueci a senha", que cria o acesso em cima da ficha antiga.
  */
 export async function criarConta(input: unknown): Promise<CadastroContaResult> {
   const h = await headers();
@@ -77,6 +79,19 @@ export async function criarConta(input: unknown): Promise<CadastroContaResult> {
         fieldErrors: { telefone: ["Este WhatsApp já tem conta"] },
       };
     }
+  }
+
+  // Já é cliente da loja (ficha que a equipe fez, ainda sem conta): não abre
+  // outra ficha. O acesso dele nasce pelo "Esqueci a senha", que prova o e-mail.
+  const ficha = await fichaDaLojaSemConta(d.email, chave, d.cpfCnpj);
+  if (ficha) {
+    return {
+      ok: false,
+      jaTemConta: true,
+      error: ficha.email
+        ? `Você já é nosso cliente. Para entrar, toque em "Esqueci a senha" e use o e-mail do seu cadastro (${mascararEmail(ficha.email)}). O link para criar sua senha chega nele.`
+        : "Você já é nosso cliente, mas seu cadastro está sem e-mail. Fale com a gente no WhatsApp que eu libero seu acesso.",
+    };
   }
 
   try {
@@ -134,4 +149,37 @@ export async function criarConta(input: unknown): Promise<CadastroContaResult> {
   }
 
   return { ok: true, email: d.email };
+}
+
+/** Ficha da loja sem conta com o mesmo e-mail, WhatsApp ou CPF. */
+async function fichaDaLojaSemConta(email: string, chave: string | null, cpf: string) {
+  const doc = cpf.replace(/\D/g, "");
+  const candidatas = await prisma.cliente.findMany({
+    where: {
+      userId: null,
+      OR: [
+        { email: { equals: email, mode: "insensitive" } },
+        ...(chave ? [{ telefone: { endsWith: chave.slice(-8) } }] : []),
+        ...(doc ? [{ cpfCnpj: doc }] : []),
+      ],
+    },
+    select: { email: true, telefone: true, cpfCnpj: true },
+    orderBy: { criadoEm: "desc" },
+    take: 20,
+  });
+  return (
+    candidatas.find(
+      (c) =>
+        c.email?.toLowerCase() === email.toLowerCase() ||
+        (doc && c.cpfCnpj === doc) ||
+        (chave && c.telefone && chaveTelefone(c.telefone) === chave),
+    ) ?? null
+  );
+}
+
+/** "joaosilva@gmail.com" → "jo•••••••@gmail.com". */
+function mascararEmail(email: string): string {
+  const [nome, dominio] = email.split("@");
+  if (!dominio) return "•••";
+  return `${nome.slice(0, 2)}${"•".repeat(Math.max(nome.length - 2, 3))}@${dominio}`;
 }

@@ -8,6 +8,7 @@ import { rateLimit, clientIp } from "@/lib/rate-limit";
 import { enviarEmail } from "@/lib/email";
 import { botao } from "@/lib/emails/layout";
 import { montarEmail } from "@/lib/emails/render";
+import { chaveTelefone } from "@/lib/sorteios/telefone";
 
 /**
  * "Esqueci minha senha" do cliente.
@@ -56,9 +57,64 @@ export async function pedirRecuperacaoSenha(
     select: { id: true, nome: true, email: true },
   });
 
-  // Sem conta: responde igual e não faz nada. Nenhuma pista para quem sonda.
-  if (!user) return { ok: true, mensagem: RESPOSTA_PADRAO };
+  if (!user) {
+    // Cliente da loja sem conta: o acesso nasce aqui, em cima da ficha dele.
+    // Roda em segundo plano pelo mesmo motivo do envio lá embaixo: o tempo de
+    // resposta não pode entregar quem é cliente.
+    void criarAcessoDaFicha(alvo)
+      .then((u) => u && enviarLink(u, alvo))
+      .catch((e) => console.error("[recuperar-senha] acesso da ficha", e));
+    return { ok: true, mensagem: RESPOSTA_PADRAO };
+  }
 
+  if (!(await enviarLink(user, alvo))) {
+    return { ok: false, mensagem: "Não foi possível agora. Tente de novo." };
+  }
+  return { ok: true, mensagem: RESPOSTA_PADRAO };
+}
+
+/**
+ * Conta para a ficha da loja (feita pela equipe) que tem este e-mail e ainda
+ * não tem conta. Nasce SEM senha: só entra quem abrir o link do e-mail, o que
+ * prova que o e-mail é dele. Por isso não leva `cadastroSiteEm` e herda os
+ * pedidos da ficha.
+ */
+async function criarAcessoDaFicha(email: string) {
+  const fichas = await prisma.cliente.findMany({
+    where: { userId: null, email: { equals: email, mode: "insensitive" } },
+    orderBy: { criadoEm: "desc" },
+    select: { id: true, nome: true, telefone: true },
+  });
+  const ficha = fichas[0];
+  if (!ficha) return null;
+
+  // WhatsApp também é login: só vai para a conta se nenhuma outra o usa.
+  const chave = ficha.telefone ? chaveTelefone(ficha.telefone) : null;
+  let telefone: string | null = null;
+  if (chave) {
+    const mesmos = await prisma.user.findMany({
+      where: { telefone: { endsWith: chave.slice(-8) } },
+      select: { telefone: true },
+      take: 20,
+    });
+    if (!mesmos.some((u) => u.telefone && chaveTelefone(u.telefone) === chave)) telefone = ficha.telefone;
+  }
+
+  return prisma.$transaction(async (tx) => {
+    const user = await tx.user.create({
+      data: { email, nome: ficha.nome, name: ficha.nome, telefone, role: "CUSTOMER" },
+      select: { id: true, nome: true, email: true },
+    });
+    await tx.cliente.update({ where: { id: ficha.id }, data: { userId: user.id } });
+    return user;
+  });
+}
+
+/** Grava o token e manda o e-mail com o link. False se nem o token gravou. */
+async function enviarLink(
+  user: { id: string; nome: string; email: string },
+  alvo: string,
+): Promise<boolean> {
   const token = randomBytes(32).toString("base64url");
   const expiraEm = new Date(Date.now() + VALIDADE_MIN * 60_000);
 
@@ -73,7 +129,7 @@ export async function pedirRecuperacaoSenha(
     });
   } catch (e) {
     console.error("[recuperar-senha] gravar token", e);
-    return { ok: false, mensagem: "Não foi possível agora. Tente de novo." };
+    return false;
   }
 
   const link = `${SITE}/redefinir-senha?token=${token}`;
@@ -103,7 +159,7 @@ export async function pedirRecuperacaoSenha(
     if (!enviou) console.error("[recuperar-senha] e-mail não saiu para", alvo);
   })().catch((e) => console.error("[recuperar-senha] envio", e));
 
-  return { ok: true, mensagem: RESPOSTA_PADRAO };
+  return true;
 }
 
 export type ChecagemToken = { valido: boolean; nome?: string };
