@@ -7,10 +7,11 @@
  * Trava: só roda em banco de teste, a não ser que LEILAO_PRODUCAO_AUTORIZADO=sim.
  * Não duplica: se o leilão já tiver lotes, para sem mexer em nada.
  *
- * Regras do leilão (mensagens do grupo, 09/10):
- *  - lote normal = os 2 casais do vídeo;
- *  - Xeque-Mate (R$ 300) = 2 casais + 1 criadeira MGV16 de brinde;
- *  - Mestre Criador (R$ 600) = 4 casais + 2 criadeiras MGV16 de brinde, e
+ * O que cada um leva vem dos anúncios dos lotes no grupo (09/10):
+ *  - lance convencional: o lote como foi anunciado (trio, cardume, Pet Premium);
+ *  - Xeque-Mate (R$ 300): 2 casais do vídeo + 1 criadeira MGV16 de brinde (no
+ *    Pet Premium, os 8 machos + 2 fêmeas do vídeo);
+ *  - Mestre Criador (R$ 600): 4 casais + 2 criadeiras MGV16 de brinde, e
  *    convive com o Xeque-Mate do mesmo lote (os dois são cobrados).
  * Por isso 08, 10 e 16 aparecem duas vezes; o 14 teve duas genéticas. A relação
  * fecha em 24 arrematações e R$ 7.300,00.
@@ -27,30 +28,11 @@ import { meioDiaBRT, rotuloLote } from "@/lib/leiloes/situacao";
 const NOME = "Leilão Marchezi Guppy Farm";
 const DIA = "2026-10-09";
 
-type Lance = "XEQUE_MATE" | "MESTRE_CRIADOR" | "CONVENCIONAL";
-const SUFIXO: Record<Lance, string> = {
-  XEQUE_MATE: " (Xeque-Mate: 2 casais + 1 criadeira MGV16 de brinde)",
-  MESTRE_CRIADOR: " (Mestre Criador: 4 casais + 2 criadeiras MGV16 de brinde)",
-  CONVENCIONAL: "",
-};
-const PEIXES: Record<Lance, number> = {
-  XEQUE_MATE: 4,
-  MESTRE_CRIADOR: 8,
-  CONVENCIONAL: 4,
-};
 // Sem prazo no link: o "pagar em até 48h" é combinado, não trava (dono, 11/10).
 
-// "Misto" é o Kit Guppy Pet Premium da loja (8 machos + 2 fêmeas), não 2 casais
-// (correção do dono, 11/10). No Xeque-Mate continua a criadeira de brinde.
-const KIT_PET = "Kit Pet Premium: 8 machos + 2 fêmeas";
-function nomeDoLote(genetica: string, lance: Lance): string {
-  if (genetica !== "Misto") return genetica + SUFIXO[lance];
-  if (lance === "XEQUE_MATE") return `Misto (${KIT_PET}; Xeque-Mate + 1 criadeira MGV16 de brinde)`;
-  if (lance === "CONVENCIONAL") return `Misto (${KIT_PET})`;
-  throw new Error("Mestre Criador em lote Misto: definir com o dono.");
-}
-const peixesDoLote = (genetica: string, lance: Lance) =>
-  genetica === "Misto" ? 10 : PEIXES[lance];
+const XM = "Xeque-Mate: 2 casais do vídeo + 1 criadeira MGV16 de brinde";
+const MC = "Mestre Criador: 4 casais + 2 criadeiras MGV16 de brinde";
+const TRIO = "trio: 1 macho + 2 fêmeas";
 
 // Arrematante: nome da relação e o WhatsApp. Vinicius e Felipe vieram "a
 // confirmar"; o número é o que eles mesmos verificaram no site (sorteio).
@@ -71,31 +53,34 @@ const PESSOAS = {
 } as const;
 type Pessoa = keyof typeof PESSOAS;
 
-const LOTES: [string, string, Lance, number, Pessoa][] = [
-  ["01", "Misto", "XEQUE_MATE", 300, "fabio"],
-  ["02", "Red Grass jovens + fêmeas Blue Grass", "CONVENCIONAL", 150, "pan"],
-  ["03", "Red Silverado Albino", "XEQUE_MATE", 300, "marcus"],
-  ["04", "Metal Yellow Pingu", "CONVENCIONAL", 155, "pompeo"],
-  ["05", "Espada Red Cap", "CONVENCIONAL", 165, "matheus"],
-  ["06", "Misto", "CONVENCIONAL", 190, "rafinha"],
-  ["07", "Full Red Albino Big Dorsal", "XEQUE_MATE", 300, "fabio"],
-  ["08", "Leopardo Red Fire", "XEQUE_MATE", 300, "pompeo"],
-  ["08", "Leopardo Red Fire", "MESTRE_CRIADOR", 600, "snook"],
-  ["09", "Half Black Yellow", "XEQUE_MATE", 300, "pompeo"],
-  ["10", "Metal Blue SSK", "XEQUE_MATE", 300, "erick"],
-  ["10", "Metal Blue SSK", "MESTRE_CRIADOR", 600, "vinicius"],
-  ["11", "Red Old Dragon", "XEQUE_MATE", 300, "felipe"],
-  ["12", "Misto", "CONVENCIONAL", 220, "marius"],
-  ["13", "Blue Grass Big Dorsal", "XEQUE_MATE", 300, "marcus"],
-  ["14", "Sky Blue", "XEQUE_MATE", 300, "fabio"],
-  ["14", "Moscow Dark Blue", "XEQUE_MATE", 300, "marcus"],
-  ["15", "Koi Tuxedo", "CONVENCIONAL", 225, "vinicius"],
-  ["16", "Moscow Full Black", "MESTRE_CRIADOR", 600, "marius"],
-  ["16", "Moscow Full Black", "XEQUE_MATE", 300, "ricardo"],
-  ["17", "Metal Yellow Dragon Halfmoon", "CONVENCIONAL", 195, "vinicius"],
-  ["18", "Red Dragon Halfmoon", "XEQUE_MATE", 300, "ricardo"],
-  ["19", "Blue Dragon Halfmoon", "XEQUE_MATE", 300, "olympio"],
-  ["20", "Full Gold + White Platinum Albino", "XEQUE_MATE", 300, "vinicius"],
+// [lote, nome (o que a pessoa leva), valor, arrematante, peixes]
+const LOTES: [string, string, number, Pessoa, number][] = [
+  ["01", "Pet Premium Misto (Xeque-Mate: 8 machos + 2 fêmeas do vídeo + 1 criadeira MGV16 de brinde)", 300, "fabio", 10],
+  ["02", `Red Grass jovens + fêmeas Blue Grass (${TRIO})`, 150, "pan", 3],
+  ["03", `Red Silverado Albino (${XM})`, 300, "marcus", 4],
+  ["04", `Metal Yellow Pingu (${TRIO})`, 155, "pompeo", 3],
+  ["05", "Espada Red Cap (cardume de 5 peixes)", 165, "matheus", 5],
+  ["06", "Pet Premium Misto (8 machos + 2 fêmeas)", 190, "rafinha", 10],
+  ["07", `Full Red Albino Big Dorsal (${XM})`, 300, "fabio", 4],
+  ["08", `Leopardo Red Fire (${XM})`, 300, "pompeo", 4],
+  ["08", `Leopardo Red Fire (${MC})`, 600, "snook", 8],
+  ["09", `Half Black Yellow (${XM})`, 300, "pompeo", 4],
+  ["10", `Metal Blue SSK (${XM})`, 300, "erick", 4],
+  ["10", `Metal Blue SSK (${MC})`, 600, "vinicius", 8],
+  ["11", `Red Old Dragon (${XM})`, 300, "felipe", 4],
+  ["12", "Pet Premium Misto (8 machos + 2 fêmeas)", 220, "marius", 10],
+  ["13", `Blue Grass Big Dorsal (${XM})`, 300, "marcus", 4],
+  ["14", `Sky Blue (${XM})`, 300, "fabio", 4],
+  ["14", `Moscow Dark Blue (${XM})`, 300, "marcus", 4],
+  ["15", "Koi Tuxedo (10 machos)", 225, "vinicius", 10],
+  ["16", `Moscow Full Black (${MC})`, 600, "marius", 8],
+  ["16", `Moscow Full Black (${XM})`, 300, "ricardo", 4],
+  ["17", `Metal Yellow Dragon Halfmoon (${TRIO})`, 195, "vinicius", 3],
+  ["18", `Red Dragon Halfmoon (${XM})`, 300, "ricardo", 4],
+  ["19", `Blue Dragon Halfmoon (${XM})`, 300, "olympio", 4],
+  // O anúncio do 20 diz "8 machos, 4 de cada linha"; o texto do Xeque-Mate foi
+  // copiado do Pet Premium ("8 machos + 2 fêmeas"). Vale o lote anunciado.
+  ["20", "Full Gold + White Platinum Albino (Xeque-Mate: 8 machos, 4 de cada linha + 1 criadeira MGV16 de brinde)", 300, "vinicius", 8],
 ];
 
 async function main() {
@@ -107,7 +92,7 @@ async function main() {
   }
   console.log(`Banco: ${host}`);
 
-  const soma = LOTES.reduce((a, l) => a + l[3], 0);
+  const soma = LOTES.reduce((a, l) => a + l[2], 0);
   if (LOTES.length !== 24 || soma !== 7300) {
     throw new Error(`Conferência falhou: ${LOTES.length} lotes, R$ ${soma} (esperado 24 e R$ 7.300).`);
   }
@@ -131,10 +116,10 @@ async function main() {
         return;
       }
       await prisma.$transaction([
-        ...LOTES.map(([, genetica, lance], i) =>
+        ...LOTES.map(([, nome, , , peixes], i) =>
           prisma.loteLeilao.update({
             where: { id: existentes[i].id },
-            data: { nome: nomeDoLote(genetica, lance), qtdPeixes: peixesDoLote(genetica, lance) },
+            data: { nome, qtdPeixes: peixes },
           }),
         ),
       ]);
@@ -146,12 +131,12 @@ async function main() {
           acao: "leilao.lote.editar",
           entidade: "Leilao",
           entidadeId: leilao.id,
-          descricao: "Aplicou as regras do leilão de 09/10 aos 24 lotes (casais, brindes, Kit Pet Premium nos Mistos e peixes por lote)",
+          descricao: "Aplicou aos 24 lotes de 09/10 o que cada um leva, conforme os anúncios do grupo (composição, brindes e peixes)",
         },
       });
       console.log("Lotes atualizados com as regras.");
-      LOTES.forEach(([numero, genetica, lance]) =>
-        console.log(`  ${rotuloLote({ numero, nome: nomeDoLote(genetica, lance) })} · ${peixesDoLote(genetica, lance)} peixes`),
+      LOTES.forEach(([numero, nome, , , peixes]) =>
+        console.log(`  ${rotuloLote({ numero, nome })} · ${peixes} peixes`),
       );
       return;
     }
@@ -184,13 +169,13 @@ async function main() {
   }
 
   const criados = await prisma.$transaction(
-    LOTES.map(([numero, genetica, lance, valor, pessoa], i) =>
+    LOTES.map(([numero, nome, valor, pessoa, peixes], i) =>
       prisma.loteLeilao.create({
         data: {
           leilaoId: leilao!.id,
           numero,
-          nome: nomeDoLote(genetica, lance),
-          qtdPeixes: peixesDoLote(genetica, lance),
+          nome,
+          qtdPeixes: peixes,
           valor,
           clienteId: clientes.get(pessoa)!,
           ordem: i + 1,
