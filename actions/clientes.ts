@@ -13,6 +13,7 @@ import {
   isPrismaError,
 } from "@/lib/utils/action-result";
 import { emailAcessoCliente } from "@/lib/emails/acesso";
+import { vincularPeloCadastroDoUsuario } from "@/lib/sorteios/servico";
 
 const onlyDigits = (s: string | undefined) => (s ?? "").replace(/\D/g, "");
 const nullify = (s: string | undefined) => {
@@ -240,6 +241,7 @@ export async function criarAcessoCliente(
   const senha = senhaProvisoria();
   const senhaHash = await bcrypt.hash(senha, 10);
 
+  let userId: string;
   try {
     const user = await prisma.user.upsert({
       where: { email },
@@ -262,6 +264,7 @@ export async function criarAcessoCliente(
       where: { OR: [{ id: cliente.id }, { email, userId: null }] },
       data: { userId: user.id },
     });
+    userId = user.id;
   } catch (e) {
     console.error("[cliente] criar acesso", e);
     return { ok: false, error: "Não foi possível criar o acesso." };
@@ -276,6 +279,13 @@ export async function criarAcessoCliente(
       ? `Gerou nova senha de acesso para ${cliente.nome}`
       : `Criou acesso ao painel para ${cliente.nome}`,
   });
+
+  // Créditos de sorteio esperando o telefone desta ficha entram já, sem
+  // depender do primeiro login. O telefone foi digitado pela equipe, então
+  // vale como prova (mesma regra de vincularPeloCadastroDoUsuario).
+  await vincularPeloCadastroDoUsuario(userId).catch((e) =>
+    console.error("[cliente] vínculo dos sorteios", e),
+  );
 
   // Manda o acesso por e-mail. Se não sair (conta de e-mail desligada, mensagem
   // desligada no painel, servidor fora do ar), a tela mostra as credenciais do

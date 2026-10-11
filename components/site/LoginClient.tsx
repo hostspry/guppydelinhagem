@@ -71,7 +71,9 @@ export default function LoginClient({
         redirect: false,
       });
       if (!res || res.error) {
-        setErroSenha("WhatsApp, e-mail ou senha não conferem. Confira e tente de novo.");
+        setErroSenha(
+          "WhatsApp, e-mail ou senha não conferem. Se você já comprou com a gente mas nunca criou uma senha, toque em \"Esqueci a senha\" e use o e-mail do seu cadastro.",
+        );
         setCarregando(null);
         return;
       }

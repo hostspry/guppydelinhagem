@@ -9,6 +9,7 @@ import { enviarEmail } from "@/lib/email";
 import { botao } from "@/lib/emails/layout";
 import { montarEmail } from "@/lib/emails/render";
 import { chaveTelefone } from "@/lib/sorteios/telefone";
+import { vincularPeloCadastroDoUsuario } from "@/lib/sorteios/servico";
 
 /**
  * "Esqueci minha senha" do cliente.
@@ -100,14 +101,19 @@ async function criarAcessoDaFicha(email: string) {
     if (!mesmos.some((u) => u.telefone && chaveTelefone(u.telefone) === chave)) telefone = ficha.telefone;
   }
 
-  return prisma.$transaction(async (tx) => {
-    const user = await tx.user.create({
+  const user = await prisma.$transaction(async (tx) => {
+    const u = await tx.user.create({
       data: { email, nome: ficha.nome, name: ficha.nome, telefone, role: "CUSTOMER" },
       select: { id: true, nome: true, email: true },
     });
-    await tx.cliente.update({ where: { id: ficha.id }, data: { userId: user.id } });
-    return user;
+    await tx.cliente.update({ where: { id: ficha.id }, data: { userId: u.id } });
+    return u;
   });
+  // Créditos de sorteio do telefone da ficha já ficam na conta.
+  await vincularPeloCadastroDoUsuario(user.id).catch((e) =>
+    console.error("[recuperar-senha] vínculo dos sorteios", e),
+  );
+  return user;
 }
 
 /** Grava o token e manda o e-mail com o link. False se nem o token gravou. */
