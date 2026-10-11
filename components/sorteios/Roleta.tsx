@@ -198,6 +198,26 @@ export function Roleta({
     [som],
   );
 
+  /** Bipe da contagem: grave no 3, 2, 1 e agudo e mais longo na largada. */
+  const bipe = useCallback(
+    (largada: boolean) => {
+      if (!som || !audio.current) return;
+      const ctx = audio.current;
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.type = "square";
+      o.frequency.value = largada ? 1320 : 660;
+      const dur = largada ? 0.55 : 0.18;
+      g.gain.setValueAtTime(0.0001, ctx.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.16, ctx.currentTime + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + dur);
+      o.connect(g).connect(ctx.destination);
+      o.start();
+      o.stop(ctx.currentTime + dur + 0.02);
+    },
+    [som],
+  );
+
   /** Rufar de tambor: ruído grave com tremido, subindo até a revelação. */
   const rufar = useCallback((duracaoMs: number) => {
     if (!som || !audio.current) return () => {};
@@ -306,9 +326,11 @@ export function Roleta({
       if (usarContagem && !poucoMovimento) {
         for (const n of [3, 2, 1]) {
           setContagem(n);
+          bipe(false);
           await new Promise((ok) => setTimeout(ok, 900));
         }
         setContagem(null);
+        bipe(true);
       }
 
       const alvoBase = anguloAlvo(r.bilhete);
@@ -393,7 +415,7 @@ export function Roleta({
       setTimeout(() => setFinal(false), 1800);
       onConcluir?.(r);
     },
-    [anguloAlvo, bilheteSobPonteiro, fanfarra, onConcluir, passo, pintar, poucoMovimento, rufar, segmentos, soltarConfete, tique, total, usarContagem],
+    [anguloAlvo, bilheteSobPonteiro, bipe, fanfarra, onConcluir, passo, pintar, poucoMovimento, rufar, segmentos, soltarConfete, tique, total, usarContagem],
   );
 
   useEffect(() => () => pararRufar.current?.(), []);
@@ -444,14 +466,25 @@ export function Roleta({
         </BotaoIcone>
       </div>
 
-      <div className={`mx-auto grid items-center gap-6 px-4 pb-8 pt-16 sm:px-8 sm:py-8 ${telaCheia ? "max-w-[1400px] lg:grid-cols-[minmax(0,1fr)_420px]" : "max-w-5xl lg:grid-cols-[minmax(0,1fr)_340px]"}`}>
+      <div
+        className={`mx-auto grid items-center ${
+          telaCheia
+            ? // Tela cheia é para filmar: a roda ocupa quase a altura toda e o
+              // painel fica numa coluna estreita ao lado.
+              "grade-cheia w-full justify-center gap-4 px-4 py-3"
+            : "max-w-5xl gap-6 px-4 pb-8 pt-16 sm:px-8 sm:py-8 lg:grid-cols-[minmax(0,1fr)_340px]"
+        }`}
+      >
         {/* Roda */}
         <div
-          className="relative mx-auto w-full transition-transform duration-[1600ms] ease-in-out"
+          className={`relative mx-auto transition-transform duration-[1600ms] ease-in-out ${
+            telaCheia ? "roda-cheia" : "w-full"
+          }`}
           style={{
-            maxWidth: telaCheia ? "min(82vh, 820px)" : 560,
+            maxWidth: telaCheia ? undefined : 560,
             transformOrigin: "50% 8%",
-            transform: final && !poucoMovimento ? "scale(1.16)" : "none",
+            // Em tela cheia a roda já é enorme: zoom menor para não cobrir o painel.
+            transform: final && !poucoMovimento ? `scale(${telaCheia ? 1.07 : 1.16})` : "none",
           }}
         >
           <svg viewBox={`0 0 ${TAM} ${TAM}`} className="w-full drop-shadow-[0_20px_40px_rgba(0,0,0,0.45)]" role="img" aria-label={`Roleta com ${total} bilhetes`}>
@@ -551,7 +584,7 @@ export function Roleta({
         </div>
 
         {/* Painel lateral */}
-        <div className="space-y-4 text-center lg:text-left">
+        <div className="relative z-20 space-y-4 text-center lg:text-left">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#FAB82A]">Prêmio</p>
             <p className="text-2xl font-semibold leading-tight">{premio}</p>
@@ -602,6 +635,9 @@ export function Roleta({
         @keyframes contagem { from { transform: scale(1.8); opacity: 0 } 40% { opacity: 1 } to { transform: scale(1); opacity: 1 } }
         @keyframes vencedor { from { transform: scale(.6); opacity: 0 } to { transform: scale(1); opacity: 1 } }
         @keyframes piscar { 0% { opacity: 1 } 100% { opacity: .25 } }
+        .roda-cheia { width: min(calc(100vw - 2rem), 62vh); }
+        @media (min-width: 1024px) { .grade-cheia { grid-template-columns: auto 360px; column-gap: 2rem; } }
+        @media (min-width: 1024px) { .roda-cheia { width: min(96vh, calc(100vw - 440px)); } }
       `}</style>
     </div>
   );
