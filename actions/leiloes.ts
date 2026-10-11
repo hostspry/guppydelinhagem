@@ -7,7 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { assertPermissao } from "@/lib/permissoes-server";
 import { auditar } from "@/lib/auditoria";
 import { chaveTelefone } from "@/lib/sorteios/telefone";
-import { telefoneDoCadastro, variantesTelefone } from "@/lib/leiloes/telefone";
+import { acharOuCriarArrematante } from "@/lib/leiloes/arrematante";
 import { lerListaDeLotes } from "@/lib/leiloes/lista";
 import {
   fimDoDiaEmDias,
@@ -132,33 +132,6 @@ export async function excluirLeilao(id: string): Promise<ActionResult> {
 }
 
 // ── Arrematante ──────────────────────────────────────────────────────────────
-
-/**
- * Acha o cliente pelo WhatsApp (qualquer grafia do cadastro) ou cria um novo.
- * O número é a identidade do leilão: é por ele que o lote aparece na conta do
- * cliente depois que ele confirma o WhatsApp no site.
- */
-async function acharOuCriarArrematante(
-  nome: string,
-  telefone: string | null,
-): Promise<string> {
-  if (telefone) {
-    const existente = await prisma.cliente.findFirst({
-      where: { telefone: { in: variantesTelefone(telefone) } },
-      orderBy: { criadoEm: "asc" },
-      select: { id: true },
-    });
-    if (existente) return existente.id;
-  }
-  const novo = await prisma.cliente.create({
-    data: {
-      nome,
-      telefone: telefone ? telefoneDoCadastro(telefone) : null,
-    },
-    select: { id: true },
-  });
-  return novo.id;
-}
 
 /** Busca para o campo "quem arrematou" (nome ou pedaço do número). */
 export async function buscarArrematantes(
