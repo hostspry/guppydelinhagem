@@ -30,8 +30,14 @@ const CONFETE = ["#FF035C", "#FAB82A", "#07366A", "#FFFFFF", "#3B82F6"];
 const TAM = 1000;
 const C = TAM / 2;
 const R = 470;
-const DURACAO_MS = 11_000;
-const VOLTAS = 7;
+// Duas fases: o giro, que desacelera até quase parar no vizinho do vencedor, e
+// o rastejo final, em que a roda escorrega devagar até o bilhete sorteado. O
+// movimento nunca para no meio: velocidade contínua, só zera no fim.
+const GIRO_MS = 13_000;
+const RASTEJO_MIN_MS = 5_000;
+const RASTEJO_MAX_MS = 8_000;
+const PAUSA_REVELAR_MS = 1_100;
+const VOLTAS = 8;
 
 function ponto(angulo: number, raio: number) {
   const a = (angulo * Math.PI) / 180;
@@ -50,9 +56,12 @@ function arco(a0: number, a1: number, raio: number) {
   return `M ${C} ${C} L ${x0} ${y0} A ${raio} ${raio} 0 ${grande} 1 ${x1} ${y1} Z`;
 }
 
-/** Desaceleração longa no fim: a parte do suspense. */
-function suavizar(t: number) {
-  return 1 - Math.pow(1 - t, 4.2);
+/**
+ * Desaceleração do giro que termina com a inclinação `a` (velocidade final
+ * normalizada), para emendar no rastejo sem tranco.
+ */
+function suavizar(u: number, a: number) {
+  return (1 - a) * (1 - Math.pow(1 - u, 3.4)) + a * u;
 }
 
 function largura(total: number) {
@@ -87,9 +96,14 @@ export function Roleta({
   const confete = useRef<HTMLCanvasElement>(null);
   const anguloAtual = useRef(0);
   const audio = useRef<AudioContext | null>(null);
-  const ultimoTique = useRef({ fatia: -1, t: 0 });
+  const ultimoTique = useRef({ bilhete: -1, t: 0 });
+  const realce = useRef<SVGPathElement>(null);
+  const pararRufar = useRef<(() => void) | null>(null);
 
   const [girando, setGirando] = useState(false);
+  // Últimos segundos: zoom no ponteiro, bordas escuras, rufar.
+  const [final, setFinal] = useState(false);
+  const [clarao, setClarao] = useState(false);
   const [contagem, setContagem] = useState<number | null>(null);
   const [vencedor, setVencedor] = useState<ResultadoApresentado | null>(resultadoInicial ?? null);
   const [som, setSom] = useState(false);
@@ -135,7 +149,12 @@ export function Roleta({
       if (contador.current) contador.current.textContent = String(b).padStart(largura(total), "0");
       const idx = segmentos.findIndex((s) => b >= s.inicio && b <= s.fim);
       if (donoAoVivo.current) donoAoVivo.current.textContent = segmentos[idx]?.rotulo ?? "";
-      return idx;
+      const seg = segmentos[idx];
+      if (realce.current && seg && realce.current.dataset.idx !== String(idx)) {
+        realce.current.dataset.idx = String(idx);
+        realce.current.setAttribute("d", arco(seg.a0, seg.a1, R));
+      }
+      return { idx, b };
     },
     [bilheteSobPonteiro, segmentos, total],
   );
@@ -158,12 +177,13 @@ export function Roleta({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  /** Um tique por bilhete que passa no ponteiro (limitado no giro rápido). */
   const tique = useCallback(
-    (idx: number) => {
+    ({ b }: { b: number }) => {
       if (!som || !audio.current) return;
       const agora = performance.now();
-      if (idx === ultimoTique.current.fatia || agora - ultimoTique.current.t < 45) return;
-      ultimoTique.current = { fatia: idx, t: agora };
+      if (b === ultimoTique.current.bilhete || agora - ultimoTique.current.t < 45) return;
+      ultimoTique.current = { bilhete: b, t: agora };
       const ctx = audio.current;
       const o = ctx.createOscillator();
       const g = ctx.createGain();
@@ -177,6 +197,43 @@ export function Roleta({
     },
     [som],
   );
+
+  /** Rufar de tambor: ruído grave com tremido, subindo até a revelação. */
+  const rufar = useCallback((duracaoMs: number) => {
+    if (!som || !audio.current) return () => {};
+    const ctx = audio.current;
+    const buf = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
+    const dados = buf.getChannelData(0);
+    for (let i = 0; i < dados.length; i++) dados[i] = Math.random() * 2 - 1;
+    const ruido = ctx.createBufferSource();
+    ruido.buffer = buf;
+    ruido.loop = true;
+    const filtro = ctx.createBiquadFilter();
+    filtro.type = "bandpass";
+    filtro.frequency.value = 220;
+    filtro.Q.value = 0.9;
+    const tremido = ctx.createGain();
+    const lfo = ctx.createOscillator();
+    const lfoGanho = ctx.createGain();
+    lfo.frequency.value = 17;
+    lfoGanho.gain.value = 0.5;
+    tremido.gain.value = 0.5;
+    lfo.connect(lfoGanho).connect(tremido.gain);
+    const volume = ctx.createGain();
+    volume.gain.setValueAtTime(0.0001, ctx.currentTime);
+    volume.gain.exponentialRampToValueAtTime(0.35, ctx.currentTime + duracaoMs / 1000);
+    ruido.connect(filtro).connect(tremido).connect(volume).connect(ctx.destination);
+    ruido.start();
+    lfo.start();
+    return () => {
+      const t = ctx.currentTime;
+      volume.gain.cancelScheduledValues(t);
+      volume.gain.setValueAtTime(volume.gain.value, t);
+      volume.gain.exponentialRampToValueAtTime(0.0001, t + 0.08);
+      ruido.stop(t + 0.1);
+      lfo.stop(t + 0.1);
+    };
+  }, [som]);
 
   const fanfarra = useCallback(() => {
     if (!som || !audio.current) return;
@@ -265,18 +322,61 @@ export function Roleta({
         const base = de - (de % 360);
         let ate = base + 360 * VOLTAS + (((alvoBase % 360) + 360) % 360);
         if (ate - de < 360 * VOLTAS) ate += 360;
+
+        // Girando no horário, o ponteiro passa dos bilhetes maiores para os
+        // menores: antes do vencedor vem a fatia seguinte a ele. O giro termina
+        // dentro dela, perto da divisa, e o rastejo atravessa a divisa.
+        const phiAlvo = (((-ate) % 360) + 360) % 360;
+        const seg = segmentos.find((s) => r.bilhete >= s.inicio && r.bilhete <= s.fim);
+        const divisa = seg ? seg.fim * passo : phiAlvo;
+        const proximo = seg ? (seg.fim % total) + 1 : 1;
+        const vizinho = segmentos.find((s) => proximo >= s.inicio && proximo <= s.fim);
+        const larguraVizinho = vizinho && vizinho !== seg ? vizinho.a1 - vizinho.a0 : 20;
+        const entrada = Math.min(Math.max(larguraVizinho * 0.6, passo * 0.6), 14);
+        // Fatia grande do vencedor: o rastejo fica mais longo (e mais lento por
+        // grau não), para começar sempre no vizinho e o nome não sair cedo.
+        const rastejo = Math.min(divisa - phiAlvo + entrada, 75);
+        const RASTEJO_MS = Math.min(RASTEJO_MAX_MS, Math.max(RASTEJO_MIN_MS, 3_400 + rastejo * 62));
+
+        const fimGiro = ate - rastejo;
+        const vFinal = (2 * rastejo) / RASTEJO_MS; // graus/ms na emenda
+        const inclinacao = Math.min(0.9, (vFinal * GIRO_MS) / (fimGiro - de));
+
         await new Promise<void>((ok) => {
           const t0 = performance.now();
+          let entrouNoFinal = false;
           const quadro = (agora: number) => {
-            const t = Math.min(1, (agora - t0) / DURACAO_MS);
-            const rot = de + (ate - de) * suavizar(t);
+            const dt = agora - t0;
+            let rot: number;
+            if (dt < GIRO_MS) {
+              const u = dt / GIRO_MS;
+              rot = de + (fimGiro - de) * suavizar(u, inclinacao);
+              if (!entrouNoFinal && u > 0.86) {
+                entrouNoFinal = true;
+                setFinal(true);
+                pararRufar.current = rufar(RASTEJO_MS + GIRO_MS * 0.14);
+              }
+            } else {
+              // Rastejo: desaceleração constante até zerar exatamente no alvo.
+              const s = Math.min(dt - GIRO_MS, RASTEJO_MS);
+              rot = fimGiro + vFinal * s - (0.5 * vFinal * s * s) / RASTEJO_MS;
+            }
             anguloAtual.current = rot;
             tique(pintar(rot));
-            if (t < 1) requestAnimationFrame(quadro);
+            if (dt < GIRO_MS + RASTEJO_MS) requestAnimationFrame(quadro);
             else ok();
           };
           requestAnimationFrame(quadro);
         });
+
+        anguloAtual.current = ate;
+        pintar(ate);
+        // Parou. Um instante de silêncio antes de revelar.
+        pararRufar.current?.();
+        pararRufar.current = null;
+        await new Promise((ok) => setTimeout(ok, PAUSA_REVELAR_MS));
+        setClarao(true);
+        setTimeout(() => setClarao(false), 450);
       }
 
       // Conferência final: o bilhete sob o ponteiro tem que ser o do servidor.
@@ -290,10 +390,13 @@ export function Roleta({
       setVencedor(r);
       if (!poucoMovimento) soltarConfete();
       fanfarra();
+      setTimeout(() => setFinal(false), 1800);
       onConcluir?.(r);
     },
-    [anguloAlvo, bilheteSobPonteiro, fanfarra, onConcluir, pintar, poucoMovimento, soltarConfete, tique, usarContagem],
+    [anguloAlvo, bilheteSobPonteiro, fanfarra, onConcluir, passo, pintar, poucoMovimento, rufar, segmentos, soltarConfete, tique, total, usarContagem],
   );
+
+  useEffect(() => () => pararRufar.current?.(), []);
 
   const ultimaChave = useRef<number | null>(null);
   useEffect(() => {
@@ -343,7 +446,14 @@ export function Roleta({
 
       <div className={`mx-auto grid items-center gap-6 px-4 pb-8 pt-16 sm:px-8 sm:py-8 ${telaCheia ? "max-w-[1400px] lg:grid-cols-[minmax(0,1fr)_420px]" : "max-w-5xl lg:grid-cols-[minmax(0,1fr)_340px]"}`}>
         {/* Roda */}
-        <div className="relative mx-auto w-full" style={{ maxWidth: telaCheia ? "min(82vh, 820px)" : 560 }}>
+        <div
+          className="relative mx-auto w-full transition-transform duration-[1600ms] ease-in-out"
+          style={{
+            maxWidth: telaCheia ? "min(82vh, 820px)" : 560,
+            transformOrigin: "50% 8%",
+            transform: final && !poucoMovimento ? "scale(1.16)" : "none",
+          }}
+        >
           <svg viewBox={`0 0 ${TAM} ${TAM}`} className="w-full drop-shadow-[0_20px_40px_rgba(0,0,0,0.45)]" role="img" aria-label={`Roleta com ${total} bilhetes`}>
             <defs>
               <radialGradient id="brilho" cx="50%" cy="35%" r="65%">
@@ -356,12 +466,23 @@ export function Roleta({
             {/* Lâmpadas da borda */}
             {Array.from({ length: 36 }, (_, i) => {
               const [x, y] = ponto(i * 10, R + 16);
-              return <circle key={i} cx={x} cy={y} r={5} fill={i % 2 ? "#FFFFFF" : "#FFE3A3"} className={girando ? "animate-pulse" : ""} />;
+              return <circle key={i} cx={x} cy={y} r={5} fill={i % 2 ? "#FFFFFF" : "#FFE3A3"} className={final ? "animate-[piscar_0.35s_steps(2)_infinite]" : girando ? "animate-pulse" : ""} />;
             })}
             <g ref={giro} style={{ transformOrigin: `${C}px ${C}px`, willChange: "transform" }}>
               {segmentos.map((s, i) => (
                 <path key={i} d={arco(s.a0, s.a1, R)} fill={s.cor.fundo} stroke="#041E3D" strokeWidth={2} />
               ))}
+              {/* Fatia sob o ponteiro, acesa no final */}
+              <path
+                ref={realce}
+                d=""
+                fill="#FFFFFF"
+                stroke="#FFFFFF"
+                strokeWidth={6}
+                className="transition-opacity duration-500"
+                style={{ opacity: final ? 0.28 : 0 }}
+                pointerEvents="none"
+              />
               {marcas &&
                 Array.from({ length: total }, (_, i) => {
                   const [x0, y0] = ponto(i * passo, R);
@@ -438,7 +559,9 @@ export function Roleta({
           </div>
 
           <div className="rounded-xl bg-white/10 p-4 ring-1 ring-white/15">
-            <p className="text-xs uppercase tracking-[0.2em] text-white/60">Bilhete no ponteiro</p>
+            <p className="text-xs uppercase tracking-[0.2em] text-white/60">
+              {final && girando ? <span className="animate-pulse text-[#FAB82A]">Devagar… quem leva?</span> : "Bilhete no ponteiro"}
+            </p>
             <span ref={contador} className="block font-mono text-6xl font-bold tabular-nums tracking-wider text-white sm:text-7xl" aria-live="off">
               {"0".repeat(largura(total))}
             </span>
@@ -461,11 +584,24 @@ export function Roleta({
         </div>
       </div>
 
+      {/* Bordas escurecem no final; clarão na revelação */}
+      <div
+        className="pointer-events-none absolute inset-0 z-10 transition-opacity duration-1000"
+        style={{ opacity: final && !poucoMovimento ? 1 : 0, background: "radial-gradient(70% 60% at 50% 40%, transparent 40%, rgba(2,10,24,0.82) 100%)" }}
+        aria-hidden="true"
+      />
+      <div
+        className="pointer-events-none absolute inset-0 z-30 bg-white transition-opacity duration-300"
+        style={{ opacity: clarao ? 0.85 : 0 }}
+        aria-hidden="true"
+      />
+
       <canvas ref={confete} className="pointer-events-none absolute inset-0 h-full w-full" aria-hidden="true" />
 
       <style>{`
         @keyframes contagem { from { transform: scale(1.8); opacity: 0 } 40% { opacity: 1 } to { transform: scale(1); opacity: 1 } }
         @keyframes vencedor { from { transform: scale(.6); opacity: 0 } to { transform: scale(1); opacity: 1 } }
+        @keyframes piscar { 0% { opacity: 1 } 100% { opacity: .25 } }
       `}</style>
     </div>
   );
