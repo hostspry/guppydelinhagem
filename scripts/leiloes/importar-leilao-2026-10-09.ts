@@ -39,9 +39,9 @@ const PEIXES: Record<Lance, number> = {
   MESTRE_CRIADOR: 8,
   CONVENCIONAL: 4,
 };
-// "Pagamento em até 48h após o leilão": as cobranças saem no dia 11, então o
-// link fica aberto até o fim do dia seguinte.
-const PRAZO_DIAS = 1;
+// "Pagamento em até 48h": como o site só passou a cobrar no dia 11, o dono deu
+// 48h a partir daí. Cobrado no dia 11, o link vale até 13/10 às 23:59.
+const PRAZO_DIAS = 2;
 
 // Arrematante: nome da relação e o WhatsApp. Vinicius e Felipe vieram "a
 // confirmar"; o número é o que eles mesmos verificaram no site (sorteio).
