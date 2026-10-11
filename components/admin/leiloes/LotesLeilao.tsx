@@ -14,6 +14,7 @@ import {
 } from "@/actions/leiloes";
 import { SITUACAO_ARREMATE, type SituacaoArremate } from "@/lib/leiloes/situacao";
 import { formatTelefone } from "@/lib/utils/format";
+import { PEIXES_POR_LOTE } from "@/lib/validations/leilao";
 
 export type LoteLinha = {
   id: string;
@@ -291,7 +292,7 @@ function LoteForm({
           </FormField>
         </div>
         <FormField label="Peixes" name="qtdPeixes" error={erros.qtdPeixes?.[0]}>
-          <input id="qtdPeixes" name="qtdPeixes" type="number" min={1} max={50} defaultValue={lote?.qtdPeixes ?? 3} className={input} />
+          <input id="qtdPeixes" name="qtdPeixes" type="number" min={1} max={50} defaultValue={lote?.qtdPeixes ?? PEIXES_POR_LOTE} className={input} />
         </FormField>
         <FormField label="Valor (R$)" name="valor" required error={erros.valor?.[0]}>
           <input
@@ -390,8 +391,8 @@ function LoteForm({
 }
 
 const EXEMPLO = `Lote;Nome do lote;Arrematante;WhatsApp;Valor;Peixes
-1;Trio Red Silverado Albino;João Silva;27 99999-1234;150,00;3
-2;Casal Full Gold;;+55 21 96642-9563;90;2`;
+01;Red Silverado Albino;João Silva;27 99999-1234;155,00;4
+08;Leopardo Red Fire (Mestre Criador: 4 casais + 2 criadeiras MGV16 de brinde);;+55 21 96642-9563;600;8`;
 
 function ColarLista({ leilaoId, onFechar }: { leilaoId: string; onFechar: () => void }) {
   const router = useRouter();
@@ -425,9 +426,10 @@ function ColarLista({ leilaoId, onFechar }: { leilaoId: string; onFechar: () => 
       </div>
       <p className="text-xs text-gray-600 leading-relaxed">
         Uma linha por lote, nesta ordem: <strong>Lote; Nome do lote; Arrematante; WhatsApp; Valor; Peixes</strong>{" "}
-        (peixes é opcional, o padrão é 3). Dá para colar direto do Google Planilhas ou do Excel. Se
+        (peixes é opcional, o padrão é {PEIXES_POR_LOTE}, os 2 casais do vídeo). Dá para colar direto do Google Planilhas ou do Excel. Se
         o arrematante só tem o número, deixe o nome vazio. O mesmo WhatsApp em vários lotes vira um
-        cliente só, com uma cobrança só.
+        cliente só, com uma cobrança só. Xeque-Mate e Mestre Criador do mesmo lote entram como
+        linhas separadas, cada uma com o seu valor.
       </p>
       <textarea
         value={texto}

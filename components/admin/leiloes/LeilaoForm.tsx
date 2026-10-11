@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { FormField } from "@/components/admin/FormField";
 import { salvarLeilao } from "@/actions/leiloes";
+import { PRAZO_PADRAO_DIAS } from "@/lib/validations/leilao";
 
 const input =
   "w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:border-[#FF035C] focus:ring-1 focus:ring-[#FF035C]";
@@ -82,7 +83,7 @@ export function LeilaoForm({
             type="number"
             min={1}
             max={30}
-            defaultValue={leilao?.prazoPagamentoDias ?? 3}
+            defaultValue={leilao?.prazoPagamentoDias ?? PRAZO_PADRAO_DIAS}
             className={input}
           />
         </FormField>

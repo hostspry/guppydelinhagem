@@ -12,6 +12,15 @@ const valorBR = z
   .refine((v) => /^\d+(\.\d{1,2})?$/.test(v), "Valor inválido")
   .transform((v) => Number(v));
 
+/**
+ * Lote do leilão = os 2 casais do vídeo. Xeque-Mate também leva 2 casais e o
+ * Mestre Criador leva 4 (8 peixes): esses o admin ajusta no lote.
+ */
+export const PEIXES_POR_LOTE = 4;
+
+/** "Pagamento em até 48h após o leilão" (regra do grupo). */
+export const PRAZO_PADRAO_DIAS = 2;
+
 const inteiro = (def: number) =>
   z
     .string()
@@ -28,7 +37,7 @@ export const leilaoSchema = z.object({
   dataLeilao: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, "Informe a data do leilão"),
-  prazoPagamentoDias: inteiro(3).pipe(
+  prazoPagamentoDias: inteiro(PRAZO_PADRAO_DIAS).pipe(
     z.number().int().min(1, "Mínimo 1 dia").max(30, "Máximo 30 dias"),
   ),
   maxParcelas: inteiro(12).pipe(
@@ -49,7 +58,7 @@ export const loteSchema = z
       .trim()
       .min(2, "Informe o nome do lote")
       .max(120, "Nome muito longo"),
-    qtdPeixes: inteiro(3).pipe(
+    qtdPeixes: inteiro(PEIXES_POR_LOTE).pipe(
       z.number().int().min(1, "Mínimo 1 peixe").max(50, "Máximo 50 peixes"),
     ),
     valor: valorBR.refine((n) => n >= 1, "O valor mínimo é R$ 1,00"),

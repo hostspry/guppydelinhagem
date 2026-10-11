@@ -8,9 +8,16 @@
  * Trava: só roda em banco de teste, a não ser que LEILAO_PRODUCAO_AUTORIZADO=sim.
  * Não duplica: se o leilão já tiver lotes, para sem mexer em nada.
  *
- * Os lotes 08, 10 e 16 aparecem duas vezes (Xeque-Mate e Mestre Criador) e o 14
- * tem duas genéticas: a relação conta as 24 arrematações e fecha em R$ 7.300,00,
- * então cada linha vira um lote cobrado.
+ * Regras do leilão (mensagens do grupo, 09/10):
+ *  - lote normal = os 2 casais do vídeo;
+ *  - Xeque-Mate (R$ 300) = 2 casais + 1 criadeira MGV16 de brinde;
+ *  - Mestre Criador (R$ 600) = 4 casais + 2 criadeiras MGV16 de brinde, e
+ *    convive com o Xeque-Mate do mesmo lote (os dois são cobrados).
+ * Por isso 08, 10 e 16 aparecem duas vezes; o 14 teve duas genéticas. A relação
+ * fecha em 24 arrematações e R$ 7.300,00.
+ *
+ * Rodar de novo com os lotes já lançados e ainda sem cobrança REESCREVE nome,
+ * peixes e prazo (foi assim que entraram as regras acima, depois da 1ª carga).
  */
 import { prisma } from "@/lib/prisma";
 import { chaveTelefone } from "@/lib/sorteios/telefone";
@@ -23,10 +30,18 @@ const DIA = "2026-10-09";
 
 type Lance = "XEQUE_MATE" | "MESTRE_CRIADOR" | "CONVENCIONAL";
 const SUFIXO: Record<Lance, string> = {
-  XEQUE_MATE: " (Xeque-Mate)",
-  MESTRE_CRIADOR: " (Mestre Criador)",
+  XEQUE_MATE: " (Xeque-Mate: 2 casais + 1 criadeira MGV16 de brinde)",
+  MESTRE_CRIADOR: " (Mestre Criador: 4 casais + 2 criadeiras MGV16 de brinde)",
   CONVENCIONAL: "",
 };
+const PEIXES: Record<Lance, number> = {
+  XEQUE_MATE: 4,
+  MESTRE_CRIADOR: 8,
+  CONVENCIONAL: 4,
+};
+// "Pagamento em até 48h após o leilão": as cobranças saem no dia 11, então o
+// link fica aberto até o fim do dia seguinte.
+const PRAZO_DIAS = 1;
 
 // Arrematante: nome da relação e o WhatsApp. Vinicius e Felipe vieram "a
 // confirmar"; o número é o que eles mesmos verificaram no site (sorteio).
@@ -91,14 +106,51 @@ async function main() {
   const dataLeilao = meioDiaBRT(DIA);
   let leilao = await prisma.leilao.findFirst({ where: { nome: NOME, dataLeilao } });
   if (leilao) {
-    const n = await prisma.loteLeilao.count({ where: { leilaoId: leilao.id } });
-    if (n > 0) {
-      console.log(`Leilão já tem ${n} lote(s). Nada a fazer.`);
+    const existentes = await prisma.loteLeilao.findMany({
+      where: { leilaoId: leilao.id },
+      orderBy: { ordem: "asc" },
+      select: { id: true, ordem: true, orderId: true },
+    });
+    if (existentes.length > 0) {
+      const cobrados = existentes.filter((l) => l.orderId).length;
+      const mesmaCarga =
+        existentes.length === LOTES.length && existentes.every((l, i) => l.ordem === i + 1);
+      if (cobrados > 0 || !mesmaCarga) {
+        console.log(
+          `Leilão já tem ${existentes.length} lote(s) (${cobrados} cobrado(s)). Nada a fazer: corrija no painel.`,
+        );
+        return;
+      }
+      await prisma.$transaction([
+        prisma.leilao.update({ where: { id: leilao.id }, data: { prazoPagamentoDias: PRAZO_DIAS } }),
+        ...LOTES.map(([, genetica, lance], i) =>
+          prisma.loteLeilao.update({
+            where: { id: existentes[i].id },
+            data: { nome: genetica + SUFIXO[lance], qtdPeixes: PEIXES[lance] },
+          }),
+        ),
+      ]);
+      await prisma.auditoriaAdmin.create({
+        data: {
+          userNome: "Importação (script)",
+          userEmail: "",
+          userPapel: "Sistema",
+          acao: "leilao.lote.editar",
+          entidade: "Leilao",
+          entidadeId: leilao.id,
+          descricao: "Aplicou as regras do leilão de 09/10 aos 24 lotes (casais, brindes e peixes por lote) e o prazo de 48h",
+          depois: { prazoPagamentoDias: PRAZO_DIAS },
+        },
+      });
+      console.log(`Lotes atualizados com as regras; prazo de ${PRAZO_DIAS} dia(s).`);
+      LOTES.forEach(([numero, genetica, lance]) =>
+        console.log(`  ${rotuloLote({ numero, nome: genetica + SUFIXO[lance] })} · ${PEIXES[lance]} peixes`),
+      );
       return;
     }
   } else {
     leilao = await prisma.leilao.create({
-      data: { nome: NOME, dataLeilao, prazoPagamentoDias: 3, maxParcelas: 12 },
+      data: { nome: NOME, dataLeilao, prazoPagamentoDias: PRAZO_DIAS, maxParcelas: 12 },
     });
     console.log(`Leilão criado: ${leilao.id}`);
   }
@@ -131,7 +183,7 @@ async function main() {
           leilaoId: leilao!.id,
           numero,
           nome: genetica + SUFIXO[lance],
-          qtdPeixes: 3,
+          qtdPeixes: PEIXES[lance],
           valor,
           clienteId: clientes.get(pessoa)!,
           ordem: i + 1,

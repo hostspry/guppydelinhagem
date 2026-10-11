@@ -103,6 +103,7 @@ export async function getLeilaoAdmin(id: string) {
           tipoEntrega: true,
           modalidadeFrete: true,
           enderecoEntrega: true,
+          observacoes: true,
           cliente: {
             select: { id: true, nome: true, telefone: true, email: true },
           },
@@ -163,6 +164,8 @@ export async function getLeilaoAdmin(id: string) {
         valor: Number(i.precoUnitario),
       })),
       ultimoPagamento: ult ? { ...ult, valor: Number(ult.valor) } : null,
+      // Nota gravada por registrarPagamentoForaLeilao: "Pago por fora (PicPay)…".
+      pagoForaCom: /Pago por fora \(([^)]+)\)/.exec(p.observacoes ?? "")?.[1] ?? null,
     };
   });
 

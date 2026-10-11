@@ -15,8 +15,10 @@ import {
   rotuloLote,
   situacaoDoArremate,
 } from "@/lib/leiloes/situacao";
-import { leilaoSchema, loteSchema } from "@/lib/validations/leilao";
+import { leilaoSchema, loteSchema, PEIXES_POR_LOTE } from "@/lib/validations/leilao";
 import type { EnderecoEntrega } from "@/lib/validations/pedido";
+import { transicionarParaPago } from "@/lib/pedido-baixa";
+import { pedirConfirmacaoEnvioAereo } from "@/lib/gollog/confirmacao";
 import type { Prisma } from "@/lib/generated/prisma/client";
 import type { ActionResult } from "@/lib/utils/action-result";
 
@@ -187,6 +189,9 @@ async function refazerCobranca(tx: Tx, orderId: string): Promise<void> {
       frete: 0,
       total: subtotal,
       entregaEscolhidaEm: null,
+      tipoEntrega: "ENVIO",
+      transportadora: null,
+      modalidadeFrete: null,
       items: {
         deleteMany: {},
         create: o.lotesLeilao.map((l) => ({
@@ -401,7 +406,7 @@ export async function importarLotes(
       leilaoId,
       numero: l.numero,
       nome: l.nome,
-      qtdPeixes: l.qtdPeixes ?? 3,
+      qtdPeixes: l.qtdPeixes ?? PEIXES_POR_LOTE,
       valor: l.valor,
       clienteId: clientes[i],
       ordem: base + i + 1,
@@ -663,4 +668,98 @@ export async function renovarPrazoLeilao(
     success: true,
     message: `Prazo renovado até ${expiraEm.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })}.`,
   };
+}
+
+// ── Pago por fora ────────────────────────────────────────────────────────────
+
+const FORMAS_FORA = {
+  PIX: { forma: "PIX", rotulo: "Pix direto" },
+  PICPAY: { forma: "OUTRO", rotulo: "PicPay" },
+  OUTRO: { forma: "OUTRO", rotulo: "outro meio" },
+} as const;
+export type FormaPagamentoFora = keyof typeof FORMAS_FORA;
+
+/**
+ * O leilão também aceita Pix direto e PicPay, fora do site. Quem pagou assim
+ * não pode continuar com a cobrança em aberto (pagaria de novo pelo link):
+ * aqui a cobrança vira PAGA pelo mesmo caminho do painel (baixa, caixa) e o
+ * link passa a mostrar "pagamento confirmado".
+ *
+ * Frete: se o cliente já escolheu no link, vale o que ele escolheu. Se não,
+ * entra o frete informado aqui (o combinado no WhatsApp; 0 se ainda não houver).
+ */
+export async function registrarPagamentoForaLeilao(
+  orderId: string,
+  input: { forma: FormaPagamentoFora; frete: number },
+): Promise<ActionResult> {
+  const membro = await assertPermissao("pedidos.status");
+  const f = FORMAS_FORA[input.forma];
+  if (!f) return { success: false, error: "Forma de pagamento inválida." };
+
+  const o = await prisma.order.findFirst({
+    where: { id: orderId, origem: "LEILAO" },
+    select: {
+      id: true,
+      numero: true,
+      status: true,
+      expiraEm: true,
+      entregaEscolhidaEm: true,
+      subtotal: true,
+      frete: true,
+      modalidadeFrete: true,
+      observacoes: true,
+      leilaoId: true,
+    },
+  });
+  if (!o) return { success: false, error: "Cobrança não encontrada." };
+  const situacao = situacaoDoArremate(o);
+  if (situacao === "PAGA") return { success: true, message: "Já estava paga." };
+  if (situacao === "CANCELADA") {
+    return { success: false, error: "Cobrança cancelada. Gere de novo pelos lotes antes de registrar o pagamento." };
+  }
+
+  const freteInformado = Number(input.frete);
+  if (!o.entregaEscolhidaEm && (!Number.isFinite(freteInformado) || freteInformado < 0)) {
+    return { success: false, error: "Frete inválido." };
+  }
+  const frete = o.entregaEscolhidaEm ? Number(o.frete) : round2(freteInformado);
+  const total = round2(Number(o.subtotal) + frete);
+  const nota = `Pago por fora (${f.rotulo}), registrado por ${membro.nome}.`;
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      await tx.order.update({
+        where: { id: o.id },
+        data: {
+          formaPagamento: f.forma,
+          frete,
+          total,
+          observacoes: [o.observacoes, nota].filter(Boolean).join("\n"),
+        },
+      });
+      // Pix do link que ficou pendente não deve mais ser pago.
+      await tx.pagamento.updateMany({
+        where: { orderId: o.id, metodo: "PIX", status: "PENDENTE" },
+        data: { status: "EXPIRADO" },
+      });
+      await transicionarParaPago(tx, o.id);
+    });
+  } catch (e) {
+    console.error("[leilao] pago por fora", e);
+    return { success: false, error: "Não consegui registrar o pagamento." };
+  }
+
+  if (o.modalidadeFrete === "AEREO") void pedirConfirmacaoEnvioAereo(o.id);
+
+  await auditar(membro, {
+    acao: "leilao.cobranca.pago_fora",
+    entidade: "Order",
+    entidadeId: o.id,
+    descricao: `Registrou a cobrança ${o.numero} como paga por fora (${f.rotulo}), R$ ${total.toFixed(2)}`,
+    antes: { status: o.status, frete: Number(o.frete) },
+    depois: { status: "PAGO", frete, total, forma: f.rotulo },
+  });
+  if (o.leilaoId) revalidar(o.leilaoId);
+  revalidatePath(`/admin/pedidos/${o.id}`);
+  return { success: true, message: `Cobrança ${o.numero} marcada como paga (${f.rotulo}).` };
 }

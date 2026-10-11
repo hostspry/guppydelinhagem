@@ -6,13 +6,19 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
   Ban,
+  BadgeCheck,
   Check,
   Copy,
   ExternalLink,
   MessageCircle,
   RotateCcw,
 } from "lucide-react";
-import { cancelarCobrancaLeilao, renovarPrazoLeilao } from "@/actions/leiloes";
+import {
+  cancelarCobrancaLeilao,
+  registrarPagamentoForaLeilao,
+  renovarPrazoLeilao,
+  type FormaPagamentoFora,
+} from "@/actions/leiloes";
 import {
   SITUACAO_ARREMATE,
   arremateAberto,
@@ -28,12 +34,16 @@ export type CobrancaLinha = {
   frete: number;
   total: number;
   expiraEm: string | null; // ISO
+  /** O cliente já escolheu entrega/frete no link. */
+  entregaEscolhida: boolean;
   link: string | null;
   tipoEntrega: "ENVIO" | "RETIRADA";
   modalidadeFrete: string | null;
   destino: string | null;
   cliente: { id: string; nome: string; telefone: string | null; email: string | null };
   itens: { nome: string; valor: number }[];
+  /** Pago direto no Pix/PicPay (registrado no painel). */
+  pagoForaCom: string | null;
   ultimoPagamento: {
     metodo: string;
     status: string;
@@ -59,7 +69,10 @@ const STATUS_PAG: Record<string, string> = {
 };
 
 function entregaTexto(c: CobrancaLinha): string {
-  if (c.situacao === "ESCOLHER_ENTREGA") return "Cliente ainda não escolheu";
+  if (!c.entregaEscolhida) {
+    if (c.situacao !== "PAGA") return "Cliente ainda não escolheu";
+    return c.frete > 0 ? `Combinada por fora · ${moeda(c.frete)}` : "Combinada por fora";
+  }
   if (c.tipoEntrega === "RETIRADA") return "Retirada em Guarapari";
   const modo = c.modalidadeFrete === "AEREO" ? "Aéreo" : "Terrestre";
   return `${modo}${c.destino ? ` para ${c.destino}` : ""} · ${moeda(c.frete)}`;
@@ -123,6 +136,9 @@ function CartaoCobranca({ c, dataLeilao }: { c: CobrancaLinha; dataLeilao: strin
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [copiado, setCopiado] = useState<"link" | "msg" | null>(null);
+  const [foraAberto, setForaAberto] = useState(false);
+  const [forma, setForma] = useState<FormaPagamentoFora>("PIX");
+  const [freteFora, setFreteFora] = useState("");
   const s = SITUACAO_ARREMATE[c.situacao];
   const aberta = arremateAberto(c.situacao);
   const texto = mensagem(c, dataLeilao);
@@ -196,7 +212,9 @@ function CartaoCobranca({ c, dataLeilao }: { c: CobrancaLinha; dataLeilao: strin
         <div className="flex gap-1.5">
           <dt className="text-gray-400">Pagamento:</dt>
           <dd className="text-gray-700">
-            {pag
+            {c.pagoForaCom
+              ? `pago por fora (${c.pagoForaCom})`
+              : pag
               ? `${METODO[pag.metodo] ?? pag.metodo}${pag.parcelas && pag.parcelas > 1 ? ` ${pag.parcelas}x` : ""} ${STATUS_PAG[pag.status] ?? pag.status} em ${dia(pag.criadoEm)}`
               : "nenhuma tentativa ainda"}
           </dd>
@@ -246,7 +264,16 @@ function CartaoCobranca({ c, dataLeilao }: { c: CobrancaLinha; dataLeilao: strin
             </a>
           )}
           {c.situacao !== "PAGA" && (
-            <div className="ml-auto flex gap-2">
+            <div className="ml-auto flex flex-wrap gap-2">
+              <button
+                type="button"
+                disabled={isPending}
+                onClick={() => setForaAberto((v) => !v)}
+                className="inline-flex items-center gap-1.5 text-xs text-green-700 px-2 py-1.5 rounded-md hover:bg-green-50 disabled:opacity-60"
+              >
+                <BadgeCheck className="w-3.5 h-3.5" aria-hidden="true" />
+                Pago por fora
+              </button>
               <button
                 type="button"
                 disabled={isPending}
@@ -270,6 +297,60 @@ function CartaoCobranca({ c, dataLeilao }: { c: CobrancaLinha; dataLeilao: strin
               </button>
             </div>
           )}
+        </div>
+      )}
+
+      {foraAberto && c.situacao !== "PAGA" && c.situacao !== "CANCELADA" && (
+        <div className="mt-3 rounded-md border border-green-200 bg-green-50/60 p-3 text-xs space-y-2">
+          <p className="text-gray-700">
+            Para quem pagou direto no Pix ou no PicPay. A cobrança vira paga e o link para de
+            aceitar pagamento.
+          </p>
+          <div className="flex flex-wrap items-end gap-2">
+            <label className="space-y-1">
+              <span className="block text-gray-500">Como pagou</span>
+              <select
+                value={forma}
+                onChange={(e) => setForma(e.target.value as FormaPagamentoFora)}
+                className="border border-gray-300 rounded-md px-2 py-1.5 bg-white"
+              >
+                <option value="PIX">Pix direto</option>
+                <option value="PICPAY">PicPay</option>
+                <option value="OUTRO">Outro</option>
+              </select>
+            </label>
+            {!c.entregaEscolhida ? (
+              <label className="space-y-1">
+                <span className="block text-gray-500">Frete pago junto (R$)</span>
+                <input
+                  value={freteFora}
+                  onChange={(e) => setFreteFora(e.target.value)}
+                  inputMode="decimal"
+                  placeholder="0,00"
+                  className="w-24 border border-gray-300 rounded-md px-2 py-1.5 bg-white"
+                />
+              </label>
+            ) : (
+              <span className="text-gray-500 pb-1.5">Frete escolhido no link: {moeda(c.frete)}</span>
+            )}
+            <button
+              type="button"
+              disabled={isPending}
+              onClick={() => {
+                const frete = Number((freteFora || "0").replace(/\./g, "").replace(",", "."));
+                if (!Number.isFinite(frete) || frete < 0) {
+                  toast.error("Frete inválido.");
+                  return;
+                }
+                if (!confirm(`Marcar a cobrança de ${c.cliente.nome} como paga por fora?`)) return;
+                rodar(() => registrarPagamentoForaLeilao(c.id, { forma, frete }));
+                setForaAberto(false);
+              }}
+              className="bg-green-600 text-white font-medium px-3 py-1.5 rounded-md hover:brightness-110 disabled:opacity-60"
+            >
+              Confirmar pagamento
+            </button>
+          </div>
         </div>
       )}
     </div>

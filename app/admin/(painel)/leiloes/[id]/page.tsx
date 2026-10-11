@@ -71,6 +71,7 @@ export default async function LeilaoDetalhePage({
           cobrancas={l.cobrancas.map((c) => ({
             ...c,
             expiraEm: c.expiraEm ? c.expiraEm.toISOString() : null,
+            entregaEscolhida: !!c.entregaEscolhidaEm,
             ultimoPagamento: c.ultimoPagamento
               ? { ...c.ultimoPagamento, criadoEm: c.ultimoPagamento.criadoEm.toISOString() }
               : null,

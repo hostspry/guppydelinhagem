@@ -124,6 +124,22 @@ async function cotarOpcoes(cep: string, peixes: number, ufInformada?: string) {
       : { disponivel: true, preco: round2(jad.price), prazo: `${jad.deliveryTime} dias úteis` };
 
   const uf = cot.data.endereco?.uf || ufInformada || "";
+
+  // Regra do leilão: não enviamos para Belém-PA (nem terrestre nem aéreo).
+  const cidade = (cot.data.endereco?.cidade ?? "")
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase();
+  if (cidade === "belem" && uf.toUpperCase() === "PA") {
+    const motivo = "Não enviamos para Belém-PA. Me chame no WhatsApp para combinarmos.";
+    return {
+      ok: true as const,
+      endereco: cot.data.endereco,
+      terrestre: { disponivel: false, motivo } as OpcaoEntrega,
+      aereo: { disponivel: false, motivo } as OpcaoEntrega,
+    };
+  }
+
   const g = freteGollog(uf);
   const aereo: OpcaoEntrega = g
     ? { disponivel: true, preco: round2(g.preco), prazo: "1 a 2 dias úteis, retirada no aeroporto" }
