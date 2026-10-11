@@ -6,6 +6,7 @@ import { CobrancasLeilao } from "@/components/admin/leiloes/CobrancasLeilao";
 import { ExcluirLeilao } from "@/components/admin/leiloes/ExcluirLeilao";
 import { getLeilaoAdmin } from "@/lib/queries/leiloes";
 import { dataLeilaoBR, diaISO } from "@/lib/leiloes/situacao";
+import { mensagemCobrancaLeilao } from "@/lib/leiloes/mensagem";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +22,19 @@ export default async function LeilaoDetalhePage({
   if (!l) notFound();
 
   const data = dataLeilaoBR(l.dataLeilao);
+  // Texto de cobrança de cada arrematante (copiar e colar, ou mandar no WhatsApp).
+  const textos: Record<string, string> = Object.fromEntries(
+    l.cobrancas.map((c) => [
+      c.id,
+      mensagemCobrancaLeilao({
+        clienteNome: c.cliente.nome,
+        dataLeilao: data,
+        itens: c.itens,
+        subtotal: c.subtotal,
+        link: c.link,
+      }),
+    ]),
+  );
   const r = l.resumo;
   const cards = [
     { label: "Arrematado", valor: moeda.format(r.totalArrematado), extra: `${l.lotes.length} lote(s), ${r.arrematantes} arrematante(s)` },
@@ -60,16 +74,18 @@ export default async function LeilaoDetalhePage({
           qtdPeixes: x.qtdPeixes,
           valor: x.valor,
           cliente: x.cliente,
+          orderId: x.orderId,
           cobranca: x.cobranca,
         }))}
+        textos={textos}
       />
 
       <section className="space-y-3">
         <h2 className="text-sm font-semibold text-[#07366A]">Cobranças por arrematante</h2>
         <CobrancasLeilao
-          dataLeilao={data}
           cobrancas={l.cobrancas.map((c) => ({
             ...c,
+            texto: textos[c.id],
             entregaEscolhida: !!c.entregaEscolhidaEm,
             ultimoPagamento: c.ultimoPagamento
               ? { ...c.ultimoPagamento, criadoEm: c.ultimoPagamento.criadoEm.toISOString() }

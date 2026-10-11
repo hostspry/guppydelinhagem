@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { BadgeCheck, ClipboardPaste, Pencil, Plus, Send, Trash2, X } from "lucide-react";
+import { BadgeCheck, Check, ClipboardPaste, Copy, Pencil, Plus, Send, Trash2, X } from "lucide-react";
 import { FormField } from "@/components/admin/FormField";
 import {
   baixaManualArrematante,
@@ -25,6 +25,7 @@ export type LoteLinha = {
   qtdPeixes: number;
   valor: number;
   cliente: { id: string; nome: string; telefone: string | null };
+  orderId: string | null;
   cobranca: { numero: string; situacao: SituacaoArremate; freteEscolhido: number | null } | null;
 };
 
@@ -43,14 +44,29 @@ type Cliente = { id: string; nome: string; telefone: string | null };
 export function LotesLeilao({
   leilaoId,
   lotes,
+  textos = {},
 }: {
   leilaoId: string;
   lotes: LoteLinha[];
+  /** Texto de cobrança por pedido (orderId), para copiar direto da tabela. */
+  textos?: Record<string, string>;
 }) {
   const router = useRouter();
   const [painel, setPainel] = useState<"novo" | "colar" | null>(lotes.length ? null : "colar");
   const [editando, setEditando] = useState<LoteLinha | null>(null);
   const [baixaDe, setBaixaDe] = useState<Cliente | null>(null);
+  const [copiadoDe, setCopiadoDe] = useState<string | null>(null);
+
+  async function copiarCobranca(orderId: string, nome: string) {
+    try {
+      await navigator.clipboard.writeText(textos[orderId]);
+      setCopiadoDe(orderId);
+      toast.success(`Texto da cobrança de ${nome} copiado.`);
+      setTimeout(() => setCopiadoDe(null), 2000);
+    } catch {
+      toast.error("Não consegui copiar. Use o botão no cartão da cobrança, mais abaixo.");
+    }
+  }
   const [isPending, startTransition] = useTransition();
 
   // Lotes ainda não pagos do arrematante da baixa manual. O frete do link só
@@ -198,9 +214,22 @@ export function LotesLeilao({
                     <td className="px-4 py-2.5 text-right font-medium text-gray-800">{moeda(l.valor)}</td>
                     <td className="px-4 py-2.5">
                       {s && l.cobranca && l.cobranca.situacao !== "CANCELADA" ? (
-                        <span className={`text-xs px-2 py-0.5 rounded-full ${s.badge}`} title={l.cobranca.numero}>
-                          {s.label}
-                        </span>
+                        <div className="flex flex-col items-start gap-1">
+                          <span className={`text-xs px-2 py-0.5 rounded-full whitespace-nowrap ${s.badge}`} title={l.cobranca.numero}>
+                            {s.label}
+                          </span>
+                          {!pago && l.orderId && textos[l.orderId] && (
+                            <button
+                              type="button"
+                              onClick={() => copiarCobranca(l.orderId!, l.cliente.nome)}
+                              className="inline-flex items-center gap-1 text-[11px] font-medium text-[#07366A] hover:underline"
+                              title="Copia o texto com os lotes deste arrematante, o total, o frete e o link de pagamento"
+                            >
+                              {copiadoDe === l.orderId ? <Check className="w-3 h-3 text-green-600" /> : <Copy className="w-3 h-3" />}
+                              Copiar cobrança
+                            </button>
+                          )}
+                        </div>
                       ) : (
                         <span className="text-xs text-gray-400">sem cobrança</span>
                       )}

@@ -23,7 +23,6 @@ import {
   type SituacaoArremate,
 } from "@/lib/leiloes/situacao";
 import { formatTelefone } from "@/lib/utils/format";
-import { mensagemCobrancaLeilao } from "@/lib/leiloes/mensagem";
 
 export type CobrancaLinha = {
   id: string;
@@ -40,6 +39,8 @@ export type CobrancaLinha = {
   destino: string | null;
   cliente: { id: string; nome: string; telefone: string | null; email: string | null };
   itens: { nome: string; valor: number }[];
+  /** Texto de cobrança pronto para copiar (lotes, total, frete e link). */
+  texto: string;
   /** Pago direto no Pix/PicPay (registrado no painel). */
   pagoForaCom: string | null;
   ultimoPagamento: {
@@ -68,7 +69,7 @@ const STATUS_PAG: Record<string, string> = {
 
 function entregaTexto(c: CobrancaLinha): string {
   if (!c.entregaEscolhida) {
-    if (c.situacao !== "PAGA") return "o cliente vê pelo CEP e escolhe ao pagar";
+    if (c.situacao !== "PAGA") return "o cliente confere pelo CEP e escolhe terrestre ou aéreo ao pagar";
     return c.frete > 0 ? `Combinada por fora · ${moeda(c.frete)}` : "Combinada por fora";
   }
   if (c.tipoEntrega === "RETIRADA") return "Retirada em Guarapari";
@@ -76,13 +77,7 @@ function entregaTexto(c: CobrancaLinha): string {
   return `${modo}${c.destino ? ` para ${c.destino}` : ""} · ${moeda(c.frete)}`;
 }
 
-export function CobrancasLeilao({
-  cobrancas,
-  dataLeilao,
-}: {
-  cobrancas: CobrancaLinha[];
-  dataLeilao: string;
-}) {
+export function CobrancasLeilao({ cobrancas }: { cobrancas: CobrancaLinha[] }) {
   const [mostrarCanceladas, setMostrarCanceladas] = useState(false);
   const visiveis = cobrancas.filter((c) => mostrarCanceladas || c.situacao !== "CANCELADA");
   const canceladas = cobrancas.length - cobrancas.filter((c) => c.situacao !== "CANCELADA").length;
@@ -99,7 +94,7 @@ export function CobrancasLeilao({
   return (
     <div className="space-y-3">
       {visiveis.map((c) => (
-        <CartaoCobranca key={c.id} c={c} dataLeilao={dataLeilao} />
+        <CartaoCobranca key={c.id} c={c} />
       ))}
       {canceladas > 0 && (
         <button
@@ -114,21 +109,15 @@ export function CobrancasLeilao({
   );
 }
 
-function CartaoCobranca({ c, dataLeilao }: { c: CobrancaLinha; dataLeilao: string }) {
+function CartaoCobranca({ c }: { c: CobrancaLinha }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [copiado, setCopiado] = useState<"link" | "msg" | null>(null);
   const [foraAberto, setForaAberto] = useState(false);
   const s = SITUACAO_ARREMATE[c.situacao];
   const aberta = arremateAberto(c.situacao);
-  // Mensagem pronta para o WhatsApp: o dono só confere e aperta enviar.
-  const texto = mensagemCobrancaLeilao({
-    clienteNome: c.cliente.nome,
-    dataLeilao,
-    itens: c.itens,
-    subtotal: c.subtotal,
-    link: c.link,
-  });
+  // Texto pronto (montado no servidor): o dono só confere e envia.
+  const texto = c.texto;
 
   const digitos = (c.cliente.telefone ?? "").replace(/\D/g, "");
   const comDdi = digitos ? (digitos.length <= 11 ? `55${digitos}` : digitos) : "";
@@ -223,10 +212,10 @@ function CartaoCobranca({ c, dataLeilao }: { c: CobrancaLinha; dataLeilao: strin
               <button
                 type="button"
                 onClick={() => copiar(texto, "msg")}
-                className="inline-flex items-center gap-1.5 border border-gray-300 text-xs px-3 py-1.5 rounded-md hover:bg-gray-50"
+                className="inline-flex items-center gap-1.5 bg-[#07366A] text-white text-xs font-medium px-3 py-1.5 rounded-md hover:brightness-110"
               >
-                {copiado === "msg" ? <Check className="w-3.5 h-3.5 text-green-600" /> : <Copy className="w-3.5 h-3.5" />}
-                Copiar mensagem
+                {copiado === "msg" ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                Copiar texto da cobrança
               </button>
               <button
                 type="button"
