@@ -33,7 +33,7 @@ export default async function LeilaoDetalhePage({
     <div className="space-y-6">
       <PageHeader
         title={l.nome}
-        description={`Leilão de ${data} · prazo de ${l.prazoPagamentoDias} dia(s) para pagar · até ${l.maxParcelas}x no cartão`}
+        description={`Leilão de ${data} · até ${l.maxParcelas}x no cartão · o link não vence`}
         breadcrumb={[
           { label: "Admin", href: "/admin" },
           { label: "Leilões", href: "/admin/leiloes" },
@@ -70,7 +70,6 @@ export default async function LeilaoDetalhePage({
           dataLeilao={data}
           cobrancas={l.cobrancas.map((c) => ({
             ...c,
-            expiraEm: c.expiraEm ? c.expiraEm.toISOString() : null,
             entregaEscolhida: !!c.entregaEscolhidaEm,
             ultimoPagamento: c.ultimoPagamento
               ? { ...c.ultimoPagamento, criadoEm: c.ultimoPagamento.criadoEm.toISOString() }
@@ -81,7 +80,7 @@ export default async function LeilaoDetalhePage({
 
       <details className="group">
         <summary className="cursor-pointer text-sm font-medium text-gray-600 hover:text-[#07366A] select-none">
-          Dados do leilão (nome, data, prazo, parcelas)
+          Dados do leilão (nome, data, parcelas)
         </summary>
         <div className="mt-3 space-y-3">
           <LeilaoForm
@@ -89,14 +88,12 @@ export default async function LeilaoDetalhePage({
               id: l.id,
               nome: l.nome,
               dataLeilao: diaISO(l.dataLeilao),
-              prazoPagamentoDias: l.prazoPagamentoDias,
               maxParcelas: l.maxParcelas,
               observacoes: l.observacoes,
             }}
           />
           <p className="text-xs text-gray-400">
-            Prazo e parcelas valem para as próximas cobranças. As já geradas mantêm o que tinham
-            (use &quot;+3 dias de prazo&quot; na cobrança).
+            As parcelas valem para as próximas cobranças; as já geradas mantêm o que tinham.
           </p>
           {l.cobrancas.length === 0 && <ExcluirLeilao id={l.id} nome={l.nome} />}
         </div>

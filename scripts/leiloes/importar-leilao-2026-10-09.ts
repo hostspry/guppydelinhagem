@@ -1,7 +1,6 @@
 /**
  * Lança o leilão de 09/10/2026 e os 24 lotes arrematados (relação enviada pelo
- * dono em 11/10/2026). NÃO gera as cobranças: isso é o "Cobrar todos" no painel,
- * que começa a contar o prazo de pagamento.
+ * dono em 11/10/2026). NÃO gera as cobranças: isso é o "Cobrar todos" no painel.
  *
  *   npx tsx --conditions=react-server scripts/leiloes/importar-leilao-2026-10-09.ts
  *
@@ -16,8 +15,8 @@
  * Por isso 08, 10 e 16 aparecem duas vezes; o 14 teve duas genéticas. A relação
  * fecha em 24 arrematações e R$ 7.300,00.
  *
- * Rodar de novo com os lotes já lançados e ainda sem cobrança REESCREVE nome,
- * peixes e prazo (foi assim que entraram as regras acima, depois da 1ª carga).
+ * Rodar de novo com os lotes já lançados e ainda sem cobrança REESCREVE nome e
+ * peixes (foi assim que entraram as regras acima, depois da 1ª carga).
  */
 import { prisma } from "@/lib/prisma";
 import { chaveTelefone } from "@/lib/sorteios/telefone";
@@ -39,9 +38,7 @@ const PEIXES: Record<Lance, number> = {
   MESTRE_CRIADOR: 8,
   CONVENCIONAL: 4,
 };
-// "Pagamento em até 48h": como o site só passou a cobrar no dia 11, o dono deu
-// 48h a partir daí. Cobrado no dia 11, o link vale até 13/10 às 23:59.
-const PRAZO_DIAS = 2;
+// Sem prazo no link: o "pagar em até 48h" é combinado, não trava (dono, 11/10).
 
 // Arrematante: nome da relação e o WhatsApp. Vinicius e Felipe vieram "a
 // confirmar"; o número é o que eles mesmos verificaram no site (sorteio).
@@ -122,7 +119,6 @@ async function main() {
         return;
       }
       await prisma.$transaction([
-        prisma.leilao.update({ where: { id: leilao.id }, data: { prazoPagamentoDias: PRAZO_DIAS } }),
         ...LOTES.map(([, genetica, lance], i) =>
           prisma.loteLeilao.update({
             where: { id: existentes[i].id },
@@ -138,11 +134,10 @@ async function main() {
           acao: "leilao.lote.editar",
           entidade: "Leilao",
           entidadeId: leilao.id,
-          descricao: "Aplicou as regras do leilão de 09/10 aos 24 lotes (casais, brindes e peixes por lote) e o prazo de 48h",
-          depois: { prazoPagamentoDias: PRAZO_DIAS },
+          descricao: "Aplicou as regras do leilão de 09/10 aos 24 lotes (casais, brindes e peixes por lote)",
         },
       });
-      console.log(`Lotes atualizados com as regras; prazo de ${PRAZO_DIAS} dia(s).`);
+      console.log("Lotes atualizados com as regras.");
       LOTES.forEach(([numero, genetica, lance]) =>
         console.log(`  ${rotuloLote({ numero, nome: genetica + SUFIXO[lance] })} · ${PEIXES[lance]} peixes`),
       );
@@ -150,7 +145,7 @@ async function main() {
     }
   } else {
     leilao = await prisma.leilao.create({
-      data: { nome: NOME, dataLeilao, prazoPagamentoDias: PRAZO_DIAS, maxParcelas: 12 },
+      data: { nome: NOME, dataLeilao, maxParcelas: 12 },
     });
     console.log(`Leilão criado: ${leilao.id}`);
   }

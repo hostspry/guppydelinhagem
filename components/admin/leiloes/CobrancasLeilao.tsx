@@ -11,12 +11,10 @@ import {
   Copy,
   ExternalLink,
   MessageCircle,
-  RotateCcw,
 } from "lucide-react";
 import {
   cancelarCobrancaLeilao,
   registrarPagamentoForaLeilao,
-  renovarPrazoLeilao,
   type FormaPagamentoFora,
 } from "@/actions/leiloes";
 import {
@@ -33,7 +31,6 @@ export type CobrancaLinha = {
   subtotal: number;
   frete: number;
   total: number;
-  expiraEm: string | null; // ISO
   /** O cliente já escolheu entrega/frete no link. */
   entregaEscolhida: boolean;
   link: string | null;
@@ -83,14 +80,13 @@ function mensagem(c: CobrancaLinha, dataLeilao: string): string {
   const primeiro = c.cliente.nome.trim().split(/\s+/)[0] ?? "";
   const ola = /^\+?\d[\d\s()-]+$/.test(primeiro) ? "Oi" : `Oi ${primeiro}`;
   const lotes = c.itens.map((i) => `${i.nome} (${moeda(i.valor)})`).join("\n");
-  const prazo = c.expiraEm ? ` Dá para pagar até ${dia(c.expiraEm)}.` : "";
   const titulo =
     c.itens.length === 1
       ? `Parabéns pelo lote arrematado no leilão de ${dataLeilao}!`
       : `Parabéns pelos ${c.itens.length} lotes arrematados no leilão de ${dataLeilao}!`;
   return (
     `${ola}, tudo bem? ${titulo}\n\n${lotes}\n\nTotal dos lotes: ${moeda(c.subtotal)}\n\n` +
-    `Neste link você escolhe o frete e paga no Pix ou no cartão.${prazo}\n${c.link ?? ""}`
+    `Neste link você escolhe o frete e paga no Pix ou no cartão.\n${c.link ?? ""}`
   );
 }
 
@@ -182,7 +178,6 @@ function CartaoCobranca({ c, dataLeilao }: { c: CobrancaLinha; dataLeilao: strin
               {c.numero}
             </Link>
             {c.cliente.telefone && ` · ${formatTelefone(c.cliente.telefone)}`}
-            {c.expiraEm && c.situacao !== "PAGA" && c.situacao !== "CANCELADA" && ` · vence ${dia(c.expiraEm)}`}
           </p>
         </div>
         <div className="text-right">
@@ -273,15 +268,6 @@ function CartaoCobranca({ c, dataLeilao }: { c: CobrancaLinha; dataLeilao: strin
               >
                 <BadgeCheck className="w-3.5 h-3.5" aria-hidden="true" />
                 Pago por fora
-              </button>
-              <button
-                type="button"
-                disabled={isPending}
-                onClick={() => rodar(() => renovarPrazoLeilao(c.id, 3))}
-                className="inline-flex items-center gap-1.5 text-xs text-gray-600 px-2 py-1.5 rounded-md hover:bg-gray-100 disabled:opacity-60"
-              >
-                <RotateCcw className="w-3.5 h-3.5" aria-hidden="true" />
-                +3 dias de prazo
               </button>
               <button
                 type="button"

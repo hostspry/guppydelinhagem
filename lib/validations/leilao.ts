@@ -18,9 +18,6 @@ const valorBR = z
  */
 export const PEIXES_POR_LOTE = 4;
 
-/** "Pagamento em até 48h após o leilão" (regra do grupo). */
-export const PRAZO_PADRAO_DIAS = 2;
-
 const inteiro = (def: number) =>
   z
     .string()
@@ -37,9 +34,6 @@ export const leilaoSchema = z.object({
   dataLeilao: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, "Informe a data do leilão"),
-  prazoPagamentoDias: inteiro(PRAZO_PADRAO_DIAS).pipe(
-    z.number().int().min(1, "Mínimo 1 dia").max(30, "Máximo 30 dias"),
-  ),
   maxParcelas: inteiro(12).pipe(
     z.number().int().min(1, "Mínimo 1x").max(12, "Máximo 12x"),
   ),

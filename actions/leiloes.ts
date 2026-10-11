@@ -10,7 +10,6 @@ import { chaveTelefone } from "@/lib/sorteios/telefone";
 import { acharOuCriarArrematante } from "@/lib/leiloes/arrematante";
 import { lerListaDeLotes } from "@/lib/leiloes/lista";
 import {
-  fimDoDiaEmDias,
   meioDiaBRT,
   rotuloLote,
   situacaoDoArremate,
@@ -56,7 +55,6 @@ export async function salvarLeilao(
   const parsed = leilaoSchema.safeParse({
     nome: formData.get("nome"),
     dataLeilao: formData.get("dataLeilao"),
-    prazoPagamentoDias: formData.get("prazoPagamentoDias") ?? "",
     maxParcelas: formData.get("maxParcelas") ?? "",
     observacoes: formData.get("observacoes") ?? "",
   });
@@ -71,7 +69,6 @@ export async function salvarLeilao(
   const data = {
     nome: d.nome,
     dataLeilao: meioDiaBRT(d.dataLeilao),
-    prazoPagamentoDias: d.prazoPagamentoDias,
     maxParcelas: d.maxParcelas,
     observacoes: nullify(d.observacoes),
   };
@@ -88,7 +85,6 @@ export async function salvarLeilao(
       antes: {
         nome: antes.nome,
         dataLeilao: antes.dataLeilao,
-        prazoPagamentoDias: antes.prazoPagamentoDias,
         maxParcelas: antes.maxParcelas,
       },
       depois: data,
@@ -189,6 +185,7 @@ async function refazerCobranca(tx: Tx, orderId: string): Promise<void> {
       frete: 0,
       total: subtotal,
       entregaEscolhidaEm: null,
+      expiraEm: null, // cobrança antiga com validade volta a aceitar pagamento
       tipoEntrega: "ENVIO",
       transportadora: null,
       modalidadeFrete: null,
@@ -438,7 +435,7 @@ export async function cobrarArrematantes(leilaoId: string): Promise<ActionResult
   const membro = await assertPermissao("pedidos.editar");
   const leilao = await prisma.leilao.findUnique({
     where: { id: leilaoId },
-    select: { id: true, nome: true, prazoPagamentoDias: true, maxParcelas: true },
+    select: { id: true, nome: true, maxParcelas: true },
   });
   if (!leilao) return { success: false, error: "Leilão não encontrado." };
 
@@ -471,7 +468,7 @@ export async function cobrarArrematantes(leilaoId: string): Promise<ActionResult
             pagamentos: { none: { status: { in: ["PAGO", "EM_ANALISE"] } } },
           },
           orderBy: { criadoEm: "desc" },
-          select: { id: true, expiraEm: true },
+          select: { id: true },
         });
         if (aberta) {
           await tx.loteLeilao.updateMany({
@@ -479,12 +476,6 @@ export async function cobrarArrematantes(leilaoId: string): Promise<ActionResult
             data: { orderId: aberta.id },
           });
           await refazerCobranca(tx, aberta.id);
-          // Lote novo ganha o prazo inteiro, mesmo que a cobrança já estivesse
-          // perto de vencer (ou vencida).
-          const prazo = fimDoDiaEmDias(leilao.prazoPagamentoDias);
-          if (!aberta.expiraEm || aberta.expiraEm < prazo) {
-            await tx.order.update({ where: { id: aberta.id }, data: { expiraEm: prazo } });
-          }
           return "somada" as const;
         }
 
@@ -537,7 +528,8 @@ export async function cobrarArrematantes(leilaoId: string): Promise<ActionResult
             total: subtotal,
             // 128 bits: o número do pedido é sequencial, o link não pode ser.
             publicToken: randomBytes(16).toString("hex"),
-            expiraEm: fimDoDiaEmDias(leilao.prazoPagamentoDias),
+            // Sem validade: o link do leilão não vence (decisão do dono). O
+            // combinado de pagar em 48h é conversa, não trava.
             maxParcelas: leilao.maxParcelas,
             observacoes: `Arremate: ${leilao.nome}`,
             items: {
@@ -633,40 +625,6 @@ export async function cancelarCobrancaLeilao(orderId: string): Promise<ActionRes
   return {
     success: true,
     message: "Cobrança cancelada. Os lotes voltaram para a lista sem cobrança.",
-  };
-}
-
-/** Mais prazo para quem ainda não pagou. */
-export async function renovarPrazoLeilao(
-  orderId: string,
-  dias = 3,
-): Promise<ActionResult> {
-  const membro = await assertPermissao("pedidos.editar");
-  const o = await cobrancaDoLeilao(orderId);
-  if (!o) return { success: false, error: "Cobrança não encontrada." };
-  const situacao = situacaoDoArremate(o);
-  if (situacao === "PAGA") return { success: false, error: "Esta cobrança já foi paga." };
-  if (situacao === "CANCELADA") {
-    return { success: false, error: "Cobrança cancelada. Clique em Cobrar para gerar uma nova com os lotes." };
-  }
-  const validade = Math.min(Math.max(Math.round(dias), 1), 30);
-  // Soma ao prazo atual quando ele ainda corre; vencida conta a partir de hoje.
-  const agora = new Date();
-  const base = o.expiraEm && o.expiraEm > agora ? o.expiraEm : agora;
-  const expiraEm = fimDoDiaEmDias(validade, base);
-  await prisma.order.update({ where: { id: orderId }, data: { expiraEm } });
-  await auditar(membro, {
-    acao: "leilao.cobranca.prazo",
-    entidade: "Order",
-    entidadeId: orderId,
-    descricao: `Deu mais ${validade} dia(s) para pagar a cobrança ${o.numero}`,
-    antes: { expiraEm: o.expiraEm },
-    depois: { expiraEm },
-  });
-  if (o.leilaoId) revalidar(o.leilaoId);
-  return {
-    success: true,
-    message: `Prazo renovado até ${expiraEm.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })}.`,
   };
 }
 

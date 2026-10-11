@@ -64,7 +64,6 @@ export async function getLeilaoAdmin(id: string) {
       id: true,
       nome: true,
       dataLeilao: true,
-      prazoPagamentoDias: true,
       maxParcelas: true,
       observacoes: true,
       lotes: {
@@ -152,7 +151,6 @@ export async function getLeilaoAdmin(id: string) {
       frete: Number(p.frete),
       total: Number(p.total),
       criadoEm: p.criadoEm,
-      expiraEm: p.expiraEm,
       entregaEscolhidaEm: p.entregaEscolhidaEm,
       link: p.publicToken ? linkDoArremate(p.publicToken) : null,
       tipoEntrega: p.tipoEntrega,
@@ -188,7 +186,6 @@ export async function getLeilaoAdmin(id: string) {
     id: l.id,
     nome: l.nome,
     dataLeilao: l.dataLeilao,
-    prazoPagamentoDias: l.prazoPagamentoDias,
     maxParcelas: l.maxParcelas,
     observacoes: l.observacoes,
     lotes,
@@ -306,7 +303,6 @@ export async function getArrematePorToken(token: string) {
     subtotal: Number(o.subtotal),
     frete: Number(o.frete),
     total,
-    expiraEm: o.expiraEm,
     maxParcelas: o.maxParcelas ?? 12,
     entrega: o.entregaEscolhidaEm
       ? {

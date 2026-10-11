@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { FormField } from "@/components/admin/FormField";
 import { salvarLeilao } from "@/actions/leiloes";
-import { PRAZO_PADRAO_DIAS } from "@/lib/validations/leilao";
 
 const input =
   "w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:border-[#FF035C] focus:ring-1 focus:ring-[#FF035C]";
@@ -19,7 +18,6 @@ export function LeilaoForm({
     id: string;
     nome: string;
     dataLeilao: string; // AAAA-MM-DD
-    prazoPagamentoDias: number;
     maxParcelas: number;
     observacoes: string | null;
   };
@@ -61,29 +59,13 @@ export function LeilaoForm({
         />
       </FormField>
 
-      <div className="grid gap-x-4 sm:grid-cols-3">
+      <div className="grid gap-x-4 sm:grid-cols-2">
         <FormField label="Data do leilão" name="dataLeilao" required error={erros.dataLeilao?.[0]}>
           <input
             id="dataLeilao"
             name="dataLeilao"
             type="date"
             defaultValue={leilao?.dataLeilao}
-            className={input}
-          />
-        </FormField>
-        <FormField
-          label="Prazo para pagar (dias)"
-          name="prazoPagamentoDias"
-          error={erros.prazoPagamentoDias?.[0]}
-          hint="Contado de quando a cobrança é gerada."
-        >
-          <input
-            id="prazoPagamentoDias"
-            name="prazoPagamentoDias"
-            type="number"
-            min={1}
-            max={30}
-            defaultValue={leilao?.prazoPagamentoDias ?? PRAZO_PADRAO_DIAS}
             className={input}
           />
         </FormField>

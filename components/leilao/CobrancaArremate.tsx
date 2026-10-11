@@ -1,4 +1,4 @@
-import { CheckCircle2, Clock, Gavel, Hourglass, XCircle } from "lucide-react";
+import { CheckCircle2, Gavel, Hourglass, XCircle } from "lucide-react";
 import { WhatsAppIcon } from "@/components/icons/WhatsAppIcon";
 import PagamentoArremate from "@/components/leilao/PagamentoArremate";
 import { whatsappLink, WHATSAPP_DISPLAY } from "@/lib/constants";
@@ -21,9 +21,6 @@ export default function CobrancaArremate({
   mostrarSaudacao?: boolean;
 }) {
   const primeiroNome = a.pagador.nome.trim().split(/\s+/)[0] ?? "";
-  const prazo = a.expiraEm
-    ? a.expiraEm.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })
-    : null;
   const aberta = arremateAberto(a.situacao);
 
   return (
@@ -79,13 +76,9 @@ export default function CobrancaArremate({
         </div>
       ) : aberta ? (
         <>
-          {prazo && (
-            <p className="flex items-center gap-1.5 text-sm text-gray-600">
-              <Clock className="w-4 h-4 text-gray-400" aria-hidden="true" />
-              Pague até {prazo}. Pix cai na hora; no cartão dá para parcelar em até{" "}
-              {a.maxParcelas}x.
-            </p>
-          )}
+          <p className="text-sm text-gray-600">
+            Pix cai na hora; no cartão dá para parcelar em até {a.maxParcelas}x.
+          </p>
           <PagamentoArremate
             token={token}
             mpPublicKey={process.env.MP_PUBLIC_KEY || process.env.NEXT_PUBLIC_MP_PUBLIC_KEY || null}

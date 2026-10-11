@@ -74,9 +74,3 @@ export function diaISO(d: Date): string {
 export function meioDiaBRT(dia: string): Date {
   return new Date(`${dia}T12:00:00-03:00`);
 }
-
-/** Fim do dia (23:59:59 de Brasília) daqui a `dias` dias: o prazo do link. */
-export function fimDoDiaEmDias(dias: number, agora = new Date()): Date {
-  const alvo = new Date(agora.getTime() + dias * 24 * 60 * 60 * 1000);
-  return new Date(`${diaISO(alvo)}T23:59:59-03:00`);
-}

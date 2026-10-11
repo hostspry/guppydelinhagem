@@ -1806,7 +1806,8 @@ model Leilao {
   nome               String
   /// Dia do leilão ao vivo. É a data que o arrematante vê na conta.
   dataLeilao         DateTime
-  /// Prazo para pagar, contado de quando a cobrança é gerada.
+  /// SEM USO desde 11/10/2026: o link do leilão não vence (o dono prefere o
+  /// combinado de 48h como hábito, não como trava). Fica até uma limpeza.
   prazoPagamentoDias Int      @default(3)
   /// Teto de parcelas no cartão das cobranças deste leilão.
   maxParcelas        Int      @default(12)
