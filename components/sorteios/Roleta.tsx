@@ -33,11 +33,12 @@ const R = 470;
 // Duas fases: o giro, que desacelera até quase parar no vizinho do vencedor, e
 // o rastejo final, em que a roda escorrega devagar até o bilhete sorteado. O
 // movimento nunca para no meio: velocidade contínua, só zera no fim.
-const GIRO_MS = 13_000;
+/** Do primeiro movimento até parar: 30 s (giro + rastejo). */
+const GIRO_TOTAL_MS = 30_000;
 const RASTEJO_MIN_MS = 5_000;
 const RASTEJO_MAX_MS = 8_000;
 const PAUSA_REVELAR_MS = 1_100;
-const VOLTAS = 8;
+const VOLTAS = 16;
 
 function ponto(angulo: number, raio: number) {
   const a = (angulo * Math.PI) / 180;
@@ -359,6 +360,7 @@ export function Roleta({
         // grau não), para começar sempre no vizinho e o nome não sair cedo.
         const rastejo = Math.min(divisa - phiAlvo + entrada, 75);
         const RASTEJO_MS = Math.min(RASTEJO_MAX_MS, Math.max(RASTEJO_MIN_MS, 3_400 + rastejo * 62));
+        const GIRO_MS = GIRO_TOTAL_MS - RASTEJO_MS;
 
         const fimGiro = ate - rastejo;
         const vFinal = (2 * rastejo) / RASTEJO_MS; // graus/ms na emenda
@@ -373,10 +375,10 @@ export function Roleta({
             if (dt < GIRO_MS) {
               const u = dt / GIRO_MS;
               rot = de + (fimGiro - de) * suavizar(u, inclinacao);
-              if (!entrouNoFinal && u > 0.86) {
+              if (!entrouNoFinal && dt > GIRO_MS - 3_000) {
                 entrouNoFinal = true;
                 setFinal(true);
-                pararRufar.current = rufar(RASTEJO_MS + GIRO_MS * 0.14);
+                pararRufar.current = rufar(RASTEJO_MS + 3_000);
               }
             } else {
               // Rastejo: desaceleração constante até zerar exatamente no alvo.
