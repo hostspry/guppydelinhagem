@@ -537,8 +537,8 @@ function Resumo({ subtotal, frete }: { subtotal: number; frete: number | null })
   return (
     <div className="border border-gray-200 rounded-lg divide-y divide-gray-100 text-sm">
       <div className="flex justify-between px-4 py-2.5">
-        <span className="text-gray-600">Lotes</span>
-        <span className="text-gray-800">{formatBRL(subtotal)}</span>
+        <span className="text-gray-600">{subtotal > 0 ? "Lotes" : "Prêmio"}</span>
+        <span className="text-gray-800">{subtotal > 0 ? formatBRL(subtotal) : "grátis"}</span>
       </div>
       <div className="flex justify-between px-4 py-2.5">
         <span className="text-gray-600">Frete</span>

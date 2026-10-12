@@ -271,6 +271,11 @@ export async function salvarEntregaArremate(
       where: { orderId: o.id, metodo: "PIX", status: "PENDENTE", valor: { not: total } },
       data: { status: "EXPIRADO" },
     });
+    // Prêmio retirado na loja: não há nada a cobrar, o pedido já fica pago.
+    if (total <= 0) {
+      await tx.order.update({ where: { id: o.id }, data: { formaPagamento: "OUTRO" } });
+      await transicionarParaPago(tx, o.id);
+    }
   });
 
   // O cadastro ganha o que o próprio cliente digitou (antifraude e próximas
@@ -491,12 +496,19 @@ export async function pagarArremateCartao(
       endereco: retirada ? LOJA_ENDERECO : enderecoCliente,
       payerAddress: retirada ? null : enderecoCliente,
       envio: { localPickup: retirada },
-      itens: o.items.map((i) => ({
-        id: i.id,
-        title: i.nomeProduto,
-        quantity: 1,
-        unitPrice: round2(Number(i.precoUnitario)),
-      })),
+      // Item de R$ 0 (prêmio) não vai para o antifraude: no lugar entra o frete,
+      // que é o que está sendo cobrado de verdade.
+      itens: (() => {
+        const pagos = o.items.filter((i) => Number(i.precoUnitario) > 0);
+        return pagos.length
+          ? pagos.map((i) => ({
+              id: i.id,
+              title: i.nomeProduto,
+              quantity: 1,
+              unitPrice: round2(Number(i.precoUnitario)),
+            }))
+          : [{ id: o.id, title: `Frete do pedido ${o.numero}`, quantity: 1, unitPrice: valor }];
+      })(),
       historico,
     });
   } catch (e) {

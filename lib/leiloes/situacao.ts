@@ -76,3 +76,11 @@ export function diaISO(d: Date): string {
 export function meioDiaBRT(dia: string): Date {
   return new Date(`${dia}T12:00:00-03:00`);
 }
+
+/**
+ * Cobrança de leilão sem valor nos itens: é prêmio (ex.: o trio do sorteio).
+ * O peixe é por conta da casa e o cliente paga só o frete.
+ */
+export function ehPremio(c: { subtotal: number }): boolean {
+  return c.subtotal <= 0;
+}

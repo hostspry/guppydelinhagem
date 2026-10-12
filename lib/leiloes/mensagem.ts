@@ -24,6 +24,24 @@ export function mensagemCobrancaLeilao(c: {
   link: string | null;
 }): string {
   const nome = primeiroNome(c.clienteNome);
+  if (c.subtotal <= 0) {
+    // Prêmio: o peixe é por conta da casa, só o frete fica com o cliente.
+    return [
+      nome ? `Oi, ${nome}! Tudo bem?` : "Oi! Tudo bem?",
+      "",
+      `Parabéns pelo prêmio do leilão de ${c.dataLeilao}:`,
+      "",
+      c.itens.map((i) => `• ${i.nome}`).join("\n"),
+      "",
+      "O prêmio é por nossa conta. Fica com você só o frete.",
+      "Frete: no link você confere pelo seu CEP e escolhe terrestre (Jadlog) ou aéreo (Gollog).",
+      "",
+      "Para pagar o frete no Pix ou no cartão, é só abrir:",
+      c.link ?? "",
+      "",
+      "Qualquer dúvida, é só me chamar aqui.",
+    ].join("\n");
+  }
   const titulo =
     c.itens.length === 1
       ? `Parabéns pelo lote arrematado no leilão de ${c.dataLeilao}:`

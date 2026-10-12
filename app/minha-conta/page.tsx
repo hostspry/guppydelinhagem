@@ -50,12 +50,15 @@ export default async function VisaoGeralPage() {
         <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 space-y-2">
           <p className="flex items-center gap-2 font-semibold text-amber-900">
             <Gavel size={18} aria-hidden="true" />
-            {arremateAPagar.lotes.length === 1
-              ? "Você arrematou 1 lote"
-              : `Você arrematou ${arremateAPagar.lotes.length} lotes`}
+            {arremateAPagar.premio
+              ? "Você ganhou um prêmio"
+              : arremateAPagar.lotes.length === 1
+                ? "Você arrematou 1 lote"
+                : `Você arrematou ${arremateAPagar.lotes.length} lotes`}
             {arremateAPagar.leilao
               ? ` no leilão de ${dataLeilaoBR(arremateAPagar.leilao.dataLeilao)}`
               : ""}
+            {arremateAPagar.premio ? ". Só falta o frete" : ""}
           </p>
           <p className="text-sm text-amber-900/80">{arremateAPagar.lotes.join(", ")}</p>
           <Link

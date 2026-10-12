@@ -268,6 +268,7 @@ export async function listArrematesDoUsuario(
       entregaEscolhidaEm: true,
       publicToken: true,
       criadoEm: true,
+      subtotal: true,
       leilao: { select: { id: true, nome: true, dataLeilao: true } },
       items: { orderBy: { id: "asc" }, select: { nomeProduto: true } },
     },
@@ -278,6 +279,8 @@ export async function listArrematesDoUsuario(
     numero: o.numero,
     token: o.publicToken,
     total: Number(o.total),
+    // Itens a R$ 0: é prêmio (sorteio), o cliente paga só o frete.
+    premio: Number(o.subtotal) <= 0,
     expiraEm: o.expiraEm,
     situacao: situacaoDoArremate(o),
     leilao: o.leilao,

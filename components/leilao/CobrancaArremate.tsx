@@ -3,7 +3,7 @@ import { WhatsAppIcon } from "@/components/icons/WhatsAppIcon";
 import PagamentoArremate from "@/components/leilao/PagamentoArremate";
 import { whatsappLink, WHATSAPP_DISPLAY } from "@/lib/constants";
 import { formatBRL } from "@/lib/utils/format";
-import { arremateAberto, dataLeilaoBR } from "@/lib/leiloes/situacao";
+import { arremateAberto, dataLeilaoBR, ehPremio } from "@/lib/leiloes/situacao";
 import type { ArrematePublico } from "@/lib/queries/leiloes";
 
 /**
@@ -22,6 +22,7 @@ export default function CobrancaArremate({
 }) {
   const primeiroNome = a.pagador.nome.trim().split(/\s+/)[0] ?? "";
   const aberta = arremateAberto(a.situacao);
+  const premio = ehPremio(a);
 
   return (
     <div className="bg-white border border-gray-200 rounded-xl p-5 sm:p-7 shadow-sm space-y-6">
@@ -35,7 +36,7 @@ export default function CobrancaArremate({
             {a.situacao === "PAGA"
               ? `Tudo certo, ${primeiroNome}!`
               : `${primeiroNome ? `${primeiroNome}, p` : "P"}arabéns ${
-                  a.lotes.length === 1 ? "pelo arremate" : "pelos arremates"
+                  premio ? "pelo prêmio" : a.lotes.length === 1 ? "pelo arremate" : "pelos arremates"
                 }!`}
           </h1>
         )}
@@ -44,13 +45,15 @@ export default function CobrancaArremate({
 
       <div>
         <h2 className="text-sm font-semibold text-[#07366A] mb-2">
-          {a.lotes.length === 1 ? "Seu lote" : `Seus ${a.lotes.length} lotes`}
+          {premio ? "Seu prêmio" : a.lotes.length === 1 ? "Seu lote" : `Seus ${a.lotes.length} lotes`}
         </h2>
         <ul className="border border-gray-200 rounded-lg divide-y divide-gray-100">
           {a.lotes.map((l, i) => (
             <li key={i} className="flex items-start justify-between gap-4 px-4 py-3 text-sm">
               <span className="text-gray-700">{l.nome}</span>
-              <span className="text-gray-800 whitespace-nowrap">{formatBRL(l.valor)}</span>
+              <span className="text-gray-800 whitespace-nowrap">
+                {l.valor > 0 ? formatBRL(l.valor) : "grátis"}
+              </span>
             </li>
           ))}
         </ul>
@@ -61,8 +64,8 @@ export default function CobrancaArremate({
           <CheckCircle2 className="w-10 h-10 text-green-600 mx-auto mb-2" aria-hidden="true" />
           <p className="font-semibold text-green-800">Pagamento confirmado</p>
           <p className="text-sm text-green-900/80 mt-1">
-            Recebi {formatBRL(a.total)}. Agora é comigo: separo os peixes e aviso por e-mail
-            quando a caixa sair.
+            {a.total > 0 ? `Recebi ${formatBRL(a.total)}. ` : ""}Agora é comigo: separo os
+            peixes e aviso por e-mail quando a caixa sair.
           </p>
         </div>
       ) : a.emAnalise && aberta ? (
