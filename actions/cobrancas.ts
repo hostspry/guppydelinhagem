@@ -21,6 +21,7 @@ import {
 import { transicionarParaPago } from "@/lib/pedido-baixa";
 import { mensagemRecusa } from "@/lib/payments/mercadopago";
 import { registrarFalhaCartao } from "@/lib/pagamento-tentativas";
+import { notificarPedidoPago } from "@/lib/notificacoes";
 import { gravarPagamentoCartao, ultimoCartao } from "@/lib/pagamento-cartao";
 import { acharClienteExistente } from "@/lib/cliente-existente";
 import type { CartaoInput, CartaoDesfecho } from "@/actions/checkout";
@@ -691,11 +692,22 @@ export async function pagarCobrancaCartao(
   }
 
   if (pago.status === StatusPagamento.PAGO) {
+    let baixou = false;
     try {
-      await prisma.$transaction((tx) => transicionarParaPago(tx, cob.id));
+      const res = await prisma.$transaction((tx) => transicionarParaPago(tx, cob.id));
+      baixou = res.baixou;
       revalidatePath("/admin/cobrancas");
     } catch (e) {
       console.error("[cobranca] transicionar cartão aprovado", e);
+    }
+    // O aviso sai daqui: quando o webhook chega, a cobrança já está paga e ele
+    // não avisa de novo. Sem isto, cartão aprovado no link não chegava no
+    // Telegram (a #2026-0074, de R$ 530, passou em silêncio em 13/10).
+    if (baixou) {
+      await notificarPedidoPago(cob.id, {
+        provider: ProviderPagamento.MERCADO_PAGO,
+        metodo: MetodoPagamento.CARTAO,
+      });
     }
     return { resultado: "aprovado", numero: cob.numero };
   }
