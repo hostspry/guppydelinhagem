@@ -4,11 +4,13 @@ import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { consultarStatusPedido } from "@/actions/checkout";
 
-const POLL_MS = 6000;
+const POLL_MS = 3000;
 
 // Na tela de análise: enquanto o cartão está "em análise", consulta o status do
 // pedido no banco (atualizado pelo webhook). Quando aprovado (PAGO), avança pra
-// página de sucesso. Não limpa o carrinho aqui — só no sucesso confirmado.
+// página de sucesso; quando o MP recusa depois da análise, vai pra tela de
+// pagamento não concluído (antes o cliente ficava aqui esperando para sempre).
+// Não limpa o carrinho aqui — só no sucesso confirmado.
 export default function AnaliseStatusPoll({
   numero,
   token,
@@ -30,6 +32,10 @@ export default function AnaliseStatusPoll({
           indo.current = true;
           clearInterval(id);
           router.push(`/pedido/${numero.replace(/^#/, "")}/sucesso${token ? `?t=${token}` : ""}`);
+        } else if (ativo && res?.cartaoRecusado) {
+          indo.current = true;
+          clearInterval(id);
+          router.replace(`/pedido/${numero.replace(/^#/, "")}/falha?motivo=cartao`);
         }
       } catch {
         // rede instável — tenta no próximo tick

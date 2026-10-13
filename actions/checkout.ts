@@ -25,6 +25,7 @@ import {
   notificarPedidoPago,
 } from "@/lib/notificacoes";
 import { registrarFalhaCartao } from "@/lib/pagamento-tentativas";
+import { gravarPagamentoCartao } from "@/lib/pagamento-cartao";
 import { calcularPrecos } from "@/lib/precos";
 import {
   normalizarCodigo,
@@ -1508,20 +1509,34 @@ export async function iniciarCheckoutPro(
  * Poll do status do pedido a partir do BANCO (o webhook é quem confirma o
  * pagamento e atualiza o status). NÃO chama o MP — público, leve, idempotente.
  * `pago` cobre PAGO e os status posteriores (ENVIADO/ENTREGUE).
+ * `cartaoRecusado`: o último cartão foi recusado (a tela de análise usa para
+ * não deixar o cliente esperando uma aprovação que não vem).
  */
 export async function consultarStatusPedido(
   numero: string,
-): Promise<{ pago: boolean; status: OrderStatus } | null> {
+): Promise<{ pago: boolean; status: OrderStatus; cartaoRecusado: boolean } | null> {
   const order = await prisma.order.findUnique({
     where: { numero },
-    select: { status: true },
+    select: {
+      status: true,
+      pagamentos: {
+        where: { metodo: MetodoPagamento.CARTAO },
+        orderBy: { criadoEm: "desc" },
+        take: 1,
+        select: { status: true },
+      },
+    },
   });
   if (!order) return null;
   const pago =
     order.status === "PAGO" ||
     order.status === "ENVIADO" ||
     order.status === "ENTREGUE";
-  return { pago, status: order.status };
+  return {
+    pago,
+    status: order.status,
+    cartaoRecusado: !pago && order.pagamentos[0]?.status === "RECUSADO",
+  };
 }
 
 /**
@@ -1896,22 +1911,18 @@ export async function pagarComCartao(
 
   // Grava a linha Pagamento em TODOS os casos (PAGO/EM_ANALISE/RECUSADO).
   try {
-    await prisma.pagamento.create({
-      data: {
-        orderId,
-        provider: ProviderPagamento.MERCADO_PAGO,
-        metodo: MetodoPagamento.CARTAO,
-        status: pago.status,
-        valor,
-        externalId: pago.externalId,
-        parcelas: pago.parcelas,
-        bandeira: pago.bandeira,
-        // Só motivo da recusa (não sensível). NUNCA token/PAN/CVV.
-        // TEMP (diagnóstico): deviceId só como "ok"/"vazio" — nunca o valor.
-        payloadRaw: {
-          statusDetail: pago.statusDetail,
-          deviceId: cartao.deviceId ? "ok" : "vazio",
-        } as Prisma.InputJsonValue,
+    await gravarPagamentoCartao({
+      orderId,
+      status: pago.status,
+      valor,
+      externalId: pago.externalId,
+      parcelas: pago.parcelas,
+      bandeira: pago.bandeira,
+      // Só motivo da recusa (não sensível). NUNCA token/PAN/CVV.
+      // TEMP (diagnóstico): deviceId só como "ok"/"vazio" — nunca o valor.
+      payloadRaw: {
+        statusDetail: pago.statusDetail,
+        deviceId: cartao.deviceId ? "ok" : "vazio",
       },
     });
     await prisma.order.update({

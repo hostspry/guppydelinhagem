@@ -1,6 +1,7 @@
 import { CheckCircle2, Gavel, Hourglass, XCircle } from "lucide-react";
 import { WhatsAppIcon } from "@/components/icons/WhatsAppIcon";
 import PagamentoArremate from "@/components/leilao/PagamentoArremate";
+import AnaliseArrematePoll from "@/components/leilao/AnaliseArrematePoll";
 import { whatsappLink, WHATSAPP_DISPLAY } from "@/lib/constants";
 import { formatBRL } from "@/lib/utils/format";
 import { arremateAberto, dataLeilaoBR, ehPremio } from "@/lib/leiloes/situacao";
@@ -73,9 +74,10 @@ export default function CobrancaArremate({
           <Hourglass className="w-9 h-9 text-blue-600 mx-auto mb-2" aria-hidden="true" />
           <p className="font-semibold text-blue-800">Pagamento em análise</p>
           <p className="text-sm text-blue-900/80 mt-1">
-            O Mercado Pago está analisando o cartão. Costuma sair em minutos e eu aviso por
-            e-mail. Não precisa pagar de novo.
+            O Mercado Pago está analisando o cartão. Costuma levar poucos segundos e esta
+            página atualiza sozinha. Não precisa pagar de novo.
           </p>
+          <AnaliseArrematePoll token={token} />
         </div>
       ) : aberta ? (
         <>
@@ -97,6 +99,7 @@ export default function CobrancaArremate({
               pagador: a.pagador,
               retirada: a.retirada,
               pixPendente: a.pixPendente,
+              cartaoRecusa: a.cartaoRecusa,
             }}
           />
         </>

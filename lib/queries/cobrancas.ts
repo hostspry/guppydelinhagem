@@ -1,6 +1,7 @@
 import { prisma } from "../prisma";
 import { SITE_URL } from "../seo";
 import type { Prisma, OrderStatus } from "../generated/prisma/client";
+import { ultimoCartao } from "../pagamento-cartao";
 
 /**
  * Cobrança avulsa — leitura.
@@ -141,6 +142,12 @@ export async function getCobrancaPorToken(token: string) {
       observacoes: true,
       cliente: { select: { nome: true, email: true } },
       items: { select: { nomeProduto: true }, take: 1 },
+      pagamentos: {
+        where: { metodo: "CARTAO" },
+        orderBy: { criadoEm: "desc" },
+        take: 1,
+        select: { metodo: true, status: true, payloadRaw: true },
+      },
     },
   });
   if (!o) return null;
@@ -156,6 +163,9 @@ export async function getCobrancaPorToken(token: string) {
     clienteNome: o.cliente.nome,
     clienteEmail: o.cliente.email, // pré-preenche o Brick
     situacao: situacaoDaCobranca(o),
+    // Último cartão: "em análise" troca o formulário por um aviso; recusado
+    // mostra o motivo em cima do formulário.
+    cartao: ultimoCartao(o.pagamentos),
   };
 }
 

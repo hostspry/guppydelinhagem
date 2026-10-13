@@ -14,10 +14,14 @@ export const metadata: Metadata = {
 // carrinho do cliente continua salvo, então ele pode tentar outro método.
 export default async function FalhaPagamentoPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ numero: string }>;
+  searchParams: Promise<{ motivo?: string }>;
 }) {
   const { numero: raw } = await params;
+  // motivo=cartao: veio da tela de análise, o MP recusou o cartão depois.
+  const cartaoRecusado = (await searchParams).motivo === "cartao";
   const numero = `#${decodeURIComponent(raw).replace(/^#/, "")}`;
 
   return (
@@ -26,11 +30,20 @@ export default async function FalhaPagamentoPage({
       <h1 className="text-primary text-2xl font-semibold">
         Pagamento não concluído
       </h1>
-      <p className="text-sm text-muted-foreground">
-        O pagamento do pedido <strong className="text-primary">{numero}</strong>{" "}
-        não foi concluído. Nada foi cobrado. Você pode tentar outro método —
-        Pix, cartão ou o próprio Mercado Pago.
-      </p>
+      {cartaoRecusado ? (
+        <p className="text-sm text-muted-foreground">
+          O Mercado Pago não aprovou o cartão do pedido{" "}
+          <strong className="text-primary">{numero}</strong> e nada foi
+          cobrado. Tentar o mesmo cartão de novo costuma dar o mesmo resultado.
+          No Pix o pagamento cai na hora, ou você pode usar outro cartão.
+        </p>
+      ) : (
+        <p className="text-sm text-muted-foreground">
+          O pagamento do pedido <strong className="text-primary">{numero}</strong>{" "}
+          não foi concluído. Nada foi cobrado. Você pode tentar outro método —
+          Pix, cartão ou o próprio Mercado Pago.
+        </p>
+      )}
       <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
         <Link
           href="/checkout"

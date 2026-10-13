@@ -27,12 +27,15 @@ export default function CobrancaPagamento({
   maxParcelas,
   mpPublicKey,
   clienteEmail,
+  recusaAnterior,
 }: {
   token: string;
   total: number;
   maxParcelas: number;
   mpPublicKey: string | null;
   clienteEmail: string | null;
+  /** Motivo do último cartão recusado (inclusive a recusa que chega depois da análise). */
+  recusaAnterior: string | null;
 }) {
   const router = useRouter();
   const [aba, setAba] = useState<"cartao" | "pix">("cartao");
@@ -54,7 +57,9 @@ export default function CobrancaPagamento({
     res: Awaited<ReturnType<typeof pagarCobrancaCartao>>,
   ): void {
     if (res.resultado === "aprovado" || res.resultado === "analise") {
-      router.refresh(); // a própria página passa a mostrar "pagamento confirmado"
+      // A página passa a mostrar "pagamento confirmado" ou o aviso de análise
+      // (e, se o MP recusar depois, volta com o motivo em cima do formulário).
+      router.refresh();
       return;
     }
     if (res.resultado === "desafio") {
@@ -147,6 +152,17 @@ export default function CobrancaPagamento({
           creq={desafio3ds.creq}
           onConcluido={() => onFim3ds(desafio3ds.paymentId)}
         />
+      )}
+
+      {/* Recusa que chegou depois (webhook) ou de uma visita anterior: no topo,
+          que é onde o cliente olha quando a página recarrega. */}
+      {recusaAnterior && !recusa && (
+        <p
+          role="alert"
+          className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-md p-3 mb-4"
+        >
+          {recusaAnterior}
+        </p>
       )}
 
       <div className="grid grid-cols-2 gap-1 bg-gray-100 p-1 rounded-lg mb-4">

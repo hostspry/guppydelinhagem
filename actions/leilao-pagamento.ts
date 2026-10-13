@@ -12,6 +12,7 @@ import { mensagemRecusa } from "@/lib/payments/mercadopago";
 import { transicionarParaPago } from "@/lib/pedido-baixa";
 import { notificarPedidoPago } from "@/lib/notificacoes";
 import { registrarFalhaCartao } from "@/lib/pagamento-tentativas";
+import { gravarPagamentoCartao } from "@/lib/pagamento-cartao";
 import { situacaoDoArremate, type SituacaoArremate } from "@/lib/leiloes/situacao";
 import {
   entregaArremateSchema,
@@ -533,20 +534,16 @@ export async function pagarArremateCartao(
   }
 
   try {
-    await prisma.pagamento.create({
-      data: {
-        orderId: o.id,
-        provider: ProviderPagamento.MERCADO_PAGO,
-        metodo: MetodoPagamento.CARTAO,
-        status: pago.status,
-        valor,
-        externalId: pago.externalId,
-        parcelas: pago.parcelas,
-        bandeira: pago.bandeira,
-        payloadRaw: {
-          statusDetail: pago.statusDetail,
-          deviceId: cartao.deviceId ? "ok" : "vazio",
-        } as Prisma.InputJsonValue,
+    await gravarPagamentoCartao({
+      orderId: o.id,
+      status: pago.status,
+      valor,
+      externalId: pago.externalId,
+      parcelas: pago.parcelas,
+      bandeira: pago.bandeira,
+      payloadRaw: {
+        statusDetail: pago.statusDetail,
+        deviceId: cartao.deviceId ? "ok" : "vazio",
       },
     });
     await prisma.order.update({
@@ -610,6 +607,24 @@ export async function pagarArremateCartao(
 }
 
 // ── Status (poll da página) ──────────────────────────────────────────────────
+
+/**
+ * Poll da tela "em análise": sai dela quando o webhook decide (aprovado ou
+ * recusado). Lido do BANCO, não chama o gateway.
+ */
+export async function statusCartaoArremate(
+  token: string,
+): Promise<{ pago: boolean; emAnalise: boolean }> {
+  if (!/^[a-f0-9]{32}$/.test(token ?? "")) return { pago: false, emAnalise: false };
+  const o = await prisma.order.findFirst({
+    where: { origem: "LEILAO", publicToken: token },
+    select: { status: true, pagamentos: { select: { status: true } } },
+  });
+  return {
+    pago: o?.status === "PAGO" || o?.status === "ENVIADO" || o?.status === "ENTREGUE",
+    emAnalise: !!o?.pagamentos.some((p) => p.status === "EM_ANALISE"),
+  };
+}
 
 /** Lido do BANCO (o webhook confirma). Leve: não chama o gateway. */
 export async function arrematePago(token: string): Promise<boolean> {

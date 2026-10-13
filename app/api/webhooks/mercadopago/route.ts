@@ -16,6 +16,7 @@ import {
   StatusPagamento,
   MetodoPagamento,
 } from "@/lib/generated/prisma/enums";
+import type { Prisma } from "@/lib/generated/prisma/client";
 
 // Webhook do Mercado Pago (Pix + Cartão). Runtime Node (Prisma + crypto).
 // Fluxo (spec §4 e §6):
@@ -155,7 +156,7 @@ export async function POST(request: Request) {
       // notificação chega; método/parcelas/bandeira/valor vêm da consulta ao MP.
       const existente = await tx.pagamento.findFirst({
         where: { externalId: consulta.externalId },
-        select: { id: true, status: true },
+        select: { id: true, status: true, payloadRaw: true },
       });
       const statusAnterior = existente?.status ?? null;
       nasceuNoMp = !existente;
@@ -167,10 +168,22 @@ export async function POST(request: Request) {
       ) {
         recusouAgora = true;
       }
+      // Motivo atualizado: o cartão pode ter nascido "em análise" e ser recusado
+      // depois. A tela do cliente mostra este motivo (lib/pagamento-cartao).
+      const raw = existente?.payloadRaw;
+      const comMotivo = consulta.statusDetail
+        ? ({
+            ...(raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {}),
+            statusDetail: consulta.statusDetail,
+          } as Prisma.InputJsonValue)
+        : undefined;
       if (existente) {
         await tx.pagamento.update({
           where: { id: existente.id },
-          data: { status: consulta.status },
+          data: {
+            status: consulta.status,
+            ...(comMotivo ? { payloadRaw: comMotivo } : {}),
+          },
         });
       } else {
         await tx.pagamento.create({
@@ -183,6 +196,7 @@ export async function POST(request: Request) {
             externalId: consulta.externalId,
             parcelas: consulta.parcelas ?? null,
             bandeira: consulta.bandeira ?? null,
+            ...(comMotivo ? { payloadRaw: comMotivo } : {}),
           },
         });
         await tx.order.update({

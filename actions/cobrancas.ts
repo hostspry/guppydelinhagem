@@ -21,6 +21,8 @@ import {
 import { transicionarParaPago } from "@/lib/pedido-baixa";
 import { mensagemRecusa } from "@/lib/payments/mercadopago";
 import { registrarFalhaCartao } from "@/lib/pagamento-tentativas";
+import { gravarPagamentoCartao, ultimoCartao } from "@/lib/pagamento-cartao";
+import { variantesTelefone } from "@/lib/leiloes/telefone";
 import type { CartaoInput, CartaoDesfecho } from "@/actions/checkout";
 import type { Prisma } from "@/lib/generated/prisma/client";
 import { type ActionResult } from "@/lib/utils/action-result";
@@ -46,6 +48,48 @@ const nullify = (s: string | null | undefined) => {
 /** Token do link: 32 hex (128 bits). Não é adivinhável e cabe numa URL curta. */
 function novoToken(): string {
   return randomBytes(16).toString("hex");
+}
+
+/**
+ * Cadastro que já existe para os dados digitados na cobrança: CPF, depois
+ * e-mail, depois telefone (em qualquer grafia). O mais antigo vence.
+ *
+ * Sem isto cada cobrança digitada virava um cliente novo. Na #2026-0074 o
+ * comprador já era cliente desde 10/10 e estava no 4º cadastro igual; o MP
+ * recebeu "conta criada há 6 minutos" e recusou o cartão como alto risco.
+ */
+async function acharClienteExistente(d: {
+  cpf: string | null;
+  email: string | null;
+  telefone: string | null;
+}) {
+  const select = { id: true, email: true, telefone: true } as const;
+  const orderBy = { criadoEm: "asc" } as const;
+  if (d.cpf) {
+    const c = await prisma.cliente.findFirst({ where: { cpfCnpj: d.cpf }, orderBy, select });
+    if (c) return c;
+  }
+  if (d.email) {
+    const c = await prisma.cliente.findFirst({
+      where: { email: { equals: d.email, mode: "insensitive" } },
+      orderBy,
+      select,
+    });
+    if (c) return c;
+  }
+  if (d.telefone && d.telefone.length >= 10) {
+    // Cadastro guarda sem o 55; a busca tenta também com 55 e sem o 9.
+    const chave = d.telefone.startsWith("55") && d.telefone.length > 11
+      ? d.telefone
+      : `55${d.telefone}`;
+    const c = await prisma.cliente.findFirst({
+      where: { telefone: { in: variantesTelefone(chave) } },
+      orderBy,
+      select,
+    });
+    if (c) return c;
+  }
+  return null;
 }
 
 // ── Criar ────────────────────────────────────────────────────────────────────
@@ -75,20 +119,42 @@ export async function criarCobranca(formData: FormData): Promise<ActionResult> {
   const data = parsed.data;
   const valor = round2(data.valor);
 
-  // Cliente: o escolhido na lista ou um novo criado na hora.
+  // Cliente: o escolhido na lista, o que já existe com os mesmos dados ou um
+  // novo criado na hora.
   let clienteId = nullify(data.clienteId);
   if (!clienteId) {
-    const novo = await prisma.cliente.create({
-      data: {
-        nome: (data.clienteNome ?? "").trim(),
-        email: nullify(data.clienteEmail),
-        telefone: soDigitos(data.clienteTelefone),
-        cpfCnpj: soDigitos(data.clienteCpf),
-        cep: soDigitos(data.clienteCep),
-      },
-      select: { id: true },
+    const email = nullify(data.clienteEmail);
+    const telefone = soDigitos(data.clienteTelefone);
+    const existente = await acharClienteExistente({
+      cpf: soDigitos(data.clienteCpf),
+      email,
+      telefone,
     });
-    clienteId = novo.id;
+    if (existente) {
+      clienteId = existente.id;
+      // Completa o que faltava no cadastro, sem trocar o que já existe.
+      const faltando = {
+        ...(!existente.email && email ? { email } : {}),
+        ...(!existente.telefone && telefone ? { telefone } : {}),
+      };
+      if (Object.keys(faltando).length) {
+        await prisma.cliente
+          .update({ where: { id: existente.id }, data: faltando })
+          .catch(() => {});
+      }
+    } else {
+      const novo = await prisma.cliente.create({
+        data: {
+          nome: (data.clienteNome ?? "").trim(),
+          email,
+          telefone,
+          cpfCnpj: soDigitos(data.clienteCpf),
+          cep: soDigitos(data.clienteCep),
+        },
+        select: { id: true },
+      });
+      clienteId = novo.id;
+    }
   }
 
   const cliente = await prisma.cliente.findUnique({ where: { id: clienteId } });
@@ -631,20 +697,16 @@ export async function pagarCobrancaCartao(
 
   // Grava a tentativa (aprovada ou não) — mesma trilha do checkout.
   try {
-    await prisma.pagamento.create({
-      data: {
-        orderId: cob.id,
-        provider: ProviderPagamento.MERCADO_PAGO,
-        metodo: MetodoPagamento.CARTAO,
-        status: pago.status,
-        valor,
-        externalId: pago.externalId,
-        parcelas: pago.parcelas,
-        bandeira: pago.bandeira,
-        payloadRaw: {
-          statusDetail: pago.statusDetail,
-          deviceId: cartao.deviceId ? "ok" : "vazio",
-        } as Prisma.InputJsonValue,
+    await gravarPagamentoCartao({
+      orderId: cob.id,
+      status: pago.status,
+      valor,
+      externalId: pago.externalId,
+      parcelas: pago.parcelas,
+      bandeira: pago.bandeira,
+      payloadRaw: {
+        statusDetail: pago.statusDetail,
+        deviceId: cartao.deviceId ? "ok" : "vazio",
       },
     });
     await prisma.order.update({
@@ -701,16 +763,29 @@ export async function pagarCobrancaCartao(
 /**
  * Status da cobrança lido do BANCO (o webhook é quem confirma). Público e leve —
  * usado pelo poll da página do link, quando o cliente volta do gateway antes da
- * notificação chegar. Não chama o gateway.
+ * notificação chegar. Não chama o gateway. `cartao` é o desfecho da última
+ * tentativa no cartão: a tela sai de "em análise" quando ele muda.
  */
-export async function statusDaCobranca(token: string): Promise<boolean> {
+export async function statusDaCobranca(
+  token: string,
+): Promise<{ pago: boolean; cartao: "EM_ANALISE" | "RECUSADO" | null }> {
   const cob = await prisma.order.findFirst({
     where: { tipo: "COBRANCA", publicToken: token },
-    select: { status: true },
+    select: {
+      status: true,
+      pagamentos: {
+        where: { metodo: MetodoPagamento.CARTAO },
+        orderBy: { criadoEm: "desc" },
+        take: 1,
+        select: { metodo: true, status: true },
+      },
+    },
   });
-  return (
-    cob?.status === "PAGO" ||
-    cob?.status === "ENVIADO" ||
-    cob?.status === "ENTREGUE"
-  );
+  return {
+    pago:
+      cob?.status === "PAGO" ||
+      cob?.status === "ENVIADO" ||
+      cob?.status === "ENTREGUE",
+    cartao: cob ? (ultimoCartao(cob.pagamentos)?.status ?? null) : null,
+  };
 }

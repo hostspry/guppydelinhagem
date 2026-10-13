@@ -46,6 +46,12 @@ export default async function AnalisePage({
           precoUnitario: true,
         },
       },
+      pagamentos: {
+        where: { metodo: "CARTAO" },
+        orderBy: { criadoEm: "desc" },
+        take: 1,
+        select: { status: true },
+      },
     },
   });
 
@@ -54,6 +60,11 @@ export default async function AnalisePage({
   // Se o webhook já confirmou enquanto isso, manda direto pro sucesso.
   if (STATUS_PAGO.includes(order.status)) {
     redirect(`/pedido/${numeroLimpo}/sucesso`);
+  }
+  // O MP recusou depois da análise (às vezes em 3 segundos): não faz sentido
+  // pedir para esperar.
+  if (order.pagamentos[0]?.status === "RECUSADO") {
+    redirect(`/pedido/${numeroLimpo}/falha?motivo=cartao`);
   }
 
   const total = Number(order.total);

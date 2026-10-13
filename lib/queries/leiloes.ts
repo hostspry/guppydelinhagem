@@ -2,6 +2,7 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { SITE_URL } from "@/lib/seo";
 import { getConfiguracaoLoja } from "@/lib/queries/config";
+import { ultimoCartao } from "@/lib/pagamento-cartao";
 import type { EnderecoEntrega } from "@/lib/validations/pedido";
 import {
   situacaoDoArremate,
@@ -300,6 +301,12 @@ export async function getArrematePorToken(token: string) {
     numero: o.numero,
     situacao,
     emAnalise: o.pagamentos.some((p) => p.status === "EM_ANALISE"),
+    // Recusa que chegou pelo webhook depois da análise: aparece em cima do
+    // formulário, senão o cliente vê o cartão sumir sem explicação.
+    cartaoRecusa: (() => {
+      const u = ultimoCartao(o.pagamentos);
+      return u?.status === "RECUSADO" ? u.mensagem : null;
+    })(),
     leilao: o.leilao,
     lotes: o.items.map((i) => ({
       nome: i.nomeProduto,

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { CheckCircle2, Clock, XCircle } from "lucide-react";
+import { CheckCircle2, Clock, Hourglass, XCircle } from "lucide-react";
 import { getCobrancaPorToken } from "@/lib/queries/cobrancas";
 import { whatsappLink, WHATSAPP_DISPLAY } from "@/lib/constants";
 import { WhatsAppIcon } from "@/components/icons/WhatsAppIcon";
@@ -89,18 +89,40 @@ export default async function CobrarPage({
               )}
             </ul>
 
-            <CobrancaPagamento
-              token={token}
-              total={c.total}
-              maxParcelas={c.maxParcelas ?? 12}
-              mpPublicKey={
-                process.env.MP_PUBLIC_KEY ||
-                process.env.NEXT_PUBLIC_MP_PUBLIC_KEY ||
-                null
-              }
-              clienteEmail={c.clienteEmail}
-            />
-            <CobrancaStatusPoll token={token} />
+            {c.cartao?.status === "EM_ANALISE" ? (
+              // Sem formulário enquanto o MP decide: um segundo pagamento agora
+              // pode virar cobrança em dobro se o primeiro for aprovado.
+              <div className="text-center rounded-lg bg-blue-50 border border-blue-200 p-5">
+                <Hourglass
+                  className="w-9 h-9 text-blue-600 mx-auto mb-2"
+                  aria-hidden="true"
+                />
+                <p className="font-semibold text-blue-800">
+                  Pagamento em análise
+                </p>
+                <p className="text-sm text-blue-900/80 mt-1">
+                  O Mercado Pago está analisando o cartão. Costuma levar poucos
+                  segundos e esta página atualiza sozinha. Não precisa pagar de
+                  novo.
+                </p>
+              </div>
+            ) : (
+              <CobrancaPagamento
+                token={token}
+                total={c.total}
+                maxParcelas={c.maxParcelas ?? 12}
+                mpPublicKey={
+                  process.env.MP_PUBLIC_KEY ||
+                  process.env.NEXT_PUBLIC_MP_PUBLIC_KEY ||
+                  null
+                }
+                clienteEmail={c.clienteEmail}
+                recusaAnterior={
+                  c.cartao?.status === "RECUSADO" ? c.cartao.mensagem : null
+                }
+              />
+            )}
+            <CobrancaStatusPoll token={token} cartao={c.cartao?.status ?? null} />
           </>
         ) : (
           <div className="text-center">

@@ -73,6 +73,8 @@ export type DadosArremate = {
   };
   retirada: { ativa: boolean; instrucoes: string | null };
   pixPendente: PixArremate | null;
+  /** Motivo do último cartão recusado (inclusive o que o webhook recusou depois da análise). */
+  cartaoRecusa: string | null;
 };
 
 const input =
@@ -671,6 +673,12 @@ function EtapaPagamento({
       </div>
 
       <Resumo subtotal={dados.subtotal} frete={dados.frete} />
+
+      {dados.cartaoRecusa && !recusa && (
+        <p role="alert" className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-md p-3">
+          {dados.cartaoRecusa}
+        </p>
+      )}
 
       <div className="grid grid-cols-2 gap-1 bg-gray-100 p-1 rounded-lg">
         <button type="button" onClick={() => setAba("pix")} className={abaCls(aba === "pix")}>
