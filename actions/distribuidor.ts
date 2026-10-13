@@ -15,6 +15,7 @@ import {
   recebimentoDistribuidorSchema,
 } from "@/lib/validations/distribuidor";
 import type { Prisma } from "@/lib/generated/prisma/client";
+import { acharClienteExistente } from "@/lib/cliente-existente";
 
 export type PedidoDistribuidorResult =
   | { success: true; orderId: string; numero: string; falta: number }
@@ -116,7 +117,11 @@ export async function criarPedidoDistribuidor(
 
   try {
     const criado = await prisma.$transaction(async (tx) => {
-      let clienteId = d.clienteId ?? null;
+      // Sem cliente escolhido, procura pelo telefone antes de abrir outro.
+      let clienteId =
+        d.clienteId ??
+        (await acharClienteExistente({ telefone: d.telefone }, tx))?.id ??
+        null;
       if (clienteId) {
         const existe = await tx.cliente.findUnique({
           where: { id: clienteId },

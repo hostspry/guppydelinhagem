@@ -25,7 +25,9 @@ export type CadastroContaResult =
  * preenchido pelo próprio cliente. Nunca reaproveita uma ficha existente pelo
  * telefone ou CPF: seria o mesmo buraco do formulário público. Se já existe
  * ficha da loja com o mesmo e-mail, WhatsApp ou CPF, o cadastro para e manda
- * para o "Esqueci a senha", que cria o acesso em cima da ficha antiga.
+ * para o "Esqueci a senha", que cria o acesso em cima da ficha antiga. Se a
+ * ficha já tem conta (a pessoa esqueceu o e-mail ou a senha), manda entrar
+ * nela ou recuperar a senha, nunca abre uma segunda conta.
  */
 export async function criarConta(input: unknown): Promise<CadastroContaResult> {
   const h = await headers();
@@ -91,6 +93,19 @@ export async function criarConta(input: unknown): Promise<CadastroContaResult> {
       error: ficha.email
         ? `Você já é nosso cliente. Para entrar, toque em "Esqueci a senha" e use o e-mail do seu cadastro (${mascararEmail(ficha.email)}). O link para criar sua senha chega nele.`
         : "Você já é nosso cliente, mas seu cadastro está sem e-mail. Fale com a gente no WhatsApp que eu libero seu acesso.",
+    };
+  }
+
+  // Já tem conta, mas com outro e-mail (esqueceu qual usou, ou a senha): não
+  // abre uma segunda. Entra na que existe ou recupera a senha dela.
+  const conta = await contaPeloCpfOuTelefone(d.cpfCnpj, chave);
+  if (conta) {
+    return {
+      ok: false,
+      jaTemConta: true,
+      error: conta.email
+        ? `Você já tem conta com o e-mail ${mascararEmail(conta.email)}. Entre com ele, ou toque em "Esqueci a senha" para criar uma senha nova.`
+        : "Você já tem conta com este CPF ou WhatsApp. Entre com ela, ou fale com a gente no WhatsApp que eu ajudo a recuperar o acesso.",
     };
   }
 
@@ -175,6 +190,33 @@ async function fichaDaLojaSemConta(email: string, chave: string | null, cpf: str
         (chave && c.telefone && chaveTelefone(c.telefone) === chave),
     ) ?? null
   );
+}
+
+/**
+ * Ficha que JÁ tem conta com o mesmo CPF ou WhatsApp. O e-mail repetido a
+ * checagem acima já pega; este é o caso de quem esqueceu o e-mail ou a senha e
+ * tenta abrir outra conta com um e-mail novo.
+ */
+async function contaPeloCpfOuTelefone(cpf: string, chave: string | null) {
+  const doc = cpf.replace(/\D/g, "");
+  if (!doc && !chave) return null;
+  const fichas = await prisma.cliente.findMany({
+    where: {
+      userId: { not: null },
+      OR: [
+        ...(doc ? [{ cpfCnpj: doc }] : []),
+        ...(chave ? [{ telefone: { endsWith: chave.slice(-8) } }] : []),
+      ],
+    },
+    select: { cpfCnpj: true, telefone: true, user: { select: { email: true } } },
+    take: 20,
+  });
+  const f = fichas.find(
+    (c) =>
+      (doc && c.cpfCnpj === doc) ||
+      (chave && c.telefone && chaveTelefone(c.telefone) === chave),
+  );
+  return f ? { email: f.user?.email ?? null } : null;
 }
 
 /** "joaosilva@gmail.com" → "jo•••••••@gmail.com". */

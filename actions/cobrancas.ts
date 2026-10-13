@@ -22,7 +22,7 @@ import { transicionarParaPago } from "@/lib/pedido-baixa";
 import { mensagemRecusa } from "@/lib/payments/mercadopago";
 import { registrarFalhaCartao } from "@/lib/pagamento-tentativas";
 import { gravarPagamentoCartao, ultimoCartao } from "@/lib/pagamento-cartao";
-import { variantesTelefone } from "@/lib/leiloes/telefone";
+import { acharClienteExistente } from "@/lib/cliente-existente";
 import type { CartaoInput, CartaoDesfecho } from "@/actions/checkout";
 import type { Prisma } from "@/lib/generated/prisma/client";
 import { type ActionResult } from "@/lib/utils/action-result";
@@ -48,48 +48,6 @@ const nullify = (s: string | null | undefined) => {
 /** Token do link: 32 hex (128 bits). Não é adivinhável e cabe numa URL curta. */
 function novoToken(): string {
   return randomBytes(16).toString("hex");
-}
-
-/**
- * Cadastro que já existe para os dados digitados na cobrança: CPF, depois
- * e-mail, depois telefone (em qualquer grafia). O mais antigo vence.
- *
- * Sem isto cada cobrança digitada virava um cliente novo. Na #2026-0074 o
- * comprador já era cliente desde 10/10 e estava no 4º cadastro igual; o MP
- * recebeu "conta criada há 6 minutos" e recusou o cartão como alto risco.
- */
-async function acharClienteExistente(d: {
-  cpf: string | null;
-  email: string | null;
-  telefone: string | null;
-}) {
-  const select = { id: true, email: true, telefone: true } as const;
-  const orderBy = { criadoEm: "asc" } as const;
-  if (d.cpf) {
-    const c = await prisma.cliente.findFirst({ where: { cpfCnpj: d.cpf }, orderBy, select });
-    if (c) return c;
-  }
-  if (d.email) {
-    const c = await prisma.cliente.findFirst({
-      where: { email: { equals: d.email, mode: "insensitive" } },
-      orderBy,
-      select,
-    });
-    if (c) return c;
-  }
-  if (d.telefone && d.telefone.length >= 10) {
-    // Cadastro guarda sem o 55; a busca tenta também com 55 e sem o 9.
-    const chave = d.telefone.startsWith("55") && d.telefone.length > 11
-      ? d.telefone
-      : `55${d.telefone}`;
-    const c = await prisma.cliente.findFirst({
-      where: { telefone: { in: variantesTelefone(chave) } },
-      orderBy,
-      select,
-    });
-    if (c) return c;
-  }
-  return null;
 }
 
 // ── Criar ────────────────────────────────────────────────────────────────────
@@ -133,9 +91,13 @@ export async function criarCobranca(formData: FormData): Promise<ActionResult> {
     if (existente) {
       clienteId = existente.id;
       // Completa o que faltava no cadastro, sem trocar o que já existe.
+      const atual = await prisma.cliente.findUnique({
+        where: { id: existente.id },
+        select: { email: true, telefone: true },
+      });
       const faltando = {
-        ...(!existente.email && email ? { email } : {}),
-        ...(!existente.telefone && telefone ? { telefone } : {}),
+        ...(!atual?.email && email ? { email } : {}),
+        ...(!atual?.telefone && telefone ? { telefone } : {}),
       };
       if (Object.keys(faltando).length) {
         await prisma.cliente

@@ -14,6 +14,7 @@ import {
 } from "@/lib/utils/action-result";
 import { emailAcessoCliente } from "@/lib/emails/acesso";
 import { vincularPeloCadastroDoUsuario } from "@/lib/sorteios/servico";
+import { acharClienteExistente } from "@/lib/cliente-existente";
 
 const onlyDigits = (s: string | undefined) => (s ?? "").replace(/\D/g, "");
 const nullify = (s: string | undefined) => {
@@ -74,8 +75,23 @@ export async function createCliente(
     };
   }
 
+  // Mesmo CPF, e-mail ou telefone de alguém que já está cadastrado: não abre
+  // outra ficha. O certo é editar a que existe.
+  const dados = toClienteData(parsed.data);
+  const existente = await acharClienteExistente({
+    cpf: dados.cpfCnpj,
+    email: dados.email,
+    telefone: dados.telefone,
+  });
+  if (existente) {
+    return {
+      success: false,
+      error: `Já existe o cadastro de ${existente.nome} com este CPF, e-mail ou telefone. Abra o cadastro dele e edite, em vez de criar outro.`,
+    };
+  }
+
   try {
-    await prisma.cliente.create({ data: toClienteData(parsed.data) });
+    await prisma.cliente.create({ data: dados });
   } catch (e) {
     console.error(e);
     return { success: false, error: "Erro ao salvar. Tente novamente." };

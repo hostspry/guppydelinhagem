@@ -26,6 +26,7 @@ import {
 } from "@/lib/notificacoes";
 import { registrarFalhaCartao } from "@/lib/pagamento-tentativas";
 import { gravarPagamentoCartao } from "@/lib/pagamento-cartao";
+import { acharClienteExistente } from "@/lib/cliente-existente";
 import { calcularPrecos } from "@/lib/precos";
 import {
   normalizarCodigo,
@@ -1091,11 +1092,11 @@ export async function criarOrderDoCheckout(
   let publicToken = randomBytes(16).toString("hex");
   try {
     const created = await prisma.$transaction(async (tx) => {
-      // Reuso de cliente por identidade forte → fraca.
-      const existente =
-        (cpf && (await tx.cliente.findFirst({ where: { cpfCnpj: cpf } }))) ||
-        (await tx.cliente.findFirst({ where: { email: data.email } })) ||
-        (tel ? await tx.cliente.findFirst({ where: { telefone: tel } }) : null);
+      // Reuso de cliente por identidade forte → fraca (CPF, e-mail, telefone).
+      const existente = await acharClienteExistente(
+        { cpf, email: data.email, telefone: tel },
+        tx,
+      );
 
       // Na RETIRADA não atualiza o endereço do cliente (o form não o coleta —
       // evita apagar um endereço já salvo de um cliente recorrente).

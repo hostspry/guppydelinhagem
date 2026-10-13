@@ -32,6 +32,7 @@ import {
   type VendaWhatsappInput,
 } from "@/lib/validations/venda-whatsapp";
 import type { Prisma } from "@/lib/generated/prisma/client";
+import { acharClienteExistente } from "@/lib/cliente-existente";
 
 export type VendaResult =
   | { success: true; orderId: string; numero: string; clienteNovo: boolean }
@@ -447,7 +448,16 @@ export async function criarVendaWhatsapp(input: unknown): Promise<VendaResult> {
   try {
     const criado = await prisma.$transaction(async (tx) => {
       // ── Cliente ──
-      let clienteId = d.clienteId ?? null;
+      // Sem cliente escolhido na tela, ainda procura pelo CPF, e-mail ou
+      // telefone: a sugestão aparece para o operador, mas nada impedia de
+      // ignorar e abrir um cadastro repetido.
+      let clienteId =
+        d.clienteId ??
+        (await acharClienteExistente(
+          { cpf: d.cpfCnpj, email: d.email, telefone: d.telefone },
+          tx,
+        ))?.id ??
+        null;
       if (clienteId) {
         const atual = await tx.cliente.findUnique({
           where: { id: clienteId },
