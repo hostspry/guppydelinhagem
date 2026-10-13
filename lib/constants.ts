@@ -91,3 +91,8 @@ export function stripMarcheziSignature(texto: string): string {
   }
   return (corte >= 0 ? texto.slice(0, corte) : texto).trim();
 }
+
+// Criadeira MGV16: a página do produto linka para o manual em /guia (e vice-versa).
+export const CRIADEIRA_MGV16_SLUG =
+  "criadeira-profissional-mgv16-6-litros-para-guppy";
+export const CRIADEIRA_MGV16_GUIA = "/guia/criadeira-mgv16";

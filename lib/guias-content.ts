@@ -116,3 +116,104 @@ export const FILHOTES_FAQ: QaPair[] = [
       "Cada ninhada costuma ter de 20 a 60 filhotes, às vezes mais em fêmeas grandes. E como a fêmea armazena esperma, novas ninhadas podem vir a cada poucas semanas.",
   },
 ];
+
+// ── /guia/criadeira-mgv16 ─────────────────────────────────────────────────────
+// Manual de montagem e uso da Criadeira Marchezi MGV16, tirado do manual
+// impresso (6 páginas) que vai com o produto. Slug e rota ficam em
+// lib/constants.ts (a página do produto, client, linka de volta).
+
+export const CRIADEIRA_INTRO =
+  "Eu desenvolvi a Criadeira Marchezi MGV16 a partir do que vivo todo dia na estufa: separar peixes, reproduzir, acompanhar matrizes, proteger os filhotes e manter a criação organizada. Ela é a mesma criadeira que uso nos meus guppies de linhagem, e aqui está o passo a passo para montar e o que eu faço com ela no dia a dia.";
+
+export const CRIADEIRA_ORIGEM =
+  "A Marchezi Guppy Farm cria guppies de linhagem e participa da criação seletiva, com peixes reconhecidos em competições nacionais e internacionais (WGA / UNAQUA 2023 e 2024). O que aprendo dentro da criação vira produto que eu mesmo uso, e é isso que coloco à disposição de outros criadores.";
+
+export const CRIADEIRA_PECAS: readonly { nome: string; qtd: number }[] = [
+  { nome: "Lateral esquerda", qtd: 1 },
+  { nome: "Lateral direita", qtd: 1 },
+  { nome: "Piso", qtd: 1 },
+  { nome: "Traseira", qtd: 1 },
+  { nome: "Viga de esquadro", qtd: 1 },
+];
+
+export const CRIADEIRA_PASSOS: readonly {
+  titulo: string;
+  texto: string;
+  imagem: string;
+}[] = [
+  {
+    titulo: "Posicione as laterais",
+    texto:
+      "Coloque as duas laterais (esquerda e direita) em pé e paralelas, com as presilhas viradas para a frente. As presilhas e as telas já vêm montadas nas laterais.",
+    imagem: "/images/criadeira-mgv16/passo-1.webp",
+  },
+  {
+    titulo: "Encaixe o piso",
+    texto:
+      "Deslize o piso pelo trilho de baixo das laterais e empurre até o fim do curso.",
+    imagem: "/images/criadeira-mgv16/passo-2.webp",
+  },
+  {
+    titulo: "Encaixe a traseira",
+    texto:
+      "Deslize a traseira pelos trilhos das laterais até encaixar por completo.",
+    imagem: "/images/criadeira-mgv16/passo-3.webp",
+  },
+  {
+    titulo: "Instale a viga de esquadro",
+    texto:
+      "Encaixe a viga de esquadro na parte de cima das laterais. Ela trava o conjunto no esquadro e fecha a montagem.",
+    imagem: "/images/criadeira-mgv16/passo-4.webp",
+  },
+];
+
+export const CRIADEIRA_USOS: readonly { titulo: string; texto: string }[] = [
+  {
+    titulo: "Reprodução",
+    texto:
+      "Isolo a fêmea prenha na criadeira. Na hora do parto os filhotes passam pela tela para a área protegida e não viram comida dos adultos.",
+  },
+  {
+    titulo: "Acompanhamento",
+    texto:
+      "Com o peixe separado e perto do vidro, fica fácil observar, comparar e decidir quem segue na seleção.",
+  },
+  {
+    titulo: "Organização das linhagens",
+    texto:
+      "Várias criadeiras no mesmo aquário mantêm linhagens e cruzamentos separados, usando o mesmo filtro e a mesma luz.",
+  },
+  {
+    titulo: "Fotos e vídeos",
+    texto:
+      "O peixe fica perto do vidro e sem nada na frente, então dá para fotografar e filmar de perto com o celular.",
+  },
+];
+
+export const CRIADEIRA_FAQ: readonly QaPair[] = [
+  {
+    pergunta: "Precisa de ferramenta ou cola para montar a criadeira MGV16?",
+    resposta:
+      "Não. Todas as peças vêm prontas e as telas já saem presas nas estruturas. A montagem é só de encaixe: laterais, piso, traseira e viga de esquadro, nessa ordem.",
+  },
+  {
+    pergunta: "Quantos peixes cabem na criadeira MGV16?",
+    resposta:
+      "Ela tem 6 litros e comporta de 3 a 6 peixes, conforme o tamanho deles e o manejo.",
+  },
+  {
+    pergunta: "Os filhotes ficam protegidos dos adultos?",
+    resposta:
+      "Sim. Na hora do parto os alevinos escapam pela tela para a área protegida, longe da mãe e dos outros adultos.",
+  },
+  {
+    pergunta: "Posso colocar mais de uma criadeira no mesmo aquário?",
+    resposta:
+      "Pode. É assim que eu uso na estufa: várias criadeiras num aquário só, cada uma com uma linhagem ou um cruzamento, aproveitando o filtro e a iluminação que já existem.",
+  },
+  {
+    pergunta: "A criadeira MGV16 serve para outros peixes além do guppy?",
+    resposta:
+      "Serve para outros poecilídeos, como platy, molinésia e espadinha, que também parem filhotes vivos.",
+  },
+];

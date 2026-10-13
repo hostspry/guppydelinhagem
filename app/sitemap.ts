@@ -22,6 +22,7 @@ const ESTATICAS: MetadataRoute.Sitemap = [
   // /guia/macho-e-femea consolidado no pilar /peixe-guppy#macho-e-femea (308 em
   // next.config). Fora do sitemap para não indexar uma rota que só redireciona.
   { url: `${SITE_URL}/guia/filhotes-de-guppy`, changeFrequency: "monthly", priority: 0.6 },
+  { url: `${SITE_URL}/guia/criadeira-mgv16`, changeFrequency: "monthly", priority: 0.6 },
   { url: `${SITE_URL}/frete`, changeFrequency: "monthly", priority: 0.6 },
   { url: `${SITE_URL}/contatos`, changeFrequency: "monthly", priority: 0.5 },
 ];

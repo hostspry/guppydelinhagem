@@ -12,6 +12,7 @@ import {
   ShoppingCart,
   X,
   Trophy,
+  BookOpen,
   Dna,
   Droplets,
   Clock,
@@ -44,7 +45,12 @@ import {
   tiktokEmbedUrl,
 } from "@/lib/utils/video";
 import { useCart } from "@/lib/stores/cart";
-import { whatsappLink, stripMarcheziSignature } from "@/lib/constants";
+import {
+  whatsappLink,
+  stripMarcheziSignature,
+  CRIADEIRA_MGV16_SLUG,
+  CRIADEIRA_MGV16_GUIA,
+} from "@/lib/constants";
 import { trackViewItem, trackAddToCart } from "@/lib/analytics";
 import {
   conteudoDoProduto,
@@ -823,6 +829,23 @@ export default function ProductDetail({
                 >
                   {descExpandida ? "Ler menos" : "Ler mais"}
                 </button>
+              )}
+
+              {product.slug === CRIADEIRA_MGV16_SLUG && (
+                <Link
+                  href={CRIADEIRA_MGV16_GUIA}
+                  className="mt-4 flex items-center gap-3 rounded-xl border border-border p-3 hover:border-secondary transition-colors"
+                >
+                  <BookOpen size={20} className="text-secondary shrink-0" aria-hidden="true" />
+                  <span className="text-sm">
+                    <span className="block font-semibold text-primary">
+                      Manual de montagem e uso
+                    </span>
+                    <span className="text-muted-foreground">
+                      Peças do kit, montagem em 4 passos e como usar na criação.
+                    </span>
+                  </span>
+                </Link>
               )}
 
               {/* Nota Marchezi — fecho integrado da descrição (divisória sutil,
