@@ -218,3 +218,22 @@ export async function exigirSessao(callbackUrl = "/minha-conta") {
   }
   return session.user;
 }
+
+/**
+ * Senha temporária ainda pendente — pelo BANCO, não pelo token.
+ *
+ * O JWT grava `senhaPrecisaTroca` no login e nunca mais é tocado. Quem definia
+ * a senha em /definir-senha seguia com o token dizendo "true": o layout de
+ * /minha-conta mandava de volta para a tela de definir senha a cada visita, e
+ * de lá não dava mais para sair, porque o formulário pede a senha temporária
+ * que acabou de deixar de valer. O cliente pagava e não conseguia abrir o
+ * pedido. Aconteceu em produção. O painel do admin já consulta o banco nessa
+ * guarda; aqui passa a ser a mesma régua.
+ */
+export async function precisaDefinirSenha(userId: string): Promise<boolean> {
+  const u = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { senhaPrecisaTroca: true },
+  });
+  return u?.senhaPrecisaTroca ?? false;
+}

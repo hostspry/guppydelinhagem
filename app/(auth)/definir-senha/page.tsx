@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import { redirect } from "next/navigation";
 import { Toaster } from "sonner";
-import { auth } from "@/lib/auth";
+import { auth, precisaDefinirSenha } from "@/lib/auth";
 import { TrocarSenhaForm } from "@/components/admin/TrocarSenhaForm";
 
 export const metadata: Metadata = {
@@ -21,8 +21,10 @@ export const metadata: Metadata = {
 export default async function DefinirSenhaPage() {
   const session = await auth();
   if (!session?.user) redirect("/login?callbackUrl=/minha-conta");
-  // Quem já tem senha própria não tem o que fazer aqui.
-  if (!session.user.senhaPrecisaTroca) redirect("/minha-conta");
+  // Quem já tem senha própria não tem o que fazer aqui. Pelo banco, igual ao
+  // layout do painel: se um lesse o token e o outro o banco, os dois redirects
+  // se devolveriam em laço.
+  if (!(await precisaDefinirSenha(session.user.id))) redirect("/minha-conta");
 
   const primeiroNome = (session.user.name ?? "").trim().split(/\s+/)[0] ?? "";
 

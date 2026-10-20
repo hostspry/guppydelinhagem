@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { auth } from "@/lib/auth";
+import { auth, precisaDefinirSenha } from "@/lib/auth";
 import { vincularClientesAoUsuario } from "@/lib/queries/minha-conta";
 import Navbar from "@/components/site/Navbar";
 import Footer from "@/components/site/Footer";
@@ -17,8 +17,9 @@ export default async function MinhaContaLayout({
 
   // Senha temporária (acesso criado pela loja numa venda direta): o cliente
   // define a dele ANTES de ver o painel. A página fica fora deste layout, senão
-  // o redirect entraria em laço.
-  if (session.user.senhaPrecisaTroca) redirect("/definir-senha");
+  // o redirect entraria em laço. A pergunta vai ao banco: o token guarda o que
+  // valia no login e não aprende que a senha já foi definida.
+  if (await precisaDefinirSenha(session.user.id)) redirect("/definir-senha");
 
   // Idempotente e barato — liga os Clientes deste e-mail ao usuário logado.
   await vincularClientesAoUsuario(session.user.id, session.user.email);
