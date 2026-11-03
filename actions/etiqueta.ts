@@ -117,6 +117,7 @@ async function carregarPedido(orderId: string) {
           },
         },
       },
+      lotesLeilao: { select: { qtdPeixes: true } },
     },
   });
   return order;
@@ -145,6 +146,32 @@ function itensParaFrete(
 }
 
 type Pedido = NonNullable<Awaited<ReturnType<typeof carregarPedido>>>;
+
+/** Serviço Jadlog .Com no Melhor Envio: o único que leva peixe vivo. */
+const JADLOG_COM = 4;
+
+/**
+ * Peixes do pedido: a receita dos itens mais os lotes de leilão.
+ *
+ * O item de leilão entra como avulso, sem machos e fêmeas, então a contagem
+ * dele vem do lote (qtdPeixes). Sem os lotes, o pedido de leilão parecia
+ * produto seco e a tela oferecia Loggi e JeT para peixe vivo.
+ */
+function peixesDoPedido(order: Pedido): number {
+  const daReceita = order.items.reduce(
+    (s, it) => s + ((it.qtdMachos ?? 0) + (it.qtdFemeas ?? 0)) * it.quantidade,
+    0,
+  );
+  const dosLotes = order.lotesLeilao.reduce((s, l) => s + l.qtdPeixes, 0);
+  return daReceita + dosLotes;
+}
+
+function temCargaViva(order: Pedido): boolean {
+  return (
+    carrinhoTemCargaViva(itensParaFrete(order.items)) ||
+    order.lotesLeilao.some((l) => l.qtdPeixes > 0)
+  );
+}
 
 /**
  * Volumes do pedido: a embalagem que o operador informou, quando informou.
@@ -216,14 +243,10 @@ export async function cotarEtiquetaDoPedido(
     return { success: false, error: "O pedido não tem itens." };
   }
 
-  const itens = itensParaFrete(order.items);
   const valorSegurado = Number(order.total) || 0;
 
-  if (carrinhoTemCargaViva(itens)) {
-    const totalPeixes = order.items.reduce(
-      (s, it) => s + ((it.qtdMachos ?? 0) + (it.qtdFemeas ?? 0)) * it.quantidade,
-      0,
-    );
+  if (temCargaViva(order)) {
+    const totalPeixes = peixesDoPedido(order);
     const { pesoGramas, caixa } = calcularPesoECaixa(Math.max(1, totalPeixes));
     const cot = await cotarFrete({
       cepDestino: cep,
@@ -426,12 +449,17 @@ export async function comprarEtiquetaDoPedido(
     };
   }
 
-  const itens = itensParaFrete(order.items);
-  const vivo = carrinhoTemCargaViva(itens);
-  const totalPeixes = order.items.reduce(
-    (s, it) => s + ((it.qtdMachos ?? 0) + (it.qtdFemeas ?? 0)) * it.quantidade,
-    0,
-  );
+  const vivo = temCargaViva(order);
+  const totalPeixes = peixesDoPedido(order);
+  // Tela aberta antes da cotação certa ainda pode mandar Loggi ou JeT. Comprar
+  // isso para peixe é etiqueta paga numa transportadora que não leva a caixa.
+  if (vivo && servicoId !== JADLOG_COM) {
+    return {
+      success: false,
+      error:
+        "Pedido com peixe vivo só sai pela Jadlog .Com. Feche a cotação e cote de novo.",
+    };
+  }
   const volumes = vivo
     ? (() => {
         const { pesoGramas, caixa } = calcularPesoECaixa(Math.max(1, totalPeixes));
