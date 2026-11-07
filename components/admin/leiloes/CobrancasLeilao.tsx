@@ -10,10 +10,12 @@ import {
   Check,
   Copy,
   ExternalLink,
+  Mail,
   MessageCircle,
 } from "lucide-react";
 import {
   cancelarCobrancaLeilao,
+  enviarCobrancaPorEmail,
   registrarPagamentoForaLeilao,
 } from "@/actions/leiloes";
 import { BaixaManualForm } from "@/components/admin/leiloes/BaixaManual";
@@ -33,6 +35,8 @@ export type CobrancaLinha = {
   total: number;
   /** O cliente já escolheu entrega/frete no link. */
   entregaEscolhida: boolean;
+  /** Último envio do e-mail de cobrança (ISO), nulo = nunca mandou. */
+  emailEnviadoEm: string | null;
   link: string | null;
   tipoEntrega: "ENVIO" | "RETIRADA";
   modalidadeFrete: string | null;
@@ -56,6 +60,14 @@ const moeda = (n: number) =>
   n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const dia = (iso: string) =>
   new Date(iso).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
+const diaHora = (iso: string) =>
+  new Date(iso).toLocaleString("pt-BR", {
+    timeZone: "America/Sao_Paulo",
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 
 const METODO: Record<string, string> = { PIX: "Pix", CARTAO: "Cartão" };
 const STATUS_PAG: Record<string, string> = {
@@ -194,6 +206,16 @@ function CartaoCobranca({ c }: { c: CobrancaLinha }) {
               : "nenhuma tentativa ainda"}
           </dd>
         </div>
+        <div className="flex gap-1.5">
+          <dt className="text-gray-400">E-mail:</dt>
+          <dd className="text-gray-700">
+            {c.emailEnviadoEm
+              ? `cobrança enviada em ${diaHora(c.emailEnviadoEm)}`
+              : c.cliente.email
+                ? "ainda não mandei"
+                : "sem e-mail no cadastro"}
+          </dd>
+        </div>
       </dl>
 
       {c.situacao !== "CANCELADA" && (
@@ -209,6 +231,23 @@ function CartaoCobranca({ c }: { c: CobrancaLinha }) {
                 <MessageCircle className="w-3.5 h-3.5" aria-hidden="true" />
                 {comDdi ? "Mandar no WhatsApp" : "Abrir WhatsApp"}
               </a>
+              {c.cliente.email && (
+                <button
+                  type="button"
+                  disabled={isPending}
+                  onClick={() => {
+                    const aviso = c.emailEnviadoEm
+                      ? `Já mandei por e-mail em ${diaHora(c.emailEnviadoEm)}. Mandar de novo para ${c.cliente.email}?`
+                      : `Mandar a cobrança por e-mail para ${c.cliente.email}?`;
+                    if (!confirm(aviso)) return;
+                    rodar(() => enviarCobrancaPorEmail(c.id));
+                  }}
+                  className="inline-flex items-center gap-1.5 bg-[#FF035C] text-white text-xs font-medium px-3 py-1.5 rounded-md hover:brightness-110 disabled:opacity-60"
+                >
+                  <Mail className="w-3.5 h-3.5" aria-hidden="true" />
+                  {c.emailEnviadoEm ? "Reenviar e-mail" : "Mandar por e-mail"}
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => copiar(texto, "msg")}

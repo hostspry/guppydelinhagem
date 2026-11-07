@@ -553,6 +553,9 @@ model Order {
   /// Quando o arrematante escolheu entrega e frete na página da cobrança.
   /// Nulo = ainda não escolheu, e o total ainda é só a soma dos lotes.
   entregaEscolhidaEm DateTime?
+  /// Último envio do e-mail de cobrança do leilão (botão "Mandar por e-mail").
+  /// Nulo = nunca saiu por e-mail; serve para não mandar duas vezes sem querer.
+  cobrancaEmailEm    DateTime?
 
   // Scaffold de checkout/integrações — dormente (reconciliado nas fases
   // Pagamentos/Envio; não usar/não apagar). parcelas: parcelamento de cartão.

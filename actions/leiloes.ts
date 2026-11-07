@@ -18,6 +18,7 @@ import { leilaoSchema, loteSchema, PEIXES_POR_LOTE } from "@/lib/validations/lei
 import type { EnderecoEntrega } from "@/lib/validations/pedido";
 import { transicionarParaPago } from "@/lib/pedido-baixa";
 import { pedirConfirmacaoEnvioAereo } from "@/lib/gollog/confirmacao";
+import { emailCobrancaLeilao } from "@/lib/emails/leilao";
 import type { Prisma } from "@/lib/generated/prisma/client";
 import type { ActionResult } from "@/lib/utils/action-result";
 
@@ -798,4 +799,31 @@ export async function baixaManualArrematante(
     return { success: false, error: "Este arrematante não tem nada em aberto neste leilão." };
   }
   return registrarPagamentoForaLeilao(aberta.id, input);
+}
+
+/**
+ * Manda a cobrança por e-mail (mensagem "Cobrança do leilão", editável em
+ * Configurações → Mensagens): lotes, total, promoção pelo menor arremate e o
+ * link para escolher o frete e pagar. Não muda nada na cobrança, só registra
+ * quando o e-mail saiu.
+ */
+export async function enviarCobrancaPorEmail(orderId: string): Promise<ActionResult> {
+  const membro = await assertPermissao("pedidos.editar");
+  const o = await prisma.order.findFirst({
+    where: { id: orderId, origem: "LEILAO" },
+    select: { numero: true, leilaoId: true, cobrancaEmailEm: true },
+  });
+  if (!o) return { success: false, error: "Cobrança não encontrada." };
+
+  const r = await emailCobrancaLeilao(orderId);
+  if (!r.ok) return { success: false, error: r.motivo };
+
+  await auditar(membro, {
+    acao: "leilao.cobranca.email",
+    entidade: "Order",
+    entidadeId: orderId,
+    descricao: `Mandou a cobrança ${o.numero} por e-mail para ${r.para}${o.cobrancaEmailEm ? " (reenvio)" : ""}`,
+  });
+  if (o.leilaoId) revalidar(o.leilaoId);
+  return { success: true, message: `E-mail enviado para ${r.para}.` };
 }

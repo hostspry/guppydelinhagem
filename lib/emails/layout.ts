@@ -58,6 +58,19 @@ export function listaItens(itens: { nome: string; qtd: number }[]): string {
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:12px 0">${linhas}</table>`;
 }
 
+/** Lotes de leilão com o valor de cada um (o arrematante confere o que levou). */
+export function listaLotes(lotes: { nome: string; valor: number }[]): string {
+  if (!lotes.length) return "";
+  const linhas = lotes
+    .map(
+      (l) =>
+        `<tr><td style="padding:8px 0;font-family:Arial,sans-serif;font-size:14px;color:#374151;border-bottom:1px solid #f0f0f0">${esc(l.nome)}</td>
+         <td align="right" style="padding:8px 0 8px 12px;font-family:Arial,sans-serif;font-size:14px;color:#374151;border-bottom:1px solid #f0f0f0;white-space:nowrap">${esc(moeda(l.valor))}</td></tr>`,
+    )
+    .join("");
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:12px 0">${linhas}</table>`;
+}
+
 /**
  * Envelope comum: logo, conteúdo e rodapé. `preheader` é a linha que o app de
  * e-mail mostra ao lado do assunto na lista — sem ela, o cliente vê o começo do

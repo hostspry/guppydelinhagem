@@ -196,6 +196,26 @@ export const TEMPLATES: TemplateDef[] = [
     quando: "Sai quando uma cobrança avulsa (link de pagamento) é paga.",
     variaveis: [VAR_NOME, { nome: "total", descricao: "Valor pago" }],
   },
+  {
+    chave: "leilao-cobranca",
+    rotulo: "Cobrança do leilão",
+    quando:
+      "Sai quando você clica em “Mandar por e-mail” numa cobrança do leilão. Leva os lotes, o total e o link onde o arrematante escolhe o frete e paga.",
+    variaveis: [
+      VAR_NOME,
+      { nome: "leilao", descricao: "Nome do leilão (ex.: Leilão Black Novembro)" },
+      { nome: "data_leilao", descricao: "Dia do leilão (ex.: 06/11/2026)" },
+      { nome: "lotes", descricao: "Lista dos lotes com o valor de cada um", bloco: true },
+      { nome: "subtotal", descricao: "Soma dos lotes, sem frete" },
+      { nome: "menor_lance", descricao: "Menor arremate dele no leilão (preço da promoção)" },
+      {
+        nome: "frete",
+        descricao: "Parágrafo do frete: escolher no link, ou o que já foi combinado",
+      },
+      { nome: "botao_pagar", descricao: "Botão para abrir o link de pagamento", bloco: true },
+      { nome: "link", descricao: "Endereço do link, em texto" },
+    ],
+  },
 ];
 
 export function templateDef(chave: string): TemplateDef | null {

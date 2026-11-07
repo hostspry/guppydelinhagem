@@ -87,6 +87,7 @@ export default async function LeilaoDetalhePage({
             ...c,
             texto: textos[c.id],
             entregaEscolhida: !!c.entregaEscolhidaEm,
+            emailEnviadoEm: c.emailEnviadoEm ? c.emailEnviadoEm.toISOString() : null,
             ultimoPagamento: c.ultimoPagamento
               ? { ...c.ultimoPagamento, criadoEm: c.ultimoPagamento.criadoEm.toISOString() }
               : null,
