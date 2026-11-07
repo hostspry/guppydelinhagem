@@ -67,6 +67,7 @@ async function carregar(token: string) {
       leilaoId: true,
       items: { orderBy: { id: "asc" }, select: { id: true, nomeProduto: true, precoUnitario: true } },
       lotesLeilao: { select: { qtdPeixes: true } },
+      freteSemLimitePeixes: true,
       pagamentos: { select: { status: true } },
       cliente: {
         select: { id: true, nome: true, email: true, cpfCnpj: true, telefone: true, criadoEm: true },
@@ -170,7 +171,8 @@ export async function cotarEntregaArremate(
     endereco: r.endereco,
     terrestre: r.terrestre,
     aereo: r.aereo,
-    acimaDoLimite: peixes > maxPeixesFreteAuto,
+    // Exceção do dono por cobrança: cota mesmo acima do limite de peixes.
+    acimaDoLimite: peixes > maxPeixesFreteAuto && !o.freteSemLimitePeixes,
   };
 }
 
@@ -221,7 +223,7 @@ export async function salvarEntregaArremate(
   } else {
     const peixes = qtdPeixes(o);
     const { maxPeixesFreteAuto } = await getConfiguracaoLoja();
-    if (peixes > maxPeixesFreteAuto) {
+    if (peixes > maxPeixesFreteAuto && !o.freteSemLimitePeixes) {
       return {
         ok: false,
         error: `Com mais de ${maxPeixesFreteAuto} peixes o frete é combinado. Chame a loja no WhatsApp.`,

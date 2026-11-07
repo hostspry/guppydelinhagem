@@ -52,6 +52,7 @@ export async function emailCobrancaLeilao(
       cliente: { select: { nome: true, email: true } },
       leilao: { select: { nome: true, dataLeilao: true } },
       unidadeGollogId: true,
+      freteSemLimitePeixes: true,
       lotesLeilao: {
         orderBy: [{ ordem: "asc" }, { criadoEm: "asc" }],
         select: { numero: true, valor: true, qtdPeixes: true },
@@ -73,7 +74,7 @@ export async function emailCobrancaLeilao(
 
   const peixes = o.lotesLeilao.reduce((a, l) => a + l.qtdPeixes, 0);
   const { maxPeixesFreteAuto } = await getConfiguracaoLoja();
-  if (!o.entregaEscolhidaEm && peixes > maxPeixesFreteAuto) {
+  if (!o.entregaEscolhidaEm && peixes > maxPeixesFreteAuto && !o.freteSemLimitePeixes) {
     return {
       ok: false,
       motivo: `São ${peixes} peixes, acima do frete automático (${maxPeixesFreteAuto}). Combine o frete antes de mandar.`,

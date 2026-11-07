@@ -556,6 +556,9 @@ model Order {
   /// Último envio do e-mail de cobrança do leilão (botão "Mandar por e-mail").
   /// Nulo = nunca saiu por e-mail; serve para não mandar duas vezes sem querer.
   cobrancaEmailEm    DateTime?
+  /// Exceção do dono: o link do leilão cota o frete automático mesmo acima de
+  /// ConfiguracaoLoja.maxPeixesFreteAuto (ex.: Pompeo, 32 peixes, 07/11/2026).
+  freteSemLimitePeixes Boolean  @default(false)
 
   // Scaffold de checkout/integrações — dormente (reconciliado nas fases
   // Pagamentos/Envio; não usar/não apagar). parcelas: parcelamento de cartão.
