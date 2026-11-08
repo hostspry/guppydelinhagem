@@ -24,6 +24,8 @@ export default function CobrancaArremate({
   const primeiroNome = a.pagador.nome.trim().split(/\s+/)[0] ?? "";
   const aberta = arremateAberto(a.situacao);
   const premio = ehPremio(a);
+  // Linha negativa é abatimento (adiantamento pago por fora), não lote.
+  const nLotes = a.lotes.filter((l) => l.valor >= 0).length;
 
   return (
     <div className="bg-white border border-gray-200 rounded-xl p-5 sm:p-7 shadow-sm space-y-6">
@@ -37,7 +39,7 @@ export default function CobrancaArremate({
             {a.situacao === "PAGA"
               ? `Tudo certo, ${primeiroNome}!`
               : `${primeiroNome ? `${primeiroNome}, p` : "P"}arabéns ${
-                  premio ? "pelo prêmio" : a.lotes.length === 1 ? "pelo arremate" : "pelos arremates"
+                  premio ? "pelo prêmio" : nLotes === 1 ? "pelo arremate" : "pelos arremates"
                 }!`}
           </h1>
         )}
@@ -46,14 +48,20 @@ export default function CobrancaArremate({
 
       <div>
         <h2 className="text-sm font-semibold text-[#07366A] mb-2">
-          {premio ? "Seu prêmio" : a.lotes.length === 1 ? "Seu lote" : `Seus ${a.lotes.length} lotes`}
+          {premio ? "Seu prêmio" : nLotes === 1 ? "Seu lote" : `Seus ${nLotes} lotes`}
         </h2>
         <ul className="border border-gray-200 rounded-lg divide-y divide-gray-100">
           {a.lotes.map((l, i) => (
             <li key={i} className="flex items-start justify-between gap-4 px-4 py-3 text-sm">
               <span className="text-gray-700">{l.nome}</span>
-              <span className="text-gray-800 whitespace-nowrap">
-                {l.valor > 0 ? formatBRL(l.valor) : "grátis"}
+              <span
+                className={`whitespace-nowrap ${l.valor < 0 ? "text-green-700" : "text-gray-800"}`}
+              >
+                {l.valor > 0
+                  ? formatBRL(l.valor)
+                  : l.valor < 0
+                    ? `− ${formatBRL(-l.valor)}`
+                    : "grátis"}
               </span>
             </li>
           ))}
