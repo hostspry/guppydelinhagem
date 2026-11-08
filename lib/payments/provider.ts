@@ -175,11 +175,13 @@ export interface CriarPreferenciaInput {
   // payment_methods.installments do Checkout Pro.
   installmentsLimit?: number;
   /**
-   * Só cartão de crédito, já na parcela combinada (MP: default_installments).
-   * Para o link com os juros somados no valor: aberto para Pix ou boleto, o
-   * cliente pagaria os juros sem parcelar.
+   * Só cartão de crédito (sem Pix, boleto ou débito), em até `maxParcelas`. O
+   * MP soma os juros de cada parcela por cima do valor e o cliente escolhe.
+   * `parcelaPadrao` já deixa uma parcela marcada (MP: default_installments).
+   * Para o link com a taxa do cartão somada no valor: aberto a Pix, o cliente
+   * pagaria a taxa sem precisar.
    */
-  somenteCredito?: { parcelas: number };
+  somenteCredito?: { maxParcelas: number; parcelaPadrao?: number };
   /** Fecha o checkout no gateway nesta data (MP: expiration_date_to). */
   expiraEm?: Date | null;
   idempotencyKey?: string;

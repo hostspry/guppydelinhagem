@@ -524,8 +524,10 @@ export const mercadoPagoProvider: PaymentProvider = {
       ...(input.somenteCredito
         ? {
             payment_methods: {
-              installments: input.somenteCredito.parcelas,
-              default_installments: input.somenteCredito.parcelas,
+              installments: input.somenteCredito.maxParcelas,
+              ...(input.somenteCredito.parcelaPadrao
+                ? { default_installments: input.somenteCredito.parcelaPadrao }
+                : {}),
               excluded_payment_types: [
                 { id: "ticket" },
                 { id: "bank_transfer" },
