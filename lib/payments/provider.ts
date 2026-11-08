@@ -174,6 +174,12 @@ export interface CriarPreferenciaInput {
   // Teto de parcelas do cartão. PagBank: payment_methods_configs. MP: entra em
   // payment_methods.installments do Checkout Pro.
   installmentsLimit?: number;
+  /**
+   * Só cartão de crédito, já na parcela combinada (MP: default_installments).
+   * Para o link com os juros somados no valor: aberto para Pix ou boleto, o
+   * cliente pagaria os juros sem parcelar.
+   */
+  somenteCredito?: { parcelas: number };
   /** Fecha o checkout no gateway nesta data (MP: expiration_date_to). */
   expiraEm?: Date | null;
   idempotencyKey?: string;

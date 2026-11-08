@@ -521,9 +521,23 @@ export const mercadoPagoProvider: PaymentProvider = {
       auto_return: "approved",
       notification_url: NOTIFICATION_URL,
       // Teto de parcelas (cobrança avulsa). Sem isso o MP usa o máximo da conta.
-      ...(input.installmentsLimit
-        ? { payment_methods: { installments: input.installmentsLimit } }
-        : {}),
+      ...(input.somenteCredito
+        ? {
+            payment_methods: {
+              installments: input.somenteCredito.parcelas,
+              default_installments: input.somenteCredito.parcelas,
+              excluded_payment_types: [
+                { id: "ticket" },
+                { id: "bank_transfer" },
+                { id: "atm" },
+                { id: "debit_card" },
+                { id: "prepaid_card" },
+              ],
+            },
+          }
+        : input.installmentsLimit
+          ? { payment_methods: { installments: input.installmentsLimit } }
+          : {}),
       // Validade do link: passou da data, o MP recusa abrir o checkout.
       ...(input.expiraEm
         ? {
