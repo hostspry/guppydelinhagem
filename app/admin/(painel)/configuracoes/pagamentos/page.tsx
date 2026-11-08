@@ -11,6 +11,7 @@ export default async function ConfiguracoesPagamentosPage() {
       inicial={{
         descontoPixGlobalPercent: config.descontoPixGlobalPercent,
         pagbankAtivo: config.pagbankAtivo,
+        taxaCartaoPercent: config.taxaCartaoPercent,
       }}
     />
   );

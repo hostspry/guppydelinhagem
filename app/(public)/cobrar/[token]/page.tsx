@@ -6,6 +6,8 @@ import { whatsappLink, WHATSAPP_DISPLAY } from "@/lib/constants";
 import { WhatsAppIcon } from "@/components/icons/WhatsAppIcon";
 import CobrancaPagamento from "@/components/cobranca/CobrancaPagamento";
 import CobrancaStatusPoll from "@/components/cobranca/CobrancaStatusPoll";
+import { getConfiguracaoLoja } from "@/lib/queries/config";
+import { rotuloTaxaCartao, valorNoCartao } from "@/lib/taxa-cartao";
 
 export const dynamic = "force-dynamic";
 
@@ -34,6 +36,11 @@ export default async function CobrarPage({
   if (!c) notFound();
 
   const primeiroNome = c.clienteNome.trim().split(/\s+/)[0] ?? "";
+  // No cartão entra a taxa do cartão por cima, para a loja receber o mesmo que
+  // no Pix. O servidor cobra com a mesma conta (actions/cobrancas).
+  const { taxaCartaoPercent } = await getConfiguracaoLoja();
+  const totalCartao = valorNoCartao(c.total, taxaCartaoPercent);
+  const comTaxa = totalCartao > c.total;
 
   return (
     <div className="max-w-lg mx-auto px-4 py-12">
@@ -77,10 +84,26 @@ export default async function CobrarPage({
             </div>
 
             <ul className="text-sm text-gray-600 space-y-1.5 mb-6">
-              <li>Pix cai na hora.</li>
-              <li>
-                No cartão dá para parcelar em até {c.maxParcelas ?? 12}x.
-              </li>
+              {comTaxa ? (
+                <>
+                  <li>
+                    No Pix: <strong className="text-gray-800">{moeda.format(c.total)}</strong>. Cai na
+                    hora.
+                  </li>
+                  <li>
+                    No cartão: <strong className="text-gray-800">{moeda.format(totalCartao)}</strong> à
+                    vista, ou em até {c.maxParcelas ?? 12}x com os juros da parcela. A diferença
+                    é a taxa do cartão ({rotuloTaxaCartao(taxaCartaoPercent)}).
+                  </li>
+                </>
+              ) : (
+                <>
+                  <li>Pix cai na hora.</li>
+                  <li>
+                    No cartão dá para parcelar em até {c.maxParcelas ?? 12}x.
+                  </li>
+                </>
+              )}
               {c.expiraEm && (
                 <li className="flex items-center gap-1.5 text-gray-500">
                   <Clock className="w-3.5 h-3.5" aria-hidden="true" />
@@ -110,6 +133,7 @@ export default async function CobrarPage({
               <CobrancaPagamento
                 token={token}
                 total={c.total}
+                totalCartao={totalCartao}
                 maxParcelas={c.maxParcelas ?? 12}
                 mpPublicKey={
                   process.env.MP_PUBLIC_KEY ||

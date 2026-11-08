@@ -7,6 +7,7 @@ import { dataLeilaoBR, situacaoDoArremate } from "@/lib/leiloes/situacao";
 import type { EnderecoEntrega } from "@/lib/validations/pedido";
 import { montarEmail } from "./render";
 import { botao, listaLotes, moeda } from "./layout";
+import { rotuloTaxaCartao } from "@/lib/taxa-cartao";
 
 /**
  * E-mail de cobrança do leilão: os lotes, o total, a promoção pelo menor
@@ -22,6 +23,12 @@ export type ResultadoEmailLeilao =
   | { ok: false; motivo: string };
 
 const PAGAMENTO = "O pagamento pode ser no Pix, que confirma na hora, ou no cartão em até 12x.";
+// Com taxa do cartão ligada (Configurações → Pagamentos), o e-mail avisa antes:
+// o cliente não pode descobrir a diferença só na hora de pagar.
+const pagamentoComTaxa = (pct: number) =>
+  pct > 0
+    ? `${PAGAMENTO} No cartão entra a taxa do cartão (${rotuloTaxaCartao(pct)}) e, se parcelar, os juros da parcela.`
+    : PAGAMENTO;
 
 /**
  * `simular`: monta o e-mail e devolve, sem enviar nem marcar como enviado.
@@ -73,7 +80,8 @@ export async function emailCobrancaLeilao(
   if (!email) return { ok: false, motivo: "O arrematante não tem e-mail. Mande pelo WhatsApp." };
 
   const peixes = o.lotesLeilao.reduce((a, l) => a + l.qtdPeixes, 0);
-  const { maxPeixesFreteAuto } = await getConfiguracaoLoja();
+  const { maxPeixesFreteAuto, taxaCartaoPercent } = await getConfiguracaoLoja();
+  const PAG = pagamentoComTaxa(taxaCartaoPercent);
   if (!o.entregaEscolhidaEm && peixes > maxPeixesFreteAuto && !o.freteSemLimitePeixes) {
     return {
       ok: false,
@@ -92,20 +100,20 @@ export async function emailCobrancaLeilao(
   let textoFrete: string;
   let rotuloBotao: string;
   if (!o.entregaEscolhidaEm) {
-    textoFrete = `No link você coloca seu CEP e escolhe o frete: terrestre pela Jadlog, que entrega no seu endereço, ou aéreo pela Gollog, com retirada no aeroporto. ${PAGAMENTO}`;
+    textoFrete = `No link você coloca seu CEP e escolhe o frete: terrestre pela Jadlog, que entrega no seu endereço, ou aéreo pela Gollog, com retirada no aeroporto. ${PAG}`;
     rotuloBotao = "Escolher o frete e pagar";
   } else if (o.tipoEntrega === "RETIRADA") {
-    textoFrete = `Combinamos a retirada aqui em Guarapari, sem frete. Total a pagar: ${moeda(Number(o.total))}. ${PAGAMENTO}`;
+    textoFrete = `Combinamos a retirada aqui em Guarapari, sem frete. Total a pagar: ${moeda(Number(o.total))}. ${PAG}`;
     rotuloBotao = "Conferir e pagar";
   } else if (o.modalidadeFrete === "AEREO") {
     const unidade = o.unidadeGollogId
       ? await prisma.unidadeGollog.findUnique({ where: { id: o.unidadeGollogId }, select: { titulo: true } })
       : null;
     const onde = unidade?.titulo ? `, com retirada em ${unidade.titulo}` : ", com retirada no aeroporto";
-    textoFrete = `O frete já está combinado: aéreo pela Gollog, ${moeda(frete)}${onde}. Total com frete: ${moeda(Number(o.total))}. ${PAGAMENTO}`;
+    textoFrete = `O frete já está combinado: aéreo pela Gollog, ${moeda(frete)}${onde}. Total com frete: ${moeda(Number(o.total))}. ${PAG}`;
     rotuloBotao = "Conferir e pagar";
   } else {
-    textoFrete = `O frete já está combinado: terrestre pela Jadlog, ${moeda(frete)}, com entrega no seu endereço. Total com frete: ${moeda(Number(o.total))}. ${PAGAMENTO}`;
+    textoFrete = `O frete já está combinado: terrestre pela Jadlog, ${moeda(frete)}, com entrega no seu endereço. Total com frete: ${moeda(Number(o.total))}. ${PAG}`;
     rotuloBotao = "Conferir e pagar";
   }
 

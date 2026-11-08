@@ -90,9 +90,26 @@ export async function salvarConfiguracaoLoja(
   // PagBank: liga/desliga as opções PagBank no checkout (sem deploy).
   const pagbankAtivo = formData.get("pagbankAtivo") === "on";
 
+  // Taxa do cartão nos links de cobrança/leilão (0 a 30%, duas casas). Campo
+  // ausente ou inválido mantém o que já estava — nunca zera sem querer.
+  const taxaCartaoRaw = Number(
+    String(formData.get("taxaCartaoPercent") ?? "").replace(",", "."),
+  );
+  const taxaCartaoPercent =
+    formData.get("taxaCartaoPercent") != null &&
+    Number.isFinite(taxaCartaoRaw) &&
+    taxaCartaoRaw >= 0 &&
+    taxaCartaoRaw <= 30
+      ? Math.round(taxaCartaoRaw * 100) / 100
+      : undefined;
+
   // Só entra no update o que a aba realmente mandou.
   const doPagamento = enviou("pagamentos")
-    ? { descontoPixGlobalPercent: pct, pagbankAtivo }
+    ? {
+        descontoPixGlobalPercent: pct,
+        pagbankAtivo,
+        ...(taxaCartaoPercent !== undefined ? { taxaCartaoPercent } : {}),
+      }
     : {};
   const daEntrega = enviou("entrega")
     ? {

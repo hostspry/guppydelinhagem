@@ -1067,6 +1067,12 @@ model ConfiguracaoLoja {
   tarjaAtiva               Boolean  @default(false) // liga/desliga a tarja promocional no topo
   tarjaTexto               String? // texto livre da tarja; vazio → usa o fallback do componente
   pagbankAtivo             Boolean  @default(false) // oferece PagBank (cartão/Pix/boleto) no checkout
+  /// Taxa do cartão (%) somada ao valor nos links de COBRANÇA e de LEILÃO, para a
+  /// loja receber o valor cheio: o Mercado Pago desconta 4,98% no crédito (à
+  /// vista ou parcelado; os juros da parcela o cliente paga por cima). O
+  /// checkout da loja não usa: lá o cartão já é o preço cheio e o Pix tem
+  /// desconto. 0 = cartão pelo mesmo valor do Pix.
+  taxaCartaoPercent        Decimal  @default(4.98) @db.Decimal(5, 2)
   // Produto seco (não é carga viva): o cliente paga a cotação do Melhor Envio
   // mais esta taxa fixa de embalagem. O isopor de R$ 20 é só do peixe.
   taxaEmbalagemSeco        Decimal  @default(5) @db.Decimal(10, 2)

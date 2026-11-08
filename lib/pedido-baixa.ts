@@ -1,6 +1,7 @@
 import "server-only";
 import type { Prisma } from "@/lib/generated/prisma/client";
 import { registrarSugestaoDeVenda } from "@/lib/financeiro/venda-no-caixa";
+import { registrarTaxaCartaoTx } from "@/lib/pagamento-taxa-cartao";
 
 // Baixa de estoque (pool machos/fêmeas) compartilhada entre os DOIS caminhos que
 // confirmam pagamento: o admin (actions/pedidos.ts → atualizarStatusPedido) e o
@@ -134,6 +135,10 @@ export async function transicionarParaPago(
       data: { estoqueBaixado: true },
     });
     baixou = true;
+
+    // Cartão num link de cobrança/leilão: a taxa paga pelo cliente entra no
+    // pedido ANTES do caixa, para a venda entrar pelo valor que de fato entrou.
+    await registrarTaxaCartaoTx(tx, orderId);
 
     // Mesma trava do estoque: a venda entra no caixa (como sugestão a conferir)
     // uma vez só, não importa se veio do admin ou do webhook.

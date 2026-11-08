@@ -347,6 +347,8 @@ export async function getArrematePorToken(token: string) {
       instrucoes: config.retiradaInstrucoes,
     },
     maxPeixesPorCaixa: config.maxPeixesFreteAuto,
+    // No cartão a página soma a taxa do cartão (lib/taxa-cartao), igual ao servidor.
+    taxaCartaoPercent: config.taxaCartaoPercent,
     pixPendente,
   };
 }

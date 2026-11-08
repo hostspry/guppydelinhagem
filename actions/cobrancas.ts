@@ -24,6 +24,8 @@ import { registrarFalhaCartao } from "@/lib/pagamento-tentativas";
 import { notificarPedidoPago } from "@/lib/notificacoes";
 import { gravarPagamentoCartao, ultimoCartao } from "@/lib/pagamento-cartao";
 import { acharClienteExistente } from "@/lib/cliente-existente";
+import { getConfiguracaoLoja } from "@/lib/queries/config";
+import { ITEM_TAXA_CARTAO, valorNoCartao } from "@/lib/taxa-cartao";
 import type { CartaoInput, CartaoDesfecho } from "@/actions/checkout";
 import type { Prisma } from "@/lib/generated/prisma/client";
 import { type ActionResult } from "@/lib/utils/action-result";
@@ -424,6 +426,9 @@ export async function pagarCobranca(
           }
         : null,
       installmentsLimit: cob.maxParcelas ?? undefined,
+      // Este botão é o do Pix. Cartão aqui sairia sem a taxa do cartão; quem
+      // quer cartão usa a aba Cartão, que cobra com a taxa.
+      somentePix: true,
       expiraEm: cob.expiraEm,
     });
     if (!pref.initPoint) {
@@ -568,7 +573,12 @@ export async function pagarCobrancaCartao(
   const nome = cob.cliente?.nome || end.nome || "";
   const partes = nome.trim().split(/\s+/);
   const descricao = cob.items[0]?.nomeProduto ?? `Cobrança ${cob.numero}`;
-  const valor = round2(Number(cob.total));
+  // No cartão o cliente paga a taxa do cartão por cima (regra do dono): a loja
+  // recebe o mesmo que no Pix. Mesma conta que a página usou no Brick.
+  const { taxaCartaoPercent } = await getConfiguracaoLoja();
+  const base = round2(Number(cob.total));
+  const valor = valorNoCartao(base, taxaCartaoPercent);
+  const taxa = round2(valor - base);
   const emailPagador =
     cartao.payer?.email || cob.cliente?.email || end.email || "";
   const cpfPagador =
@@ -627,12 +637,10 @@ export async function pagarCobrancaCartao(
           }
         : null,
       itens: [
-        {
-          id: cob.id,
-          title: descricao,
-          quantity: 1,
-          unitPrice: valor,
-        },
+        { id: cob.id, title: descricao, quantity: 1, unitPrice: base },
+        ...(taxa > 0
+          ? [{ id: `${cob.id}-taxa`, title: ITEM_TAXA_CARTAO, quantity: 1, unitPrice: taxa }]
+          : []),
       ],
       historico,
     });

@@ -182,6 +182,11 @@ export interface CriarPreferenciaInput {
    * pagaria a taxa sem precisar.
    */
   somenteCredito?: { maxParcelas: number; parcelaPadrao?: number };
+  /**
+   * Só Pix (sem cartão, boleto ou lotérica). Para o botão "Pagar com Pix" do
+   * link de cobrança: cartão por ali sairia sem a taxa do cartão.
+   */
+  somentePix?: boolean;
   /** Fecha o checkout no gateway nesta data (MP: expiration_date_to). */
   expiraEm?: Date | null;
   idempotencyKey?: string;

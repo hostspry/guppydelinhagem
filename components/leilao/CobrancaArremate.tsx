@@ -103,6 +103,7 @@ export default function CobrancaArremate({
               maxParcelas: a.maxParcelas,
               qtdPeixes: a.qtdPeixes,
               maxPeixesPorCaixa: a.maxPeixesPorCaixa,
+              taxaCartaoPercent: a.taxaCartaoPercent,
               entrega: a.entrega,
               pagador: a.pagador,
               retirada: a.retirada,

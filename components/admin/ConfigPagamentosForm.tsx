@@ -8,9 +8,16 @@ const inputClass =
   "w-32 px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:border-[#FF035C] focus:ring-1 focus:ring-[#FF035C]";
 
 /** Desconto do Pix e quais meios de pagamento aparecem no checkout. */
-export function ConfigPagamentosForm({ inicial }: { inicial: { descontoPixGlobalPercent: number; pagbankAtivo: boolean } }) {
+export function ConfigPagamentosForm({
+  inicial,
+}: {
+  inicial: { descontoPixGlobalPercent: number; pagbankAtivo: boolean; taxaCartaoPercent: number };
+}) {
   const [pct, setPct] = useState(String(inicial.descontoPixGlobalPercent));
   const [pagbankAtivo, setPagbankAtivo] = useState(inicial.pagbankAtivo);
+  const [taxaCartao, setTaxaCartao] = useState(
+    String(inicial.taxaCartaoPercent).replace(".", ","),
+  );
   const [isPending, startTransition] = useTransition();
 
   function onSubmit(e: React.FormEvent) {
@@ -19,6 +26,7 @@ export function ConfigPagamentosForm({ inicial }: { inicial: { descontoPixGlobal
     // Marca a seção: a action só grava os campos das seções que chegaram.
     fd.set("secao", "pagamentos");
     fd.set("descontoPixGlobalPercent", pct);
+    fd.set("taxaCartaoPercent", taxaCartao);
     if (pagbankAtivo) fd.set("pagbankAtivo", "on");
     startTransition(async () => {
       const r = await salvarConfiguracaoLoja(fd);
@@ -61,6 +69,36 @@ export function ConfigPagamentosForm({ inicial }: { inicial: { descontoPixGlobal
           <strong>&ldquo;usar desconto Pix global&rdquo;</strong> que não têm
           desconto próprio. Produtos com desconto próprio usam o deles; sem
           nenhum, Pix = preço cheio.
+        </p>
+      </div>
+
+      {/* ── Taxa do cartão nos links de cobrança e leilão ── */}
+      <div className="border-t border-gray-100 pt-6">
+        <h2 className="text-xs font-semibold text-[#07366A] uppercase tracking-wide mb-3">
+          Taxa do cartão nos links
+        </h2>
+        <label htmlFor="taxaCartaoPercent" className="block text-sm text-gray-700 mb-1">
+          Taxa somada no cartão (%)
+        </label>
+        <div className="flex items-center gap-2">
+          <input
+            id="taxaCartaoPercent"
+            name="taxaCartaoPercent"
+            type="text"
+            inputMode="decimal"
+            value={taxaCartao}
+            onChange={(e) => setTaxaCartao(e.target.value)}
+            className={inputClass}
+          />
+          <span className="text-sm text-gray-500">%</span>
+        </div>
+        <p className="text-xs text-gray-500 mt-2 leading-snug max-w-md">
+          Vale para os links de cobrança e de leilão. No cartão o valor sobe o
+          suficiente para a loja receber o mesmo que no Pix, depois da taxa do
+          Mercado Pago (hoje 4,98% no crédito). Se o cliente parcelar, os juros da
+          parcela o Mercado Pago soma por cima. Com 0, o cartão sai pelo mesmo
+          valor do Pix. O checkout da loja não muda: lá o cartão já é o preço
+          cheio e o Pix tem desconto.
         </p>
       </div>
 

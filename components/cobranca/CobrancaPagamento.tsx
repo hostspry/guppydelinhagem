@@ -10,6 +10,9 @@ import { relatarFalhaCartao } from "@/lib/falha-cartao";
 import { pagarCobranca, pagarCobrancaCartao } from "@/actions/cobrancas";
 import { finalizarDesafio3ds, type CartaoInput } from "@/actions/checkout";
 
+const formatoBRL = (v: number) =>
+  v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+
 /**
  * Pagamento do link de cobrança.
  *
@@ -24,6 +27,7 @@ import { finalizarDesafio3ds, type CartaoInput } from "@/actions/checkout";
 export default function CobrancaPagamento({
   token,
   total,
+  totalCartao,
   maxParcelas,
   mpPublicKey,
   clienteEmail,
@@ -31,6 +35,8 @@ export default function CobrancaPagamento({
 }: {
   token: string;
   total: number;
+  /** Total no cartão, já com a taxa do cartão (calculado no servidor). */
+  totalCartao: number;
   maxParcelas: number;
   mpPublicKey: string | null;
   clienteEmail: string | null;
@@ -88,7 +94,7 @@ export default function CobrancaPagamento({
       relatarFalhaCartao({
         etapa: "COBRANCA",
         mensagem: `chamada da cobrança falhou: ${e instanceof Error ? e.message : String(e)}`,
-        valor: total,
+        valor: totalCartao,
         parcelas: cartao.installments,
         email: clienteEmail ?? undefined,
         fluxo: "cobranca",
@@ -180,11 +186,13 @@ export default function CobrancaPagamento({
         mpPublicKey ? (
           <>
             <p className="text-[11px] text-gray-500 text-center mb-2">
-              Em até {maxParcelas}x no cartão.
+              {totalCartao > total
+                ? `${formatoBRL(totalCartao)} no cartão, em até ${maxParcelas}x.`
+                : `Em até ${maxParcelas}x no cartão.`}
             </p>
             <CardPaymentBrick
               publicKey={mpPublicKey}
-              amount={total}
+              amount={totalCartao}
               maxInstallments={maxParcelas}
               payerEmail={clienteEmail ?? undefined}
               onPagar={onCartao}

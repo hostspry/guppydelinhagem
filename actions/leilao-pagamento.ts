@@ -13,6 +13,7 @@ import { transicionarParaPago } from "@/lib/pedido-baixa";
 import { notificarPedidoPago } from "@/lib/notificacoes";
 import { registrarFalhaCartao } from "@/lib/pagamento-tentativas";
 import { gravarPagamentoCartao } from "@/lib/pagamento-cartao";
+import { ITEM_TAXA_CARTAO, valorNoCartao } from "@/lib/taxa-cartao";
 import { situacaoDoArremate, type SituacaoArremate } from "@/lib/leiloes/situacao";
 import {
   entregaArremateSchema,
@@ -444,7 +445,11 @@ export async function pagarArremateCartao(
   const retirada = o.tipoEntrega === "RETIRADA";
   const nome = end.nome || o.cliente.nome;
   const partes = nome.trim().split(/\s+/);
-  const valor = round2(Number(o.total));
+  // No cartão o cliente paga a taxa do cartão por cima (regra do dono): a loja
+  // recebe o mesmo que no Pix. Mesma conta que a página usou no Brick.
+  const { taxaCartaoPercent } = await getConfiguracaoLoja();
+  const valor = valorNoCartao(round2(Number(o.total)), taxaCartaoPercent);
+  const taxa = round2(valor - round2(Number(o.total)));
   const emailPagador = cartao.payer?.email || end.email || o.cliente.email || "";
   const cpfPagador = cartao.payer?.identification?.number || end.cpfCnpj || o.cliente.cpfCnpj;
   const telefone = end.telefone || o.cliente.telefone || null;
@@ -503,14 +508,17 @@ export async function pagarArremateCartao(
       // que é o que está sendo cobrado de verdade.
       itens: (() => {
         const pagos = o.items.filter((i) => Number(i.precoUnitario) > 0);
-        return pagos.length
+        const linhas = pagos.length
           ? pagos.map((i) => ({
               id: i.id,
               title: i.nomeProduto,
               quantity: 1,
               unitPrice: round2(Number(i.precoUnitario)),
             }))
-          : [{ id: o.id, title: `Frete do pedido ${o.numero}`, quantity: 1, unitPrice: valor }];
+          : [{ id: o.id, title: `Frete do pedido ${o.numero}`, quantity: 1, unitPrice: round2(valor - taxa) }];
+        return taxa > 0
+          ? [...linhas, { id: `${o.id}-taxa`, title: ITEM_TAXA_CARTAO, quantity: 1, unitPrice: taxa }]
+          : linhas;
       })(),
       historico,
     });

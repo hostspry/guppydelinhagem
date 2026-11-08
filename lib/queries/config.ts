@@ -19,6 +19,8 @@ export type ConfiguracaoLojaData = {
   tarjaAtiva: boolean;
   tarjaTexto: string | null;
   pagbankAtivo: boolean;
+  /** % somado ao valor no cartão nos links de cobrança e leilão (ver lib/taxa-cartao). */
+  taxaCartaoPercent: number;
   taxaEmbalagemSeco: number;
   remetenteNome: string | null;
   remetenteDocumento: string | null;
@@ -55,6 +57,7 @@ export const getConfiguracaoLoja = cache(
         tarjaAtiva: true,
         tarjaTexto: true,
         pagbankAtivo: true,
+        taxaCartaoPercent: true,
         taxaEmbalagemSeco: true,
         remetenteNome: true,
         remetenteDocumento: true,
@@ -80,6 +83,8 @@ export const getConfiguracaoLoja = cache(
       tarjaAtiva: c?.tarjaAtiva ?? false,
       tarjaTexto: c?.tarjaTexto ?? null,
       pagbankAtivo: c?.pagbankAtivo ?? false,
+      taxaCartaoPercent:
+        c?.taxaCartaoPercent == null ? 4.98 : Number(c.taxaCartaoPercent),
       taxaEmbalagemSeco:
         c?.taxaEmbalagemSeco == null ? 5 : Number(c.taxaEmbalagemSeco),
       remetenteNome: c?.remetenteNome ?? null,

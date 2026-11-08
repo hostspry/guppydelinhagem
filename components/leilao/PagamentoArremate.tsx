@@ -16,6 +16,7 @@ import {
   Truck,
 } from "lucide-react";
 import CardPaymentBrick from "@/components/checkout/CardPaymentBrick";
+import { rotuloTaxaCartao, valorNoCartao } from "@/lib/taxa-cartao";
 import ThreeDsChallenge from "@/components/checkout/ThreeDsChallenge";
 import { WhatsAppIcon } from "@/components/icons/WhatsAppIcon";
 import { carregarDeviceMp } from "@/lib/mp-device";
@@ -52,6 +53,8 @@ export type DadosArremate = {
   maxParcelas: number;
   qtdPeixes: number;
   maxPeixesPorCaixa: number;
+  /** % somado ao total no cartão para a loja receber o mesmo que no Pix. */
+  taxaCartaoPercent: number;
   entrega: {
     tipo: "ENVIO" | "RETIRADA";
     modalidade: "TERRESTRE" | "AEREO" | null;
@@ -588,6 +591,9 @@ function EtapaPagamento({
     creq: string;
   } | null>(null);
   const entrega = dados.entrega!;
+  // Mesma conta do servidor (actions/leilao-pagamento): o Brick mostra as
+  // parcelas sobre o valor que de fato vai ser cobrado.
+  const totalCartao = valorNoCartao(dados.total, dados.taxaCartaoPercent);
 
   // Fingerprint do antifraude começa a coletar na abertura, não no clique.
   useEffect(() => {
@@ -604,7 +610,7 @@ function EtapaPagamento({
       relatarFalhaCartao({
         etapa: "COBRANCA",
         mensagem: `chamada do leilão falhou: ${e instanceof Error ? e.message : String(e)}`,
-        valor: dados.total,
+        valor: totalCartao,
         parcelas: cartao.installments,
         fluxo: "leilao",
       });
@@ -696,11 +702,13 @@ function EtapaPagamento({
       ) : mpPublicKey ? (
         <div>
           <p className="text-[11px] text-gray-500 text-center mb-2">
-            Em até {dados.maxParcelas}x no cartão.
+            {totalCartao > dados.total
+              ? `${formatBRL(totalCartao)} no cartão, à vista ou em até ${dados.maxParcelas}x com os juros da parcela. A diferença para o Pix é a taxa do cartão (${rotuloTaxaCartao(dados.taxaCartaoPercent)}).`
+              : `Em até ${dados.maxParcelas}x no cartão.`}
           </p>
           <CardPaymentBrick
             publicKey={mpPublicKey}
-            amount={dados.total}
+            amount={totalCartao}
             maxInstallments={dados.maxParcelas}
             payerEmail={dados.pagador.email || undefined}
             onPagar={onCartao}

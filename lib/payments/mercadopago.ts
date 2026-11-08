@@ -537,9 +537,21 @@ export const mercadoPagoProvider: PaymentProvider = {
               ],
             },
           }
-        : input.installmentsLimit
-          ? { payment_methods: { installments: input.installmentsLimit } }
-          : {}),
+        : input.somentePix
+          ? {
+              payment_methods: {
+                excluded_payment_types: [
+                  { id: "credit_card" },
+                  { id: "debit_card" },
+                  { id: "prepaid_card" },
+                  { id: "ticket" },
+                  { id: "atm" },
+                ],
+              },
+            }
+          : input.installmentsLimit
+            ? { payment_methods: { installments: input.installmentsLimit } }
+            : {}),
       // Validade do link: passou da data, o MP recusa abrir o checkout.
       ...(input.expiraEm
         ? {
