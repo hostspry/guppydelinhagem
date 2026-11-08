@@ -35,6 +35,7 @@ const DELIVERED = "delivered";
 const POSTADO = new Set(["posted", "delivered", "out_of_delivery", "undelivered"]);
 // Janela de reconciliação: pedidos recentes ainda não vinculados.
 const JANELA_DIAS = 90;
+const DIA_MS = 24 * 60 * 60 * 1000;
 const norm = (s: string | null | undefined) => (s ?? "").trim().toLowerCase();
 
 export async function sincronizarRastreios(): Promise<SyncResumo> {
@@ -68,9 +69,21 @@ async function reconciliarEnviosDoPainel(): Promise<number> {
     return 0;
   }
   // Só envios já efetivados (com id e algum código/postagem).
-  const envios = r.data.filter(
+  const efetivados = r.data.filter(
     (e) => e.id && (e.selfTracking || e.tracking || e.postadoEm),
   );
+  if (efetivados.length === 0) return 0;
+
+  // Envio que já é de um pedido não serve para outro. Sem esta trava, o cliente
+  // que compra de novo herda a etiqueta da compra anterior (mesmo e-mail): foi o
+  // #2026-0092, que pagou e na volta seguinte do cron virou ENVIADO e ENTREGUE
+  // com o rastreio do #2026-0075, entregue em outubro.
+  const ligados = await prisma.order.findMany({
+    where: { meShipmentId: { in: efetivados.map((e) => e.id) } },
+    select: { meShipmentId: true },
+  });
+  const jaLigados = new Set(ligados.map((o) => o.meShipmentId));
+  const envios = efetivados.filter((e) => !jaLigados.has(e.id));
   if (envios.length === 0) return 0;
 
   const desde = new Date(Date.now() - JANELA_DIAS * 24 * 60 * 60 * 1000);
@@ -88,6 +101,7 @@ async function reconciliarEnviosDoPainel(): Promise<number> {
       userId: true,
       transportadora: true,
       enderecoEntrega: true,
+      criadoEm: true,
     },
   });
   if (candidatos.length === 0) return 0;
@@ -99,9 +113,13 @@ async function reconciliarEnviosDoPainel(): Promise<number> {
   for (const envio of envios) {
     const email = norm(envio.destinatarioEmail);
     if (!email) continue;
+    // Etiqueta gerada antes de o pedido existir é de outra compra. Folga de um
+    // dia porque o ME manda a data sem fuso (horário de Brasília).
+    const gerado = Date.parse(envio.geradoEm ?? envio.postadoEm ?? "") + DIA_MS;
     // Casa por e-mail do snapshot; ambíguo (2+) → não adivinha.
     const match = candidatos.filter((c) => {
       if (usados.has(c.id)) return false;
+      if (!Number.isNaN(gerado) && gerado < c.criadoEm.getTime()) return false;
       const e = (c.enderecoEntrega ?? {}) as { email?: string | null };
       return norm(e.email) === email;
     });
