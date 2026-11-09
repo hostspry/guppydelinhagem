@@ -19,6 +19,7 @@ import {
   carrinhoTemCargaViva,
   calcularPesoECaixa,
   seguroDeCargaViva,
+  produtosDeclaradosDePeixe,
   cotarFrete,
   transportadoraDaEmpresa,
 } from "@/lib/shipping";
@@ -117,7 +118,7 @@ async function carregarPedido(orderId: string) {
           },
         },
       },
-      lotesLeilao: { select: { qtdPeixes: true } },
+      lotesLeilao: { select: { qtdPeixes: true, nome: true } },
     },
   });
   return order;
@@ -503,11 +504,15 @@ export async function comprarEtiquetaDoPedido(
       postal_code: cepDest,
       country_id: "BR",
     } satisfies MeEndereco,
-    products: order.items.map((it) => ({
-      name: it.nomeProduto.slice(0, 60),
-      quantity: it.quantidade,
-      unitary_value: Number(it.precoUnitario),
-    })),
+    // Peixe declara no máximo R$ 10 por cabeça (romaneio e DC-e), nunca o
+    // preço de venda. Produto seco declara o que custou.
+    products: vivo
+      ? produtosDeclaradosDePeixe(order.items, order.lotesLeilao)
+      : order.items.map((it) => ({
+          name: it.nomeProduto.slice(0, 60),
+          quantity: it.quantidade,
+          unitary_value: Number(it.precoUnitario),
+        })),
     volumes,
     options: {
       insurance_value: valorDeclarado,

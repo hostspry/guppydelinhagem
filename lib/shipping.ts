@@ -48,6 +48,68 @@ export function seguroDeCargaViva(qtdPeixes: number): number {
   return Math.max(1, Number.isFinite(n) ? n : 1) * SEGURO_POR_PEIXE;
 }
 
+type ItemDeclarado = {
+  nomeProduto: string;
+  quantidade: number;
+  precoUnitario: unknown;
+  qtdMachos: number | null;
+  qtdFemeas: number | null;
+};
+type LoteDeclarado = { nome: string; qtdPeixes: number };
+export type ProdutoDeclarado = { name: string; quantity: number; unitary_value: number };
+
+/** "Lote 07 · Full Red Big Dorsal (Xeque-Mate: ...)" → "Full Red Big Dorsal". */
+function linhaDoPeixe(nome: string): string {
+  return (
+    nome
+      .replace(/^Lote \S+ · /, "")
+      .replace(/^Guppy /i, "")
+      .replace(/\s*\(.*$/, "")
+      .replace(/\s*—.*$/, "")
+      .replace(/,.*$/, "")
+      .trim() || nome
+  );
+}
+
+/**
+ * O que vai nos produtos da etiqueta de um pedido com peixe: é daqui que o
+ * Melhor Envio monta o romaneio e a declaração de conteúdo eletrônica (DC-e).
+ *
+ * Regra do dono: cada peixe vale no máximo R$ 10, o mesmo do seguro. O preço
+ * de venda não entra: lote de leilão de R$ 400 com 8 peixes declara R$ 80.
+ * A DC-e é emitida na geração e não muda depois; corrigir é cancelar a
+ * etiqueta e comprar outra, então a regra tem que estar certa ANTES da compra.
+ *
+ * Peixes de cada item: a receita (machos + fêmeas) ou, no item de leilão, o
+ * lote de mesmo nome (qtdPeixes). Item sem peixe (ração, acessório) vai pelo
+ * preço. Linha negativa (adiantamento) não é conteúdo e fica de fora.
+ */
+export function produtosDeclaradosDePeixe(
+  items: ItemDeclarado[],
+  lotes: LoteDeclarado[],
+): ProdutoDeclarado[] {
+  const out: ProdutoDeclarado[] = [];
+  for (const it of items) {
+    const preco = Number(it.precoUnitario) || 0;
+    if (preco <= 0) continue;
+    const porUnidade = (it.qtdMachos ?? 0) + (it.qtdFemeas ?? 0);
+    const semPrefixo = it.nomeProduto.replace(/^Lote \S+ · /, "");
+    const lote = porUnidade > 0 ? null : lotes.find((l) => l.nome === semPrefixo || l.nome === it.nomeProduto);
+    const peixes = porUnidade > 0 ? porUnidade * it.quantidade : (lote?.qtdPeixes ?? 0) * it.quantidade;
+    if (peixes <= 0) {
+      out.push({ name: it.nomeProduto.slice(0, 60), quantity: it.quantidade, unitary_value: preco });
+      continue;
+    }
+    const porPeixe = Math.floor(((preco * it.quantidade) / peixes) * 100) / 100;
+    out.push({
+      name: `Peixe ornamental vivo: ${linhaDoPeixe(it.nomeProduto)}`.slice(0, 60),
+      quantity: peixes,
+      unitary_value: Math.min(SEGURO_POR_PEIXE, porPeixe),
+    });
+  }
+  return out;
+}
+
 export type Caixa = { comprimento: number; largura: number; altura: number };
 export type PesoCaixa = { pesoGramas: number; caixa: Caixa };
 
