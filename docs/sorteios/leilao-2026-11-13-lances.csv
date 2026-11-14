@@ -1,0 +1,177 @@
+lote;sequencia;horario;participante;whatsapp;valor;tipo;classificacao;motivo;texto
+01;1;13/11/2026 20:16;George Portela;+55 68 9960-3417;95;normal;válido;primeiro lance válido;95
+01;2;13/11/2026 20:16;Lucas de Souza;+55 27 99892-9446;75;normal;inválido;menor que 95;75
+01;3;13/11/2026 20:16;Jefferson;+55 62 8564-5429;100;normal;válido;supera 95;100
+01;4;13/11/2026 20:17;Pompeo;+55 12 99125-0075;110;normal;válido;supera 100;110
+01;5;13/11/2026 20:17;Lucas de Souza;+55 27 99892-9446;105;normal;inválido;menor que 110;105
+01;6;13/11/2026 20:17;Fernando Anderle;+55 48 9641-3333;115;normal;válido;supera 110;115
+01;7;13/11/2026 20:17;Vinicius Auch;+55 53 98119-1075;125;normal;válido;supera 115;125
+01;8;13/11/2026 20:17;Fernando Anderle;+55 48 9641-3333;130;normal;válido;supera 125;130
+01;9;13/11/2026 20:18;+55 74 9195-3710;+55 74 9195-3710;130;normal;inválido;igual a 130; vale o primeiro;130
+01;10;13/11/2026 20:17;Jean;+55 62 8103-7988;130;normal;inválido;igual a 130; vale o primeiro;130
+01;11;13/11/2026 20:18;Vinicius Auch;+55 53 98119-1075;135;normal;válido;supera 130;135
+01;12;13/11/2026 20:18;Fernando Anderle;+55 48 9641-3333;140;normal;válido;supera 135;140
+01;13;13/11/2026 20:18;Vinicius Auch;+55 53 98119-1075;150;normal;válido;supera 140;150
+02;1;13/11/2026 20:22;Lucas de Souza;+55 27 99892-9446;85;normal;válido;primeiro lance válido;85
+02;2;13/11/2026 20:22;George Portela;+55 68 9960-3417;105;normal;válido;supera 85;105
+02;3;13/11/2026 20:22;+55 11 94598-4448;+55 11 94598-4448;65;normal;inválido;menor que 105;65
+02;4;13/11/2026 20:22;Fernando Anderle;+55 48 9641-3333;120;normal;válido;supera 105;120
+02;5;13/11/2026 20:22;Jefferson;+55 62 8564-5429;115;normal;inválido;menor que 120;115
+02;6;13/11/2026 20:22;Vinicius Auch;+55 53 98119-1075;125;normal;válido;supera 120;125
+02;7;13/11/2026 20:22;Fernando Anderle;+55 48 9641-3333;130;normal;válido;supera 125;130
+02;8;13/11/2026 20:22;Vinicius Auch;+55 53 98119-1075;135;normal;válido;supera 130;135
+02;9;13/11/2026 20:22;Pompeo;+55 12 99125-0075;140;normal;válido;supera 135;140
+02;10;13/11/2026 20:22;Fernando Anderle;+55 48 9641-3333;145;normal;válido;supera 140;145
+02;11;13/11/2026 20:22;Vinicius Auch;+55 53 98119-1075;145;normal;inválido;igual a 145; vale o primeiro;145
+02;12;13/11/2026 20:22;Vinicius Auch;+55 53 98119-1075;150;normal;válido;supera 145;150
+02;13;13/11/2026 20:22;Jean;+55 62 8103-7988;145;normal;inválido;menor que 150;145
+02;14;13/11/2026 20:22;Pompeo;+55 12 99125-0075;155;normal;válido;supera 150;155
+02;15;13/11/2026 20:22;Jean;+55 62 8103-7988;160;normal;válido;supera 155;160
+02;16;13/11/2026 20:23;Alexandre;+55 48 9111-3525;165;normal;válido;supera 160;165
+03;1;13/11/2026 20:25;George Portela;+55 68 9960-3417;95;normal;válido;primeiro lance válido;95
+03;2;13/11/2026 20:25;Jefferson;+55 62 8564-5429;100;normal;válido;supera 95;100
+03;3;13/11/2026 20:25;George Portela;+55 68 9960-3417;115;normal;válido;supera 100;115
+03;4;13/11/2026 20:25;Lucas Spinelli;+55 16 99408-4049;115;normal;inválido;igual a 115; vale o primeiro;115
+03;5;13/11/2026 20:25;Lucas Spinelli;+55 16 99408-4049;120;normal;válido;supera 115;120
+03;6;13/11/2026 20:25;Fernando Anderle;+55 48 9641-3333;120;normal;inválido;igual a 120; vale o primeiro;120
+03;7;13/11/2026 20:25;Fernando Anderle;+55 48 9641-3333;125;normal;válido;supera 120;125
+03;8;13/11/2026 20:25;Pompeo;+55 12 99125-0075;130;normal;válido;supera 125;130
+03;9;13/11/2026 20:25;Fernando Anderle;+55 48 9641-3333;140;normal;válido;supera 130;140
+03;10;13/11/2026 20:25;Alexandre;+55 48 9111-3525;135;normal;inválido;menor que 140;135
+03;11;13/11/2026 20:25;Jean;+55 62 8103-7988;135;normal;inválido;menor que 140;135
+03;12;13/11/2026 20:25;Cristiano;+55 28 99974-9911;130;normal;inválido;menor que 140;130
+03;13;13/11/2026 20:25;Vinicius Auch;+55 53 98119-1075;135;normal;inválido;menor que 140;135
+03;14;13/11/2026 20:25;Cristiano;+55 28 99974-9911;145;normal;válido;supera 140;145
+03;15;13/11/2026 20:25;Fernando Anderle;+55 48 9641-3333;150;normal;válido;supera 145;150
+03;16;13/11/2026 20:25;Vinicius Auch;+55 53 98119-1075;155;normal;válido;supera 150;155
+03;17;13/11/2026 20:26;Cristiano;+55 28 99974-9911;160;normal;válido;supera 155;160
+03;18;13/11/2026 20:26;Vinicius Auch;+55 53 98119-1075;165;normal;válido;supera 160;165
+03;19;13/11/2026 20:26;Pompeo;+55 12 99125-0075;170;normal;válido;supera 165;170
+04;1;13/11/2026 20:30;George Portela;+55 68 9960-3417;95;normal;válido;primeiro lance válido;95
+04;2;13/11/2026 20:30;Fernando Anderle;+55 48 9641-3333;100;normal;válido;supera 95;100
+04;3;13/11/2026 20:31;George Portela;+55 68 9960-3417;105;normal;válido;supera 100;105
+04;4;13/11/2026 20:31;Pompeo;+55 12 99125-0075;200;xeque-mate;válido;primeiro Xeque-Mate do lote;200
+05;1;13/11/2026 20:34;George Portela;+55 68 9960-3417;105;normal;válido;primeiro lance válido;105
+05;2;13/11/2026 20:34;Lucas Spinelli;+55 16 99408-4049;95;normal;inválido;menor que 105;95
+05;3;13/11/2026 20:34;Lucas Spinelli;+55 16 99408-4049;115;normal;válido;supera 105;115
+05;4;13/11/2026 20:34;Alexandre;+55 48 9111-3525;110;normal;inválido;menor que 115;110
+05;5;13/11/2026 20:34;+55 28 99996-5455;+55 28 99996-5455;120;normal;válido;supera 115;120
+05;6;13/11/2026 20:34;Alexandre;+55 48 9111-3525;125;normal;válido;supera 120;125
+05;7;13/11/2026 20:34;Cristiano;+55 28 99974-9911;150;normal;válido;supera 125;150
+05;8;13/11/2026 20:34;Vinicius Auch;+55 53 98119-1075;130;normal;inválido;menor que 150; lance de 130 no meio da frase;Camarão vem junto ? 130
+05;9;13/11/2026 20:34;Vinicius Auch;+55 53 98119-1075;155;normal;válido;supera 150;155
+05;10;13/11/2026 20:34;Pompeo;+55 12 99125-0075;130;normal;inválido;menor que 155;130
+05;11;13/11/2026 20:36;Cristiano;+55 28 99974-9911;160;normal;válido;supera 155;160
+05;12;13/11/2026 20:37;+55 14 99736-1214;+55 14 99736-1214;165;normal;válido;supera 160;165
+06;1;13/11/2026 20:41;George Portela;+55 68 9960-3417;105;normal;válido;primeiro lance válido;105
+06;2;13/11/2026 20:41;+55 42 8409-0350;+55 42 8409-0350;100;normal;inválido;menor que 105;100
+06;3;13/11/2026 20:41;Marcos Vinícius;+55 34 9819-4760;200;xeque-mate;válido;primeiro Xeque-Mate do lote;200
+06;4;13/11/2026 20:43;Marcos Vinícius;+55 34 9819-4760;210;normal;inválido;depois do Xeque-Mate;210
+07;1;13/11/2026 20:46;George Portela;+55 68 9960-3417;105;normal;válido;primeiro lance válido;105
+07;2;13/11/2026 20:46;+55 42 8409-0350;+55 42 8409-0350;120;normal;válido;supera 105;120
+07;3;13/11/2026 20:46;Lucas Spinelli;+55 16 99408-4049;115;normal;inválido;menor que 120;115
+07;4;13/11/2026 20:46;Lucas Spinelli;+55 16 99408-4049;125;normal;válido;supera 120;125
+07;5;13/11/2026 20:46;George Portela;+55 68 9960-3417;130;normal;válido;supera 125;130
+07;6;13/11/2026 20:46;+55 42 8409-0350;+55 42 8409-0350;135;normal;válido;supera 130;135
+07;7;13/11/2026 20:46;Cristiano;+55 28 99974-9911;150;normal;válido;supera 135;150
+07;8;13/11/2026 20:46;Pompeo;+55 12 99125-0075;160;normal;válido;supera 150;160
+07;9;13/11/2026 20:46;+55 42 8409-0350;+55 42 8409-0350;155;normal;inválido;menor que 160;155
+07;10;13/11/2026 20:46;Alexandre;+55 48 9111-3525;155;normal;inválido;menor que 160;155
+07;11;13/11/2026 20:46;Cristiano;+55 28 99974-9911;165;normal;válido;supera 160;165
+07;12;13/11/2026 20:47;Alexandre;+55 84 8826-9909;170;normal;válido;supera 165;170
+08;1;13/11/2026 20:52;George Portela;+55 68 9960-3417;105;normal;válido;primeiro lance válido;105
+08;2;13/11/2026 20:52;+55 42 8409-0350;+55 42 8409-0350;125;normal;válido;supera 105;125
+08;3;13/11/2026 20:52;Lucas Spinelli;+55 16 99408-4049;115;normal;inválido;menor que 125;115
+08;4;13/11/2026 20:52;George Portela;+55 68 9960-3417;130;normal;válido;supera 125;130
+08;5;13/11/2026 20:52;+55 42 8409-0350;+55 42 8409-0350;140;normal;válido;supera 130;140
+08;6;13/11/2026 20:52;Alexandre;+55 48 9111-3525;145;normal;válido;supera 140;145
+08;7;13/11/2026 20:52;+55 42 8409-0350;+55 42 8409-0350;150;normal;válido;supera 145;150
+08;8;13/11/2026 20:52;Pompeo;+55 12 99125-0075;150;normal;inválido;igual a 150; vale o primeiro;150
+08;9;13/11/2026 20:52;Cristiano;+55 28 99974-9911;165;normal;válido;supera 150;165
+08;10;13/11/2026 20:52;Pompeo;+55 12 99125-0075;155;normal;inválido;menor que 165;155
+08;11;13/11/2026 20:52;Vinicius Auch;+55 53 98119-1075;155;normal;inválido;menor que 165;155
+08;12;13/11/2026 20:52;Vinicius Auch;+55 53 98119-1075;170;normal;inválido;supera 165; empate em 170; o dono viu no VAR e deu o lance ao Pompeo, e o Vinicius concordou;170
+08;13;13/11/2026 20:52;Pompeo;+55 12 99125-0075;170;normal;válido;supera 165; empate em 170 decidido pelo dono a favor do Pompeo;170
+08;14;13/11/2026 20:57;Higor;+55 65 9959-4390;200;xeque-mate;válido;primeiro Xeque-Mate do lote;200
+09;1;13/11/2026 21:01;George Portela;+55 68 9960-3417;110;normal;válido;primeiro lance válido;110
+09;2;13/11/2026 21:01;Lucas Spinelli;+55 16 99408-4049;115;normal;válido;supera 110;115
+09;3;13/11/2026 21:01;Fernando Anderle;+55 48 9641-3333;100;normal;inválido;menor que 115;100
+09;4;13/11/2026 21:01;+55 21 99411-5093;+55 21 99411-5093;95;normal;inválido;menor que 115;95
+09;5;13/11/2026 21:01;Vinicius Auch;+55 53 98119-1075;200;xeque-mate;válido;primeiro Xeque-Mate do lote;200
+09;6;13/11/2026 21:01;+55 42 8409-0350;+55 42 8409-0350;125;normal;inválido;depois do Xeque-Mate;125
+09;7;13/11/2026 21:01;Fernando Anderle;+55 48 9641-3333;130;normal;inválido;depois do Xeque-Mate;130
+09;8;13/11/2026 21:01;+55 42 8409-0350;+55 42 8409-0350;130;normal;inválido;depois do Xeque-Mate;130
+09;9;13/11/2026 21:01;Jean;+55 62 8103-7988;150;normal;inválido;depois do Xeque-Mate;150
+09;10;13/11/2026 21:01;+55 21 98095-8936;+55 21 98095-8936;135;normal;inválido;depois do Xeque-Mate;135
+09;11;13/11/2026 21:01;Alexandre;+55 48 9111-3525;140;normal;inválido;depois do Xeque-Mate;140
+09;12;13/11/2026 21:01;+55 85 8754-5386;+55 85 8754-5386;155;normal;inválido;depois do Xeque-Mate;155
+09;13;13/11/2026 21:02;Jefferson;+55 62 8564-5429;155;normal;inválido;depois do Xeque-Mate;155
+10;1;13/11/2026 21:04;+55 42 8409-0350;+55 42 8409-0350;120;normal;válido;primeiro lance válido;120
+10;2;13/11/2026 21:04;+55 21 99411-5093;+55 21 99411-5093;95;normal;inválido;menor que 120;95
+10;3;13/11/2026 21:04;George Portela;+55 68 9960-3417;110;normal;inválido;menor que 120;110
+10;4;13/11/2026 21:04;Lucas Spinelli;+55 16 99408-4049;115;normal;inválido;menor que 120;115
+10;5;13/11/2026 21:04;George Portela;+55 68 9960-3417;130;normal;válido;supera 120;130
+10;6;13/11/2026 21:04;+55 42 8409-0350;+55 42 8409-0350;140;normal;válido;supera 130;140
+10;7;13/11/2026 21:04;+55 61 8350-1577;+55 61 8350-1577;100;normal;inválido;menor que 140;100
+10;8;13/11/2026 21:04;+55 42 8409-0350;+55 42 8409-0350;150;normal;válido;supera 140;150
+10;9;13/11/2026 21:04;Lucas Spinelli;+55 16 99408-4049;155;normal;válido;supera 150;155
+10;10;13/11/2026 21:04;+55 81 9652-0497;+55 81 9652-0497;140;normal;inválido;menor que 155;140
+10;11;13/11/2026 21:04;Alexandre;+55 48 9111-3525;155;normal;inválido;igual a 155; vale o primeiro;155
+10;12;13/11/2026 21:04;+55 42 8409-0350;+55 42 8409-0350;160;normal;válido;supera 155;160
+10;13;13/11/2026 21:04;+55 45 8805-1015;+55 45 8805-1015;160;normal;inválido;igual a 160; vale o primeiro;160
+10;14;13/11/2026 21:04;Cristiano;+55 28 99974-9911;150;normal;inválido;menor que 160;150
+10;15;13/11/2026 21:04;Cristiano;+55 28 99974-9911;150;normal;inválido;menor que 160;150
+10;16;13/11/2026 21:04;Pompeo;+55 12 99125-0075;160;normal;inválido;igual a 160; vale o primeiro;160
+10;17;13/11/2026 21:04;Jefferson;+55 62 8564-5429;167;normal;inválido;incremento fora dos múltiplos de R$ 5 (sobre 160);167
+10;18;13/11/2026 21:05;Alexandre;+55 48 9111-3525;170;normal;válido;supera 160;170
+10;19;13/11/2026 21:06;Marcos Vinícius;+55 34 9819-4760;200;xeque-mate;válido;primeiro Xeque-Mate do lote;200
+11;1;13/11/2026 21:09;George Portela;+55 68 9960-3417;110;normal;válido;primeiro lance válido;110
+11;2;13/11/2026 21:09;+55 61 8350-1577;+55 61 8350-1577;120;normal;válido;supera 110;120
+11;3;13/11/2026 21:09;George Portela;+55 68 9960-3417;130;normal;válido;supera 120;130
+11;4;13/11/2026 21:09;Cristiano;+55 28 99974-9911;150;normal;válido;supera 130;150
+11;5;13/11/2026 21:09;Fernando Anderle;+55 48 9641-3333;;normal;inválido;valor ilegível; valor ilegível (Q55);Q55
+11;6;13/11/2026 21:09;Pompeo;+55 12 99125-0075;160;normal;válido;supera 150;160
+11;7;13/11/2026 21:09;Alexandre;+55 48 9111-3525;160;normal;inválido;igual a 160; vale o primeiro;160
+11;8;13/11/2026 21:09;Cristiano;+55 28 99974-9911;165;normal;válido;supera 160;165
+11;9;13/11/2026 21:09;Jefferson;+55 62 8564-5429;150;normal;inválido;menor que 165;150
+11;10;13/11/2026 21:09;Jean;+55 62 8103-7988;170;normal;válido;supera 165;170
+11;11;13/11/2026 21:09;Alexandre;+55 48 9111-3525;170;normal;inválido;igual a 170; vale o primeiro;170
+12;1;13/11/2026 21:16;George Portela;+55 68 9960-3417;105;normal;válido;primeiro lance válido;105
+12;2;13/11/2026 21:16;Alexandre;+55 48 9111-3525;130;normal;válido;supera 105;130
+12;3;13/11/2026 21:16;George Portela;+55 68 9960-3417;135;normal;válido;supera 130;135
+12;4;13/11/2026 21:16;Cristiano;+55 28 99974-9911;150;normal;válido;supera 135;150
+12;5;13/11/2026 21:17;Pompeo;+55 12 99125-0075;155;normal;válido;supera 150;155
+12;6;13/11/2026 21:17;Cristiano;+55 28 99974-9911;160;normal;válido;supera 155;160
+13;1;13/11/2026 21:21;George Portela;+55 68 9960-3417;105;normal;válido;primeiro lance válido;105
+13;2;13/11/2026 21:21;Alexandre;+55 48 9111-3525;80;normal;inválido;menor que 105;80
+13;3;13/11/2026 21:21;+55 45 8805-1015;+55 45 8805-1015;120;normal;válido;supera 105;120
+13;4;13/11/2026 21:21;Vinicius Auch;+55 53 98119-1075;120;normal;inválido;igual a 120; vale o primeiro;120
+13;5;13/11/2026 21:21;George Portela;+55 68 9960-3417;130;normal;válido;supera 120;130
+13;6;13/11/2026 21:21;Cristiano;+55 28 99974-9911;140;normal;válido;supera 130;140
+13;7;13/11/2026 21:21;Thales;+55 21 98382-7966;200;xeque-mate;válido;primeiro Xeque-Mate do lote;200
+14;1;13/11/2026 21:25;George Portela;+55 68 9960-3417;95;normal;válido;primeiro lance válido;95
+14;2;13/11/2026 21:25;+55 45 8805-1015;+55 45 8805-1015;120;normal;válido;supera 95;120
+14;3;13/11/2026 21:25;George Portela;+55 68 9960-3417;130;normal;válido;supera 120;130
+14;4;13/11/2026 21:25;+55 28 99992-4631;+55 28 99992-4631;100;normal;inválido;menor que 130;100
+14;5;13/11/2026 21:25;Jefferson;+55 62 8564-5429;100;normal;inválido;menor que 130;100
+14;6;13/11/2026 21:25;Jean;+55 62 8103-7988;100;normal;inválido;menor que 130;100
+14;7;13/11/2026 21:25;Jean;+55 62 8103-7988;140;normal;válido;supera 130;140
+14;8;13/11/2026 21:25;Tiago;+55 85 9951-0140;200;xeque-mate;válido;primeiro Xeque-Mate do lote;200
+14;9;13/11/2026 21:25;+55 21 99411-5093;+55 21 99411-5093;150;normal;inválido;depois do Xeque-Mate;150
+14;10;13/11/2026 21:25;Alexandre;+55 48 9111-3525;160;normal;inválido;depois do Xeque-Mate;160
+14;11;13/11/2026 21:25;Vinicius Auch;+55 53 98119-1075;165;normal;inválido;depois do Xeque-Mate;165
+14;12;13/11/2026 21:28;Pompeo;+55 12 99125-0075;400;mestre criador;válido;Mestre Criador aceito;400
+15;1;13/11/2026 21:33;Alexandre;+55 48 9111-3525;120;normal;válido;primeiro lance válido;120
+15;2;13/11/2026 21:33;+55 19 99781-0194;+55 19 99781-0194;200;xeque-mate;válido;primeiro Xeque-Mate do lote;200
+15;3;13/11/2026 21:33;+55 14 99741-3607;+55 14 99741-3607;150;normal;inválido;depois do Xeque-Mate;150
+15;4;13/11/2026 21:33;Jean;+55 62 8103-7988;200;xeque-mate;inválido;Xeque-Mate igual a um anterior; vale o primeiro;200
+16;1;13/11/2026 21:37;Alexandre;+55 48 9111-3525;115;normal;válido;primeiro lance válido;115
+16;2;13/11/2026 21:37;George Portela;+55 68 9960-3417;110;normal;inválido;menor que 115;110
+16;3;13/11/2026 21:37;George Portela;+55 68 9960-3417;135;normal;válido;supera 115;135
+16;4;13/11/2026 21:37;+55 14 99741-3607;+55 14 99741-3607;150;normal;válido;supera 135;150
+16;5;13/11/2026 21:37;Marcos Vinícius;+55 34 9819-4760;200;xeque-mate;válido;primeiro Xeque-Mate do lote;200
+16;6;13/11/2026 21:37;+55 61 8350-1577;+55 61 8350-1577;120;normal;inválido;depois do Xeque-Mate;120
+16;7;13/11/2026 21:37;+55 44 9956-8350;+55 44 9956-8350;100;normal;inválido;depois do Xeque-Mate;100
+16;8;13/11/2026 21:37;Pompeo;+55 12 99125-0075;140;normal;inválido;depois do Xeque-Mate;140
+16;9;13/11/2026 21:38;Higor;+55 65 9959-4390;200;xeque-mate;inválido;Xeque-Mate igual a um anterior; vale o primeiro;200
+16;10;13/11/2026 21:40;Higor;+55 65 9959-4390;400;mestre criador;válido;Mestre Criador aceito;400
