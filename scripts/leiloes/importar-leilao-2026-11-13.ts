@@ -15,12 +15,14 @@
  *  - lance convencional: o lote como foi anunciado (trio 1 macho + 2 fêmeas,
  *    Pet Premium 8 machos + 2 fêmeas);
  *  - lances iguais não valem: vale o que chegou primeiro;
- *  - Xeque-Mate (R$ 200): todos os peixes do vídeo (o trio; no lote 15,
- *    os 10 machos);
- *  - Mestre Criador (R$ 400): o dobro dos peixes do vídeo, conforme estoque.
- *    Nos lotes 14 e 16 o Xeque-Mate veio antes, então o trio filmado fica com
- *    ele e o Mestre recebe 2 machos + 4 fêmeas que não são os do vídeo. Os dois
- *    são cobrados, por isso 14 e 16 aparecem duas vezes.
+ *  - Xeque-Mate (R$ 200): os peixes do vídeo, que são 4 nas linhagens (o
+ *    trio é só para lance abaixo de R$ 200). Correção do dono em 14/11;
+ *  - Mestre Criador (R$ 400): o dobro, 8 peixes da linhagem. Nos lotes 14 e
+ *    16 o Xeque-Mate veio antes, então os 4 filmados ficam com ele e o Mestre
+ *    recebe 8 que não são os do vídeo. Os dois são cobrados, por isso 14 e 16
+ *    aparecem duas vezes;
+ *  - kits (lote 01 Pet Premium e lote 15 com 10 machos): até R$ 200 levam o
+ *    kit como anunciado; só no Mestre Criador o kit dobra.
  *  - cartão em até 10x (maxParcelas 10).
  *
  * Fora daqui: a promoção "até 5 outras linhagens pelo valor do menor arremate"
@@ -43,8 +45,8 @@ const QTD = 18;
 const TOTAL = 3750;
 
 const TRIO = "trio: 1 macho + 2 fêmeas";
-const XM = "Xeque-Mate: trio do vídeo";
-const MC_DEPOIS_XM = "Mestre Criador: o dobro, 2 machos + 4 fêmeas da mesma linhagem, fora os do vídeo";
+const XM = "Xeque-Mate: os 4 peixes do vídeo";
+const MC_DEPOIS_XM = "Mestre Criador: 8 peixes da mesma linhagem, fora os do vídeo";
 
 // Arrematante: nome que o dono usou no grupo e o WhatsApp do lance. Quem já tem
 // cadastro é achado pelo número (o nome daqui só vale para cadastro novo). Quem
@@ -74,21 +76,21 @@ const LOTES: [string, string, number, Pessoa, number][] = [
   ["01", "Pet Premium Misto (8 machos + 2 fêmeas)", 150, "vinicius", 10],
   ["02", `Magenta Round Tail (${TRIO})`, 165, "alexandre48", 3],
   ["03", `Asian Platinum White Mosaico Delta (${TRIO})`, 170, "pompeo", 3],
-  ["04", `Koi Tuxedo Red/Black Ear (${XM})`, 200, "pompeo", 3],
+  ["04", `Koi Tuxedo Red/Black Ear (${XM})`, 200, "pompeo", 4],
   ["05", `Red Old Dragon (${TRIO})`, 165, "paiDoRavi", 3],
-  ["06", `Albino Red Koi (${XM})`, 200, "marcos", 3],
+  ["06", `Albino Red Koi (${XM})`, 200, "marcos", 4],
   ["07", `Asian King Cobra (${TRIO})`, 170, "alexandre84", 3],
-  ["08", `Japan Blue Blue Tail (${XM})`, 200, "higor", 3],
-  ["09", `Albino White Platinum (${XM})`, 200, "vinicius", 3],
-  ["10", `Black Flame Silverado (${XM})`, 200, "marcos", 3],
+  ["08", `Japan Blue Blue Tail (${XM})`, 200, "higor", 4],
+  ["09", `Albino White Platinum (${XM})`, 200, "vinicius", 4],
+  ["10", `Black Flame Silverado (${XM})`, 200, "marcos", 4],
   ["11", `Metal Leopard Half Moon (${TRIO})`, 170, "jean", 3],
   ["12", `Platinum Red Mosaic Big Ear (${TRIO})`, 160, "cristiano", 3],
-  ["13", `Leopard Half Moon (${XM})`, 200, "thales", 3],
-  ["14", `Black Silverado Super Delta (${XM})`, 200, "tiago", 3],
-  ["14", `Black Silverado Super Delta (${MC_DEPOIS_XM})`, 400, "pompeo", 6],
+  ["13", `Leopard Half Moon (${XM})`, 200, "thales", 4],
+  ["14", `Black Silverado Super Delta (${XM})`, 200, "tiago", 4],
+  ["14", `Black Silverado Super Delta (${MC_DEPOIS_XM})`, 400, "pompeo", 8],
   ["15", "Exclusive Aquarium Black Flame Silverado (Xeque-Mate: 10 machos do vídeo)", 200, "final0194", 10],
-  ["16", `Blue Grass Super Delta (${XM})`, 200, "marcos", 3],
-  ["16", `Blue Grass Super Delta (${MC_DEPOIS_XM})`, 400, "higor", 6],
+  ["16", `Blue Grass Super Delta (${XM})`, 200, "marcos", 4],
+  ["16", `Blue Grass Super Delta (${MC_DEPOIS_XM})`, 400, "higor", 8],
 ];
 
 /** Mesma busca do acharOuCriarArrematante, sem criar nada (para SIMULAR). */
