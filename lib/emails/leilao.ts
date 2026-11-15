@@ -22,13 +22,16 @@ export type ResultadoEmailLeilao =
   | { ok: true; para: string; assunto: string; html: string }
   | { ok: false; motivo: string };
 
-const PAGAMENTO = "O pagamento pode ser no Pix, que confirma na hora, ou no cartão em até 12x.";
+// As parcelas vêm da cobrança (Leilao.maxParcelas copiado no "Cobrar todos"):
+// o e-mail não pode prometer 12x num leilão anunciado em até 10x.
+const pagamento = (parcelas: number) =>
+  `O pagamento pode ser no Pix, que confirma na hora, ou no cartão em até ${parcelas}x.`;
 // Com taxa do cartão ligada (Configurações → Pagamentos), o e-mail avisa antes:
 // o cliente não pode descobrir a diferença só na hora de pagar.
-const pagamentoComTaxa = (pct: number) =>
+const pagamentoComTaxa = (pct: number, parcelas: number) =>
   pct > 0
-    ? `${PAGAMENTO} No cartão entra a taxa do cartão (${rotuloTaxaCartao(pct)}) e, se parcelar, os juros da parcela.`
-    : PAGAMENTO;
+    ? `${pagamento(parcelas)} No cartão entra a taxa do cartão (${rotuloTaxaCartao(pct)}) e, se parcelar, os juros da parcela.`
+    : pagamento(parcelas);
 
 /**
  * `simular`: monta o e-mail e devolve, sem enviar nem marcar como enviado.
@@ -50,6 +53,7 @@ export async function emailCobrancaLeilao(
       expiraEm: true,
       entregaEscolhidaEm: true,
       publicToken: true,
+      maxParcelas: true,
       subtotal: true,
       frete: true,
       total: true,
@@ -81,7 +85,7 @@ export async function emailCobrancaLeilao(
 
   const peixes = o.lotesLeilao.reduce((a, l) => a + l.qtdPeixes, 0);
   const { maxPeixesFreteAuto, taxaCartaoPercent } = await getConfiguracaoLoja();
-  const PAG = pagamentoComTaxa(taxaCartaoPercent);
+  const PAG = pagamentoComTaxa(taxaCartaoPercent, o.maxParcelas ?? 12);
   if (!o.entregaEscolhidaEm && peixes > maxPeixesFreteAuto && !o.freteSemLimitePeixes) {
     return {
       ok: false,
