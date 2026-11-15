@@ -5,6 +5,7 @@ import AnaliseArrematePoll from "@/components/leilao/AnaliseArrematePoll";
 import { whatsappLink, WHATSAPP_DISPLAY } from "@/lib/constants";
 import { formatBRL } from "@/lib/utils/format";
 import { arremateAberto, dataLeilaoBR, ehPremio } from "@/lib/leiloes/situacao";
+import { primeiroNome as nomeDeSaudacao } from "@/lib/leiloes/mensagem";
 import type { ArrematePublico } from "@/lib/queries/leiloes";
 
 /**
@@ -21,7 +22,8 @@ export default function CobrancaArremate({
   a: ArrematePublico;
   mostrarSaudacao?: boolean;
 }) {
-  const primeiroNome = a.pagador.nome.trim().split(/\s+/)[0] ?? "";
+  // Arrematante salvo só pelo número fica sem nome na saudação.
+  const primeiroNome = nomeDeSaudacao(a.pagador.nome);
   const aberta = arremateAberto(a.situacao);
   const premio = ehPremio(a);
   // Linha negativa é abatimento (adiantamento pago por fora), não lote.
@@ -37,7 +39,7 @@ export default function CobrancaArremate({
         {mostrarSaudacao && (
           <h1 className="text-xl font-bold text-[#07366A]">
             {a.situacao === "PAGA"
-              ? `Tudo certo, ${primeiroNome}!`
+              ? `Tudo certo${primeiroNome ? `, ${primeiroNome}` : ""}!`
               : `${primeiroNome ? `${primeiroNome}, p` : "P"}arabéns ${
                   premio ? "pelo prêmio" : nLotes === 1 ? "pelo arremate" : "pelos arremates"
                 }!`}

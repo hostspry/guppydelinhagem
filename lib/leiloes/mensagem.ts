@@ -9,8 +9,11 @@
 const moeda = (n: number) =>
   n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
-/** "PAMELA DE OLIVEIRA" → "Pamela"; contato salvo só pelo número → null. */
-function primeiroNome(nome: string): string | null {
+/**
+ * "PAMELA DE OLIVEIRA" → "Pamela"; contato salvo só pelo número → null.
+ * A página do link usa a mesma regra para não saudar "+55, parabéns".
+ */
+export function primeiroNome(nome: string): string | null {
   const p = nome.trim().split(/\s+/)[0] ?? "";
   if (!p || /^\+?\d/.test(p)) return null;
   return p.charAt(0).toLocaleUpperCase("pt-BR") + p.slice(1).toLocaleLowerCase("pt-BR");
