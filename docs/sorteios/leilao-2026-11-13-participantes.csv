@@ -1,6 +1,6 @@
 Nº;Participante;Telefone;Chances;Lances válidos;Bilhetes de arremate;Arremates
 1;Pompeo;+55 12 99125-0075;46;11;35;lote 03 R$ 170, lote 04 R$ 200, lote 14 R$ 400
-2;Marcos Vinícius;+55 34 9819-4760;33;3;30;lote 06 R$ 200, lote 10 R$ 200, lote 16 R$ 200
+2;Marcos Vinícius;+55 34 9819-4760;3;3;0;não pagou os lotes 06, 10 e 16 (cobrança #2026-0110 cancelada em 16/11)
 3;Higor;+55 65 9959-4390;32;2;30;lote 08 R$ 200, lote 16 R$ 400
 4;Vinicius Auch;+55 53 98119-1075;25;10;15;lote 01 R$ 150, lote 09 R$ 200
 5;George Portela;+55 68 9960-3417;23;23;0;
@@ -21,4 +21,4 @@ Nº;Participante;Telefone;Chances;Lances válidos;Bilhetes de arremate;Arremates
 20;Lucas de Souza;+55 27 99892-9446;1;1;0;
 21;+55 28 99996-5455;+55 28 99996-5455;1;1;0;
 22;+55 61 8350-1577;+55 61 8350-1577;1;1;0;
-;Total;;273;108;165;
+;Total;;243;108;135;

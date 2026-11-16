@@ -1,13 +1,17 @@
 /**
  * Cria o "Sorteio Casal Black Flame Silverado" (Leilão Black Novembro 2,
  * 13/11/2026) e importa a apuração PRELIMINAR
- * (docs/sorteios/leilao-2026-11-13-participantes.csv): 22 participantes e 273
+ * (docs/sorteios/leilao-2026-11-13-participantes.csv): 22 participantes e 243
  * chances, apuradas pelos lances do export do grupo
  * (docs/sorteios/leilao-2026-11-13-lances.csv, lance por lance).
  *
  * Regras anunciadas às 19:41 do dia 13: cada lance válido dá 1 chance, mesmo
  * sem arrematar; quem arrematou ganha vagas extras por lote (até R$ 199 = 5,
- * R$ 200 = 10, R$ 400 = 20). 108 lances válidos + 165 vagas = 273.
+ * R$ 200 = 10, R$ 400 = 20). 108 lances válidos + 135 vagas = 243.
+ *
+ * O Marcos Vinícius (34 9819-4760) perdeu as 30 vagas de arremate: não pagou os
+ * lotes 06, 10 e 16 até o prazo final e a cobrança #2026-0110 foi cancelada em
+ * 16/11/2026. Ficam os 3 bilhetes dos lances.
  *
  *   npx tsx --conditions=react-server scripts/sorteios/importar-leilao-2026-11-13.ts
  *
@@ -28,7 +32,7 @@ import { identificar, importarParticipantes, salvarSorteio } from "@/lib/sorteio
 const SLUG = "casal-black-flame-silverado-2026-11";
 const ARQUIVO = "docs/sorteios/leilao-2026-11-13-participantes.csv";
 const PARTICIPANTES = 22;
-const CHANCES = 273;
+const CHANCES = 243;
 const ator = { id: null, nome: "Importação inicial (script)" };
 
 async function main() {
