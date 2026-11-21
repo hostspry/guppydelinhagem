@@ -1,8 +1,9 @@
 import Image from "next/image";
 import Link from "next/link";
-import { Truck, MapPin, User } from "lucide-react";
+import { MapPin, User } from "lucide-react";
 import NavBar3 from "./NavBar3";
 import CartIcon from "./CartIcon";
+import FaixaFreteGratis from "./FaixaFreteGratis";
 import { WHATSAPP_URL } from "@/lib/constants";
 import { getFreteGratisConfig } from "@/lib/queries/config";
 import { formatBRL } from "@/lib/utils/format";
@@ -59,13 +60,9 @@ export default async function Navbar() {
 
           {/* Centro: frete grátis (do config — some se desligado) */}
           {freteGratis.ativo && freteGratis.acimaDe != null && (
-            <div className="hidden md:flex items-center gap-2 text-sm font-light">
-              <Truck size={16} />
-              <span>
-                Frete Grátis Para Pedidos Acima de{" "}
-                {formatBRL(freteGratis.acimaDe).replace(/\s/g, " ")}!
-              </span>
-            </div>
+            <FaixaFreteGratis
+              valor={formatBRL(freteGratis.acimaDe).replace(/\s/g, " ")}
+            />
           )}
 
           {/* Direita: rastreamento */}
