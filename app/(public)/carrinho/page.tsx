@@ -159,7 +159,12 @@ export default function CarrinhoPage() {
   // Frete grátis: base = subtotal EFETIVO do cartão (com campanha). Não promete
   // quando o pedido excede o limite de peixes (frete será combinado no WhatsApp).
   const fg = resolvido?.freteGratis;
-  const freteGratisAtivo = !!fg?.ativo && fg.acimaDe != null && !excedeCaixa;
+  const freteCampanha = resolvido?.freteGratisCampanha ?? null;
+  const faltamFreteCampanha = freteCampanha
+    ? Math.max(0, freteCampanha.minimo - freteCampanha.unidades)
+    : 0;
+  const freteGratisAtivo =
+    !!fg?.ativo && fg.acimaDe != null && !excedeCaixa && !freteCampanha?.ganhou;
   const freteGratisAcimaDe = fg?.acimaDe ?? 0;
   const faltaFreteGratis = Math.max(0, freteGratisAcimaDe - subtotalCheioEfetivo);
   const freteGratisAtingido = freteGratisAtivo && faltaFreteGratis <= 0;
@@ -436,6 +441,16 @@ export default function CarrinhoPage() {
                 {formatBRL(subtotalCheioEfetivo)}
               </span>
             </div>
+          )}
+
+          {/* Frete grátis da campanha, por quantidade */}
+          {freteCampanha && (
+            <p className="flex items-center gap-1.5 text-sm font-medium text-green-700 bg-green-50 border border-green-200 rounded-lg p-2.5">
+              <Truck size={15} className="shrink-0" aria-hidden="true" />
+              {freteCampanha.ganhou
+                ? "Você ganhou frete grátis!"
+                : `Faltam ${faltamFreteCampanha} ${faltamFreteCampanha === 1 ? "unidade" : "unidades"} para o frete grátis`}
+            </p>
           )}
 
           {/* Frete grátis — progresso sobre o valor efetivo (cartão com campanha) */}

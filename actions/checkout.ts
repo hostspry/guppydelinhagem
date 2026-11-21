@@ -37,7 +37,12 @@ import {
   type ItemPrecificadoCupom,
 } from "@/lib/cupom";
 import { resolverCampanhaInfo } from "@/lib/campanha";
-import { precoComCampanha, type CampanhaInfo } from "@/lib/campanha-core";
+import {
+  freteGratisDaCampanha,
+  precoComCampanha,
+  type CampanhaInfo,
+  type FreteGratisCampanha,
+} from "@/lib/campanha-core";
 import { getCupomByCodigo } from "@/lib/queries/cupons";
 import {
   getConfigPreco,
@@ -590,6 +595,7 @@ export type DescontoItem = {
   cupomId: string | null; // cupom vencedor (snapshot do OrderItem; base cartão)
   cupomCodigo: string | null;
   tipoVencedor: "CAMPANHA" | "SECRETO" | null;
+  campanhaCodigo: string | null; // campanha vigente do produto, mesmo se o secreto vencer
 };
 
 /**
@@ -752,7 +758,14 @@ async function resolverDescontosPorItem(
     if (descontoCartaoUnit > 0) escolher(campCartaoUnit, secCartaoUnit);
     else if (descontoPixUnit > 0) escolher(campPixUnit, secPixUnit);
 
-    return { descontoCartaoUnit, descontoPixUnit, cupomId, cupomCodigo, tipoVencedor };
+    return {
+      descontoCartaoUnit,
+      descontoPixUnit,
+      cupomId,
+      cupomCodigo,
+      tipoVencedor,
+      campanhaCodigo: camp?.codigo ?? null,
+    };
   });
 }
 
@@ -782,6 +795,7 @@ export type CarrinhoResolvido = {
   // Config da loja que o carrinho/checkout precisam (descem do servidor).
   maxPeixesFreteAuto: number;
   freteGratis: { ativo: boolean; acimaDe: number | null };
+  freteGratisCampanha: FreteGratisCampanha | null;
 };
 
 /**
@@ -839,6 +853,12 @@ export async function resolverItensCarrinho(
       ativo: cfg.freteGratisAtivo && cfg.freteGratisAcimaDe != null,
       acimaDe: cfg.freteGratisAcimaDe,
     },
+    freteGratisCampanha: freteGratisDaCampanha(
+      prec.itens.map((it, i) => ({
+        campanhaCodigo: desc[i].campanhaCodigo,
+        quantidade: it.quantidade,
+      })),
+    ),
   };
 }
 
@@ -969,9 +989,17 @@ export async function criarOrderDoCheckout(
     // Frete grátis vale igual no seco (mesma base do carrinho de peixe).
     const subtotalCheioEfetivoSeco = round2(subtotalCheio - descontoCartao);
     const freteGratisSeco = await getFreteGratisConfig();
+    const ganhouNaCampanha =
+      freteGratisDaCampanha(
+        prec.itens.map((it, i) => ({
+          campanhaCodigo: descItens[i].campanhaCodigo,
+          quantidade: it.quantidade,
+        })),
+      )?.ganhou ?? false;
     if (
-      freteGratisSeco.ativo &&
-      subtotalCheioEfetivoSeco >= (freteGratisSeco.acimaDe ?? Infinity)
+      ganhouNaCampanha ||
+      (freteGratisSeco.ativo &&
+        subtotalCheioEfetivoSeco >= (freteGratisSeco.acimaDe ?? Infinity))
     ) {
       frete = 0;
     }

@@ -38,7 +38,11 @@ import ProductShare from "./ProductShare";
 import WaitlistForm from "./WaitlistForm";
 import { formatBRL } from "@/lib/utils/format";
 import { calcularPrecos } from "@/lib/precos";
-import { precoComCampanha, type CampanhaInfo } from "@/lib/campanha-core";
+import {
+  minimoFreteGratisCampanha,
+  precoComCampanha,
+  type CampanhaInfo,
+} from "@/lib/campanha-core";
 import {
   youtubeEmbedUrl,
   instagramEmbedUrl,
@@ -203,6 +207,7 @@ export default function ProductDetail({
   const promo = campanha
     ? precoComCampanha(precoCheio, descontoPercent, campanha)
     : null;
+  const minimoFreteCampanha = minimoFreteGratisCampanha(campanha?.codigo);
   const capa =
     product.videos.find((v) => v.principal)?.thumbnailUrl ??
     fotos[0]?.url ??
@@ -663,15 +668,25 @@ export default function ProductDetail({
             </p>
           )}
 
-          {/* Frete — logo abaixo do preço */}
-          <div className="max-w-md">
-            <ProductFreteEstimator
-              qtd={qtdPeixesUnit * qtd}
-              produtoId={product.id}
-              cargaViva={ehCargaViva(product.tipo)}
-              unidades={qtd}
-            />
-          </div>
+          {/* Frete grátis da campanha, por quantidade */}
+          {minimoFreteCampanha != null && (
+            <p className="inline-flex items-center gap-1.5 text-sm font-medium text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-1.5">
+              <Truck size={15} className="shrink-0" aria-hidden="true" />
+              Frete grátis comprando {minimoFreteCampanha} ou mais
+            </p>
+          )}
+
+          {/* Frete — logo abaixo do preço. Na quantidade da campanha já é grátis. */}
+          {!(minimoFreteCampanha != null && qtd >= minimoFreteCampanha) && (
+            <div className="max-w-md">
+              <ProductFreteEstimator
+                qtd={qtdPeixesUnit * qtd}
+                produtoId={product.id}
+                cargaViva={ehCargaViva(product.tipo)}
+                unidades={qtd}
+              />
+            </div>
+          )}
 
           {/* Estoque + compra / lista de espera */}
           {semEstoque ? (

@@ -22,6 +22,36 @@ export type CampanhaProduto = CampanhaInfo & {
   descontoPercent: number; // p/ o badge "-X% OFF"
 };
 
+// Frete grátis que só existe dentro de uma campanha: código → unidades mínimas.
+// Depende da campanha estar vigente, então acaba junto com ela.
+const FRETE_GRATIS_CAMPANHA: Record<string, number> = { CRIADEIRA50: 10 };
+
+export function minimoFreteGratisCampanha(
+  codigo: string | null | undefined,
+): number | null {
+  return (codigo && FRETE_GRATIS_CAMPANHA[codigo]) || null;
+}
+
+export type FreteGratisCampanha = {
+  minimo: number;
+  unidades: number;
+  ganhou: boolean;
+};
+
+/**
+ * Frete grátis da campanha para o carrinho. Só vale com o carrinho inteiro na
+ * mesma campanha: outro item junto muda a caixa e o custo do envio.
+ */
+export function freteGratisDaCampanha(
+  itens: { campanhaCodigo: string | null; quantidade: number }[],
+): FreteGratisCampanha | null {
+  const codigo = itens[0]?.campanhaCodigo ?? null;
+  const minimo = minimoFreteGratisCampanha(codigo);
+  if (!minimo || itens.some((i) => i.campanhaCodigo !== codigo)) return null;
+  const unidades = itens.reduce((a, i) => a + i.quantidade, 0);
+  return { minimo, unidades, ganhou: unidades >= minimo };
+}
+
 /**
  * Aplica a campanha sobre um preço cheio (cartão à vista). Com `precoUnico`, o Pix
  * fica igual ao cartão (o desconto Pix do produto some). Sem ele, o Pix mantém a

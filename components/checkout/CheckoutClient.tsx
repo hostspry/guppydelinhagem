@@ -376,17 +376,19 @@ export default function CheckoutClient({
   // limite de peixes (frete combinado no WhatsApp).
   const fg = resolvido?.freteGratis ?? freteGratis;
   // Frete grátis não se aplica na retirada (o frete já é 0 e não há barra/progresso).
+  const ganhouFreteCampanha = !!resolvido?.freteGratisCampanha?.ganhou;
   const freteGratisAplicado =
     !isRetirada &&
-    fg.ativo &&
     !excedeCaixa &&
-    subtotalCheioEfetivo >= (fg.acimaDe ?? Infinity);
+    (ganhouFreteCampanha ||
+      (fg.ativo && subtotalCheioEfetivo >= (fg.acimaDe ?? Infinity)));
   const freteEfetivo = isRetirada ? 0 : freteGratisAplicado ? 0 : freteValor;
   // Barra de progresso (só no envio, ativo e dentro do limite de peixes).
   const mostraBarraFreteGratis = !isRetirada && fg.ativo && !excedeCaixa;
   const faltaFreteGratis = Math.max(0, (fg.acimaDe ?? 0) - subtotalCheioEfetivo);
-  const freteGratisPct =
-    fg.acimaDe && fg.acimaDe > 0
+  const freteGratisPct = ganhouFreteCampanha
+    ? 100
+    : fg.acimaDe && fg.acimaDe > 0
       ? Math.min(100, Math.round((subtotalCheioEfetivo / fg.acimaDe) * 100))
       : 0;
 
