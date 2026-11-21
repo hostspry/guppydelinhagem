@@ -989,18 +989,19 @@ export async function criarOrderDoCheckout(
     // Frete grátis vale igual no seco (mesma base do carrinho de peixe).
     const subtotalCheioEfetivoSeco = round2(subtotalCheio - descontoCartao);
     const freteGratisSeco = await getFreteGratisConfig();
-    const ganhouNaCampanha =
-      freteGratisDaCampanha(
-        prec.itens.map((it, i) => ({
-          campanhaCodigo: descItens[i].campanhaCodigo,
-          quantidade: it.quantidade,
-        })),
-      )?.ganhou ?? false;
-    if (
-      ganhouNaCampanha ||
-      (freteGratisSeco.ativo &&
-        subtotalCheioEfetivoSeco >= (freteGratisSeco.acimaDe ?? Infinity))
-    ) {
+    // Carrinho só da campanha segue a regra dela (unidades), e não a de valor:
+    // o preço de cartão bateria o mínimo da loja antes da quantidade combinada.
+    const freteCampanha = freteGratisDaCampanha(
+      prec.itens.map((it, i) => ({
+        campanhaCodigo: descItens[i].campanhaCodigo,
+        quantidade: it.quantidade,
+      })),
+    );
+    const ganhouFreteGratis = freteCampanha
+      ? freteCampanha.ganhou
+      : freteGratisSeco.ativo &&
+        subtotalCheioEfetivoSeco >= (freteGratisSeco.acimaDe ?? Infinity);
+    if (ganhouFreteGratis) {
       frete = 0;
     }
   } else if (!isRetirada) {

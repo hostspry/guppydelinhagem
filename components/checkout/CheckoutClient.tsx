@@ -377,12 +377,13 @@ export default function CheckoutClient({
   const fg = resolvido?.freteGratis ?? freteGratis;
   // Frete grátis não se aplica na retirada (o frete já é 0 e não há barra/progresso).
   const freteCampanha = resolvido?.freteGratisCampanha ?? null;
-  const ganhouFreteCampanha = !!freteCampanha?.ganhou;
+  // Carrinho só da campanha segue a regra dela (unidades), igual ao servidor.
   const freteGratisAplicado =
     !isRetirada &&
     !excedeCaixa &&
-    (ganhouFreteCampanha ||
-      (fg.ativo && subtotalCheioEfetivo >= (fg.acimaDe ?? Infinity)));
+    (freteCampanha
+      ? freteCampanha.ganhou
+      : fg.ativo && subtotalCheioEfetivo >= (fg.acimaDe ?? Infinity));
   const freteEfetivo = isRetirada ? 0 : freteGratisAplicado ? 0 : freteValor;
   // Barra de progresso (só no envio, ativo e dentro do limite de peixes).
   const mostraBarraFreteGratis =
