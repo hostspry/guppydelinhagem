@@ -376,7 +376,8 @@ export default function CheckoutClient({
   // limite de peixes (frete combinado no WhatsApp).
   const fg = resolvido?.freteGratis ?? freteGratis;
   // Frete grátis não se aplica na retirada (o frete já é 0 e não há barra/progresso).
-  const ganhouFreteCampanha = !!resolvido?.freteGratisCampanha?.ganhou;
+  const freteCampanha = resolvido?.freteGratisCampanha ?? null;
+  const ganhouFreteCampanha = !!freteCampanha?.ganhou;
   const freteGratisAplicado =
     !isRetirada &&
     !excedeCaixa &&
@@ -384,13 +385,19 @@ export default function CheckoutClient({
       (fg.ativo && subtotalCheioEfetivo >= (fg.acimaDe ?? Infinity)));
   const freteEfetivo = isRetirada ? 0 : freteGratisAplicado ? 0 : freteValor;
   // Barra de progresso (só no envio, ativo e dentro do limite de peixes).
-  const mostraBarraFreteGratis = !isRetirada && fg.ativo && !excedeCaixa;
+  const mostraBarraFreteGratis =
+    !isRetirada && (fg.ativo || !!freteCampanha) && !excedeCaixa;
   const faltaFreteGratis = Math.max(0, (fg.acimaDe ?? 0) - subtotalCheioEfetivo);
-  const freteGratisPct = ganhouFreteCampanha
+  const faltamUnidadesFrete = freteCampanha
+    ? Math.max(0, freteCampanha.minimo - freteCampanha.unidades)
+    : 0;
+  const freteGratisPct = freteGratisAplicado
     ? 100
-    : fg.acimaDe && fg.acimaDe > 0
-      ? Math.min(100, Math.round((subtotalCheioEfetivo / fg.acimaDe) * 100))
-      : 0;
+    : freteCampanha
+      ? Math.min(100, Math.round((freteCampanha.unidades / freteCampanha.minimo) * 100))
+      : fg.acimaDe && fg.acimaDe > 0
+        ? Math.min(100, Math.round((subtotalCheioEfetivo / fg.acimaDe) * 100))
+        : 0;
 
   // Totais por aba a partir dos subtotais EFETIVOS (já com campanha/cupom). O
   // cartão (Brick) usa totalCartao — bate com o que o servidor cobra.
@@ -1593,7 +1600,9 @@ export default function CheckoutClient({
                 <Truck size={15} className="shrink-0 text-green-600" aria-hidden="true" />
                 {freteGratisAplicado
                   ? "Você ganhou frete grátis!"
-                  : `Faltam ${formatBRL(faltaFreteGratis)} para o frete grátis`}
+                  : freteCampanha
+                    ? `Faltam ${faltamUnidadesFrete} ${faltamUnidadesFrete === 1 ? "unidade" : "unidades"} para o frete grátis`
+                    : `Faltam ${formatBRL(faltaFreteGratis)} para o frete grátis`}
               </p>
               <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
                 <div

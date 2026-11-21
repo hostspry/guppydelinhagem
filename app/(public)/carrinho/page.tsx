@@ -163,10 +163,15 @@ export default function CarrinhoPage() {
   const faltamFreteCampanha = freteCampanha
     ? Math.max(0, freteCampanha.minimo - freteCampanha.unidades)
     : 0;
-  const freteGratisAtivo =
-    !!fg?.ativo && fg.acimaDe != null && !excedeCaixa && !freteCampanha?.ganhou;
   const freteGratisAcimaDe = fg?.acimaDe ?? 0;
   const faltaFreteGratis = Math.max(0, freteGratisAcimaDe - subtotalCheioEfetivo);
+  // Carrinho da campanha conta por unidades. A barra de valor só aparece nele
+  // quando a regra da loja já deu frete grátis antes do mínimo da campanha.
+  const freteGratisAtivo =
+    !!fg?.ativo &&
+    fg.acimaDe != null &&
+    !excedeCaixa &&
+    (!freteCampanha || (!freteCampanha.ganhou && faltaFreteGratis <= 0));
   const freteGratisAtingido = freteGratisAtivo && faltaFreteGratis <= 0;
   const freteGratisPct =
     freteGratisAtivo && freteGratisAcimaDe > 0
@@ -444,7 +449,7 @@ export default function CarrinhoPage() {
           )}
 
           {/* Frete grátis da campanha, por quantidade */}
-          {freteCampanha && (
+          {freteCampanha && !freteGratisAtingido && (
             <p className="flex items-center gap-1.5 text-sm font-medium text-green-700 bg-green-50 border border-green-200 rounded-lg p-2.5">
               <Truck size={15} className="shrink-0" aria-hidden="true" />
               {freteCampanha.ganhou
