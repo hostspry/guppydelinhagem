@@ -19,6 +19,7 @@ type CampanhaVigente = {
   valor: number;
   escopo: "TODOS" | "CATEGORIAS" | "PRODUTOS";
   precoUnico: boolean;
+  soPix: boolean;
   encerraAoEsgotarEstoque: boolean;
   categoriaIds: string[];
   produtoIds: string[];
@@ -58,6 +59,7 @@ export const getCampanhasVigentes = cache(
         valor: true,
         escopo: true,
         precoUnicoNaCampanha: true,
+        modoAplicacao: true,
         encerraAoEsgotarEstoque: true,
         limiteUsos: true,
         usosRealizados: true,
@@ -94,7 +96,9 @@ export const getCampanhasVigentes = cache(
         tipoValor: c.tipoValor,
         valor: Number(c.valor),
         escopo: c.escopo,
-        precoUnico: c.precoUnicoNaCampanha,
+        // Só no Pix nunca é preço único: o cartão continua no cheio.
+        precoUnico: c.precoUnicoNaCampanha && c.modoAplicacao !== "SO_PIX",
+        soPix: c.modoAplicacao === "SO_PIX",
         encerraAoEsgotarEstoque: c.encerraAoEsgotarEstoque,
         categoriaIds: c.categorias.map((x) => x.id),
         produtoIds: c.produtos.map((x) => x.id),
@@ -142,12 +146,22 @@ function melhorCampanha(
   let melhorAbatimento = 0;
   for (const c of campanhas) {
     if (!cobreProduto(c, p) || !temEstoque(c)) continue;
-    const { precoPromoCheio } = precoComCampanha(p.precoCheio, p.descontoPixPercent, {
-      tipoValor: c.tipoValor,
-      valor: c.valor,
-      precoUnico: c.precoUnico,
-    });
-    const abatimento = p.precoCheio - precoPromoCheio;
+    const { precoPromoCheio, precoPromoPix } = precoComCampanha(
+      p.precoCheio,
+      p.descontoPixPercent,
+      {
+        tipoValor: c.tipoValor,
+        valor: c.valor,
+        precoUnico: c.precoUnico,
+        soPix: c.soPix,
+      },
+    );
+    // Campanha só no Pix não mexe no cartão: vale o que ela tira do Pix atual.
+    const pixAtual =
+      Math.round(p.precoCheio * (100 - p.descontoPixPercent)) / 100;
+    const abatimento = c.soPix
+      ? pixAtual - precoPromoPix
+      : p.precoCheio - precoPromoCheio;
     if (abatimento > melhorAbatimento) {
       melhorAbatimento = abatimento;
       melhor = c;
@@ -169,6 +183,7 @@ export async function resolverCampanhaInfo(
     tipoValor: c.tipoValor,
     valor: c.valor,
     precoUnico: c.precoUnico,
+    soPix: c.soPix,
   };
 }
 
@@ -192,6 +207,7 @@ export async function resolverCampanhas(
       tipoValor: c.tipoValor,
       valor: c.valor,
       precoUnico: c.precoUnico,
+      soPix: c.soPix,
     });
     map.set(p.id, {
       cupomId: c.id,
@@ -199,6 +215,7 @@ export async function resolverCampanhas(
       tipoValor: c.tipoValor,
       valor: c.valor,
       precoUnico: c.precoUnico,
+      soPix: c.soPix,
       ...promo,
     });
   }

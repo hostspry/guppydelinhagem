@@ -803,9 +803,14 @@ export async function resolverItensCarrinho(
     const d = desc[i];
     const precoCheioEfetivo = round2(Math.max(0, it.precoCheio - d.descontoCartaoUnit));
     const precoPixEfetivo = round2(Math.max(0, it.precoPix - d.descontoPixUnit));
+    // Campanha só no Pix não baixa o cartão: o selo mostra o desconto do Pix.
+    const precoDoSelo =
+      d.tipoVencedor === "CAMPANHA" && d.descontoCartaoUnit === 0
+        ? precoPixEfetivo
+        : precoCheioEfetivo;
     const descontoPercent =
       it.precoCheio > 0
-        ? Math.round(((it.precoCheio - precoCheioEfetivo) / it.precoCheio) * 100)
+        ? Math.round(((it.precoCheio - precoDoSelo) / it.precoCheio) * 100)
         : 0;
     return {
       produtoId: it.productId,

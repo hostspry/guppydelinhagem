@@ -797,6 +797,7 @@ export async function getVideoFeed(): Promise<FeedProduto[]> {
             tipoValor: camp.tipoValor,
             valor: camp.valor,
             precoUnico: camp.precoUnico,
+            soPix: camp.soPix,
           }
         : null,
       variantes: p.variantes.map((v) => ({

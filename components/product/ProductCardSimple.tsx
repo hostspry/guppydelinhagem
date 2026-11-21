@@ -134,10 +134,7 @@ export default function ProductCardSimple({
                 </p>
               ) : (
                 <p className="text-xs text-muted-foreground mt-1">
-                  <span className="line-through">
-                    {formatBRL(campanha.precoPromoCheio)}
-                  </span>{" "}
-                  no cartão
+                  {formatBRL(campanha.precoPromoCheio)} no cartão
                 </p>
               )}
             </>
