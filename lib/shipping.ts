@@ -82,7 +82,8 @@ function linhaDoPeixe(nome: string): string {
  *
  * Peixes de cada item: a receita (machos + fêmeas) ou, no item de leilão, o
  * lote de mesmo nome (qtdPeixes). Item sem peixe (ração, acessório) vai pelo
- * preço. Linha negativa (adiantamento) não é conteúdo e fica de fora.
+ * preço. Linha negativa (adiantamento) não é conteúdo e fica de fora. Peixe de
+ * R$ 0 (reposição, prêmio) viaja e conta no seguro, então entra a R$ 10.
  */
 export function produtosDeclaradosDePeixe(
   items: ItemDeclarado[],
@@ -91,16 +92,19 @@ export function produtosDeclaradosDePeixe(
   const out: ProdutoDeclarado[] = [];
   for (const it of items) {
     const preco = Number(it.precoUnitario) || 0;
-    if (preco <= 0) continue;
+    if (preco < 0) continue;
     const porUnidade = (it.qtdMachos ?? 0) + (it.qtdFemeas ?? 0);
     const semPrefixo = it.nomeProduto.replace(/^Lote \S+ · /, "");
     const lote = porUnidade > 0 ? null : lotes.find((l) => l.nome === semPrefixo || l.nome === it.nomeProduto);
     const peixes = porUnidade > 0 ? porUnidade * it.quantidade : (lote?.qtdPeixes ?? 0) * it.quantidade;
     if (peixes <= 0) {
-      out.push({ name: it.nomeProduto.slice(0, 60), quantity: it.quantidade, unitary_value: preco });
+      if (preco > 0) {
+        out.push({ name: it.nomeProduto.slice(0, 60), quantity: it.quantidade, unitary_value: preco });
+      }
       continue;
     }
-    const porPeixe = Math.floor(((preco * it.quantidade) / peixes) * 100) / 100;
+    const porPeixe =
+      preco > 0 ? Math.floor(((preco * it.quantidade) / peixes) * 100) / 100 : SEGURO_POR_PEIXE;
     out.push({
       name: `Peixe ornamental vivo: ${linhaDoPeixe(it.nomeProduto)}`.slice(0, 60),
       quantity: peixes,
