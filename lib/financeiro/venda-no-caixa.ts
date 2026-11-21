@@ -2,13 +2,13 @@ import "server-only";
 import type { Prisma } from "@/lib/generated/prisma/client";
 import type { SegmentoFinanceiro } from "@/lib/generated/prisma/enums";
 import { SLUG_VENDAS_SITE } from "./categorias-padrao";
+import { hojeNoCaixa } from "./periodo";
 
 /**
  * Ponte entre a venda e o caixa.
  *
- * O dono pediu para conferir cada venda antes de ela contar, então o pedido pago
- * gera uma sugestão PENDENTE — dinheiro previsto, fora do saldo — e a tela de
- * pendências transforma em CONFIRMADO.
+ * Cliente pagou, a venda já vale: o pedido pago entra CONFIRMADO, sem fila de
+ * conferência (decisão do dono em 21/11/2026), pelo valor que o cliente pagou.
  *
  * Idempotência: a unique (pagamentoId, origem) do Lancamento. O webhook do
  * gateway reenvia a mesma notificação várias vezes e cada reenvio esbarra nela.
@@ -99,8 +99,8 @@ async function idCategoria(
   return c?.id ?? null;
 }
 
-/** Pedido virou PAGO → entrada pendente de conferência. */
-export async function registrarSugestaoDeVenda(
+/** Pedido virou PAGO → entrada confirmada no caixa. */
+export async function registrarVendaNoCaixa(
   tx: Prisma.TransactionClient,
   orderId: string,
 ): Promise<void> {
@@ -111,6 +111,7 @@ export async function registrarSugestaoDeVenda(
       numero: true,
       total: true,
       frete: true,
+      origem: true,
       cliente: { select: { nome: true } },
       items: {
         select: {
@@ -125,16 +126,23 @@ export async function registrarSugestaoDeVenda(
         where: { status: "PAGO" },
         orderBy: { criadoEm: "desc" },
         take: 1,
-        select: { id: true },
+        select: { id: true, valor: true },
       },
     },
   });
   if (!order) return;
 
-  const total = Number(order.total);
+  // Distribuidor paga em partes e tem o próprio registro (distribuidor.ts).
+  // Lançar o total aqui contaria a mesma venda duas vezes.
+  if (order.origem === "DISTRIBUIDOR") return;
+
+  // Order.total guarda o preço do cartão. O que o cliente pagou de fato (Pix com
+  // desconto, por exemplo) está na linha Pagamento.
+  const pagamento = order.pagamentos[0];
+  const total = Number(pagamento?.valor ?? order.total);
   if (!(total > 0)) return; // pedido zerado (brinde, teste) não vira caixa
 
-  const chave = chaveDoPagamento(order.pagamentos[0]?.id ?? null, order.id);
+  const chave = chaveDoPagamento(pagamento?.id ?? null, order.id);
   const categoriaId = await idCategoria(tx, SLUG_VENDAS_SITE);
 
   const fatias = repartirPorSegmento(order.items, total, Number(order.frete));
@@ -150,13 +158,13 @@ export async function registrarSugestaoDeVenda(
         data: {
           segmento,
           tipo: "ENTRADA",
-          status: "PENDENTE",
+          status: "CONFIRMADO",
           origem: "PEDIDO",
           descricao: misto
             ? `Venda ${order.numero}${nome} (${ROTULO_SEGMENTO[segmento]})`
             : `Venda ${order.numero}${nome}`,
           valor,
-          data: new Date(),
+          data: hojeNoCaixa(),
           categoriaId,
           orderId: order.id,
           // Venda dividida precisa de uma chave por fatia: a trava é

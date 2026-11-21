@@ -7,9 +7,8 @@ import { competenciaDe } from "./periodo";
  * Estufa: o resultado do mês (entradas menos custos) vai para o Manassés até
  * R$ 6.000. O que passar disso é dividido meio a meio com o Lucas.
  *
- * Produtos: tudo é da Lívia, descontados os custos dessa parte. A venda paga já
- * conta para ela sem esperar a conferência do caixa, e nunca entra na divisão
- * da estufa.
+ * Produtos: tudo é da Lívia, descontados os custos dessa parte. Nunca entra na
+ * divisão da estufa.
  *
  * Cada mês fecha sozinho: saldo, retirada e piso de R$ 6.000 não passam para o
  * mês seguinte. O que o Lucas recebeu em outubro não mexe na conta de novembro.
@@ -53,7 +52,6 @@ export type FechamentoEstufa = {
   entradas: number;
   custos: number;
   resultado: number;
-  aConferir: number;
   /** Quanto do piso de R$ 6.000 foi preenchido neste mês. */
   primeiros: number;
   manasses: SaldoSocio;
@@ -142,7 +140,6 @@ function somarMes(
 function montarEstufa(
   linhas: LinhaCaixa[],
   competencia: string,
-  aConferir: number,
 ): FechamentoEstufa {
   const m = somarMes(linhas, "PEIXES_VIVOS", competencia);
   const resultado = m.entradas - m.custos;
@@ -152,7 +149,6 @@ function montarEstufa(
     entradas: reais(m.entradas),
     custos: reais(m.custos),
     resultado: reais(resultado),
-    aConferir,
     primeiros: reais(d.primeiros),
     manasses: {
       metade: reais(d.metadeManasses),
@@ -191,14 +187,13 @@ function montarProdutos(
 export function montarFechamento(args: {
   competencia: string;
   linhas: LinhaCaixa[];
-  aConferirEstufa: number;
   segmentos: readonly SegmentoFinanceiro[];
 }): Fechamento {
-  const { competencia, linhas, aConferirEstufa, segmentos } = args;
+  const { competencia, linhas, segmentos } = args;
   return {
     competencia,
     estufa: segmentos.includes("PEIXES_VIVOS")
-      ? montarEstufa(linhas, competencia, aConferirEstufa)
+      ? montarEstufa(linhas, competencia)
       : null,
     produtos: segmentos.includes("PRODUTOS")
       ? montarProdutos(linhas, competencia)

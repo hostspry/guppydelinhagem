@@ -40,6 +40,14 @@ export function dataDoDia(iso: string): Date | null {
   return date;
 }
 
+/** Hoje em Brasília, ao meio-dia UTC (o formato das datas do caixa). */
+export function hojeNoCaixa(): Date {
+  const b = new Date(Date.now() - 3 * 60 * 60 * 1000);
+  return new Date(
+    Date.UTC(b.getUTCFullYear(), b.getUTCMonth(), b.getUTCDate(), 12, 0, 0),
+  );
+}
+
 /** Date → "2026-08-15" (para <input type="date">). */
 export function paraInputDate(d: Date): string {
   return d.toISOString().slice(0, 10);

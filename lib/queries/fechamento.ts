@@ -16,37 +16,16 @@ export async function fechamentoDoMes(competencia: string): Promise<Fechamento> 
     segmentosPermitidos(),
   ]);
 
-  const [linhas, pendentes] = await Promise.all([
-    prisma.lancamento.findMany({
-      where: {
-        ...escopo,
-        data: { gte: inicio, lt: fim },
-        OR: [
-          { status: "CONFIRMADO" },
-          // Venda de produto paga já é da Lívia, mesmo antes da conferência.
-          { segmento: "PRODUTOS", status: "PENDENTE", tipo: "ENTRADA", origem: "PEDIDO" },
-        ],
-      },
-      select: {
-        segmento: true,
-        tipo: true,
-        valor: true,
-        data: true,
-        categoria: { select: { slug: true } },
-      },
-    }),
-    prisma.lancamento.groupBy({
-      by: ["segmento"],
-      where: {
-        ...escopo,
-        status: "PENDENTE",
-        tipo: "ENTRADA",
-        origem: "PEDIDO",
-        data: { gte: inicio, lt: fim },
-      },
-      _sum: { valor: true },
-    }),
-  ]);
+  const linhas = await prisma.lancamento.findMany({
+    where: { ...escopo, status: "CONFIRMADO", data: { gte: inicio, lt: fim } },
+    select: {
+      segmento: true,
+      tipo: true,
+      valor: true,
+      data: true,
+      categoria: { select: { slug: true } },
+    },
+  });
 
   return montarFechamento({
     competencia,
@@ -58,8 +37,5 @@ export async function fechamentoDoMes(competencia: string): Promise<Fechamento> 
       data: l.data,
       categoriaSlug: l.categoria?.slug ?? null,
     })),
-    aConferirEstufa: Number(
-      pendentes.find((p) => p.segmento === "PEIXES_VIVOS")?._sum.valor ?? 0,
-    ),
   });
 }
