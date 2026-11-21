@@ -102,7 +102,6 @@ export function FechamentoMes({ fechamento }: { fechamento: Fechamento }) {
                   { rotulo: pisoRotulo, valor: estufa.primeiros },
                   { rotulo: "50% do restante", valor: estufa.manasses.metade },
                   { rotulo: "Retirado no mês", valor: estufa.manasses.retirado },
-                  { rotulo: "Acumulado", valor: estufa.manasses.acumulado, destaque: true },
                 ]}
               />
               <CardFechamento
@@ -112,7 +111,6 @@ export function FechamentoMes({ fechamento }: { fechamento: Fechamento }) {
                 linhas={[
                   { rotulo: "50% do restante", valor: estufa.lucas.metade },
                   { rotulo: "Retirado no mês", valor: estufa.lucas.retirado },
-                  { rotulo: "Acumulado", valor: estufa.lucas.acumulado, destaque: true },
                 ]}
               />
             </div>
@@ -140,7 +138,6 @@ export function FechamentoMes({ fechamento }: { fechamento: Fechamento }) {
                   { rotulo: "Vendas de produtos", valor: produtos.entradas },
                   { rotulo: "Custos", valor: produtos.custos },
                   { rotulo: "Retirado no mês", valor: produtos.retirado },
-                  { rotulo: "Acumulado", valor: produtos.acumulado, destaque: true },
                   ...(produtos.aConferir > 0
                     ? [{ rotulo: "Vendas a conferir", valor: produtos.aConferir }]
                     : []),
@@ -152,8 +149,8 @@ export function FechamentoMes({ fechamento }: { fechamento: Fechamento }) {
       </div>
 
       <p className="text-xs text-gray-400 mt-2">
-        Só conta o que está confirmado no caixa. Retirada não é custo: ela sai do
-        saldo de quem recebeu.
+        Cada mês fecha sozinho e só conta o que está confirmado no caixa. Retirada
+        não é custo: ela sai do saldo de quem recebeu.
       </p>
     </section>
   );

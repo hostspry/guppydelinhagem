@@ -5,10 +5,12 @@ import { competenciaDe } from "./periodo";
  * Fechamento do mês: quanto cabe a cada pessoa.
  *
  * Estufa: o resultado do mês (entradas menos custos) vai para o Manassés até
- * R$ 6.000. O que passar disso é dividido meio a meio com o Lucas. A conta é
- * refeita em cada mês, porque o piso de R$ 6.000 é mensal.
+ * R$ 6.000. O que passar disso é dividido meio a meio com o Lucas.
  *
  * Produtos: tudo é da Lívia, descontados os custos dessa parte.
+ *
+ * Cada mês fecha sozinho: saldo, retirada e piso de R$ 6.000 não passam para o
+ * mês seguinte. O que o Lucas recebeu em outubro não mexe na conta de novembro.
  *
  * Retirada NÃO é custo. Se fosse, o dinheiro que um sócio recebeu diminuiria a
  * parte dos dois. Ela sai só do saldo de quem recebeu.
@@ -43,8 +45,6 @@ export type SaldoSocio = {
   parte: number;
   retirado: number;
   saldoMes: number;
-  /** Todas as partes até este mês, menos todas as retiradas. */
-  acumulado: number;
 };
 
 export type FechamentoEstufa = {
@@ -65,7 +65,6 @@ export type FechamentoProdutos = {
   custos: number;
   retirado: number;
   saldoMes: number;
-  acumulado: number;
   aConferir: number;
 };
 
@@ -108,26 +107,20 @@ type Mes = {
   retiradas: Record<Pessoa, number>;
 };
 
-const mesVazio = (): Mes => ({
-  entradas: 0,
-  custos: 0,
-  frete: 0,
-  retiradas: { manasses: 0, lucas: 0, livia: 0 },
-});
-
-function agruparPorMes(
+function somarMes(
   linhas: LinhaCaixa[],
   segmento: SegmentoFinanceiro,
   competencia: string,
-): Map<string, Mes> {
-  const meses = new Map<string, Mes>();
-  for (const l of linhas) {
-    if (l.segmento !== segmento) continue;
-    const chave = competenciaDe(l.data);
-    if (chave > competencia) continue;
+): Mes {
+  const mes: Mes = {
+    entradas: 0,
+    custos: 0,
+    frete: 0,
+    retiradas: { manasses: 0, lucas: 0, livia: 0 },
+  };
 
-    const mes = meses.get(chave) ?? mesVazio();
-    meses.set(chave, mes);
+  for (const l of linhas) {
+    if (l.segmento !== segmento || competenciaDe(l.data) !== competencia) continue;
     const valor = centavos(l.valor);
 
     if (l.tipo === "ENTRADA") {
@@ -142,7 +135,7 @@ function agruparPorMes(
     mes.custos += valor;
     if (l.categoriaSlug === SLUG_FRETE) mes.frete += valor;
   }
-  return meses;
+  return mes;
 }
 
 function montarEstufa(
@@ -150,17 +143,7 @@ function montarEstufa(
   competencia: string,
   aConferir: number,
 ): FechamentoEstufa {
-  const meses = agruparPorMes(linhas, "PEIXES_VIVOS", competencia);
-
-  let acumuladoManasses = 0;
-  let acumuladoLucas = 0;
-  for (const m of meses.values()) {
-    const d = dividirResultadoEstufa(m.entradas - m.custos);
-    acumuladoManasses += d.manasses - m.retiradas.manasses;
-    acumuladoLucas += d.lucas - m.retiradas.lucas;
-  }
-
-  const m = meses.get(competencia) ?? mesVazio();
+  const m = somarMes(linhas, "PEIXES_VIVOS", competencia);
   const resultado = m.entradas - m.custos;
   const d = dividirResultadoEstufa(resultado);
 
@@ -175,14 +158,12 @@ function montarEstufa(
       parte: reais(d.manasses),
       retirado: reais(m.retiradas.manasses),
       saldoMes: reais(d.manasses - m.retiradas.manasses),
-      acumulado: reais(acumuladoManasses),
     },
     lucas: {
       metade: reais(d.metadeLucas),
       parte: reais(d.lucas),
       retirado: reais(m.retiradas.lucas),
       saldoMes: reais(d.lucas - m.retiradas.lucas),
-      acumulado: reais(acumuladoLucas),
     },
   };
 }
@@ -192,14 +173,7 @@ function montarProdutos(
   competencia: string,
   aConferir: number,
 ): FechamentoProdutos {
-  const meses = agruparPorMes(linhas, "PRODUTOS", competencia);
-
-  let acumulado = 0;
-  for (const m of meses.values()) {
-    acumulado += m.entradas - m.custos - m.retiradas.livia;
-  }
-
-  const m = meses.get(competencia) ?? mesVazio();
+  const m = somarMes(linhas, "PRODUTOS", competencia);
   return {
     entradas: reais(m.entradas),
     frete: reais(m.frete),
@@ -207,7 +181,6 @@ function montarProdutos(
     custos: reais(m.custos),
     retirado: reais(m.retiradas.livia),
     saldoMes: reais(m.entradas - m.custos - m.retiradas.livia),
-    acumulado: reais(acumulado),
     aConferir,
   };
 }
