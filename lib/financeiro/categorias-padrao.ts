@@ -38,7 +38,10 @@ export const CATEGORIAS_PADRAO: CategoriaPadrao[] = [
   { slug: "equipamentos", nome: "Equipamentos e manutenção", tipo: "SAIDA" },
   { slug: "marketing", nome: "Marketing e anúncios", tipo: "SAIDA" },
   { slug: "impostos", nome: "Impostos e taxas", tipo: "SAIDA" },
-  { slug: "retirada-dono", nome: "Retirada do dono", tipo: "SAIDA" },
+  // O fechamento do mês procura as retiradas pelo slug (lib/financeiro/fechamento.ts).
+  { slug: "retirada-dono", nome: "Retirada do dono", tipo: "SAIDA", sistema: true },
+  { slug: "retirada-lucas", nome: "Retirada do Lucas", tipo: "SAIDA", sistema: true },
+  { slug: "retirada-livia", nome: "Retirada da Lívia", tipo: "SAIDA", sistema: true },
   { slug: "outras-saidas", nome: "Outras saídas", tipo: "SAIDA" },
 ];
 

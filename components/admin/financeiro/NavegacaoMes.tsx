@@ -8,13 +8,20 @@ import {
 } from "@/lib/financeiro/periodo";
 
 /** Setas de mês. Links de verdade (não botões) para o mês entrar no histórico. */
-export function NavegacaoMes({ competencia }: { competencia: string }) {
+export function NavegacaoMes({
+  competencia,
+  base = "/admin/financeiro",
+}: {
+  competencia: string;
+  /** Página onde as setas continuam (o caixa ou o dashboard). */
+  base?: string;
+}) {
   const hoje = competenciaAtual();
 
   return (
     <div className="flex items-center gap-1">
       <Link
-        href={`/admin/financeiro?mes=${competenciaAnterior(competencia)}`}
+        href={`${base}?mes=${competenciaAnterior(competencia)}`}
         className="p-1.5 rounded-md border border-gray-200 text-gray-500 hover:text-[#07366A] hover:border-gray-300"
         aria-label="Mês anterior"
       >
@@ -26,7 +33,7 @@ export function NavegacaoMes({ competencia }: { competencia: string }) {
       </span>
 
       <Link
-        href={`/admin/financeiro?mes=${competenciaSeguinte(competencia)}`}
+        href={`${base}?mes=${competenciaSeguinte(competencia)}`}
         className="p-1.5 rounded-md border border-gray-200 text-gray-500 hover:text-[#07366A] hover:border-gray-300"
         aria-label="Próximo mês"
       >
@@ -35,7 +42,7 @@ export function NavegacaoMes({ competencia }: { competencia: string }) {
 
       {competencia !== hoje && (
         <Link
-          href="/admin/financeiro"
+          href={base}
           className="ml-2 text-xs text-[#FF035C] hover:underline"
         >
           voltar para o mês atual

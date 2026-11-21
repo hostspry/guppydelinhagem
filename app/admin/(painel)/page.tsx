@@ -1,6 +1,10 @@
 import { auth } from "@/lib/auth";
 import { getDashboardStats } from "@/lib/queries/dashboard";
+import { fechamentoDoMes } from "@/lib/queries/fechamento";
+import { membroAtual } from "@/lib/permissoes-server";
+import { competenciaAtual, ehCompetencia } from "@/lib/financeiro/periodo";
 import { StatCard } from "@/components/admin/StatCard";
+import { FechamentoMes } from "@/components/admin/FechamentoMes";
 import {
   Bell,
   Clock,
@@ -21,11 +25,22 @@ const currencyBR = new Intl.NumberFormat("pt-BR", {
 export default async function AdminDashboard({
   searchParams,
 }: {
-  searchParams: Promise<{ semPermissao?: string }>;
+  searchParams: Promise<{ semPermissao?: string; mes?: string }>;
 }) {
   const session = await auth();
-  const stats = await getDashboardStats();
-  const { semPermissao } = await searchParams;
+  const { semPermissao, mes } = await searchParams;
+  const competencia = mes && ehCompetencia(mes) ? mes : competenciaAtual();
+
+  const membro = await membroAtual().catch(() => null);
+  const veCaixa = membro?.permissoes.includes("financeiro.gerenciar") ?? false;
+  // A receita somada mistura peixes e produtos: quem só vê um lado descobriria o
+  // outro pela diferença.
+  const veReceitaTotal = veCaixa && membro?.segmentosFinanceiros === null;
+
+  const [stats, fechamento] = await Promise.all([
+    getDashboardStats(),
+    veCaixa ? fechamentoDoMes(competencia) : null,
+  ]);
 
   return (
     <div>
@@ -44,6 +59,8 @@ export default async function AdminDashboard({
         </div>
       )}
 
+      {fechamento && <FechamentoMes fechamento={fechamento} />}
+
       {/* Grid de stats: 2 cols mobile, 3 cols desktop */}
       <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-6">
         <StatCard
@@ -58,12 +75,14 @@ export default async function AdminDashboard({
           value={stats.pendingOrders}
           description="Aguardando ação"
         />
-        <StatCard
-          icon={DollarSign}
-          label="Receita do mês"
-          value={currencyBR.format(stats.monthRevenue)}
-          description={`${stats.monthOrders} vendas`}
-        />
+        {veReceitaTotal && (
+          <StatCard
+            icon={DollarSign}
+            label="Receita do mês"
+            value={currencyBR.format(stats.monthRevenue)}
+            description={`${stats.monthOrders} vendas`}
+          />
+        )}
         <StatCard
           icon={ShoppingBag}
           label="Pedidos do mês"

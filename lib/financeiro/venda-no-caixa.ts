@@ -27,9 +27,10 @@ function chaveDoPagamento(pagamentoId: string | null, orderId: string): string {
  * Reparte o total de uma venda entre as unidades de negócio.
  *
  * Um pedido pode misturar peixe e produto seco (o carrinho permite). Jogar tudo
- * num lado só mentiria no resultado das duas operações, então repartimos pelo
- * valor dos itens e rateamos o frete na mesma proporção. A sobra de centavo do
- * arredondamento fica com o maior segmento, para a soma bater com order.total.
+ * num lado só mentiria no resultado das duas operações, então repartimos os
+ * itens pelo valor. O frete do pedido misto fica INTEIRO na estufa, porque é ela
+ * que despacha a caixa com o peixe. A sobra de centavo também fica na estufa,
+ * para a soma bater com order.total.
  *
  * Item sem produto no catálogo (venda avulsa, produto excluído) conta como
  * peixe: é o que a loja vendeu a vida toda, e é o palpite que erra menos.
@@ -43,6 +44,7 @@ function repartirPorSegmento(
     product: { tipo: string } | null;
   }[],
   total: number,
+  frete: number,
 ): Map<SegmentoFinanceiro, number> {
   const porSegmento = new Map<SegmentoFinanceiro, number>();
   let soma = 0;
@@ -71,20 +73,16 @@ function repartirPorSegmento(
     return new Map([[unico, total]]);
   }
 
-  // Rateio: cada lado leva sua fatia do total (que já inclui frete e desconto).
-  const entradas = [...porSegmento.entries()].sort((a, b) => b[1] - a[1]);
-  const resultado = new Map<SegmentoFinanceiro, number>();
-  let distribuido = 0;
-  entradas.forEach(([seg, valor], i) => {
-    if (i === entradas.length - 1) {
-      resultado.set(seg, Math.round((total - distribuido) * 100) / 100);
-      return;
-    }
-    const fatia = soma > 0 ? Math.round((total * valor) / soma * 100) / 100 : 0;
-    resultado.set(seg, fatia);
-    distribuido += fatia;
-  });
-  return resultado;
+  // Pedido misto: produtos levam só a fatia dos itens (já com o desconto). O
+  // restante, que inclui o frete inteiro, fica na estufa.
+  const semFrete = Math.max(0, total - frete);
+  const valorProdutos = porSegmento.get("PRODUTOS") ?? 0;
+  const produtos =
+    soma > 0 ? Math.round(((semFrete * valorProdutos) / soma) * 100) / 100 : 0;
+  return new Map<SegmentoFinanceiro, number>([
+    ["PEIXES_VIVOS", Math.round((total - produtos) * 100) / 100],
+    ["PRODUTOS", produtos],
+  ]);
 }
 
 /** Tipos de produto que são carga viva — a estufa. */
@@ -112,6 +110,7 @@ export async function registrarSugestaoDeVenda(
       id: true,
       numero: true,
       total: true,
+      frete: true,
       cliente: { select: { nome: true } },
       items: {
         select: {
@@ -138,7 +137,7 @@ export async function registrarSugestaoDeVenda(
   const chave = chaveDoPagamento(order.pagamentos[0]?.id ?? null, order.id);
   const categoriaId = await idCategoria(tx, SLUG_VENDAS_SITE);
 
-  const fatias = repartirPorSegmento(order.items, total);
+  const fatias = repartirPorSegmento(order.items, total, Number(order.frete));
   const misto = fatias.size > 1;
   const nome = order.cliente?.nome ? ` — ${order.cliente.nome}` : "";
 
