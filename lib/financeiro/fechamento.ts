@@ -7,7 +7,9 @@ import { competenciaDe } from "./periodo";
  * Estufa: o resultado do mês (entradas menos custos) vai para o Manassés até
  * R$ 6.000. O que passar disso é dividido meio a meio com o Lucas.
  *
- * Produtos: tudo é da Lívia, descontados os custos dessa parte.
+ * Produtos: tudo é da Lívia, descontados os custos dessa parte. A venda paga já
+ * conta para ela sem esperar a conferência do caixa, e nunca entra na divisão
+ * da estufa.
  *
  * Cada mês fecha sozinho: saldo, retirada e piso de R$ 6.000 não passam para o
  * mês seguinte. O que o Lucas recebeu em outubro não mexe na conta de novembro.
@@ -65,7 +67,6 @@ export type FechamentoProdutos = {
   custos: number;
   retirado: number;
   saldoMes: number;
-  aConferir: number;
 };
 
 export type Fechamento = {
@@ -171,7 +172,6 @@ function montarEstufa(
 function montarProdutos(
   linhas: LinhaCaixa[],
   competencia: string,
-  aConferir: number,
 ): FechamentoProdutos {
   const m = somarMes(linhas, "PRODUTOS", competencia);
   return {
@@ -181,7 +181,6 @@ function montarProdutos(
     custos: reais(m.custos),
     retirado: reais(m.retiradas.livia),
     saldoMes: reais(m.entradas - m.custos - m.retiradas.livia),
-    aConferir,
   };
 }
 
@@ -192,17 +191,17 @@ function montarProdutos(
 export function montarFechamento(args: {
   competencia: string;
   linhas: LinhaCaixa[];
-  aConferir: Partial<Record<SegmentoFinanceiro, number>>;
+  aConferirEstufa: number;
   segmentos: readonly SegmentoFinanceiro[];
 }): Fechamento {
-  const { competencia, linhas, aConferir, segmentos } = args;
+  const { competencia, linhas, aConferirEstufa, segmentos } = args;
   return {
     competencia,
     estufa: segmentos.includes("PEIXES_VIVOS")
-      ? montarEstufa(linhas, competencia, aConferir.PEIXES_VIVOS ?? 0)
+      ? montarEstufa(linhas, competencia, aConferirEstufa)
       : null,
     produtos: segmentos.includes("PRODUTOS")
-      ? montarProdutos(linhas, competencia, aConferir.PRODUTOS ?? 0)
+      ? montarProdutos(linhas, competencia)
       : null,
   };
 }

@@ -78,9 +78,9 @@ export default async function AdminDashboard({
         {veReceitaTotal && (
           <StatCard
             icon={DollarSign}
-            label="Receita do mês"
+            label="Receita total do mês"
             value={currencyBR.format(stats.monthRevenue)}
-            description={`${stats.monthOrders} vendas`}
+            description={`${stats.monthOrders} vendas, peixes e produtos somados`}
           />
         )}
         <StatCard

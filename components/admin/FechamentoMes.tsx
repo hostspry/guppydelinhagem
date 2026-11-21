@@ -138,9 +138,6 @@ export function FechamentoMes({ fechamento }: { fechamento: Fechamento }) {
                   { rotulo: "Vendas de produtos", valor: produtos.entradas },
                   { rotulo: "Custos", valor: produtos.custos },
                   { rotulo: "Retirado no mês", valor: produtos.retirado },
-                  ...(produtos.aConferir > 0
-                    ? [{ rotulo: "Vendas a conferir", valor: produtos.aConferir }]
-                    : []),
                 ]}
               />
             </div>
@@ -149,8 +146,9 @@ export function FechamentoMes({ fechamento }: { fechamento: Fechamento }) {
       </div>
 
       <p className="text-xs text-gray-400 mt-2">
-        Cada mês fecha sozinho e só conta o que está confirmado no caixa. Retirada
-        não é custo: ela sai do saldo de quem recebeu.
+        Cada mês fecha sozinho. Na estufa só conta o que está confirmado no caixa.
+        Venda de produto paga vai direto para a Lívia e não entra na divisão da
+        estufa. Retirada não é custo: ela sai do saldo de quem recebeu.
       </p>
     </section>
   );

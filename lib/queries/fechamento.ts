@@ -18,7 +18,15 @@ export async function fechamentoDoMes(competencia: string): Promise<Fechamento> 
 
   const [linhas, pendentes] = await Promise.all([
     prisma.lancamento.findMany({
-      where: { ...escopo, status: "CONFIRMADO", data: { gte: inicio, lt: fim } },
+      where: {
+        ...escopo,
+        data: { gte: inicio, lt: fim },
+        OR: [
+          { status: "CONFIRMADO" },
+          // Venda de produto paga já é da Lívia, mesmo antes da conferência.
+          { segmento: "PRODUTOS", status: "PENDENTE", tipo: "ENTRADA", origem: "PEDIDO" },
+        ],
+      },
       select: {
         segmento: true,
         tipo: true,
@@ -50,8 +58,8 @@ export async function fechamentoDoMes(competencia: string): Promise<Fechamento> 
       data: l.data,
       categoriaSlug: l.categoria?.slug ?? null,
     })),
-    aConferir: Object.fromEntries(
-      pendentes.map((p) => [p.segmento, Number(p._sum.valor ?? 0)]),
+    aConferirEstufa: Number(
+      pendentes.find((p) => p.segmento === "PEIXES_VIVOS")?._sum.valor ?? 0,
     ),
   });
 }
