@@ -174,6 +174,10 @@ export default function CardPaymentBrick({
               }
             },
             onError: (err: { message?: string }) => {
+              // Trocar de aba com o formulário carregando remove a tela dele, e
+              // os campos seguros reclamam ("Secure Fields failed"). Esse Brick
+              // já saiu: nem o cliente nem o relatório devem ver o erro dele.
+              if (cancelado) return;
               const msg = err?.message ?? "Erro no formulário de cartão.";
               relatar("FORMULARIO", msg);
               onErroRef.current?.(msg);
