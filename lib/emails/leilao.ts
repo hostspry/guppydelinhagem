@@ -4,6 +4,7 @@ import { enviarEmail } from "@/lib/email";
 import { getConfiguracaoLoja } from "@/lib/queries/config";
 import { linkDoArremate } from "@/lib/queries/leiloes";
 import { dataLeilaoBR, situacaoDoArremate } from "@/lib/leiloes/situacao";
+import { linhaDaCobranca } from "@/lib/leiloes/mensagem";
 import type { EnderecoEntrega } from "@/lib/validations/pedido";
 import { montarEmail } from "./render";
 import { botao, listaLotes, moeda } from "./layout";
@@ -68,7 +69,10 @@ export async function emailCobrancaLeilao(
         orderBy: [{ ordem: "asc" }, { criadoEm: "asc" }],
         select: { numero: true, valor: true, qtdPeixes: true },
       },
-      items: { orderBy: { id: "asc" }, select: { nomeProduto: true, precoUnitario: true } },
+      items: {
+        orderBy: { id: "asc" },
+        select: { nomeProduto: true, precoUnitario: true, quantidade: true, productId: true },
+      },
     },
   });
   if (!o || !o.leilao) return { ok: false, motivo: "Cobrança de leilão não encontrada." };
@@ -129,7 +133,7 @@ export async function emailCobrancaLeilao(
       nome: primeiroNome,
       leilao: o.leilao.nome,
       data_leilao: dataLeilaoBR(o.leilao.dataLeilao),
-      lotes: listaLotes(o.items.map((i) => ({ nome: i.nomeProduto, valor: Number(i.precoUnitario) }))),
+      lotes: listaLotes(o.items.map(linhaDaCobranca)),
       subtotal: moeda(subtotal),
       menor_lance: moeda(menor),
       frete: textoFrete,

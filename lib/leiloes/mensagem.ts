@@ -19,10 +19,27 @@ export function primeiroNome(nome: string): string | null {
   return p.charAt(0).toLocaleUpperCase("pt-BR") + p.slice(1).toLocaleLowerCase("pt-BR");
 }
 
+/**
+ * Linha da cobrança como o cliente vê. Lote tem sempre quantidade 1; produto
+ * somado à cobrança (ex.: 6 criadeiras) mostra a quantidade e o valor da linha.
+ */
+export function linhaDaCobranca(i: {
+  nomeProduto: string;
+  precoUnitario: unknown;
+  quantidade: number;
+  productId: string | null;
+}): { nome: string; valor: number; produto: boolean } {
+  return {
+    nome: i.quantidade > 1 ? `${i.quantidade}x ${i.nomeProduto}` : i.nomeProduto,
+    valor: Math.round(Number(i.precoUnitario) * i.quantidade * 100) / 100,
+    produto: i.productId != null,
+  };
+}
+
 export function mensagemCobrancaLeilao(c: {
   clienteNome: string;
   dataLeilao: string; // "09/10/2026"
-  itens: { nome: string; valor: number }[];
+  itens: { nome: string; valor: number; produto?: boolean }[];
   subtotal: number;
   link: string | null;
 }): string {
@@ -45,10 +62,11 @@ export function mensagemCobrancaLeilao(c: {
       "Qualquer dúvida, é só me chamar aqui.",
     ].join("\n");
   }
+  const nLotes = c.itens.filter((i) => !i.produto).length;
   const titulo =
-    c.itens.length === 1
+    nLotes === 1
       ? `Parabéns pelo lote arrematado no leilão de ${c.dataLeilao}:`
-      : `Parabéns pelos ${c.itens.length} lotes arrematados no leilão de ${c.dataLeilao}:`;
+      : `Parabéns pelos ${nLotes} lotes arrematados no leilão de ${c.dataLeilao}:`;
   const lotes = c.itens.map((i) => `• ${i.nome}: ${moeda(i.valor)}`).join("\n");
   return [
     nome ? `Oi, ${nome}! Tudo bem?` : "Oi! Tudo bem?",

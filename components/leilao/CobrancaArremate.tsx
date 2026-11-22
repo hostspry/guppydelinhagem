@@ -26,8 +26,10 @@ export default function CobrancaArremate({
   const primeiroNome = nomeDeSaudacao(a.pagador.nome);
   const aberta = arremateAberto(a.situacao);
   const premio = ehPremio(a);
-  // Linha negativa é abatimento (adiantamento pago por fora), não lote.
-  const nLotes = a.lotes.filter((l) => l.valor >= 0).length;
+  // Linha negativa é abatimento (adiantamento pago por fora), não lote. Produto
+  // somado à cobrança (ex.: criadeiras) também não é lote.
+  const nLotes = a.lotes.filter((l) => l.valor >= 0 && !l.produto).length;
+  const temProduto = a.lotes.some((l) => l.produto);
 
   return (
     <div className="bg-white border border-gray-200 rounded-xl p-5 sm:p-7 shadow-sm space-y-6">
@@ -50,7 +52,13 @@ export default function CobrancaArremate({
 
       <div>
         <h2 className="text-sm font-semibold text-[#07366A] mb-2">
-          {premio ? "Seu prêmio" : nLotes === 1 ? "Seu lote" : `Seus ${nLotes} lotes`}
+          {premio
+            ? "Seu prêmio"
+            : temProduto
+              ? "Seu pedido"
+              : nLotes === 1
+                ? "Seu lote"
+                : `Seus ${nLotes} lotes`}
         </h2>
         <ul className="border border-gray-200 rounded-lg divide-y divide-gray-100">
           {a.lotes.map((l, i) => (

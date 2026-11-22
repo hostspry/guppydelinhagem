@@ -8,6 +8,7 @@ import {
   situacaoDoArremate,
   type SituacaoArremate,
 } from "@/lib/leiloes/situacao";
+import { linhaDaCobranca } from "@/lib/leiloes/mensagem";
 
 /**
  * Leilões — leitura.
@@ -111,7 +112,7 @@ export async function getLeilaoAdmin(id: string) {
           },
           items: {
             orderBy: { id: "asc" },
-            select: { nomeProduto: true, precoUnitario: true },
+            select: { nomeProduto: true, precoUnitario: true, quantidade: true, productId: true },
           },
           pagamentos: {
             orderBy: { criadoEm: "desc" },
@@ -166,10 +167,7 @@ export async function getLeilaoAdmin(id: string) {
       modalidadeFrete: p.modalidadeFrete,
       destino: end.cidade ? `${end.cidade}/${end.uf ?? ""}` : null,
       cliente: p.cliente,
-      itens: p.items.map((i) => ({
-        nome: i.nomeProduto,
-        valor: Number(i.precoUnitario),
-      })),
+      itens: p.items.map(linhaDaCobranca),
       ultimoPagamento: ult ? { ...ult, valor: Number(ult.valor) } : null,
       // Nota gravada por registrarPagamentoForaLeilao: "Pago por fora (PicPay)…".
       pagoForaCom: /Pago por fora \(([^)]+)\)/.exec(p.observacoes ?? "")?.[1] ?? null,
@@ -237,7 +235,7 @@ export async function getArrematePorToken(token: string) {
       leilao: { select: { nome: true, dataLeilao: true } },
       items: {
         orderBy: { id: "asc" },
-        select: { nomeProduto: true, precoUnitario: true },
+        select: { nomeProduto: true, precoUnitario: true, quantidade: true, productId: true },
       },
       lotesLeilao: { select: { qtdPeixes: true } },
       cliente: {
@@ -310,10 +308,7 @@ export async function getArrematePorToken(token: string) {
       return u?.status === "RECUSADO" ? u.mensagem : null;
     })(),
     leilao: o.leilao,
-    lotes: o.items.map((i) => ({
-      nome: i.nomeProduto,
-      valor: Number(i.precoUnitario),
-    })),
+    lotes: o.items.map(linhaDaCobranca),
     qtdPeixes: o.lotesLeilao.reduce((a, l) => a + l.qtdPeixes, 0),
     subtotal: Number(o.subtotal),
     frete: Number(o.frete),
