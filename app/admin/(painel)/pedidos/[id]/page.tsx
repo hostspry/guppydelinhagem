@@ -215,6 +215,9 @@ export default async function PedidoDetalhePage({ params }: Props) {
               selfTracking={pedido.selfTracking}
               etiquetaUrl={pedido.etiquetaUrl}
               rastreioStatus={pedido.rastreioStatus}
+              emailEnvioEm={pedido.emailEnvioEm?.toISOString() ?? null}
+              emailEnvioPara={pedido.emailEnvioPara}
+              emailEnvioErro={pedido.emailEnvioErro}
               clienteNome={e.nome}
               clienteTelefone={e.telefone}
               daShopee={pedido.origem === "SHOPEE"}

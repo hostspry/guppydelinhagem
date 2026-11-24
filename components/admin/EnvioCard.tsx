@@ -23,6 +23,7 @@ import {
 import type { OrderStatus, Transportadora } from "@/lib/generated/prisma/client";
 import { EtiquetaBotao } from "./EtiquetaBotao";
 import { reenviarRastreio } from "@/actions/etiqueta";
+import { dataHoraBR } from "@/lib/sorteios/formato";
 
 type Props = {
   id: string;
@@ -34,6 +35,11 @@ type Props = {
   etiquetaUrl: string | null;
   /** Último status do envio no Melhor Envio (posted/delivered/canceled/…). */
   rastreioStatus: string | null;
+  /** Último e-mail de postagem aceito pelo servidor (ISO) e para quem foi. */
+  emailEnvioEm?: string | null;
+  emailEnvioPara?: string | null;
+  /** Por que a última tentativa não saiu. Nulo quando saiu. */
+  emailEnvioErro?: string | null;
   clienteNome: string;
   clienteTelefone: string | null;
   /** Pedido de marketplace: quem despacha, etiqueta e rastreia é ele. */
@@ -54,6 +60,9 @@ export function EnvioCard({
   selfTracking,
   etiquetaUrl,
   rastreioStatus,
+  emailEnvioEm = null,
+  emailEnvioPara = null,
+  emailEnvioErro = null,
   clienteNome,
   clienteTelefone,
   daShopee = false,
@@ -172,6 +181,38 @@ export function EnvioCard({
                 </button>
               )}
             </div>
+          </div>
+
+          {/* Registro do e-mail de postagem: responde "o cliente recebeu o
+              rastreio?" sem depender do log do servidor, que some no deploy. */}
+          <div className="space-y-1.5 text-xs leading-snug">
+            {emailEnvioEm ? (
+              <p className="flex items-start gap-1.5 text-gray-600">
+                <Mail className="w-3.5 h-3.5 mt-px shrink-0 text-green-600" aria-hidden="true" />
+                <span>
+                  E-mail de postagem saiu em {dataHoraBR(emailEnvioEm).replace(",", " às")}
+                  {emailEnvioPara && (
+                    <>
+                      {" "}para <span className="text-[#07366A] break-all">{emailEnvioPara}</span>
+                    </>
+                  )}
+                  .
+                </span>
+              </p>
+            ) : (
+              !emailEnvioErro && (
+                <p className="flex items-start gap-1.5 text-gray-400">
+                  <Mail className="w-3.5 h-3.5 mt-px shrink-0" aria-hidden="true" />
+                  Sem registro do e-mail de postagem.
+                </p>
+              )
+            )}
+            {emailEnvioErro && (
+              <p className="rounded-md bg-amber-50 border border-amber-200 p-2 text-amber-900">
+                {emailEnvioEm ? "A última tentativa de e-mail não saiu: " : "O e-mail de postagem não saiu: "}
+                {emailEnvioErro}
+              </p>
+            )}
           </div>
 
           <div className="flex flex-col gap-2 pt-1">

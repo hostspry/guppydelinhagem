@@ -142,6 +142,25 @@ export async function contaAtiva(): Promise<ContaSmtp | null> {
 }
 
 /**
+ * Envia pela conta cadastrada e diz o motivo quando não sai. Para quem precisa
+ * guardar o resultado (o e-mail de postagem fica registrado no pedido).
+ */
+export async function enviarEmailDetalhado(msg: {
+  para: string;
+  assunto: string;
+  html: string;
+  texto?: string;
+}): Promise<ResultadoEnvio> {
+  const conta = await contaAtiva();
+  if (!conta) {
+    return { ok: false, erro: "Nenhuma conta de e-mail ativa em Configurações → E-mail." };
+  }
+  const r = await enviarComConta(conta, msg);
+  if (!r.ok) console.error("[email] falha ao enviar:", r.erro);
+  return r;
+}
+
+/**
  * Envia pela conta cadastrada. `false` quando não há conta ativa ou o envio
  * falhou — quem chama decide se isso importa, e nunca quebra por causa disso.
  */
@@ -151,9 +170,5 @@ export async function enviarEmail(msg: {
   html: string;
   texto?: string;
 }): Promise<boolean> {
-  const conta = await contaAtiva();
-  if (!conta) return false;
-  const r = await enviarComConta(conta, msg);
-  if (!r.ok) console.error("[email] falha ao enviar:", r.erro);
-  return r.ok;
+  return (await enviarEmailDetalhado(msg)).ok;
 }

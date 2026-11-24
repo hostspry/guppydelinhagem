@@ -1,6 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
-import { enviarEmail } from "@/lib/email";
+import { enviarEmail, enviarEmailDetalhado } from "@/lib/email";
 import {
   buildTrackingUrl,
   codigoRastreavel,
@@ -165,7 +165,11 @@ export async function emailPedidoPago(orderId: string): Promise<boolean> {
  */
 export async function emailPedidoEnviado(orderId: string): Promise<boolean> {
   const d = await carregar(orderId);
-  if (!d?.email || d.ehCobranca) return false;
+  if (!d || d.ehCobranca) return false;
+  if (!d.email) {
+    await registrarEmailEnvio(orderId, null, "O cliente não tem e-mail no cadastro.");
+    return false;
+  }
 
   // O ME…BR na frente, que é o que o Melhor Rastreio entende melhor. A guarda
   // pula o id interno do Melhor Envio, que já foi gravado aqui por engano: sem
@@ -195,9 +199,44 @@ export async function emailPedidoEnviado(orderId: string): Promise<boolean> {
     },
     codigo ? `Código de rastreio: ${codigo}` : `Pedido ${d.numero} postado.`,
   );
-  if (!email) return false;
+  if (!email) {
+    await registrarEmailEnvio(
+      orderId,
+      d.email,
+      "A mensagem de pedido enviado está desligada em Configurações → Mensagens.",
+    );
+    return false;
+  }
 
   // O código no assunto ajuda quem procura o e-mail depois.
   const assunto = codigo ? `${email.assunto} (rastreio ${codigo})` : email.assunto;
-  return enviarEmail({ para: d.email, assunto, html: email.html });
+  const r = await enviarEmailDetalhado({ para: d.email, assunto, html: email.html });
+  await registrarEmailEnvio(orderId, d.email, r.ok ? null : r.erro);
+  return r.ok;
+}
+
+/**
+ * Guarda no pedido o resultado do e-mail de postagem, para a pergunta "o
+ * cliente recebeu o rastreio?" ter resposta no painel. O log do servidor some a
+ * cada deploy, e foi assim que os envios Jadlog de 23/11 ficaram sem prova.
+ *
+ * Sucesso grava quando e para quem, e limpa o erro. Falha grava só o motivo e
+ * mantém o último sucesso: um reenvio que falha não apaga o e-mail que já saiu.
+ * Nunca lança: o envio já aconteceu (ou não), o registro é complemento.
+ */
+async function registrarEmailEnvio(
+  orderId: string,
+  para: string | null,
+  erro: string | null,
+): Promise<void> {
+  try {
+    await prisma.order.update({
+      where: { id: orderId },
+      data: erro
+        ? { emailEnvioErro: erro.slice(0, 300) }
+        : { emailEnvioEm: new Date(), emailEnvioPara: para, emailEnvioErro: null },
+    });
+  } catch (e) {
+    console.error("[email-pedido] registrar envio", orderId, e);
+  }
 }

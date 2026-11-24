@@ -851,6 +851,8 @@ export async function reenviarRastreio(orderId: string): Promise<ReenvioResult> 
   }
 
   const enviou = await emailPedidoEnviado(orderId);
+  // O card de envio mostra o registro do e-mail (saiu ou o motivo da falha).
+  revalidatePath(`/admin/pedidos/${orderId}`);
   if (!enviou) {
     return {
       success: false,

@@ -510,6 +510,15 @@ model Order {
   rastreioStatus   String? // último status conhecido no ME (posted/delivered/…)
   enviadoEm        DateTime? // quando virou ENVIADO (etiqueta gerada ou registro manual)
 
+  /// E-mail "encomenda postada" para o cliente (lib/emails/pedido.ts).
+  /// emailEnvioEm/Para = a última vez que o servidor de e-mail ACEITOU a
+  /// mensagem, e para qual endereço. emailEnvioErro = por que a última tentativa
+  /// não saiu; volta a nulo quando uma sai. Os três nulos = nunca tentou, ou
+  /// pedido postado antes de 24/11/2026, quando o registro começou.
+  emailEnvioEm   DateTime?
+  emailEnvioPara String?
+  emailEnvioErro String?
+
   // Cupom aplicado (opcional). cupomCodigo é snapshot (sobrevive à exclusão do cupom).
   cupomId     String?
   cupom       CupomDesconto? @relation(fields: [cupomId], references: [id], onDelete: SetNull)
