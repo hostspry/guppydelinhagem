@@ -1,7 +1,12 @@
+import type { ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import { Receipt, ShoppingBag, UserRound, Wallet } from "lucide-react";
 import { NavegacaoMes } from "@/components/admin/financeiro/NavegacaoMes";
-import { PISO_MANASSES, type Fechamento } from "@/lib/financeiro/fechamento";
+import {
+  PISO_MANASSES,
+  type Fechamento,
+  type RetiradaPrivada,
+} from "@/lib/financeiro/fechamento";
 import { moedaBR } from "@/lib/financeiro/periodo";
 
 type Linha = { rotulo: string; valor: number; destaque?: boolean };
@@ -18,11 +23,13 @@ function CardFechamento({
   titulo,
   valor,
   linhas,
+  detalhe,
 }: {
   icon: LucideIcon;
   titulo: string;
   valor: number;
   linhas: Linha[];
+  detalhe?: ReactNode;
 }) {
   return (
     <div className="bg-white border border-gray-200 rounded-lg p-4 min-w-0">
@@ -59,7 +66,39 @@ function CardFechamento({
           </div>
         ))}
       </dl>
+      {detalhe}
     </div>
+  );
+}
+
+/** Só é renderizado para o dono: para os demais a lista chega vazia. */
+function PixComLucas({ itens }: { itens: RetiradaPrivada[] }) {
+  const total = itens.reduce((soma, r) => soma + r.valor, 0);
+  return (
+    <details className="mt-3 rounded-md bg-amber-50 px-2.5 py-2 text-xs text-amber-900">
+      <summary className="cursor-pointer font-medium">
+        {itens.length === 1 ? "1 Pix ficou" : `${itens.length} Pix ficaram`} com
+        ele: {moeda(total)} (só você vê)
+      </summary>
+      <ul className="mt-2 space-y-1">
+        {itens.map((r) => (
+          <li
+            key={`${r.descricao}-${r.data.toISOString()}`}
+            className="flex items-baseline justify-between gap-2"
+          >
+            <span className="min-w-0">
+              {r.data.toLocaleDateString("pt-BR", {
+                timeZone: "UTC",
+                day: "2-digit",
+                month: "2-digit",
+              })}{" "}
+              {r.descricao}
+            </span>
+            <span className="tabular-nums whitespace-nowrap">{moeda(r.valor)}</span>
+          </li>
+        ))}
+      </ul>
+    </details>
   );
 }
 
@@ -109,6 +148,11 @@ export function FechamentoMes({ fechamento }: { fechamento: Fechamento }) {
                   { rotulo: "50% do restante", valor: estufa.lucas.metade },
                   { rotulo: "Retirado no mês", valor: estufa.lucas.retirado },
                 ]}
+                detalhe={
+                  estufa.retiradasPrivadasLucas.length > 0 ? (
+                    <PixComLucas itens={estufa.retiradasPrivadasLucas} />
+                  ) : undefined
+                }
               />
             </div>
           </div>

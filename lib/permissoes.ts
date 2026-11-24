@@ -224,6 +224,14 @@ export type MembroAtual = {
 
 type SegmentoVisivel = SegmentoFinanceiro[] | null;
 
+/**
+ * É o dono da loja? Exige o papel e o cargo protegido juntos, para que um ajuste
+ * em só um dos dois não abra o que é exclusivo dele.
+ */
+export function ehDono(membro: Pick<MembroAtual, "role" | "cargo">): boolean {
+  return membro.role === "SUPER_ADMIN" && membro.cargo?.protegido === true;
+}
+
 // ─────────────────────────────────────────────
 // Segmentos do financeiro
 // ─────────────────────────────────────────────

@@ -1287,6 +1287,24 @@ model Lancamento {
   @@index([status, vencimento])
 }
 
+/// Pix de venda que caiu na conta do Lucas e não foi repassado. Conta como
+/// retirada dele, mas por enquanto só o dono pode ver.
+///
+/// Fica fora de `Lancamento` de propósito: o Lucas tem acesso ao caixa, então
+/// qualquer linha ali apareceria nas listas e relatórios dele. A única leitura
+/// desta tabela é `fechamentoDoMes`, e só quando quem está logado é o dono.
+model RetiradaPrivadaLucas {
+  id           String   @id @default(cuid())
+  descricao    String
+  valor        Decimal  @db.Decimal(10, 2)
+  data         DateTime
+  /// Entrada do caixa que originou a retirada. Único para não contar duas vezes.
+  lancamentoId String   @unique
+  criadoEm     DateTime @default(now())
+
+  @@index([data])
+}
+
 // Despesa que se repete todo mês (energia, internet, ração). O cron gera a conta
 // do mês uma única vez — `ultimaCompetencia` ("2026-08") é a trava.
 model RecorrenciaFinanceira {

@@ -39,6 +39,13 @@ export type LinhaCaixa = {
   categoriaSlug: string | null;
 };
 
+/** Pix que ficou com o Lucas. Só chega aqui quando quem vê a tela é o dono. */
+export type RetiradaPrivada = {
+  descricao: string;
+  valor: number;
+  data: Date;
+};
+
 export type SaldoSocio = {
   /** Metade do que passou de R$ 6.000 no mês. */
   metade: number;
@@ -56,6 +63,8 @@ export type FechamentoEstufa = {
   primeiros: number;
   manasses: SaldoSocio;
   lucas: SaldoSocio;
+  /** Já somadas em `lucas.retirado`. Vazio para quem não é o dono. */
+  retiradasPrivadasLucas: RetiradaPrivada[];
 };
 
 export type FechamentoProdutos = {
@@ -140,10 +149,17 @@ function somarMes(
 function montarEstufa(
   linhas: LinhaCaixa[],
   competencia: string,
+  retiradasPrivadas: RetiradaPrivada[],
 ): FechamentoEstufa {
   const m = somarMes(linhas, "PEIXES_VIVOS", competencia);
   const resultado = m.entradas - m.custos;
   const d = dividirResultadoEstufa(resultado);
+  const privadasDoMes = retiradasPrivadas.filter(
+    (r) => competenciaDe(r.data) === competencia,
+  );
+  const retiradoLucas =
+    m.retiradas.lucas +
+    privadasDoMes.reduce((soma, r) => soma + centavos(r.valor), 0);
 
   return {
     entradas: reais(m.entradas),
@@ -159,9 +175,10 @@ function montarEstufa(
     lucas: {
       metade: reais(d.metadeLucas),
       parte: reais(d.lucas),
-      retirado: reais(m.retiradas.lucas),
-      saldoMes: reais(d.lucas - m.retiradas.lucas),
+      retirado: reais(retiradoLucas),
+      saldoMes: reais(d.lucas - retiradoLucas),
     },
+    retiradasPrivadasLucas: privadasDoMes,
   };
 }
 
@@ -188,12 +205,14 @@ export function montarFechamento(args: {
   competencia: string;
   linhas: LinhaCaixa[];
   segmentos: readonly SegmentoFinanceiro[];
+  /** Só o dono recebe. Para os demais fica vazio e o saldo sai sem elas. */
+  retiradasPrivadasLucas?: RetiradaPrivada[];
 }): Fechamento {
-  const { competencia, linhas, segmentos } = args;
+  const { competencia, linhas, segmentos, retiradasPrivadasLucas = [] } = args;
   return {
     competencia,
     estufa: segmentos.includes("PEIXES_VIVOS")
-      ? montarEstufa(linhas, competencia)
+      ? montarEstufa(linhas, competencia, retiradasPrivadasLucas)
       : null,
     produtos: segmentos.includes("PRODUTOS")
       ? montarProdutos(linhas, competencia)
