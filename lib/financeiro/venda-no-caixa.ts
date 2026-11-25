@@ -1,7 +1,7 @@
 import "server-only";
 import type { Prisma } from "@/lib/generated/prisma/client";
 import type { SegmentoFinanceiro } from "@/lib/generated/prisma/enums";
-import { SLUG_VENDAS_SITE } from "./categorias-padrao";
+import { SLUG_TAXA_PAGAMENTO, SLUG_VENDAS_SITE } from "./categorias-padrao";
 import { hojeNoCaixa } from "./periodo";
 
 /**
@@ -99,6 +99,19 @@ async function idCategoria(
   return c?.id ?? null;
 }
 
+/** A trava (pagamentoId, origem) já tem linha? */
+async function existeLinha(
+  tx: Prisma.TransactionClient,
+  pagamentoId: string,
+  origem: "PEDIDO" | "TAXA_PAGAMENTO",
+): Promise<boolean> {
+  const l = await tx.lancamento.findUnique({
+    where: { pagamentoId_origem: { pagamentoId, origem } },
+    select: { id: true },
+  });
+  return l != null;
+}
+
 /** Pedido virou PAGO → entrada confirmada no caixa. */
 export async function registrarVendaNoCaixa(
   tx: Prisma.TransactionClient,
@@ -149,41 +162,140 @@ export async function registrarVendaNoCaixa(
   const misto = fatias.size > 1;
   const nome = order.cliente?.nome ? ` — ${order.cliente.nome}` : "";
 
-  // create + catch do P2002 em vez de upsert: se a linha já existe, ela pode ter
-  // sido confirmada ou editada pelo dono, e não queremos sobrescrever isso.
+  // Confere antes de criar, em vez de upsert: se a linha já existe, ela pode ter
+  // sido editada pelo dono, e não queremos sobrescrever isso. Nem create + catch
+  // do P2002: no Postgres o erro derruba a transação inteira, e o resto dela
+  // (status do pedido, estoque) iria junto.
   for (const [segmento, valor] of fatias) {
     if (!(valor > 0)) continue;
-    try {
-      await tx.lancamento.create({
-        data: {
-          segmento,
-          tipo: "ENTRADA",
-          status: "CONFIRMADO",
-          origem: "PEDIDO",
-          descricao: misto
-            ? `Venda ${order.numero}${nome} (${ROTULO_SEGMENTO[segmento]})`
-            : `Venda ${order.numero}${nome}`,
-          valor,
-          data: hojeNoCaixa(),
-          categoriaId,
-          orderId: order.id,
-          // Venda dividida precisa de uma chave por fatia: a trava é
-          // (pagamentoId, origem), então duas linhas com a mesma chave se
-          // atropelariam. Venda de um lado só mantém a chave antiga.
-          pagamentoId: misto ? `${chave}#${segmento}` : chave,
-        },
-      });
-    } catch (e) {
-      const code = (e as { code?: string } | null)?.code;
-      if (code !== "P2002") throw e;
-    }
+    // Venda dividida precisa de uma chave por fatia: a trava é
+    // (pagamentoId, origem), então duas linhas com a mesma chave se
+    // atropelariam. Venda de um lado só mantém a chave antiga.
+    const pagamentoId = misto ? `${chave}#${segmento}` : chave;
+    if (await existeLinha(tx, pagamentoId, "PEDIDO")) continue;
+    await tx.lancamento.create({
+      data: {
+        segmento,
+        tipo: "ENTRADA",
+        status: "CONFIRMADO",
+        origem: "PEDIDO",
+        descricao: misto
+          ? `Venda ${order.numero}${nome} (${ROTULO_SEGMENTO[segmento]})`
+          : `Venda ${order.numero}${nome}`,
+        valor,
+        data: hojeNoCaixa(),
+        categoriaId,
+        orderId: order.id,
+        pagamentoId,
+      },
+    });
   }
+
+  // O líquido já chegou (webhook antes da confirmação): a taxa entra junto.
+  // Se não chegou, o próximo aviso do webhook lança.
+  if (pagamento) await registrarTaxaDoGateway(tx, pagamento.id);
 }
 
 const ROTULO_SEGMENTO: Record<SegmentoFinanceiro, string> = {
   PEIXES_VIVOS: "peixes",
   PRODUTOS: "produtos",
 };
+
+/**
+ * Setembro e outubro ficaram sem taxa e o dono não pediu para mexer (25/11/2026).
+ * Um aviso atrasado do gateway sobre venda dessa época não reabre o mês.
+ */
+const INICIO_TAXA_AUTOMATICA = new Date(Date.UTC(2026, 10, 1));
+
+const ROTULO_PROVIDER: Record<string, string> = {
+  MERCADO_PAGO: "Mercado Pago",
+  PAGBANK: "PagBank",
+  PICPAY: "PicPay",
+};
+
+/**
+ * Taxa do gateway de um pagamento aprovado.
+ *
+ * A venda entra no caixa pelo valor que o cliente pagou, mas o gateway fica com
+ * uma parte (no cartão de link, o acréscimo que o cliente pagou; no Pix, ~0,99%).
+ * Sem esta SAÍDA o resultado da estufa mostrava dinheiro que nunca caiu na conta.
+ *
+ * valor − valorLiquido, no mesmo caixa e no mesmo dia da venda, para cair no mês
+ * dela. Pedido misto: a taxa vai toda para a estufa, porque o acréscimo do
+ * cartão fica na fatia dos peixes.
+ *
+ * Idempotente pela trava (pagamentoId, TAXA_PAGAMENTO). Confere antes de criar
+ * em vez de pegar o P2002: um erro dentro da transação do Postgres derrubaria o
+ * resto dela, e o webhook chama isto a cada reenvio.
+ */
+export async function registrarTaxaDoGateway(
+  tx: Prisma.TransactionClient,
+  pagamentoId: string,
+): Promise<void> {
+  const pag = await tx.pagamento.findUnique({
+    where: { id: pagamentoId },
+    select: {
+      id: true,
+      orderId: true,
+      provider: true,
+      metodo: true,
+      parcelas: true,
+      status: true,
+      valor: true,
+      valorLiquido: true,
+      order: { select: { numero: true, origem: true } },
+    },
+  });
+  if (!pag || pag.status !== "PAGO" || pag.valorLiquido == null) return;
+  if (pag.order.origem === "DISTRIBUIDOR") return;
+
+  const pago = Number(pag.valor);
+  const liquido = Number(pag.valorLiquido);
+  const taxa = Math.round((pago - liquido) * 100) / 100;
+  if (!(taxa >= 0.01)) return;
+  // Diferença grande demais não é taxa: melhor não lançar e o dono conferir.
+  if (taxa > pago * 0.3) {
+    console.warn(`[caixa] taxa de ${taxa} no pagamento ${pag.id} não parece taxa; nada lançado`);
+    return;
+  }
+
+  if (await existeLinha(tx, pag.id, "TAXA_PAGAMENTO")) return;
+
+  // Sem venda no caixa (pedido zerado, distribuidor) não há taxa a lançar.
+  const vendas = await tx.lancamento.findMany({
+    where: { orderId: pag.orderId, tipo: "ENTRADA", origem: "PEDIDO", status: "CONFIRMADO" },
+    orderBy: { data: "asc" },
+    select: { segmento: true, data: true },
+  });
+  if (vendas.length === 0) return;
+  const dia = vendas[0].data;
+  if (dia < INICIO_TAXA_AUTOMATICA) return;
+
+  const forma =
+    pag.metodo === "CARTAO"
+      ? `cartão ${pag.parcelas ?? 1}x`
+      : pag.metodo === "PIX"
+        ? "Pix"
+        : pag.metodo.toLowerCase();
+
+  await tx.lancamento.create({
+    data: {
+      segmento: vendas.some((v) => v.segmento === "PEIXES_VIVOS")
+        ? "PEIXES_VIVOS"
+        : "PRODUTOS",
+      tipo: "SAIDA",
+      status: "CONFIRMADO",
+      origem: "TAXA_PAGAMENTO",
+      descricao: `Taxa do ${ROTULO_PROVIDER[pag.provider] ?? pag.provider}, ${pag.order.numero} (${forma})`,
+      valor: taxa,
+      data: dia,
+      categoriaId: await idCategoria(tx, SLUG_TAXA_PAGAMENTO),
+      orderId: pag.orderId,
+      pagamentoId: pag.id,
+      observacoes: `Pago R$ ${pago.toFixed(2)}, caiu R$ ${liquido.toFixed(2)}`,
+    },
+  });
+}
 
 /**
  * Venda desfeita (cancelamento de pedido pago ou estorno no gateway).
@@ -227,27 +339,50 @@ export async function registrarDevolucaoDeVenda(
     }
     if (entrada.status !== "CONFIRMADO") continue;
 
-    try {
-      await tx.lancamento.create({
-        data: {
-          // A devolução volta para o mesmo caixa de onde a venda entrou.
-          segmento: entrada.segmento,
-          tipo: "SAIDA",
-          status: "CONFIRMADO",
-          origem: "PEDIDO",
-          descricao: `Devolução da venda ${order?.numero ?? ""}`.trim(),
-          valor: entrada.valor,
-          data: new Date(),
-          categoriaId: entrada.categoriaId,
-          orderId,
-          // Chave própria: a devolução é uma linha distinta da venda, mas também
-          // só pode existir uma por venda.
-          pagamentoId: `devolucao:${entrada.pagamentoId ?? entrada.id}`,
-        },
-      });
-    } catch (e) {
-      const code = (e as { code?: string } | null)?.code;
-      if (code !== "P2002") throw e;
-    }
+    // Chave própria: a devolução é uma linha distinta da venda, mas também só
+    // pode existir uma por venda. Confere antes (ver registrarVendaNoCaixa).
+    const chave = `devolucao:${entrada.pagamentoId ?? entrada.id}`;
+    if (await existeLinha(tx, chave, "PEDIDO")) continue;
+    await tx.lancamento.create({
+      data: {
+        // A devolução volta para o mesmo caixa de onde a venda entrou.
+        segmento: entrada.segmento,
+        tipo: "SAIDA",
+        status: "CONFIRMADO",
+        origem: "PEDIDO",
+        descricao: `Devolução da venda ${order?.numero ?? ""}`.trim(),
+        valor: entrada.valor,
+        data: new Date(),
+        categoriaId: entrada.categoriaId,
+        orderId,
+        pagamentoId: chave,
+      },
+    });
+  }
+
+  // No estorno total o Mercado Pago devolve a tarifa que cobrou. Sem esta volta,
+  // venda estornada deixaria a taxa como prejuízo. Mesma ideia da devolução:
+  // uma linha nova no dia do estorno, sem reescrever o mês da venda.
+  const taxas = await tx.lancamento.findMany({
+    where: { orderId, origem: "TAXA_PAGAMENTO", tipo: "SAIDA", status: "CONFIRMADO" },
+    select: { id: true, valor: true, pagamentoId: true, categoriaId: true, segmento: true },
+  });
+  for (const t of taxas) {
+    const chave = `devolucao:${t.pagamentoId ?? t.id}`;
+    if (await existeLinha(tx, chave, "TAXA_PAGAMENTO")) continue;
+    await tx.lancamento.create({
+      data: {
+        segmento: t.segmento,
+        tipo: "ENTRADA",
+        status: "CONFIRMADO",
+        origem: "TAXA_PAGAMENTO",
+        descricao: `Taxa devolvida no estorno ${order?.numero ?? ""}`.trim(),
+        valor: t.valor,
+        data: hojeNoCaixa(),
+        categoriaId: t.categoriaId,
+        orderId,
+        pagamentoId: chave,
+      },
+    });
   }
 }

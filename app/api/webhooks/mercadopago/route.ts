@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { getPaymentProvider } from "@/lib/payments/registry";
 import { transicionarParaPago } from "@/lib/pedido-baixa";
+import { registrarTaxaDoGateway } from "@/lib/financeiro/venda-no-caixa";
 import { empurrarEstoqueDoPedido } from "@/lib/shopee/estoque";
 import { aplicarEstornoPedido } from "@/lib/pagamento-estorno";
 import { registrarFalhaCartao } from "@/lib/pagamento-tentativas";
@@ -177,16 +178,24 @@ export async function POST(request: Request) {
             statusDetail: consulta.statusDetail,
           } as Prisma.InputJsonValue)
         : undefined;
+      // Líquido só de pagamento aprovado: é dele que sai a taxa no caixa.
+      const liquido =
+        consulta.status === StatusPagamento.PAGO && consulta.valorLiquido
+          ? { valorLiquido: consulta.valorLiquido }
+          : {};
+      let pagamentoId: string;
       if (existente) {
+        pagamentoId = existente.id;
         await tx.pagamento.update({
           where: { id: existente.id },
           data: {
             status: consulta.status,
+            ...liquido,
             ...(comMotivo ? { payloadRaw: comMotivo } : {}),
           },
         });
       } else {
-        await tx.pagamento.create({
+        const criado = await tx.pagamento.create({
           data: {
             orderId: orderId as string,
             provider: ProviderPagamento.MERCADO_PAGO,
@@ -196,9 +205,12 @@ export async function POST(request: Request) {
             externalId: consulta.externalId,
             parcelas: consulta.parcelas ?? null,
             bandeira: consulta.bandeira ?? null,
+            ...liquido,
             ...(comMotivo ? { payloadRaw: comMotivo } : {}),
           },
+          select: { id: true },
         });
+        pagamentoId = criado.id;
         await tx.order.update({
           where: { id: orderId as string },
           data: {
@@ -212,7 +224,11 @@ export async function POST(request: Request) {
         // Função COMPARTILHADA (admin/cartão/webhook): transição → PAGO + baixa
         // do pool, uma vez só (trava estoqueBaixado). Reenvio do MP, ou o cartão
         // que já confirmou na action, não baixam de novo.
-        return transicionarParaPago(tx, orderId as string);
+        const r = await transicionarParaPago(tx, orderId as string);
+        // Cartão confirmado na action entra no caixa antes de o líquido chegar;
+        // a taxa vem aqui, no aviso seguinte. Idempotente (uma por pagamento).
+        await registrarTaxaDoGateway(tx, pagamentoId);
+        return r;
       }
 
       if (consulta.status === StatusPagamento.ESTORNADO) {

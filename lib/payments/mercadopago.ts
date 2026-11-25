@@ -218,6 +218,7 @@ type MpPaymentResponse = {
   payment_method_id?: string;
   payment_type_id?: string;
   transaction_amount?: number;
+  transaction_details?: { net_received_amount?: number };
   date_of_expiration?: string;
   three_ds_info?: { external_resource_url?: string; creq?: string };
   point_of_interaction?: {
@@ -436,6 +437,7 @@ export const mercadoPagoProvider: PaymentProvider = {
     const data = (await mpFetch(`/v1/payments/${externalId}`, {
       method: "GET",
     })) as MpPaymentResponse;
+    const liquido = data.transaction_details?.net_received_amount;
     return {
       externalId: String(data.id),
       status: mapStatus(data.status, data.status_detail),
@@ -445,6 +447,8 @@ export const mercadoPagoProvider: PaymentProvider = {
       parcelas: data.installments ?? null,
       bandeira: data.payment_method_id ?? null,
       statusDetail: data.status_detail ?? null,
+      // Zero enquanto o pagamento não foi aprovado: aí não serve como líquido.
+      valorLiquido: liquido != null && liquido > 0 ? liquido : null,
     };
   },
 

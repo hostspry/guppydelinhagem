@@ -670,6 +670,9 @@ model Pagamento {
   qrCode        String?
   parcelas      Int? // cartão: nº de parcelas da tentativa (1–12)
   bandeira      String? // cartão: "visa"/"master"/… (só exibição)
+  /// Quanto caiu na conta depois da taxa do gateway (MP: net_received_amount).
+  /// Vem do webhook. valor − valorLiquido vira a saída "taxa-pagamento" do caixa.
+  valorLiquido  Decimal?          @db.Decimal(10, 2)
   payloadRaw    Json?
   // Estorno (refund). estornadoEm é a TRAVA de idempotência (action + webhook);
   // refundId é o id do refund no gateway (snapshot). Nulos = não estornado.
