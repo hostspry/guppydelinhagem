@@ -39,7 +39,7 @@ export type LinhaCaixa = {
   categoriaSlug: string | null;
 };
 
-/** Pix que ficou com o Lucas. Só chega aqui quando quem vê a tela é o dono. */
+/** Pix de venda que ficou com o Lucas. Conta como retirada dele. */
 export type RetiradaPrivada = {
   descricao: string;
   valor: number;
@@ -63,7 +63,7 @@ export type FechamentoEstufa = {
   primeiros: number;
   manasses: SaldoSocio;
   lucas: SaldoSocio;
-  /** Já somadas em `lucas.retirado`. Vazio para quem não é o dono. */
+  /** Já somadas em `lucas.retirado`. São o motivo de cada retirada. */
   retiradasPrivadasLucas: RetiradaPrivada[];
 };
 
@@ -205,7 +205,7 @@ export function montarFechamento(args: {
   competencia: string;
   linhas: LinhaCaixa[];
   segmentos: readonly SegmentoFinanceiro[];
-  /** Só o dono recebe. Para os demais fica vazio e o saldo sai sem elas. */
+  /** Pix que ficaram com o Lucas (quem vê a estufa recebe). Entram na retirada dele. */
   retiradasPrivadasLucas?: RetiradaPrivada[];
 }): Fechamento {
   const { competencia, linhas, segmentos, retiradasPrivadasLucas = [] } = args;

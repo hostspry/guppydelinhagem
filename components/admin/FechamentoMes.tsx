@@ -71,14 +71,18 @@ function CardFechamento({
   );
 }
 
-/** Só é renderizado para o dono: para os demais a lista chega vazia. */
+/**
+ * Os motivos da retirada do Lucas: cada Pix de venda que caiu na conta dele e
+ * não veio para o caixa. Aberto por padrão para o saldo não aparecer menor sem
+ * explicação.
+ */
 function PixComLucas({ itens }: { itens: RetiradaPrivada[] }) {
   const total = itens.reduce((soma, r) => soma + r.valor, 0);
   return (
-    <details className="mt-3 rounded-md bg-amber-50 px-2.5 py-2 text-xs text-amber-900">
+    <details open className="mt-3 rounded-md bg-amber-50 px-2.5 py-2 text-xs text-amber-900">
       <summary className="cursor-pointer font-medium">
         {itens.length === 1 ? "1 Pix ficou" : `${itens.length} Pix ficaram`} com
-        ele: {moeda(total)} (só você vê)
+        o Lucas: {moeda(total)}
       </summary>
       <ul className="mt-2 space-y-1">
         {itens.map((r) => (

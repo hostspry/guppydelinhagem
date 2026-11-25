@@ -1297,11 +1297,12 @@ model Lancamento {
 }
 
 /// Pix de venda que caiu na conta do Lucas e não foi repassado. Conta como
-/// retirada dele, mas por enquanto só o dono pode ver.
+/// retirada dele. Nasceu sigiloso; desde 25/11/2026 o dono liberou e quem vê a
+/// estufa (o Lucas também) vê o mesmo saldo e cada Pix no fechamento.
 ///
-/// Fica fora de `Lancamento` de propósito: o Lucas tem acesso ao caixa, então
-/// qualquer linha ali apareceria nas listas e relatórios dele. A única leitura
-/// desta tabela é `fechamentoDoMes`, e só quando quem está logado é o dono.
+/// Fica fora de `Lancamento` porque a entrada da venda já está no caixa: esta
+/// linha só desconta do saldo do Lucas. A única leitura desta tabela é
+/// `fechamentoDoMes`.
 model RetiradaPrivadaLucas {
   id           String   @id @default(cuid())
   descricao    String

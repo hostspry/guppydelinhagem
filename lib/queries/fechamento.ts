@@ -1,29 +1,24 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
-import {
-  filtroSegmento,
-  membroAtual,
-  segmentosPermitidos,
-} from "@/lib/permissoes-server";
-import { ehDono } from "@/lib/permissoes";
+import { filtroSegmento, segmentosPermitidos } from "@/lib/permissoes-server";
 import { montarFechamento, type Fechamento } from "@/lib/financeiro/fechamento";
 import { intervaloDaCompetencia } from "@/lib/financeiro/periodo";
 
 /**
  * Busca o caixa confirmado do mês e monta o fechamento. O filtro de segmento
  * entra no `where`: quem só vê a estufa não recebe nenhuma linha de produtos,
- * nem para somar. As retiradas privadas do Lucas seguem a mesma ideia: só são
- * lidas do banco quando quem está logado é o dono.
+ * nem para somar. Os Pix que ficaram com o Lucas são da estufa, então quem vê a
+ * estufa vê também esses Pix: o dono e o Lucas enxergam o mesmo saldo (dono,
+ * 25/11/2026).
  */
 export async function fechamentoDoMes(competencia: string): Promise<Fechamento> {
   const { inicio, fim } = intervaloDaCompetencia(competencia);
-  const [escopo, segmentos, membro] = await Promise.all([
+  const [escopo, segmentos] = await Promise.all([
     filtroSegmento(),
     segmentosPermitidos(),
-    membroAtual(),
   ]);
 
-  const retiradasPrivadas = ehDono(membro)
+  const retiradasPrivadas = segmentos.includes("PEIXES_VIVOS")
     ? await prisma.retiradaPrivadaLucas.findMany({
         where: { data: { gte: inicio, lt: fim } },
         orderBy: { data: "asc" },
