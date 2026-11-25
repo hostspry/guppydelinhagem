@@ -220,10 +220,15 @@ export async function cotarFrete(params: {
             width: params.caixa.largura,
             length: params.caixa.comprimento,
             weight: params.pesoGramas / 1000, // ME espera kg
-            insurance_value: seguroDeCargaViva(params.qtdPeixes ?? 1),
           },
         ],
-        options: { receipt: false, own_hand: false },
+        // Seguro em options: dentro do volume o calculate do ME ignora, e a
+        // cotação saía sem o custo do seguro que a etiqueta cobra.
+        options: {
+          receipt: false,
+          own_hand: false,
+          insurance_value: seguroDeCargaViva(params.qtdPeixes ?? 1),
+        },
         services: "4", // Jadlog .Com
       }),
       cache: "no-store",
@@ -471,12 +476,11 @@ export async function cotarFreteSeco(params: {
     return { ok: false, status: 400, error: "Nenhum item para despachar." };
   }
 
-  // O seguro é do pedido inteiro; concentramos no primeiro volume para não
-  // multiplicar o valor segurado (e o preço) por volume.
-  const volumes = params.volumes.map((v, i) => ({
-    ...v,
-    insurance_value: i === 0 ? params.valorSegurado : 0,
-  }));
+  // O seguro vai em options.insurance_value, uma vez por envio. É o único lugar
+  // onde o calculate do ME cobra seguro: dentro de `volumes` ele é ignorado, e a
+  // cotação saía abaixo do que o carrinho debita na compra da etiqueta (Loggi
+  // 16,89 cotado contra 18,92 cobrado na #2026-0137, 25/11/2026).
+  const volumes = params.volumes;
 
   const [meSettled, viacepSettled] = await Promise.allSettled([
     fetch(ME_ENDPOINT, {
@@ -493,7 +497,11 @@ export async function cotarFreteSeco(params: {
         from: { postal_code: FRETE_CONFIG.cepOrigem },
         to: { postal_code: cep },
         volumes,
-        options: { receipt: false, own_hand: false },
+        options: {
+          receipt: false,
+          own_hand: false,
+          insurance_value: params.valorSegurado,
+        },
       }),
       cache: "no-store",
     }),
