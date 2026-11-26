@@ -32,15 +32,28 @@ export function codigoRastreavel(
 }
 
 /**
+ * Rastreio da Gollog. O AWB não vai no link: a página só mostra o resultado
+ * depois da busca feita nela (com o código na URL ela abre vazia). O Melhor
+ * Rastreio lê o AWB como Jadlog e não acha nada. Então o cliente abre esta
+ * página e digita o código, só os números.
+ */
+export const RASTREIO_GOLLOG_URL = "https://servicos.gollog.com.br/app/site/tracking";
+
+/**
  * Link de rastreio do CLIENTE = Melhor Rastreio (um clique, sem CPF/captcha).
  * Prefere o `selfTracking` (código ME…BR) — é o que o Melhor Rastreio entende
  * melhor; cai no código digitado quando não há self_tracking (envio manual).
+ * Aéreo (Gollog) vai para a página de rastreio da Gollog.
  * Sem nenhum código → null (o chamador omite o link).
  */
 export function buildTrackingUrl(
   selfTracking: string | null | undefined,
   codigo: string | null | undefined,
+  transportadora?: Transportadora | null,
 ): string | null {
+  if (transportadora === "GOLLOG") {
+    return codigoRastreavel(codigo) ? RASTREIO_GOLLOG_URL : null;
+  }
   const cod = [selfTracking, codigo].find(codigoRastreavel);
   if (!cod) return null;
   return `https://www.melhorrastreio.com.br/rastreio/${encodeURIComponent(cod.trim())}`;
@@ -67,9 +80,11 @@ export function mensagemRastreio(params: {
       ? ` pela ${transportadoraLabel(params.transportadora)}`
       : "";
   const base = `Oi, ${primeiroNome(params.nomeCliente)}! Tudo certo? Seu pedido ${params.numeroPedido} na Guppy de Linhagem já saiu pra entrega${via}.`;
-  const rastreio = params.url
-    ? ` Você acompanha aqui: ${params.url} (código ${params.codigo}).`
-    : ` Código de rastreio: ${params.codigo}.`;
+  const rastreio = !params.url
+    ? ` Código de rastreio: ${params.codigo}.`
+    : params.transportadora === "GOLLOG"
+      ? ` Você acompanha em ${params.url}, digitando o código ${params.codigo.replace(/\D/g, "")}. Na retirada, leve um documento com foto e o código.`
+      : ` Você acompanha aqui: ${params.url} (código ${params.codigo}).`;
   return `${base}${rastreio} Qualquer novidade eu te aviso!`;
 }
 

@@ -120,7 +120,7 @@ export async function listPedidos({
     // enquanto ela não emitiu o dela.
     rastreio:
       r.codigoRastreio ?? (codigoRastreavel(r.selfTracking) ? r.selfTracking : null),
-    rastreioUrl: buildTrackingUrl(r.selfTracking, r.codigoRastreio),
+    rastreioUrl: buildTrackingUrl(r.selfTracking, r.codigoRastreio, r.transportadora),
     // Nome real do serviço quando o enum não dá conta ("Correios PAC"). O enum
     // tem 3 valores e o catálogo do Melhor Envio muda sozinho.
     servicoEnvioNome: r.servicoEnvioNome,

@@ -49,7 +49,11 @@ export default async function DetalhePedidoPage({ params }: Props) {
     pedido.status === "ENVIADO" || pedido.status === "ENTREGUE";
   const cancelado = pedido.status === "CANCELADO";
   const passoAtual = PASSOS.findIndex((p) => p.status === pedido.status);
-  const rastrearUrl = buildTrackingUrl(pedido.selfTracking, pedido.codigoRastreio);
+  const rastrearUrl = buildTrackingUrl(
+    pedido.selfTracking,
+    pedido.codigoRastreio,
+    pedido.transportadora,
+  );
   const garantiaHref = whatsappLink(
     `Olá! Preciso de ajuda com o pedido ${pedido.numero} (garantia de chegada viva).`,
   );
@@ -156,7 +160,9 @@ export default async function DetalhePedidoPage({ params }: Props) {
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#07366A] hover:underline"
                 >
-                  Acompanhar a entrega →
+                  {pedido.transportadora === "GOLLOG"
+                    ? "Acompanhar no site da Gollog (digite o código acima) →"
+                    : "Acompanhar a entrega →"}
                 </a>
               )}
             </div>

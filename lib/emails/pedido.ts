@@ -175,7 +175,7 @@ export async function emailPedidoEnviado(orderId: string): Promise<boolean> {
   // pula o id interno do Melhor Envio, que já foi gravado aqui por engano: sem
   // ela, um reenvio repetiria o código que ninguém consegue rastrear.
   const codigo = [d.selfTracking, d.codigoRastreio].find(codigoRastreavel) ?? null;
-  const url = buildTrackingUrl(d.selfTracking, d.codigoRastreio);
+  const url = buildTrackingUrl(d.selfTracking, d.codigoRastreio, d.transportadora);
   // "pela Jadlog", "pela Loggi Express". Transportadora fora do enum tem o nome
   // real em servicoEnvioNome; sem nenhum dos dois a frase omite o trecho, em vez
   // de dizer "despachado pela transportadora".

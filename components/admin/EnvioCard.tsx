@@ -95,7 +95,7 @@ export function EnvioCard({
   const aereo = transportadora === "GOLLOG";
   const editando = enviado; // modal em modo edição quando já enviado
 
-  const url = buildTrackingUrl(selfTracking, codigoRastreio);
+  const url = buildTrackingUrl(selfTracking, codigoRastreio, transportadora);
   const mensagem = mensagemRastreio({
     nomeCliente: clienteNome,
     numeroPedido: numero,
