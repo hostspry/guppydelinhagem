@@ -9,7 +9,7 @@ import {
 import type { Transportadora } from "@/lib/generated/prisma/enums";
 import type { EnderecoEntrega } from "@/lib/validations/pedido";
 import { ehCargaViva } from "@/lib/frete-tipos";
-import { botao, destaque, listaItens, moeda } from "./layout";
+import { botao, destaque, listaItens, moeda, p } from "./layout";
 import { montarEmail } from "./render";
 import { FUSO } from "@/lib/rastreio/periodo";
 
@@ -176,6 +176,8 @@ export async function emailPedidoEnviado(orderId: string): Promise<boolean> {
   // ela, um reenvio repetiria o código que ninguém consegue rastrear.
   const codigo = [d.selfTracking, d.codigoRastreio].find(codigoRastreavel) ?? null;
   const url = buildTrackingUrl(d.selfTracking, d.codigoRastreio, d.transportadora);
+  // Aéreo: a página da Gollog abre sem o código, e a caixa é retirada na base.
+  const gollog = d.transportadora === "GOLLOG";
   // "pela Jadlog", "pela Loggi Express". Transportadora fora do enum tem o nome
   // real em servicoEnvioNome; sem nenhum dos dois a frase omite o trecho, em vez
   // de dizer "despachado pela transportadora".
@@ -194,8 +196,15 @@ export async function emailPedidoEnviado(orderId: string): Promise<boolean> {
       // Sai por extenso na frase; vazio quando não há transportadora definida.
       transportadora: transp ? `pela ${transp}` : "",
       rastreio: codigo ?? "",
-      caixa_rastreio: codigo ? destaque("Código de rastreio", codigo) : "",
-      botao_rastrear: url ? botao("Rastrear entrega", url) : "",
+      caixa_rastreio: !codigo
+        ? ""
+        : gollog
+          ? destaque("Código de rastreio (AWB)", codigo) +
+            p(
+              "No site da Gollog, digite esse código, só os números. A caixa fica na base GOLLOG para retirada: leve um documento com foto e o código.",
+            )
+          : destaque("Código de rastreio", codigo),
+      botao_rastrear: url ? botao(gollog ? "Rastrear no site da Gollog" : "Rastrear entrega", url) : "",
     },
     codigo ? `Código de rastreio: ${codigo}` : `Pedido ${d.numero} postado.`,
   );
